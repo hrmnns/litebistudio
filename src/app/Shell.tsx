@@ -3,7 +3,7 @@ import { TileGrid } from './TileGrid';
 import { ExcelImport } from './components/ExcelImport';
 import { SchemaDocumentation } from './components/SchemaDocumentation';
 import { SystemStatus } from './components/SystemStatus';
-import { LayoutDashboard, Settings, Database, Menu, Info, Upload } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, Info, Upload, ShieldCheck } from 'lucide-react';
 import invoiceItemsSchema from '../schemas/invoice-items-schema.json';
 
 export const Shell: React.FC = () => {
@@ -18,10 +18,18 @@ export const Shell: React.FC = () => {
         md:relative md:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between md:block">
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                        IT Dashboard
-                    </h1>
+                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between md:flex-col md:items-start md:gap-2">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-blue-600 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none">
+                            <ShieldCheck className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
+                                IT <span className="text-blue-600">Dashboard</span>
+                            </h1>
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Analytics Platform</p>
+                        </div>
+                    </div>
                     <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 text-slate-500 hover:text-slate-700">
                         <Menu className="w-6 h-6" />
                     </button>
