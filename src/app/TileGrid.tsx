@@ -13,7 +13,11 @@ const getSizeClass = (size: TileSize) => {
     }
 };
 
-export const TileGrid: React.FC = () => {
+interface TileGridProps {
+    onNavigate: (view: any) => void;
+}
+
+export const TileGrid: React.FC<TileGridProps> = ({ onNavigate }) => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
             {TILES.map((tile) => {
@@ -29,7 +33,7 @@ export const TileGrid: React.FC = () => {
                         title={tile.title}
                         className={getSizeClass(tile.defaultSize)}
                     >
-                        <Component />
+                        <Component onNavigate={onNavigate} />
                     </Card>
                 );
             })}

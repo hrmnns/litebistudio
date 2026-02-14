@@ -4,11 +4,16 @@ import { ExcelImport } from './components/ExcelImport';
 import { SchemaDocumentation } from './components/SchemaDocumentation';
 import { SystemStatus } from './components/SystemStatus';
 import { LayoutDashboard, Settings, Database, Menu, Info, Upload, ShieldCheck } from 'lucide-react';
+import { ItCostsYearView } from './views/ItCostsYearView';
+import { ItCostsMonthView } from './views/ItCostsMonthView';
+import { ItCostsInvoiceItemsView } from './views/ItCostsInvoiceItemsView';
 import invoiceItemsSchema from '../schemas/invoice-items-schema.json';
 
 export const Shell: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings'>('dashboard');
+    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice'>('dashboard');
+    const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+    const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
@@ -79,7 +84,7 @@ export const Shell: React.FC = () => {
                 <div className="flex-1 overflow-auto">
                     {currentView === 'dashboard' && (
                         <div className="animate-in fade-in duration-500">
-                            <TileGrid />
+                            <TileGrid onNavigate={(view: any) => setCurrentView(view)} />
                         </div>
                     )}
 
@@ -195,6 +200,41 @@ export const Shell: React.FC = () => {
                             <Settings className="w-12 h-12 mx-auto mb-4 opacity-20" />
                             <h2 className="text-xl font-medium">Settings</h2>
                             <p>Configuration options coming soon.</p>
+                        </div>
+                    )}
+
+                    {currentView === 'it-costs-year' && (
+                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <ItCostsYearView
+                                onBack={() => setCurrentView('dashboard')}
+                                onDrillDown={(period: string) => {
+                                    setSelectedPeriod(period);
+                                    setCurrentView('it-costs-month');
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {currentView === 'it-costs-month' && selectedPeriod && (
+                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <ItCostsMonthView
+                                period={selectedPeriod}
+                                onBack={() => setCurrentView('it-costs-year')}
+                                onDrillDown={(invoiceId: string) => {
+                                    setSelectedInvoiceId(invoiceId);
+                                    setCurrentView('it-costs-invoice');
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {currentView === 'it-costs-invoice' && selectedInvoiceId && (
+                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <ItCostsInvoiceItemsView
+                                invoiceId={selectedInvoiceId}
+                                period={selectedPeriod || ''}
+                                onBack={() => setCurrentView('it-costs-month')}
+                            />
                         </div>
                     )}
                 </div>
