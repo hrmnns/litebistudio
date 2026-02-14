@@ -15,12 +15,18 @@ export function useQuery<T = any>(query: string, params: any[] = []) {
         let mounted = true;
 
         const fetchData = async () => {
+            // Skip execution if query is empty
+            if (!query || query.trim() === '') {
+                if (mounted) {
+                    setData([]);
+                    setLoading(false);
+                }
+                return;
+            }
+
             try {
                 setLoading(true);
                 await initDB();
-                // Ensure schema is loaded? Only once globally really, but safe to call
-                // await initSchema(); 
-                // We probably should initialize schema at app start, not here.
 
                 const result = await runQuery(query, params);
                 if (mounted) {

@@ -7,13 +7,15 @@ import { LayoutDashboard, Settings, Database, Menu, Info, Upload, ShieldCheck } 
 import { ItCostsYearView } from './views/ItCostsYearView';
 import { ItCostsMonthView } from './views/ItCostsMonthView';
 import { ItCostsInvoiceItemsView } from './views/ItCostsInvoiceItemsView';
+import { ItCostsItemHistoryView } from './views/ItCostsItemHistoryView';
 import invoiceItemsSchema from '../schemas/invoice-items-schema.json';
 
 export const Shell: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice'>('dashboard');
+    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history'>('dashboard');
     const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+    const [selectedItemParams, setSelectedItemParams] = useState<{ vendorId: string; description: string } | null>(null);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
@@ -234,6 +236,20 @@ export const Shell: React.FC = () => {
                                 invoiceId={selectedInvoiceId}
                                 period={selectedPeriod || ''}
                                 onBack={() => setCurrentView('it-costs-month')}
+                                onViewHistory={(vendorId: string, description: string) => {
+                                    setSelectedItemParams({ vendorId, description });
+                                    setCurrentView('it-costs-item-history');
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {currentView === 'it-costs-item-history' && selectedItemParams && (
+                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <ItCostsItemHistoryView
+                                vendorId={selectedItemParams.vendorId}
+                                description={selectedItemParams.description}
+                                onBack={() => setCurrentView('it-costs-invoice')}
                             />
                         </div>
                     )}

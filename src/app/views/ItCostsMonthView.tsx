@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Search, Download, Receipt, Calendar } from 'lucide-react';
+import { ArrowLeft, Search, Download, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 
 interface ItCostsMonthViewProps {
@@ -9,36 +9,96 @@ interface ItCostsMonthViewProps {
     onDrillDown?: (invoiceId: string) => void;
 }
 
+// Helper to get previous period (assuming YYYY-MM format)
+const getPreviousPeriod = (currentPeriod: string) => {
+    const [year, month] = currentPeriod.split('-').map(Number);
+    // Create date for 1st of current month
+    const date = new Date(year, month - 1, 1);
+    // Subtract 1 month
+    date.setMonth(date.getMonth() - 1);
+    const prevYear = date.getFullYear();
+    const prevMonth = String(date.getMonth() + 1).padStart(2, '0');
+    return `${prevYear}-${prevMonth}`;
+};
+
 export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBack, onDrillDown }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
-    // Fetch all unique invoices for this period
-    const { data, loading, error } = useQuery(`
-        SELECT 
-            DocumentId,
-            MAX(PostingDate) as PostingDate,
-            MAX(VendorName) as VendorName,
-            MAX(VendorId) as VendorId,
-            SUM(Amount) as total_amount,
-            COUNT(*) as item_count,
-            MAX(Description) as primary_description
-        FROM invoice_items 
-        WHERE Period = '${period}'
-        GROUP BY DocumentId
-        ORDER BY PostingDate DESC
+    // Fetch current month invoices
+    const { data: currentMonthData, loading: loadingCurrent } = useQuery(`
+        SELECT * FROM invoice_items WHERE Period = '${period}'
     `);
 
-    if (loading) return (
+    // Fetch previous month items for comparison
+    const { data: previousMonthData, loading: loadingPrevious } = useQuery(`
+        SELECT * FROM invoice_items WHERE Period = '${previousPeriod}'
+    `);
+
+    if (loadingCurrent || loadingPrevious) return (
         <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
     );
 
-    if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
+    const currentItems = currentMonthData || [];
+    const previousItems = previousMonthData || [];
 
-    const items = data || [];
-    const totalAmount = items.reduce((acc: number, item: any) => acc + item.total_amount, 0);
-    const vendorCount = new Set(items.map((item: any) => item.VendorId)).size;
+    // Group current items by Invoice (DocumentId)
+    const invoices = (() => {
+        const grouped = new Map<string, any>();
+
+        currentItems.forEach((item: any) => {
+            if (!grouped.has(item.DocumentId)) {
+                grouped.set(item.DocumentId, {
+                    DocumentId: item.DocumentId,
+                    PostingDate: item.PostingDate,
+                    VendorName: item.VendorName,
+                    VendorId: item.VendorId,
+                    total_amount: 0,
+                    items: [],
+                    primary_description: item.Description
+                });
+            }
+            const invoice = grouped.get(item.DocumentId);
+            invoice.total_amount += item.Amount;
+            invoice.items.push(item);
+        });
+
+        // Calculate Anomalies per Invoice
+        return Array.from(grouped.values()).map(invoice => {
+            let newItemsCount = 0;
+            let amountChangedCount = 0;
+
+            const prevVendorItems = previousItems.filter((p: any) => p.VendorId === invoice.VendorId);
+
+            invoice.items.forEach((currentItem: any) => {
+                // Check if this item (Description + Category) existed last month for this vendor
+                const matchIndex = prevVendorItems.findIndex((p: any) =>
+                    p.Description === currentItem.Description &&
+                    p.Category === currentItem.Category
+                );
+
+                if (matchIndex === -1) {
+                    newItemsCount++;
+                } else {
+                    const match = prevVendorItems[matchIndex];
+                    // Check for significant price change (>10% AND absolute diff > 10€)
+                    const diff = Math.abs(currentItem.Amount - match.Amount);
+                    const percentDiff = diff / Math.abs(match.Amount || 1);
+                    if (diff > 10 && percentDiff > 0.1) {
+                        amountChangedCount++;
+                    }
+                }
+            });
+
+            return { ...invoice, newItemsCount, amountChangedCount };
+        }).sort((a, b) => b.PostingDate.localeCompare(a.PostingDate));
+    })();
+
+    const totalAmount = invoices.reduce((acc, inv) => acc + inv.total_amount, 0);
+    const vendorCount = new Set(invoices.map(inv => inv.VendorId)).size;
+    const totalAnomalies = invoices.reduce((acc, inv) => acc + inv.newItemsCount + inv.amountChangedCount, 0);
 
     const columns: Column<any>[] = [
         {
@@ -70,13 +130,29 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             )
         },
         {
-            header: 'Items',
-            accessor: 'item_count',
-            align: 'center',
+            header: 'Anomalies',
+            accessor: 'newItemsCount',
             render: (item: any) => (
-                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-md text-[10px] font-bold">
-                    {item.item_count} Pos.
-                </span>
+                <div className="flex gap-2">
+                    {item.newItemsCount > 0 && (
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-bold flex items-center gap-1" title={`${item.newItemsCount} items not seen in previous month`}>
+                            <PlusCircle className="w-3 h-3" />
+                            {item.newItemsCount} New
+                        </span>
+                    )}
+                    {item.amountChangedCount > 0 && (
+                        <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-md text-[10px] font-bold flex items-center gap-1" title={`${item.amountChangedCount} items with significant price change`}>
+                            <AlertTriangle className="w-3 h-3" />
+                            {item.amountChangedCount} Changed
+                        </span>
+                    )}
+                    {item.newItemsCount === 0 && item.amountChangedCount === 0 && (
+                        <span className="px-2 py-1 bg-slate-50 dark:bg-slate-800 text-slate-400 rounded-md text-[10px] font-medium flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            Stable
+                        </span>
+                    )}
+                </div>
             )
         },
         {
@@ -101,7 +177,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
                     onClick={() => onDrillDown?.(item.DocumentId)}
                     className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 hover:underline px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md transition-colors"
                 >
-                    View Items
+                    Analyze
                 </button>
             )
         }
@@ -119,8 +195,15 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Monthly Invoices: {period}</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Overview of all individual invoices for this period</p>
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Monthly Analysis: {period}</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-slate-500 dark:text-slate-400">Comparing to {previousPeriod}</span>
+                            {totalAnomalies > 0 && (
+                                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-full">
+                                    {totalAnomalies} Anomalies Detected
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -144,11 +227,11 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-1">Invoice Count</div>
-                    <div className="text-2xl font-bold text-slate-900 dark:text-white text-right">{items.length}</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white text-right">{invoices.length}</div>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-1">Avg. Invoice value</div>
-                    <div className="text-2xl font-bold text-slate-900 dark:text-white text-right">€{Math.round(totalAmount / (items.length || 1)).toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white text-right">€{Math.round(totalAmount / (invoices.length || 1)).toLocaleString()}</div>
                 </div>
             </div>
 
@@ -168,7 +251,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
                 </div>
 
                 <DataTable
-                    data={items}
+                    data={invoices}
                     columns={columns}
                     searchTerm={searchTerm}
                     searchFields={['VendorName', 'DocumentId', 'primary_description']}

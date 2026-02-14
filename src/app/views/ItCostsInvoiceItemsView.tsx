@@ -1,25 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Search, Receipt, Calendar, Info, Tag } from 'lucide-react';
+import { ArrowLeft, Search, Receipt, Calendar, Info, Tag, AlertTriangle, PlusCircle, TrendingUp } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 
 interface ItCostsInvoiceItemsViewProps {
     invoiceId: string;
     period: string;
     onBack: () => void;
+    onViewHistory: (vendorId: string, description: string) => void;
 }
 
-export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = ({ invoiceId, period, onBack }) => {
+// Helper to get previous period (assuming YYYY-MM format)
+const getPreviousPeriod = (currentPeriod: string) => {
+    const [year, month] = currentPeriod.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    date.setMonth(date.getMonth() - 1);
+    const prevYear = date.getFullYear();
+    const prevMonth = String(date.getMonth() + 1).padStart(2, '0');
+    return `${prevYear}-${prevMonth}`;
+};
+
+export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = ({ invoiceId, period, onBack, onViewHistory }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
     // Fetch all positions for this specific invoice
-    const { data, loading, error } = useQuery(`
+    const { data: currentItemsData, loading: loadingCurrent, error } = useQuery(`
         SELECT * FROM invoice_items 
         WHERE DocumentId = '${invoiceId}'
         ORDER BY LineId ASC
     `);
 
-    if (loading) return (
+    // Fetch previous month items for this vendor to compare
+    const vendorId = currentItemsData?.[0]?.VendorId;
+    const { data: previousItemsData, loading: loadingPrevious } = useQuery(
+        vendorId ? `SELECT * FROM invoice_items WHERE Period = '${previousPeriod}' AND VendorId = '${vendorId}'` : ''
+    );
+
+    if (loadingCurrent || loadingPrevious) return (
         <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
@@ -27,10 +45,35 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
 
     if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
-    const items = data || [];
+    const items = currentItemsData || [];
+    const previousItems = previousItemsData || [];
     const totalAmount = items.reduce((acc: number, item: any) => acc + item.Amount, 0);
     const vendorName = items[0]?.VendorName || 'Unknown Vendor';
     const postingDate = items[0]?.PostingDate || period;
+
+    // Enhance items with anomaly flags
+    const enhancedItems = items.map((item: any) => {
+        const match = previousItems.find((p: any) =>
+            p.Description === item.Description &&
+            p.Category === item.Category
+        );
+
+        let status: 'normal' | 'new' | 'changed' = 'normal';
+        let previousAmount = null;
+
+        if (!match) {
+            status = 'new';
+        } else {
+            const diff = Math.abs(item.Amount - match.Amount);
+            const percentDiff = diff / Math.abs(match.Amount || 1);
+            if (diff > 10 && percentDiff > 0.1) {
+                status = 'changed';
+                previousAmount = match.Amount;
+            }
+        }
+
+        return { ...item, status, previousAmount };
+    });
 
     const columns: Column<any>[] = [
         {
@@ -38,7 +81,11 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             accessor: 'LineId',
             align: 'center',
             render: (item: any) => (
-                <span className="text-slate-400 font-mono text-[10px]">#{item.LineId}</span>
+                <div className="flex flex-col items-center gap-1">
+                    <span className="text-slate-400 font-mono text-[10px]">#{item.LineId}</span>
+                    {item.status === 'new' && <PlusCircle className="w-3 h-3 text-blue-500" />}
+                    {item.status === 'changed' && <AlertTriangle className="w-3 h-3 text-orange-500" />}
+                </div>
             )
         },
         {
@@ -46,7 +93,12 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             accessor: 'Description',
             render: (item: any) => (
                 <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-slate-700 dark:text-slate-200">{item.Description}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-700 dark:text-slate-200">{item.Description}</span>
+                        {item.status === 'new' && (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-bold uppercase rounded">New</span>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2">
                         <span className="text-[9px] text-slate-400 flex items-center gap-1">
                             <Tag className="w-2.5 h-2.5" />
@@ -86,11 +138,33 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             render: (item: any) => {
                 const isCredit = item.Amount < 0;
                 return (
-                    <span className={`font-bold ${isCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
-                        {isCredit ? '-' : ''}€{Math.abs(item.Amount).toLocaleString()}
-                    </span>
+                    <div className="flex flex-col items-end">
+                        <span className={`font-bold ${isCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
+                            {isCredit ? '-' : ''}€{Math.abs(item.Amount).toLocaleString()}
+                        </span>
+                        {item.status === 'changed' && (
+                            <span className="text-[9px] text-orange-600 bg-orange-50 px-1 rounded flex items-center gap-1">
+                                Var: {((item.Amount - item.previousAmount) > 0 ? '+' : '')}
+                                {Math.round(item.Amount - item.previousAmount)}€
+                            </span>
+                        )}
+                    </div>
                 );
             }
+        },
+        {
+            header: 'Action',
+            accessor: 'actions',
+            align: 'right',
+            render: (item: any) => (
+                <button
+                    onClick={() => onViewHistory(item.VendorId, item.Description)}
+                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
+                    title="Analyze History"
+                >
+                    <TrendingUp className="w-4 h-4" />
+                </button>
+            )
         }
     ];
 
@@ -161,10 +235,20 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                             className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                         />
                     </div>
+                    <div className="flex items-center gap-4 ml-4">
+                        <div className="flex items-center gap-1.5">
+                            <PlusCircle className="w-3 h-3 text-blue-500" />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">New Position</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="w-3 h-3 text-orange-500" />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Price Change</span>
+                        </div>
+                    </div>
                 </div>
 
                 <DataTable
-                    data={items}
+                    data={enhancedItems}
                     columns={columns}
                     searchTerm={searchTerm}
                     searchFields={['Description', 'CostCenter', 'GLAccount', 'Category']}
