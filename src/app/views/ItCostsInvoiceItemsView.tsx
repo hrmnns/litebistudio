@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Search, Receipt, Calendar, Info, Tag, AlertTriangle, PlusCircle, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Search, Receipt, Calendar, Tag, AlertTriangle, PlusCircle, TrendingUp } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 
 interface ItCostsInvoiceItemsViewProps {

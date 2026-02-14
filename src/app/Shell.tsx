@@ -10,12 +10,44 @@ import { ItCostsInvoiceItemsView } from './views/ItCostsInvoiceItemsView';
 import { ItCostsItemHistoryView } from './views/ItCostsItemHistoryView';
 import invoiceItemsSchema from '../schemas/invoice-items-schema.json';
 
+import { useLocalStorage } from '../hooks/useLocalStorage';
+
 export const Shell: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history'>('dashboard');
     const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
     const [selectedItemParams, setSelectedItemParams] = useState<{ vendorId: string; description: string } | null>(null);
+
+    // Theme Management with Persistence
+    const [theme, setTheme] = useLocalStorage<'light' | 'dark' | 'system'>('theme', 'system');
+
+    React.useEffect(() => {
+        const root = window.document.documentElement;
+
+        const removeOldTheme = () => {
+            root.classList.remove('light', 'dark');
+        };
+
+        const applyTheme = (t: 'light' | 'dark' | 'system') => {
+            removeOldTheme();
+            if (t === 'system') {
+                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                root.classList.add(systemTheme);
+                return;
+            }
+            root.classList.add(t);
+        };
+
+        applyTheme(theme);
+
+        if (theme === 'system') {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const handleChange = () => applyTheme('system');
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        }
+    }, [theme]);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
@@ -198,10 +230,55 @@ export const Shell: React.FC = () => {
                     )}
 
                     {currentView === 'settings' && (
-                        <div className="p-8 text-center text-slate-500 mt-20">
-                            <Settings className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                            <h2 className="text-xl font-medium">Settings</h2>
-                            <p>Configuration options coming soon.</p>
+                        <div className="p-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-8">Settings</h2>
+
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                        {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
+                                    </span>
+                                    Appearance
+                                </h3>
+                                <div className="space-y-4">
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        Customize how the IT Dashboard looks on your device.
+                                    </p>
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <button
+                                            onClick={() => setTheme('light')}
+                                            className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'light'
+                                                ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
+                                                : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
+                                                }`}
+                                        >
+                                            <span className="text-xl">🌞</span>
+                                            <span className="text-sm font-medium">Light</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setTheme('dark')}
+                                            className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'dark'
+                                                ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
+                                                : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
+                                                }`}
+                                        >
+                                            <span className="text-xl">🌚</span>
+                                            <span className="text-sm font-medium">Dark</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setTheme('system')}
+                                            className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'system'
+                                                ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
+                                                : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
+                                                }`}
+                                        >
+                                            <span className="text-xl">💻</span>
+                                            <span className="text-sm font-medium">System</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
