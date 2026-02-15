@@ -5,41 +5,86 @@ import { DataTable } from '../../components/ui/DataTable';
 import { Modal } from '../components/Modal';
 
 interface ItCostsItemHistoryViewProps {
-    vendorId: string;
-    description: string;
+    item: any;
     onBack: () => void;
 }
 
-export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ vendorId, description, onBack }) => {
+export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ item: referenceItem, onBack }) => {
     const [selectedItem, setSelectedItem] = useState<any>(null);
-    // Fetch history for this item (same Vendor + Description)
-    // Fetch history for this item (same Vendor + Description)
 
-    // Use parameters to avoid escaping issues
-    // Try LIKE if description contains dates (basic heuristic)
-    const hasDigits = /\d/.test(description);
-    const sql = hasDigits
-        ? `SELECT * FROM invoice_items WHERE VendorId = ? AND Description LIKE ? ORDER BY PostingDate ASC`
-        : `SELECT * FROM invoice_items WHERE VendorId = ? AND Description = ? ORDER BY PostingDate ASC`;
+    // Retrieve custom key fields
+    const keyFields = useMemo(() => {
+        try {
+            const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
+            const firstMappingWithKeys = Object.values(savedMappings).find((m: any) => m.__keyFields);
+            return (firstMappingWithKeys as any)?.__keyFields || ['DocumentId', 'LineId'];
+        } catch (e) {
+            return ['DocumentId', 'LineId'];
+        }
+    }, []);
 
-    const searchParam = hasDigits
-        ? description.replace(/\d+/g, '%')
-        : description;
+    // Build dynamic SQL with all key fields to track THIS specific item identity over time
+    const sql = useMemo(() => {
+        const conditions: string[] = [];
+        const params: any[] = [];
 
-    const { data, loading, error } = useQuery(sql, [vendorId, searchParam]);
+        keyFields.forEach((field: string) => {
+            if (referenceItem[field] !== undefined && referenceItem[field] !== null) {
+                conditions.push(`${field} = ?`);
+                params.push(referenceItem[field]);
+            } else {
+                conditions.push(`${field} IS NULL`);
+            }
+        });
+
+        return {
+            query: `SELECT * FROM invoice_items WHERE ${conditions.join(' AND ')} ORDER BY Period ASC, PostingDate ASC`,
+            params
+        };
+    }, [referenceItem, keyFields]);
+
+    const { data, loading, error } = useQuery(sql.query, sql.params);
 
     const history = data || [];
-    const isRecurring = history.length > 1;
 
-    // Chart Data Preparation (moved before conditional returns)
+    // 1. Detect ambiguity (multiple records per period for the same primary key)
+    const ambiguityMap = useMemo(() => {
+        const counts: Record<string, number> = {};
+        history.forEach((i: any) => counts[i.Period] = (counts[i.Period] || 0) + 1);
+        return counts;
+    }, [history]);
+
+    const hasAmbiguity = Object.values(ambiguityMap).some(count => count > 1);
+
+    // 2. Separate "Past", "Current", and "Future" records
+    const referencePeriod = referenceItem.Period;
+    const records = useMemo(() => {
+        return history.map((i: any) => ({
+            ...i,
+            isFuture: i.Period > referencePeriod,
+            isCurrent: i.Period === referencePeriod,
+            isPast: i.Period < referencePeriod,
+            isAmbiguousInPeriod: ambiguityMap[i.Period] > 1
+        }));
+    }, [history, referencePeriod, ambiguityMap]);
+
+    const isRecurring = records.filter(r => !r.isAmbiguousInPeriod).length > 1;
+
+    // Chart Data (Filtered to unique records per period to avoid misleading lines)
     const chartData = useMemo(() => {
-        if (!isRecurring) return [];
-        return history.map((item: any) => ({
+        const uniqueByPeriod: Record<string, any> = {};
+        records.forEach(r => {
+            if (!r.isAmbiguousInPeriod && !uniqueByPeriod[r.Period]) {
+                uniqueByPeriod[r.Period] = r;
+            }
+        });
+        return Object.values(uniqueByPeriod).sort((a, b) => a.Period.localeCompare(b.Period)).map((item: any) => ({
             date: item.PostingDate,
             amount: item.Amount,
-            period: item.Period
+            period: item.Period,
+            isFuture: item.isFuture
         }));
-    }, [history, isRecurring]);
+    }, [records]);
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
@@ -49,8 +94,8 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
     if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
-    const firstOccurrence = history[0];
-    const latestOccurrence = history[history.length - 1];
+    const firstOccurrence = records[0];
+    const latestOccurrence = records[records.length - 1];
 
     // Simple SVG Chart Logic
     const ChartRenderer = () => {
@@ -91,15 +136,22 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                 <circle
                                     cx={getX(i)}
                                     cy={getY(d.amount)}
-                                    r="4"
-                                    className="fill-blue-600 stroke-white dark:stroke-slate-800 stroke-2"
+                                    r="5"
+                                    className={`${d.isFuture ? 'fill-indigo-400' : 'fill-blue-600'} stroke-white dark:stroke-slate-800 stroke-2`}
                                 />
-                                {/* Tooltip text (simplified) */}
+                                {d.isFuture && (
+                                    <circle
+                                        cx={getX(i)}
+                                        cy={getY(d.amount)}
+                                        r="8"
+                                        className="fill-indigo-500/10 animate-pulse"
+                                    />
+                                )}
                                 <text
                                     x={getX(i)}
-                                    y={getY(d.amount) - 10}
+                                    y={getY(d.amount) - 12}
                                     textAnchor="middle"
-                                    className="text-[10px] fill-slate-500 font-bold"
+                                    className={`text-[10px] font-black ${d.isFuture ? 'fill-indigo-500' : 'fill-blue-600'}`}
                                 >
                                     {Math.round(d.amount)}€
                                 </text>
@@ -107,9 +159,10 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                     x={getX(i)}
                                     y={height - 5}
                                     textAnchor="middle"
-                                    className="text-[8px] fill-slate-400"
+                                    className={`text-[8px] font-bold ${d.isFuture ? 'fill-indigo-400' : 'fill-slate-400'}`}
                                 >
                                     {d.period}
+                                    {d.isFuture && ' 🔮'}
                                 </text>
                             </g>
                         ))}
@@ -134,10 +187,12 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         <div className="flex items-center gap-2 mb-1">
                             <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black uppercase rounded">Item History</span>
                             <span className="text-slate-300 mx-1">/</span>
-                            <span className="text-slate-500 text-[10px] font-bold uppercase">{vendorId}</span>
+                            <span className="text-slate-500 text-[10px] font-bold uppercase">
+                                {referenceItem.VendorName || referenceItem.VendorId || 'Global'}
+                            </span>
                         </div>
                         <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white max-w-2xl leading-tight">
-                            {description}
+                            {referenceItem.Description || 'Unknown Item'}
                         </h2>
                     </div>
                 </div>
@@ -145,24 +200,54 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* Main Content: Chart or First Occurrence Alert */}
+                {/* Main Content: Chart, Conflicts or First Occurrence Alert */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                        <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-blue-500" />
-                            Cost Development
-                        </h3>
+                    {hasAmbiguity && (
+                        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-4 flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                            <div>
+                                <h4 className="text-sm font-bold text-amber-900 dark:text-amber-100">Duplicate Key Detection</h4>
+                                <p className="text-xs text-amber-800 dark:text-amber-200/70">
+                                    Multiple records exist for the same period with this primary key. This indicator suggests a data quality issue or an incomplete primary key definition.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
-                        {isRecurring ? (
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-blue-500" />
+                                Lifetime Cost Development
+                            </h3>
+                            {records.some(r => r.isFuture) && (
+                                <span className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded flex items-center gap-1">
+                                    <TrendingUp className="w-3 h-3" />
+                                    Future Insights Included
+                                </span>
+                            )}
+                        </div>
+
+                        {chartData.length >= 2 ? (
                             <ChartRenderer />
-                        ) : (
+                        ) : records.length === 1 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center bg-blue-50 dark:bg-blue-900/10 rounded-xl border-2 border-dashed border-blue-200 dark:border-blue-900/30">
                                 <div className="w-16 h-16 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center mb-4">
                                     <AlertCircle className="w-8 h-8 text-blue-600 dark:text-blue-300" />
                                 </div>
-                                <h4 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2">First Occurrence</h4>
-                                <p className="text-blue-700 dark:text-blue-300 max-w-sm">
-                                    This item has appeared significantly for the first time in the selected period. No historical trend data is available yet.
+                                <h4 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2">Initial Record Identified</h4>
+                                <p className="text-blue-700 dark:text-blue-300 max-w-sm text-sm">
+                                    This identity was first established in <strong>{firstOccurrence?.Period}</strong>. As more data is imported, you'll see the cost development here.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-12 text-center bg-amber-50 dark:bg-amber-900/10 rounded-xl border-2 border-dashed border-amber-200 dark:border-amber-900/30">
+                                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-800 rounded-full flex items-center justify-center mb-4">
+                                    <Layers className="w-8 h-8 text-amber-600 dark:text-amber-300" />
+                                </div>
+                                <h4 className="text-lg font-bold text-amber-900 dark:text-amber-100 mb-2">Indeterminate Trend</h4>
+                                <p className="text-amber-700 dark:text-amber-300 max-w-sm text-sm">
+                                    Ambiguous records in all periods prevent a reliable trend calculation. Please check the transaction history below for details.
                                 </p>
                             </div>
                         )}
@@ -243,12 +328,12 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                     </div>
 
                     <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 p-6">
-                        <div className="text-emerald-800 dark:text-emerald-200 font-bold mb-1">Total Lifetime Cost</div>
+                        <div className="text-emerald-800 dark:text-emerald-200 font-bold mb-1">Lifetime Cost (Total)</div>
                         <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
-                            €{history.reduce((acc: number, item: any) => acc + item.Amount, 0).toLocaleString()}
+                            €{records.reduce((acc: number, item: any) => acc + item.Amount, 0).toLocaleString()}
                         </div>
                         <div className="text-xs text-emerald-600/70 mt-2 font-medium">
-                            Across {history.length} occurrences
+                            Across {records.length} total records
                         </div>
                     </div>
                 </div>
@@ -263,27 +348,31 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                     </h3>
                 </div>
                 <DataTable
-                    data={[...history].reverse()} // Show newest first
+                    data={[...records].reverse()} // Show newest first
                     columns={[
-                        {
-                            header: 'Date',
-                            accessor: 'PostingDate',
-                            render: (item: any) => (
-                                <span className="font-mono text-sm">{item.PostingDate}</span>
-                            )
-                        },
                         {
                             header: 'Period',
                             accessor: 'Period',
                             render: (item: any) => (
-                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-xs font-bold">{item.Period}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${item.isFuture ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                                        {item.Period}
+                                    </span>
+                                    {item.isFuture && <span className="text-[10px] font-black text-indigo-500 uppercase">Future</span>}
+                                    {item.isCurrent && <span className="text-[10px] font-black text-blue-500 uppercase">Selected</span>}
+                                </div>
                             )
                         },
                         {
                             header: 'Document ID',
                             accessor: 'DocumentId',
                             render: (item: any) => (
-                                <span className="font-mono text-xs text-slate-500">{item.DocumentId}</span>
+                                <div className="flex flex-col">
+                                    <span className="font-mono text-xs text-slate-500">{item.DocumentId}</span>
+                                    {item.isAmbiguousInPeriod && (
+                                        <span className="text-[8px] font-black text-amber-500 uppercase tracking-tighter">Duplicate Key</span>
+                                    )}
+                                </div>
                             )
                         },
                         {

@@ -21,7 +21,7 @@ export const Shell: React.FC = () => {
     const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history' | 'data-inspector' | 'systems-management'>('dashboard');
     const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
-    const [selectedItemParams, setSelectedItemParams] = useState<{ vendorId: string; description: string } | null>(null);
+    const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
     // Theme & Customization Management
     const [theme, setTheme] = useLocalStorage<'light' | 'dark' | 'system'>('theme', 'system');
@@ -460,8 +460,8 @@ export const Shell: React.FC = () => {
                                     invoiceId={selectedInvoiceId}
                                     period={selectedPeriod || ''}
                                     onBack={() => setCurrentView('it-costs-month')}
-                                    onViewHistory={(vendorId: string, description: string) => {
-                                        setSelectedItemParams({ vendorId, description });
+                                    onViewHistory={(item: any) => {
+                                        setSelectedItem(item);
                                         setCurrentView('it-costs-item-history');
                                     }}
                                 />
@@ -470,11 +470,10 @@ export const Shell: React.FC = () => {
                     }
 
                     {
-                        currentView === 'it-costs-item-history' && selectedItemParams && (
+                        currentView === 'it-costs-item-history' && selectedItem && (
                             <div className="animate-in slide-in-from-right-4 duration-500 h-full">
                                 <ItCostsItemHistoryView
-                                    vendorId={selectedItemParams.vendorId}
-                                    description={selectedItemParams.description}
+                                    item={selectedItem}
                                     onBack={() => setCurrentView('it-costs-invoice')}
                                 />
                             </div>

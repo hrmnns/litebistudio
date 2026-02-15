@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Search, Download, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Search, Download, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle, Copy } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 
 interface ItCostsMonthViewProps {
@@ -25,6 +25,17 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     const [searchTerm, setSearchTerm] = useState('');
     const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
+    // Retrieve custom key fields from saved mappings
+    const keyFields = useMemo(() => {
+        try {
+            const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
+            const firstMappingWithKeys = Object.values(savedMappings).find((m: any) => m.__keyFields);
+            return (firstMappingWithKeys as any)?.__keyFields || ['DocumentId', 'LineId'];
+        } catch (e) {
+            return ['DocumentId', 'LineId'];
+        }
+    }, []);
+
     // Fetch current month invoices
     const { data: currentMonthData, loading: loadingCurrent } = useQuery(`
         SELECT * FROM invoice_items WHERE Period = '${period}'
@@ -35,14 +46,34 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
         SELECT * FROM invoice_items WHERE Period = '${previousPeriod}'
     `);
 
+    const currentItems = currentMonthData || [];
+    const previousItems = previousMonthData || [];
+
+    // Intra-month duplicate detection (ambiguity check)
+    const keyFrequency = useMemo(() => {
+        const freq: Record<string, number> = {};
+        currentItems.forEach((item: any) => {
+            const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
+            freq[compositeKey] = (freq[compositeKey] || 0) + 1;
+        });
+        return freq;
+    }, [currentItems, keyFields]);
+
+    // Fast lookup for previous month items
+    const prevItemMap = useMemo(() => {
+        const map = new Map<string, any>();
+        previousItems.forEach((p: any) => {
+            const key = keyFields.map((f: string) => String(p[f] || '').trim()).join('|');
+            map.set(key, p);
+        });
+        return map;
+    }, [previousItems, keyFields]);
+
     if (loadingCurrent || loadingPrevious) return (
         <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
     );
-
-    const currentItems = currentMonthData || [];
-    const previousItems = previousMonthData || [];
 
     // Group current items by Invoice (DocumentId)
     const invoices = (() => {
@@ -69,74 +100,39 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
         return Array.from(grouped.values()).map(invoice => {
             let newItemsCount = 0;
             let amountChangedCount = 0;
-
-            const prevVendorItems = previousItems.filter((p: any) => p.VendorId === invoice.VendorId);
+            let ambiguousCount = 0;
 
             invoice.items.forEach((currentItem: any) => {
-                // Check if this item (Description + Category) existed last month for this vendor
-                // Normalize description by removing numbers/dates for comparison. Handle nulls safely.
-                const normalize = (s: string | null | undefined) => (s || '').replace(/\d+/g, '#').trim();
+                const compositeKey = keyFields.map((f: string) => String(currentItem[f] || '').trim()).join('|');
+                const isAmbiguous = keyFrequency[compositeKey] > 1;
 
-                // PRIORITY 1: Match by DocumentId + LineId + CostCenter (for unique recurring identification)
-                let matchIndex = prevVendorItems.findIndex((p: any) =>
-                    String(p.DocumentId).trim() === String(currentItem.DocumentId).trim() &&
-                    String(p.LineId).trim() === String(currentItem.LineId).trim() &&
-                    String(p.CostCenter).trim() === String(currentItem.CostCenter).trim()
-                );
-
-                // PRIORITY 2: If no strict Document match, Fallback to Description + Category (for new invoices/vendors)
-                if (matchIndex === -1) {
-                    matchIndex = prevVendorItems.findIndex((p: any) =>
-                        normalize(p.Description) === normalize(currentItem.Description) &&
-                        p.Category === currentItem.Category
-                    );
+                if (isAmbiguous) {
+                    ambiguousCount++;
+                    return; // Skip further comparison for ambiguous items
                 }
 
-                if (String(invoice.DocumentId).trim() === '4000000921') {
-                    // Use a more robust way to group logs once per invoice group
-                    if (!(window as any)._loggedThisRender) (window as any)._loggedThisRender = new Set();
-                    if (!(window as any)._loggedThisRender.has(invoice.DocumentId)) {
-                        console.group(`🔍 Debugging Anomaly in MONTH VIEW: ${invoice.DocumentId}`);
-                        (window as any)._loggedThisRender.add(invoice.DocumentId);
-                        // Clean up set after a bit so it logs on next render
-                        setTimeout(() => (window as any)._loggedThisRender?.delete(invoice.DocumentId), 1000);
-                    }
+                // STRICT MATCHING ONLY (Key-Centric)
+                const match = prevItemMap.get(compositeKey);
 
-                    const match = matchIndex !== -1 ? prevVendorItems[matchIndex] : null;
-                    console.log(`Item #${currentItem.LineId}: ${currentItem.Description}`);
-                    console.log(`  - Match Found: ${matchIndex !== -1 ? 'YES' : 'NO'}`);
-                    if (match) console.log(`  - Prev Amount: ${match.Amount}, Current Amount: ${currentItem.Amount}`);
-                }
-
-                if (matchIndex === -1) {
+                if (!match) {
                     newItemsCount++;
                 } else {
-                    const match = prevVendorItems[matchIndex];
                     // Check for significant price change (>10% AND absolute diff > 10€)
                     const diff = Math.abs(currentItem.Amount - match.Amount);
                     const percentDiff = diff / Math.abs(match.Amount || 1);
                     if (diff > 10 && percentDiff > 0.1) {
                         amountChangedCount++;
-                        if (String(invoice.DocumentId).trim() === '4000000921') {
-                            console.log(`  - RESULT: CHANGED (Diff: ${diff}, %: ${Math.round(percentDiff * 100)}%)`);
-                        }
-                    } else if (String(invoice.DocumentId).trim() === '4000000921') {
-                        console.log(`  - RESULT: STABLE`);
                     }
                 }
             });
 
-            if (String(invoice.DocumentId).trim() === '4000000921') {
-                console.groupEnd();
-            }
-
-            return { ...invoice, newItemsCount, amountChangedCount };
+            return { ...invoice, newItemsCount, amountChangedCount, ambiguousCount };
         }).sort((a, b) => b.PostingDate.localeCompare(a.PostingDate));
     })();
 
     const totalAmount = invoices.reduce((acc, inv) => acc + inv.total_amount, 0);
     const vendorCount = new Set(invoices.map(inv => inv.VendorId || inv.VendorName)).size;
-    const totalAnomalies = invoices.reduce((acc, inv) => acc + inv.newItemsCount + inv.amountChangedCount, 0);
+    const totalAnomalies = invoices.reduce((acc, inv) => acc + inv.newItemsCount + inv.amountChangedCount + inv.ambiguousCount, 0);
 
     const columns: Column<any>[] = [
         {
@@ -173,18 +169,24 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             render: (item: any) => (
                 <div className="flex gap-2">
                     {item.newItemsCount > 0 && (
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-bold flex items-center gap-1" title={`${item.newItemsCount} items not seen in previous month`}>
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-bold flex items-center gap-1" title={`${item.newItemsCount} new items`}>
                             <PlusCircle className="w-3 h-3" />
-                            {item.newItemsCount} New
+                            {item.newItemsCount}
                         </span>
                     )}
                     {item.amountChangedCount > 0 && (
-                        <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-md text-[10px] font-bold flex items-center gap-1" title={`${item.amountChangedCount} items with significant price change`}>
+                        <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-md text-[10px] font-bold flex items-center gap-1" title={`${item.amountChangedCount} price changes`}>
                             <AlertTriangle className="w-3 h-3" />
-                            {item.amountChangedCount} Changed
+                            {item.amountChangedCount}
                         </span>
                     )}
-                    {item.newItemsCount === 0 && item.amountChangedCount === 0 && (
+                    {item.ambiguousCount > 0 && (
+                        <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-[10px] font-bold flex items-center gap-1 animate-pulse" title={`${item.ambiguousCount} ambiguous keys`}>
+                            <Copy className="w-3 h-3" />
+                            {item.ambiguousCount}
+                        </span>
+                    )}
+                    {item.newItemsCount === 0 && item.amountChangedCount === 0 && item.ambiguousCount === 0 && (
                         <span className="px-2 py-1 bg-slate-50 dark:bg-slate-800 text-slate-400 rounded-md text-[10px] font-medium flex items-center gap-1">
                             <TrendingUp className="w-3 h-3" />
                             Stable

@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Data files (Privacy)
+*.sqlite3
+*.db
+*.xlsx
+*.xls
+*.csv
+src/datasets/*.sqlite3
+src/datasets/*.db

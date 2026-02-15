@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Search, Receipt, Calendar, Tag, AlertTriangle, PlusCircle, TrendingUp, Printer, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Search, Receipt, Calendar, Tag, AlertTriangle, PlusCircle, Printer, ShieldCheck, Copy } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 
 interface ItCostsInvoiceItemsViewProps {
     invoiceId: string;
     period: string;
     onBack: () => void;
-    onViewHistory: (vendorId: string, description: string) => void;
+    onViewHistory: (item: any) => void;
 }
 
 // Helper to get previous period (assuming YYYY-MM format)
@@ -24,19 +24,61 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     const [searchTerm, setSearchTerm] = useState('');
     const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
-    // Fetch all positions for this specific invoice
+    // 1. Fetch current items FIRST
     const { data: currentItemsData, loading: loadingCurrent, error } = useQuery(
         `SELECT * FROM invoice_items WHERE DocumentId = ? AND Period = ? ORDER BY LineId ASC`,
         [invoiceId, period]
     );
 
-    // Fetch previous month items for this vendor to compare
-    const vendorId = currentItemsData?.[0]?.VendorId;
-    // Ensure we only query if vendorId exists
-    const prevQuery = vendorId ? `SELECT * FROM invoice_items WHERE Period = ? AND VendorId = ?` : '';
-    const prevParams = vendorId ? [previousPeriod, vendorId] : [];
+    const items = currentItemsData || [];
+
+    // 2. Retrieve keyFields (now items is safely defined)
+    const keyFields = useMemo(() => {
+        try {
+            const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
+
+            if (items.length > 0) {
+                const currentFields = Object.keys(items[0]);
+                let bestMapping = null;
+                let maxOverlap = -1;
+
+                for (const mapping of Object.values(savedMappings) as any[]) {
+                    if (!mapping.__keyFields) continue;
+                    const mappedFields = Object.keys(mapping);
+                    const overlap = mappedFields.filter(f => currentFields.includes(f)).length;
+                    if (overlap > maxOverlap) {
+                        maxOverlap = overlap;
+                        bestMapping = mapping;
+                    }
+                }
+                if (bestMapping) return (bestMapping as any).__keyFields;
+            }
+
+            const firstMappingWithKeys = Object.values(savedMappings).find((m: any) => m.__keyFields);
+            return (firstMappingWithKeys as any)?.__keyFields || ['DocumentId', 'LineId'];
+        } catch (e) {
+            return ['DocumentId', 'LineId'];
+        }
+    }, [items]);
+
+    // 3. Fetch previous month items by DocumentId ONLY (Key-Centric)
+    // We ignore VendorIds and fetch all items with the same DocumentId to find matches via keyFields.
+    const prevQuery = `SELECT * FROM invoice_items WHERE Period = ? AND DocumentId = ?`;
+    const prevParams = [previousPeriod, invoiceId];
 
     const { data: previousItemsData, loading: loadingPrevious } = useQuery(prevQuery, prevParams);
+
+    const previousItems = previousItemsData || [];
+
+    // Intra-month duplicate detection (ambiguity check)
+    const keyFrequency = useMemo(() => {
+        const freq: Record<string, number> = {};
+        items.forEach((item: any) => {
+            const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
+            freq[compositeKey] = (freq[compositeKey] || 0) + 1;
+        });
+        return freq;
+    }, [items, keyFields]);
 
     if (loadingCurrent || loadingPrevious) return (
         <div className="flex items-center justify-center h-64">
@@ -46,35 +88,28 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
 
     if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
-    const items = currentItemsData || [];
-    const previousItems = previousItemsData || [];
     const totalAmount = items.reduce((acc: number, item: any) => acc + item.Amount, 0);
     const vendorName = items[0]?.VendorName || 'Unknown Vendor';
     const postingDate = items[0]?.PostingDate || period;
 
     // Enhance items with anomaly flags
-    const normalize = (s: string | null | undefined) => (s || '').replace(/\d+/g, '#').trim();
-
     const enhancedItems = items.map((item: any) => {
-        // PRIORITY 1: Match by DocumentId + LineId + CostCenter (for unique recurring identification)
-        let match = previousItems.find((p: any) =>
-            String(p.DocumentId).trim() === String(item.DocumentId).trim() &&
-            String(p.LineId).trim() === String(item.LineId).trim() &&
-            String(p.CostCenter).trim() === String(item.CostCenter).trim()
-        );
+        const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
+        const isAmbiguous = keyFrequency[compositeKey] > 1;
 
-        // PRIORITY 2: Fallback to Description + Category
-        if (!match) {
-            match = previousItems.find((p: any) =>
-                normalize(p.Description) === normalize(item.Description) &&
-                p.Category === item.Category
+        // STRICT MATCHING ONLY (No Fuzzy Fallback)
+        let match = previousItems.find((p: any) => {
+            return keyFields.every((f: string) =>
+                String(p[f] || '').trim() === String(item[f] || '').trim()
             );
-        }
+        });
 
-        let status: 'normal' | 'new' | 'changed' = 'normal';
+        let status: 'normal' | 'new' | 'changed' | 'ambiguous' = 'normal';
         let previousAmount = null;
 
-        if (!match) {
+        if (isAmbiguous) {
+            status = 'ambiguous';
+        } else if (!match) {
             status = 'new';
         } else {
             const diff = Math.abs(item.Amount - match.Amount);
@@ -95,9 +130,29 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             align: 'center',
             render: (item: any) => (
                 <div className="flex flex-col items-center gap-1">
-                    <span className="text-slate-400 font-mono text-[10px]">#{item.LineId}</span>
-                    {item.status === 'new' && <PlusCircle className="w-3 h-3 text-blue-500" />}
-                    {item.status === 'changed' && <AlertTriangle className="w-3 h-3 text-orange-500" />}
+                    <div className="text-slate-400 font-mono text-[9px] flex flex-col items-center leading-tight">
+                        {keyFields.map((f: string) => (
+                            <span key={f} title={f}>{item[f]}</span>
+                        ))}
+                    </div>
+                    {item.status === 'new' && (
+                        <div title="New entry (not in previous month)">
+                            <PlusCircle className="w-3 h-3 text-blue-500" />
+                        </div>
+                    )}
+                    {item.status === 'changed' && (
+                        <div title="Price change detected">
+                            <AlertTriangle className="w-3 h-3 text-orange-500" />
+                        </div>
+                    )}
+                    {item.status === 'ambiguous' && (
+                        <div className="flex flex-col items-center group relative">
+                            <Copy className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover:block z-20 w-32 bg-red-600 text-white text-[10px] p-2 rounded shadow-lg">
+                                Ambiguous Key: Multiple items sharing the same identity in this month.
+                            </div>
+                        </div>
+                    )}
                 </div>
             )
         },
@@ -171,11 +226,12 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             align: 'right',
             render: (item: any) => (
                 <button
-                    onClick={() => onViewHistory(item.VendorId, item.Description)}
-                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
-                    title="Analyze History"
+                    onClick={() => onViewHistory(item)}
+                    className="p-1.5 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-600 dark:hover:bg-blue-600 rounded-lg text-blue-600 dark:text-blue-400 hover:text-white dark:hover:text-white transition-all shadow-sm border border-blue-100 dark:border-blue-900/30 flex items-center gap-1.5 group"
+                    title="Detailed Lifetime Analysis"
                 >
-                    <TrendingUp className="w-4 h-4" />
+                    <Search className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold px-0.5">Details</span>
                 </button>
             )
         }
@@ -292,7 +348,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
 
                 <DataTable
                     data={enhancedItems}
-                    columns={columns.filter(col => col.accessor !== 'actions')}
+                    columns={columns}
                     searchTerm={searchTerm}
                     searchFields={['Description', 'CostCenter', 'GLAccount', 'Category']}
                     emptyMessage="No positions found matching your search"

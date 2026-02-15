@@ -9,6 +9,7 @@ import { ColumnMapper } from './ColumnMapper';
 import type { MappingConfig } from './ColumnMapper';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { applyTransform } from '../../lib/transformers';
+import { KeySelectionModal } from './KeySelectionModal';
 
 const ajv = new Ajv2020({ allErrors: true, useDefaults: true });
 addFormats(ajv);
@@ -27,12 +28,13 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
     // Mapping State
     const [mapperOpen, setMapperOpen] = useState(false);
     const [pendingFileColumns, setPendingFileColumns] = useState<string[]>([]);
+    const [initialMapping, setInitialMapping] = useState<Record<string, MappingConfig> | undefined>(undefined);
     const [workbookCache, setWorkbookCache] = useState<XLSX.WorkBook | null>(null);
+    const [mappedDataCache, setMappedDataCache] = useState<any[]>([]);
 
-    // Persisted Mappings: Key = SourceColumns.sort().join('|') -> Value = MappingConfig
+    // Key Selection State
+    const [keyModalOpen, setKeyModalOpen] = useState(false);
     const [savedMappings, setSavedMappings] = useLocalStorage<Record<string, Record<string, MappingConfig>>>('excel_mappings_v2', {});
-
-    const requiredFields = invoiceItemsSchema.items.required || [];
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -103,26 +105,19 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
             const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[];
             const columns = (headerRow || []).filter(h => h && typeof h === 'string'); // Filter valid headers
 
-            const missingRequired = requiredFields.filter(field => !columns.includes(field));
-
             let finalData = invoiceItems;
 
             if (manualMapping) {
                 finalData = applyMapping(invoiceItems, manualMapping);
-            } else if (missingRequired.length > 0) {
-                // Check saved mapping
+            } else {
+                // ALWAYS trigger UI for review, even if saved mapping exists
                 const mappingKey = [...columns].sort().join('|');
                 const savedMap = savedMappings[mappingKey];
 
-                if (savedMap) {
-                    console.log('Applying saved mapping', savedMap);
-                    finalData = applyMapping(invoiceItems, savedMap);
-                } else {
-                    // Trigger UI
-                    setPendingFileColumns(columns);
-                    setMapperOpen(true);
-                    return; // Stop here, wait for user
-                }
+                setPendingFileColumns(columns);
+                setInitialMapping(savedMap); // Pre-fill with saved map if available
+                setMapperOpen(true);
+                return; // Wait for user confirmation
             }
 
             // Enrich Data (FiscalYear) & Standardize
@@ -183,6 +178,21 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
             });
 
             invoiceItems = convertDates(finalData);
+
+            // 3. Duplicate Detection and Key Selection
+            const mappingKey = [...columns].sort().join('|');
+            const savedMap = savedMappings[mappingKey];
+            const keyFields = (savedMap as any)?.__keyFields || ['DocumentId', 'LineId'];
+
+            const hasDuplicates = checkDuplicates(invoiceItems, keyFields);
+
+            // If we have duplicates, we MUST show the key selection modal.
+            // We only skip this if we are ALREADY in the process of confirming keys (which calls performImport directly).
+            if (hasDuplicates) {
+                setMappedDataCache(invoiceItems);
+                setKeyModalOpen(true);
+                return;
+            }
         }
 
         // 3. Validation & Insert
@@ -263,6 +273,40 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
         }
     };
 
+    const checkDuplicates = (data: any[], keyFields: string[]) => {
+        const seen = new Set();
+        for (const row of data) {
+            const compositeKey = keyFields.map(f => String(row[f] || '')).join('|');
+            if (seen.has(compositeKey)) return true;
+            seen.add(compositeKey);
+        }
+        return false;
+    };
+
+    const handleKeyConfirm = async (keyFields: string[]) => {
+        setKeyModalOpen(false);
+        setIsImporting(true);
+
+        // Update saved mapping with key configuration
+        if (workbookCache && mappedDataCache.length > 0) {
+            const sheet = workbookCache.Sheets[workbookCache.SheetNames[0]]; // Simplification
+            const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[];
+            const columns = (headerRow || []).filter(h => h && typeof h === 'string');
+            const mappingKey = [...columns].sort().join('|');
+
+            setSavedMappings(prev => ({
+                ...prev,
+                [mappingKey]: {
+                    ...prev[mappingKey],
+                    __keyFields: keyFields as any
+                }
+            }));
+
+            // Final Perform Import
+            await performImport(mappedDataCache, [], []);
+        }
+    };
+
     const performImport = async (invoiceItems: any[], kpis: any[], events: any[]) => {
         // Validation for Invoice Items
         if (invoiceItems.length > 0) {
@@ -303,12 +347,28 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
             {mapperOpen && (
                 <ColumnMapper
                     sourceColumns={pendingFileColumns}
+                    initialMapping={initialMapping}
                     onConfirm={handleMappingConfirm}
                     onCancel={() => {
                         setMapperOpen(false);
                         setIsImporting(false);
                         setStatus('idle');
+                        setInitialMapping(undefined);
                     }}
+                />
+            )}
+
+            {keyModalOpen && (
+                <KeySelectionModal
+                    isOpen={keyModalOpen}
+                    onClose={() => {
+                        setKeyModalOpen(false);
+                        setIsImporting(false);
+                    }}
+                    onConfirm={handleKeyConfirm}
+                    mappedData={mappedDataCache}
+                    initialKeyFields={['DocumentId', 'LineId']}
+                    availableFields={Object.keys(invoiceItemsSchema.items.properties)}
                 />
             )}
 
