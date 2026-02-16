@@ -1,9 +1,14 @@
 import React from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { DashboardRepository } from '../../lib/repositories/DashboardRepository';
+import type { DbRow } from '../../types';
 import { CheckCircle, AlertCircle, Clock } from 'lucide-react';
 
 export const OperationsTile: React.FC = () => {
-    const { data, loading, error } = useQuery('SELECT * FROM operations_events ORDER BY timestamp DESC LIMIT 5');
+    const { data, loading, error } = useAsync<DbRow[]>(
+        () => DashboardRepository.getRecentOperations(),
+        []
+    );
 
     if (loading) return <div className="p-4 text-center text-slate-500">Loading...</div>;
     if (error) return <div className="p-4 text-center text-red-500">Error: {error.message}</div>;

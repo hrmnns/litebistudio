@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { AnomalyRepository } from '../../lib/repositories/AnomalyRepository';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, TrendingUp, Sparkles, ArrowRight } from 'lucide-react';
 
@@ -10,11 +11,10 @@ import type { Anomaly } from '../../types';
 export const AnomalyRadarTile: React.FC = () => {
     const navigate = useNavigate();
     // Fetch top 3 critical anomalies from the latest period
-    const { data: anomalies, loading } = useQuery<Anomaly>(`
-        SELECT * FROM view_anomalies 
-        ORDER BY RiskScore DESC, Period DESC 
-        LIMIT 3
-    `);
+    const { data: anomalies, loading } = useAsync<Anomaly[]>(
+        () => AnomalyRepository.getTopRisks(3),
+        []
+    );
 
     const topRisks = useMemo(() => anomalies || [], [anomalies]);
 

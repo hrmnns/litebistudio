@@ -1,4 +1,5 @@
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { SummaryCard } from '../components/ui/SummaryCard';
 import { TrendingUp, TrendingDown, DollarSign, Calendar, Filter } from 'lucide-react';
@@ -11,20 +12,11 @@ interface ItCostsYearViewProps {
 
 export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDrillDown }) => {
     // Fetch last 12 months of IT Costs
-    const { data, loading, error } = useQuery<ItCostsTrend>(`
-        SELECT 
-            Period, 
-            SUM(Amount) as total,
-            MAX(FiscalYear) as year,
-            MAX(PostingDate) as date,
-            COUNT(DISTINCT DocumentId) as invoice_count,
-            COUNT(*) as item_count,
-            COUNT(DISTINCT CASE WHEN DocumentId LIKE 'GEN-%' THEN DocumentId END) as synthetic_invoices
-        FROM invoice_items
-        GROUP BY Period
-        ORDER BY Period DESC
-        LIMIT 15
-    `);
+    // Fetch last 12 months of IT Costs
+    const { data, loading, error } = useAsync<ItCostsTrend[]>(
+        () => InvoiceRepository.getYearlyTrend(),
+        []
+    );
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">

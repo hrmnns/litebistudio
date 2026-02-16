@@ -1,12 +1,17 @@
 import React from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useNavigate } from 'react-router-dom';
+import type { SystemRecord } from '../../types';
 import { CheckCircle2, XCircle, HelpCircle, Globe2, ShieldCheck, Cpu, Star } from 'lucide-react';
 
 
 export const SystemsTile: React.FC = () => {
     const navigate = useNavigate();
-    const { data: systems, loading, error } = useQuery('SELECT * FROM systems WHERE is_favorite = 1 ORDER BY sort_order ASC, name ASC LIMIT 4');
+    const { data: systems, loading, error } = useAsync<SystemRecord[]>(
+        () => SystemRepository.getFavorites(),
+        []
+    );
 
     if (loading && !systems) return <div className="p-4 text-center text-slate-400 animate-pulse">Loading favorites...</div>;
     if (error) return <div className="p-4 text-center text-red-500 text-xs text-wrap">Error: {error.message}</div>;

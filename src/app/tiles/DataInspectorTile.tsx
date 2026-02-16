@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Search, Layers, Hash } from 'lucide-react';
-import { runQuery } from '../../lib/db';
+import { SystemRepository } from '../../lib/repositories/SystemRepository';
 
 export const DataInspectorTile: React.FC = () => {
     const [stats, setStats] = useState<{ tables: number; records: number }>({ tables: 0, records: 0 });
@@ -9,19 +9,8 @@ export const DataInspectorTile: React.FC = () => {
     const fetchStats = async () => {
         try {
             setLoading(true);
-            // Get user tables
-            const tables = await runQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-
-            let totalRecords = 0;
-            for (const table of tables) {
-                const countResult = await runQuery(`SELECT count(*) as count FROM ${table.name}`);
-                totalRecords += (countResult[0]?.count as number) || 0;
-            }
-
-            setStats({
-                tables: tables.length,
-                records: totalRecords
-            });
+            const stats = await SystemRepository.getDatabaseStats();
+            setStats(stats);
         } catch (e) {
             console.error('Failed to fetch DB stats', e);
         } finally {

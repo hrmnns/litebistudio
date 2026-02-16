@@ -132,5 +132,15 @@ export interface SettingRecord {
 
 // ─── Utility ──────────────────────────────────────────────────
 
+
+export interface TableColumn {
+    cid: number;
+    name: string;
+    type: string;
+    notnull: number;
+    dflt_value: any;
+    pk: number;
+}
+
 /** Generic database row — use sparingly, prefer specific types */
 export type DbRow = Record<string, unknown>;

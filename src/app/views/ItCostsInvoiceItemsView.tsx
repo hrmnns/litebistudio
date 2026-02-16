@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { Search, Receipt, AlertTriangle, PlusCircle, Copy } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ExportFAB } from '../components/ui/ExportFAB';
@@ -30,16 +31,15 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
     // 1. Fetch current items FIRST
-    const { data: items, loading: loadingCurrent, error } = useQuery<InvoiceItem>(
-        'SELECT * FROM invoice_items WHERE Period = ? AND DocumentId = ? ORDER BY LineId ASC',
+    const { data: items, loading: loadingCurrent, error } = useAsync<InvoiceItem[]>(
+        () => InvoiceRepository.getItemsByInvoice(period, invoiceId),
         [period, invoiceId]
     );
 
     // 3. Fetch previous month items by DocumentId ONLY (Key-Centric)
-    // We ignore VendorIds and fetch all items with the same DocumentId to find matches via keyFields.
-    const { data: previousItems, loading: loadingPrevious } = useQuery<InvoiceItem>(
-        'SELECT * FROM invoice_items WHERE Period = ? AND DocumentId IN (SELECT DocumentId FROM invoice_items WHERE Period = ? AND DocumentId = ?)',
-        [previousPeriod, period, invoiceId]
+    const { data: previousItems, loading: loadingPrevious } = useAsync<InvoiceItem[]>(
+        () => InvoiceRepository.getItemsByInvoice(previousPeriod, invoiceId),
+        [previousPeriod, invoiceId]
     );
 
     const currentItems = items || [];
@@ -134,11 +134,11 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
 
     if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
-    const totalAmount = items.reduce((acc: number, item: InvoiceItem) => acc + item.Amount, 0);
-    const vendorName = items[0]?.VendorName || 'Unknown Vendor';
+    const totalAmount = currentItems.reduce((acc: number, item: InvoiceItem) => acc + item.Amount, 0);
+    const vendorName = currentItems[0]?.VendorName || 'Unknown Vendor';
 
     const handleExcelExport = () => {
-        const exportData = items.map(p => ({
+        const exportData = currentItems.map(p => ({
             'Sac-Kto': p.ServiceAccount,
             'Description': p.Description,
             'KST': p.CostCenter,
@@ -295,7 +295,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 no-print">
                     <SummaryCard
                         title="Total Items"
-                        value={items.length}
+                        value={currentItems.length}
                         icon={Receipt}
                         color="text-slate-500"
                     />
@@ -358,7 +358,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5 font-medium">
                             <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            {items.length} Positions Total
+                            {currentItems.length} Positions Total
                         </div>
                         {anomalySummary.ambiguous > 0 && (
                             <div className="flex items-center gap-1.5 text-red-500 font-black">

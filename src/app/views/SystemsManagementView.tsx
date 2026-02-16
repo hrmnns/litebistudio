@@ -1,6 +1,7 @@
 import React from 'react';
-import { useQuery } from '../../hooks/useQuery';
-import { runQuery } from '../../lib/db';
+import { useAsync } from '../../hooks/useAsync';
+import { SystemRepository } from '../../lib/repositories/SystemRepository';
+import { SettingsRepository } from '../../lib/repositories/SettingsRepository';
 import type { SystemRecord } from '../../types';
 import {
     Plus, Save, RefreshCw, HelpCircle, CheckCircle2, XCircle,
@@ -30,8 +31,9 @@ interface SystemsManagementViewProps {
 }
 
 export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ onBack }) => {
-    const { data: systems, loading, refresh } = useQuery<SystemRecord>(
-        'SELECT * FROM systems ORDER BY sort_order ASC, name ASC'
+    const { data: systems, loading, refresh } = useAsync<SystemRecord[]>(
+        () => SystemRepository.getAll(),
+        []
     );
     const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
@@ -45,16 +47,16 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
 
     React.useEffect(() => {
         const fetchSettings = async () => {
-            const result = await runQuery("SELECT value FROM settings WHERE key = 'webhook_url'");
-            if (result && result.length > 0) {
-                setWebhookUrl(result[0].value as string);
+            const url = await SettingsRepository.get('webhook_url');
+            if (url) {
+                setWebhookUrl(url);
             }
         };
         fetchSettings();
     }, []);
 
     const handleSaveSettings = async () => {
-        await runQuery("INSERT OR REPLACE INTO settings (key, value) VALUES ('webhook_url', ?)", [webhookUrl]);
+        await SettingsRepository.set('webhook_url', webhookUrl);
         setShowSettings(false);
     };
 
@@ -124,7 +126,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                 await sendWebhookNotification(system.name);
             }
 
-            await runQuery('UPDATE systems SET status = ? WHERE id = ?', [status, system.id]);
+            await SystemRepository.update(system.id, { status: status as any });
         }
 
         setScanningId(null);
@@ -143,7 +145,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
 
             // Update all sort_orders in DB
             for (let i = 0; i < newSystems.length; i++) {
-                await runQuery('UPDATE systems SET sort_order = ? WHERE id = ?', [i, newSystems[i].id]);
+                await SystemRepository.update(newSystems[i].id, { sort_order: i });
             }
 
             refresh();
@@ -151,7 +153,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
     };
 
     const handleToggleFavorite = async (id: number, current: number) => {
-        await runQuery('UPDATE systems SET is_favorite = ? WHERE id = ?', [current ? 0 : 1, id]);
+        await SystemRepository.update(id, { is_favorite: current ? 0 : 1 });
         refresh();
     };
 
@@ -161,14 +163,11 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
 
         setIsSaving(true);
         try {
-            const nextOrder = systems && systems.length > 0
-                ? Math.max(...systems.map((s: SystemRecord) => s.sort_order)) + 1
-                : 0;
-
-            await runQuery(
-                'INSERT INTO systems (name, url, category, status, is_favorite, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
-                [newSystem.name, newSystem.url, newSystem.category, 'unknown', 0, nextOrder]
-            );
+            await SystemRepository.add({
+                name: newSystem.name,
+                url: newSystem.url,
+                category: newSystem.category
+            });
             await refresh();
             setIsAddModalOpen(false);
             setNewSystem({ name: '', url: '', category: 'IT' });

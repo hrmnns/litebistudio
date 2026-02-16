@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { Search, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle, Copy, ShieldCheck, Box, FileText, Layers } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ExportFAB } from '../components/ui/ExportFAB';
@@ -56,34 +57,38 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     }, []);
 
     // Fetch current month invoices
-    const { data: currentItems, loading: loadingCurrent } = useQuery<InvoiceItem>(
-        'SELECT * FROM invoice_items WHERE Period = ? ORDER BY DocumentId, LineId',
+    const { data: currentItems, loading: loadingCurrent } = useAsync<InvoiceItem[]>(
+        () => InvoiceRepository.getMonthlyOverview(period),
         [period]
     );
 
     // Fetch previous period for comparison
-    const { data: previousItems, loading: loadingPrevious } = useQuery<InvoiceItem>(
-        'SELECT * FROM invoice_items WHERE Period = ? ORDER BY DocumentId, LineId',
+    const { data: previousItems, loading: loadingPrevious } = useAsync<InvoiceItem[]>(
+        () => InvoiceRepository.getMonthlyOverview(previousPeriod),
         [previousPeriod]
     );
 
     // Intra-month duplicate detection (ambiguity check)
     const keyFrequency = useMemo(() => {
         const freq: Record<string, number> = {};
-        currentItems.forEach((item: InvoiceItem) => {
-            const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
-            freq[compositeKey] = (freq[compositeKey] || 0) + 1;
-        });
+        if (currentItems) {
+            currentItems.forEach((item: InvoiceItem) => {
+                const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
+                freq[compositeKey] = (freq[compositeKey] || 0) + 1;
+            });
+        }
         return freq;
     }, [currentItems, keyFields]);
 
     // Fast lookup for previous month items
     const prevItemMap = useMemo(() => {
         const map = new Map<string, InvoiceItem>();
-        previousItems.forEach((p: InvoiceItem) => {
-            const key = keyFields.map((f: string) => String(p[f] || '').trim()).join('|');
-            map.set(key, p);
-        });
+        if (previousItems) {
+            previousItems.forEach((p: InvoiceItem) => {
+                const key = keyFields.map((f: string) => String(p[f] || '').trim()).join('|');
+                map.set(key, p);
+            });
+        }
         return map;
     }, [previousItems, keyFields]);
 
@@ -97,22 +102,24 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     const invoices = (() => {
         const grouped = new Map<string, any>();
 
-        currentItems.forEach((item: InvoiceItem) => {
-            if (!grouped.has(item.DocumentId)) {
-                grouped.set(item.DocumentId, {
-                    DocumentId: item.DocumentId,
-                    PostingDate: item.PostingDate,
-                    VendorName: item.VendorName,
-                    VendorId: item.VendorId,
-                    total_amount: 0,
-                    items: [],
-                    primary_description: item.Description
-                });
-            }
-            const invoice = grouped.get(item.DocumentId);
-            invoice.total_amount += item.Amount;
-            invoice.items.push(item);
-        });
+        if (currentItems) {
+            currentItems.forEach((item: InvoiceItem) => {
+                if (!grouped.has(item.DocumentId)) {
+                    grouped.set(item.DocumentId, {
+                        DocumentId: item.DocumentId,
+                        PostingDate: item.PostingDate,
+                        VendorName: item.VendorName,
+                        VendorId: item.VendorId,
+                        total_amount: 0,
+                        items: [],
+                        primary_description: item.Description
+                    });
+                }
+                const invoice = grouped.get(item.DocumentId);
+                invoice.total_amount += item.Amount;
+                invoice.items.push(item);
+            });
+        }
 
         // Calculate Anomalies per Invoice
         return Array.from(grouped.values()).map(invoice => {
@@ -152,7 +159,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     const totalAnomalies = invoices.reduce((acc, inv) => acc + inv.newItemsCount + inv.amountChangedCount + inv.ambiguousCount, 0);
 
     // Calculate Data Integrity Metrics
-    const totalPositions = currentItems.length;
+    const totalPositions = currentItems?.length || 0;
     const autoGenInvoicesCount = invoices.filter(inv => inv.DocumentId?.startsWith('GEN-')).length;
     const dataCoverage = invoices.length > 0
         ? Math.round(((invoices.length - autoGenInvoicesCount) / invoices.length) * 100)

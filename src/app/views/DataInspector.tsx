@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { Download, RefreshCw, AlertCircle, ArrowLeft, Search, Database, Table as TableIcon, Code, Play } from 'lucide-react';
-import { runQuery } from '../../lib/db';
 import * as XLSX from 'xlsx';
 
 interface DataInspectorProps {
@@ -13,70 +13,51 @@ interface DataInspectorProps {
 export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [mode, setMode] = useState<'table' | 'sql'>('table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
-    const [activeSql, setActiveSql] = useState(''); // Executed query
 
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTable, setSelectedTable] = useState('invoice_items');
     const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [tables, setTables] = useState<string[]>([]);
-    const [tableSchema, setTableSchema] = useState<any[]>([]);
     const limit = 500;
 
-    // 1. Fetch available tables
-    useEffect(() => {
-        const fetchTables = async () => {
-            const result = await runQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-            setTables(result.map(r => r.name as string));
-        };
-        fetchTables();
-    }, []);
+    // Fetch available tables
+    const { data: tables } = useAsync<string[]>(
+        () => SystemRepository.getTables(),
+        []
+    );
 
-    // 2. Fetch schema for selected table (Only in Table Mode)
-    useEffect(() => {
-        const fetchSchema = async () => {
-            if (mode === 'table' && selectedTable) {
-                const result = await runQuery(`PRAGMA table_info(${selectedTable})`);
-                setTableSchema(result);
-                // Reset SQL when switching tables
-                setInputSql(`SELECT * FROM ${selectedTable} LIMIT 100`);
+    // Main Data Fetching
+    const { data: items, loading, error, refresh: execute } = useAsync<any[]>(
+        async () => {
+            if (mode === 'table') {
+                return await SystemRepository.inspectTable(selectedTable, limit, searchTerm);
+            } else {
+                if (!inputSql) return []; // Don't run empty SQL
+                return await SystemRepository.executeRaw(inputSql);
             }
-        };
-        fetchSchema();
-    }, [selectedTable, mode]);
+        },
+        [mode, selectedTable] // Auto-run when mode or table changes
+    );
 
-    // 3. Build Query based on Mode
-    let query = '';
-    let queryParams: any[] = [];
+    // Debounced search for table mode
+    useEffect(() => {
+        if (mode === 'table') {
+            const timer = setTimeout(() => {
+                execute();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [searchTerm, mode]); // Re-run when searchTerm changes
 
-    if (mode === 'table') {
-        // Table Mode: Search across text columns
-        const searchFilter = searchTerm ? tableSchema
-            .filter(col => col.type.toUpperCase().includes('TEXT') || col.name.toLowerCase().includes('id') || col.name.toLowerCase().includes('name'))
-            .map(col => `${col.name} LIKE '%' || ?1 || '%'`)
-            .join(' OR ') : '';
+    const handleRunSql = () => {
+        if (!inputSql) return;
+        execute();
+    };
 
-        query = `
-            SELECT *
-            FROM ${selectedTable}
-            ${searchFilter ? `WHERE ${searchFilter}` : ''}
-            ORDER BY rowid DESC 
-            LIMIT ?2
-        `;
-        queryParams = [searchTerm, limit];
-    } else {
-        // SQL Mode: Use the user's active SQL
-        query = activeSql;
-        queryParams = [];
-    }
-
-    const { data: items, loading, error, refresh } = useQuery(query, queryParams);
-
-    // 4. Generate Columns dynamically
+    // Generate Columns dynamically
     const columns: any[] = React.useMemo(() => {
         if (!items || items.length === 0) return [];
 
-        // In SQL mode, or dynamic table mode, derive cols from first item
         const keys = Object.keys(items[0]);
         return keys.map(key => {
             const isAmount = key.toLowerCase().includes('amount') || key.toLowerCase().includes('price');
@@ -101,11 +82,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             };
         });
     }, [items]);
-
-    const handleRunSql = () => {
-        setActiveSql(inputSql);
-        refresh();
-    };
 
     return (
         <div className="p-8 max-w-7xl mx-auto h-full flex flex-col animate-in slide-in-from-bottom-4 duration-500">
@@ -136,7 +112,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                     <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                         <button
-                            onClick={() => setMode('table')}
+                            onClick={() => {
+                                setMode('table');
+                                execute();
+                            }}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'table' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                         >
                             <TableIcon className="w-4 h-4" />
@@ -156,7 +135,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                     <div className="flex gap-2">
                         <button
-                            onClick={refresh}
+                            onClick={execute}
                             className={`p-2 rounded-lg transition-all ${loading ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/40' : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
                             title="Refresh Data"
                         >
@@ -192,7 +171,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     }}
                                     className="appearance-none pl-10 pr-10 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium"
                                 >
-                                    {tables.map(t => (
+                                    {tables?.map(t => (
                                         <option key={t} value={t}>{t}</option>
                                     ))}
                                 </select>
@@ -267,7 +246,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             data={items || []}
                             columns={columns}
                             searchTerm=""
-                            emptyMessage={mode === 'sql' && !activeSql ? "Enter a SQL query and click Run." : "No results found."}
+                            emptyMessage={mode === 'sql' && !inputSql ? "Enter a SQL query and click Run." : "No results found."}
                             onRowClick={(item) => setSelectedItem(item)}
                         />
                     )}
@@ -302,7 +281,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <p className="text-sm font-bold">SQL Error</p>
                         <p className="text-xs opacity-90">{String(error)}</p>
                     </div>
-                    <button onClick={refresh} className="ml-auto p-1.5 hover:bg-red-200 dark:hover:bg-red-800 rounded-md transition-colors">
+                    <button onClick={execute} className="ml-auto p-1.5 hover:bg-red-200 dark:hover:bg-red-800 rounded-md transition-colors">
                         <RefreshCw className="w-4 h-4" />
                     </button>
                 </div>

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+// import { useQuery } from '../../hooks/useQuery'; // Keep for now if needed, or remove if fully replaced
+import { WorklistRepository } from '../../lib/repositories/WorklistRepository';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { Bookmark, ExternalLink, Trash2, Calendar, Tag } from 'lucide-react';
-import { runQuery, toggleWorklist } from '../../lib/db';
 import type { WorklistEntry, InvoiceItem } from '../../types';
+import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 
 interface WorklistViewProps {
     onBack: () => void;
@@ -17,15 +19,15 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
     const [loadingDetail, setLoadingDetail] = useState(false);
 
     // Fetch all worklist items
-    const { data: worklistItems, refresh } = useQuery<WorklistEntry>(`
-        SELECT * FROM worklist 
-        ORDER BY added_at DESC
-    `);
+    const { data: worklistItems, refresh } = useAsync<WorklistEntry[]>(
+        () => WorklistRepository.getAll(),
+        []
+    );
 
     const handleRemove = async (e: React.MouseEvent, item: WorklistEntry) => {
         e.stopPropagation();
         if (confirm('Diesen Eintrag aus dem Arbeitsvorrat entfernen?')) {
-            await toggleWorklist(item.source_table, item.source_id);
+            await WorklistRepository.toggle(item.source_table, item.source_id);
             refresh();
             window.dispatchEvent(new Event('db-updated'));
         }
@@ -34,23 +36,17 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
     const handleRowClick = async (item: WorklistEntry) => {
         setLoadingDetail(true);
         try {
-            // Fetch the actual record from its source table
-            // We assume 'id' or 'DocumentId' for resolution. 
-            // In invoice_items, we might have multiple rows per DocumentId, but usually the worklist points to a specific record.
-            // If it's invoice_items, we'll fetch all items of that DocumentId for better context
-            let sql = `SELECT * FROM ${item.source_table} WHERE id = ?`;
-            let bind = [item.source_id];
+            // Fetch details using Repository
+            // Currently mostly supports 'invoice_items'
+            let records: InvoiceItem[] = [];
 
-            // Special handling for invoice_items if source_id is NOT a numeric PK but a DocumentId (though our toggle logic tries to use IDs)
-            if (item.source_table === 'invoice_items' && isNaN(Number(item.source_id))) {
-                sql = `SELECT * FROM invoice_items WHERE DocumentId = ?`;
-            } else if (item.source_table === 'invoice_items') {
-                // If it's a specific row ID, we might still want the full invoice? 
-                // Let's start with the specific record.
-                sql = `SELECT * FROM invoice_items WHERE id = ?`;
+            if (item.source_table === 'invoice_items') {
+                records = await InvoiceRepository.getByIdOrDocumentId(item.source_id);
+            } else {
+                console.warn(`Detail view not implemented for table: ${item.source_table}`);
+                // Fallback or generic fetch could go here if needed, but for now we enforce repo usage.
             }
 
-            const records = await runQuery(sql, bind) as InvoiceItem[];
             setDetailRecords(records);
             setSelectedDetail({ table: item.source_table, id: item.source_id });
         } catch (err) {

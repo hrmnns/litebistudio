@@ -1,5 +1,6 @@
 import React from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { DashboardRepository } from '../../lib/repositories/DashboardRepository';
 import { Wallet, Users, ArrowUpRight } from 'lucide-react';
 
 import type { KpiRecord, ItCostsSummary } from '../../types';
@@ -7,14 +8,24 @@ import type { KpiRecord, ItCostsSummary } from '../../types';
 
 export const ItCostsTile: React.FC = () => {
     // 1. Fetch aggregates
-    const { data: summaryData, loading: summaryLoading, error: summaryError } = useQuery<ItCostsSummary>("SELECT * FROM it_costs_summary");
+    const { data: summary, loading: summaryLoading, error: summaryError } = useAsync<ItCostsSummary | null>(
+        () => DashboardRepository.getItCostsSummary(),
+        []
+    );
+
     // 2. Fetch history for trend (last 4 months)
-    const { data: trendData, loading: trendLoading } = useQuery<KpiRecord>("SELECT * FROM kpi_history WHERE metric = 'IT Costs' AND period NOT LIKE '%-13' ORDER BY date DESC LIMIT 4");
+    const { data: trendData, loading: trendLoading } = useAsync<KpiRecord[]>(
+        () => DashboardRepository.getItCostsTrend(),
+        []
+    );
 
     if (summaryLoading || trendLoading) return <div className="p-4 text-center text-slate-500 animate-pulse">Loading costs...</div>;
     if (summaryError) return <div className="p-4 text-center text-red-500">Error: {summaryError.message}</div>;
 
-    const summary = summaryData?.[0] || { total_amount: 0, active_vendors: 0, latest_date: 'N/A', latest_year: 'N/A' };
+    if (summaryLoading || trendLoading) return <div className="p-4 text-center text-slate-500 animate-pulse">Loading costs...</div>;
+    // if (summaryError) return <div className="p-4 text-center text-red-500">Error: {summaryError.message}</div>;
+
+    const displaySummary = summary || { total_amount: 0, active_vendors: 0, latest_date: 'N/A', latest_year: 0 };
 
     // Trend calculation: Comparison between latest month and previous month (MoM)
     let trendPercent = 0;
@@ -36,10 +47,10 @@ export const ItCostsTile: React.FC = () => {
                 <div className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100/50 dark:border-blue-900/30">
                     <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-2">
                         <Wallet className="w-3.5 h-3.5" />
-                        <span className="text-[9px] uppercase font-bold tracking-wider text-left">Total Spend ({summary.latest_year})</span>
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-left">Total Spend ({displaySummary.latest_year})</span>
                     </div>
                     <div className="text-xl font-black text-slate-900 dark:text-white leading-none text-right">
-                        €{summary.total_amount?.toLocaleString()}
+                        €{displaySummary.total_amount?.toLocaleString()}
                     </div>
                 </div>
 
@@ -49,7 +60,7 @@ export const ItCostsTile: React.FC = () => {
                         <span className="text-[9px] uppercase font-bold tracking-wider text-left">Active Vendors</span>
                     </div>
                     <div className="text-xl font-black text-slate-900 dark:text-white leading-none text-right">
-                        {summary.active_vendors}
+                        {displaySummary.active_vendors}
                     </div>
                 </div>
             </div>

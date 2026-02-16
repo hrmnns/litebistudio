@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '../../hooks/useQuery';
-import { runQuery } from '../../lib/db';
+import { useAsync } from '../../hooks/useAsync';
+import { AnomalyRepository } from '../../lib/repositories/AnomalyRepository';
+import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { ShieldAlert, TrendingUp, AlertTriangle, PlusCircle, FileText, Calendar, Wallet } from 'lucide-react';
@@ -17,53 +18,35 @@ interface AnomalyDetailViewProps {
 export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId, period, onBack, onOpenInvoice }) => {
     const [selectedHistory, setSelectedHistory] = useState<{ items: InvoiceItem[], index: number } | null>(null);
     // 1. Fetch the specific anomaly details
-    const { data: anomalies, loading } = useQuery<Anomaly>(`
-        SELECT * FROM view_anomalies 
-        WHERE DocumentId = ? AND Period = ?
-    `, [anomalyId, period]);
-
-    const anomaly = anomalies && anomalies.length > 0 ? anomalies[0] : null;
+    const { data: anomaly, loading } = useAsync<Anomaly | null>(
+        () => AnomalyRepository.getAnomalyDetail(anomalyId, period),
+        [anomalyId, period]
+    );
 
     // 2. Fetch Report / History for this item (Context)
     // We match by VendorName and Description to find the same "Item" over time
     // 2. Fetch Report / History for this item (Context)
-    // We match by VendorName and Description to find the same "Item" over time
-    const { data: historyData } = useQuery<InvoiceItemHistory>(`
-        SELECT 
-            Period,
-            SUM(Amount) as Amount, 
-            COUNT(*) as RecordCount,
-            MAX(id) as id,
-            MAX(DocumentId) as DocumentId,
-            MAX(LineId) as LineId,
-            MAX(VendorName) as VendorName,
-            MAX(Description) as Description,
-            MAX(CostCenter) as CostCenter,
-            MAX(GLAccount) as GLAccount
-        FROM invoice_items 
-        WHERE VendorName = ? AND Description = ? 
-        GROUP BY Period
-        ORDER BY Period ASC
-    `, [anomaly?.VendorName || '', anomaly?.Description || '']);
+    const { data: historyData } = useAsync(
+        async () => {
+            if (!anomaly) return [];
+            const result = await InvoiceRepository.getVendorItemHistory(
+                anomaly.VendorName || '',
+                anomaly.Description || ''
+            );
+            return result as unknown as InvoiceItemHistory[];
+        },
+        [anomaly]
+    );
 
     const history = useMemo(() => historyData || [], [historyData]);
 
     const handleSelectHistoryPoint = async (point: any) => {
-        // Fetch all individual records for this period/item
-        const sql = `
-            SELECT * FROM invoice_items 
-            WHERE VendorName = ? AND Description = ? AND Period = ?
-            ORDER BY id ASC
-        `;
-        const params = [anomaly?.VendorName || '', anomaly?.Description || '', point.Period];
-
-        // We use window.query directly since useQuery is for hooks
-        // Assuming we need to handle this via some query mechanism
-        // For simplicity in this mock-up context, we just reuse the existing data 
-        // OR better: we adjust the history query to potentially include more data if needed.
-        // ACTUALLY: Let's fetch the data.
         try {
-            const results = await runQuery(sql, params) as InvoiceItem[];
+            const results = await InvoiceRepository.getItemsByVendorAndDescription(
+                anomaly?.VendorName || '',
+                anomaly?.Description || '',
+                point.Period
+            );
             if (results && results.length > 0) {
                 setSelectedHistory({ items: results, index: 0 });
             }

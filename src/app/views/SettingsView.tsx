@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Save, RefreshCw } from 'lucide-react';
-import { runQuery } from '../../lib/db';
+import { SettingsRepository } from '../../lib/repositories/SettingsRepository';
 import { TILES } from '../../config/tiles';
 import type { ThemeMode } from '../../hooks/useTheme';
 
@@ -25,16 +25,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     useEffect(() => {
         const fetchSettings = async () => {
-            const result = await runQuery("SELECT value FROM settings WHERE key = 'webhook_url'");
-            if (result && result.length > 0) {
-                setWebhookUrl(result[0].value as string);
+            const url = await SettingsRepository.get('webhook_url');
+            if (url) {
+                setWebhookUrl(url);
             }
         };
         fetchSettings();
     }, []);
 
     const handleSaveWebhook = async () => {
-        await runQuery("INSERT OR REPLACE INTO settings (key, value) VALUES ('webhook_url', ?)", [webhookUrl]);
+        await SettingsRepository.set('webhook_url', webhookUrl);
         alert('Notification settings saved successfully!');
     };
 

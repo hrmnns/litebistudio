@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useAsync } from '../../hooks/useAsync';
+import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { TrendingUp, AlertCircle, Info, Tag, Layers, Receipt } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ViewHeader } from '../components/ui/ViewHeader';
@@ -28,29 +29,12 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
         }
     }, []);
 
-    // Build dynamic SQL with all key fields to track THIS specific item identity over time
-    const sql = useMemo(() => {
-        const conditions: string[] = [];
-        const params: (string | number)[] = [];
+    const { data: historyData, loading, error } = useAsync<InvoiceItem[]>(
+        () => InvoiceRepository.getItemHistory(referenceItem, keyFields),
+        [referenceItem, keyFields]
+    );
 
-        keyFields.forEach((field: string) => {
-            if (referenceItem[field] !== undefined && referenceItem[field] !== null) {
-                conditions.push(`${field} = ?`);
-                params.push(referenceItem[field] as string | number);
-            } else {
-                conditions.push(`${field} IS NULL`);
-            }
-        });
-
-        return {
-            query: `SELECT * FROM invoice_items WHERE ${conditions.join(' AND ')} ORDER BY Period ASC, PostingDate ASC`,
-            params
-        };
-    }, [referenceItem, keyFields]);
-
-    const { data, loading, error } = useQuery<InvoiceItem>(sql.query, sql.params);
-
-    const history = data || [];
+    const history = historyData || [];
 
     // 1. Detect ambiguity (multiple records per period for the same primary key)
     const ambiguityMap = useMemo(() => {
