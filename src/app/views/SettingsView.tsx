@@ -2,24 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Save, RefreshCw } from 'lucide-react';
 import { SettingsRepository } from '../../lib/repositories/SettingsRepository';
 import { TILES } from '../../config/tiles';
-import type { ThemeMode } from '../../hooks/useTheme';
+import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
-interface SettingsViewProps {
-    theme: ThemeMode;
-    setTheme: (t: ThemeMode) => void;
-    visibleTileIds: string[];
-    setVisibleTileIds: (ids: string[] | ((prev: string[]) => string[])) => void;
-    tileOrder: string[];
-    onBack: () => void;
-}
-
-export const SettingsView: React.FC<SettingsViewProps> = ({
-    theme,
-    setTheme,
-    visibleTileIds,
-    setVisibleTileIds,
-    tileOrder,
-}) => {
+export const SettingsView: React.FC = () => {
+    const { theme, setTheme } = useThemeContext();
+    const { visibleTileIds, setVisibleTileIds, tileOrder } = useDashboard();
     const [webhookUrl, setWebhookUrl] = useState('');
     const [isTestingWebhook, setIsTestingWebhook] = useState(false);
 

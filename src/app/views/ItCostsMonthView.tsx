@@ -6,7 +6,8 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ExportFAB } from '../components/ui/ExportFAB';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { SummaryCard } from '../components/ui/SummaryCard';
-import * as XLSX from 'xlsx';
+import { getPreviousPeriod } from '../../lib/utils/dateUtils';
+import { exportToExcel } from '../../lib/utils/exportUtils';
 import type { InvoiceItem } from '../../types';
 
 /** Grouped invoice structure for the month view */
@@ -28,18 +29,6 @@ interface ItCostsMonthViewProps {
     onBack: () => void;
     onDrillDown?: (invoiceId: string) => void;
 }
-
-// Helper to get previous period (assuming YYYY-MM format)
-const getPreviousPeriod = (currentPeriod: string) => {
-    const [year, month] = currentPeriod.split('-').map(Number);
-    // Create date for 1st of current month
-    const date = new Date(year, month - 1, 1);
-    // Subtract 1 month
-    date.setMonth(date.getMonth() - 1);
-    const prevYear = date.getFullYear();
-    const prevMonth = String(date.getMonth() + 1).padStart(2, '0');
-    return `${prevYear}-${prevMonth}`;
-};
 
 export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBack, onDrillDown }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -179,10 +168,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             'Status': (inv.newItemsCount + inv.amountChangedCount + inv.ambiguousCount > 0) ? 'Anomalous' : 'Stable'
         }));
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Monthly Analysis");
-        XLSX.writeFile(wb, `IT_Costs_Analysis_${period}.xlsx`);
+        exportToExcel(exportData, `IT_Costs_Analysis_${period}`, "Monthly Analysis");
     };
 
     const columns: Column<InvoiceGroup>[] = [

@@ -14,9 +14,18 @@ async function initDB() {
 
     try {
         log('Initializing SQLite...');
+
+        let isRetrying = false;
         const config = {
             print: log,
-            printErr: error,
+            printErr: (...args: any[]) => {
+                const msg = args.join(' ');
+                if (isRetrying && (msg.includes('OPFS asyncer') || msg.includes('GetSyncHandleError'))) {
+                    // Suppress expected errors during retry
+                    return;
+                }
+                error(...args);
+            },
         };
 
         sqlite3 = await (sqlite3InitModule as any)(config);
@@ -211,11 +220,14 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
-            case 'INIT_SCHEMA':
-                if (!db) await initDB();
-                // Schema is already init on DB open, but strictly speaking we can run it again if needed
-                // or just do nothing if only needed for ensuring connection.
+            case 'CLOSE':
+                if (db) {
+                    log('Closing database...');
+                    db.close();
+                    db = null;
+                }
                 result = true;
+                self.close(); // Terminate the worker thread gracefully
                 break;
         }
 

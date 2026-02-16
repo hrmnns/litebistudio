@@ -3,8 +3,8 @@ import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
+import { exportToExcel } from '../../lib/utils/exportUtils';
 import { Download, RefreshCw, AlertCircle, ArrowLeft, Search, Database, Table as TableIcon, Code, Play } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -144,11 +144,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <button
                             onClick={() => {
                                 if (!items || items.length === 0) return;
-                                const ws = XLSX.utils.json_to_sheet(items);
-                                const wb = XLSX.utils.book_new();
-                                XLSX.utils.book_append_sheet(wb, ws, "Export");
                                 const timestamp = new Date().toISOString().slice(0, 10);
-                                XLSX.writeFile(wb, `export_${timestamp}.xlsx`);
+                                exportToExcel(items, `export_${timestamp}`, "Export");
                             }}
                             className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
                         >

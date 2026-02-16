@@ -1,40 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { useTheme } from '../hooks/useTheme';
+import { useDashboard } from '../lib/context/DashboardContext';
 import { Sidebar } from './components/Sidebar';
-import { TILES } from '../config/tiles';
-
-export interface LayoutContext {
-    visibleTileIds: string[];
-    setVisibleTileIds: (ids: string[] | ((prev: string[]) => string[])) => void;
-    tileOrder: string[];
-    setTileOrder: (order: string[] | ((prev: string[]) => string[])) => void;
-    theme: 'light' | 'dark' | 'system';
-    setTheme: (t: 'light' | 'dark' | 'system') => void;
-}
+import { onTabConflict } from '../lib/db';
+import { MultiTabModal } from './components/MultiTabModal';
+import { useEffect } from 'react';
 
 export const Layout: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
+    const [hasConflict, setHasConflict] = useState(false);
+    const { isSidebarCollapsed, setSidebarCollapsed } = useDashboard();
 
-    const { theme, setTheme } = useTheme();
-
-    // Tile customization
-    const [visibleTileIds, setVisibleTileIds] = useLocalStorage<string[]>('visibleTileIds', TILES.map(t => t.id));
-    const [tileOrder, setTileOrder] = useLocalStorage<string[]>('tileOrder', TILES.map(t => t.id));
-
-    // Sync state if new tiles are added to the configuration
     useEffect(() => {
-        const allTileIds = TILES.map(t => t.id);
-        const newTiles = allTileIds.filter(id => !tileOrder.includes(id));
-
-        if (newTiles.length > 0) {
-            setTileOrder(prev => [...prev, ...newTiles]);
-            setVisibleTileIds(prev => [...new Set([...prev, ...newTiles])]);
-        }
-    }, [tileOrder, setTileOrder, visibleTileIds, setVisibleTileIds]);
+        const unsubscribe = onTabConflict((conflict) => {
+            setHasConflict(conflict);
+        });
+        return () => {
+            unsubscribe();
+        };
+    }, []);
 
     return (
         <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
@@ -43,7 +28,7 @@ export const Layout: React.FC = () => {
                 isCollapsed={isSidebarCollapsed}
                 sidebarOpen={sidebarOpen}
                 onNavigate={() => { }}
-                onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                onToggleCollapse={() => setSidebarCollapsed(!isSidebarCollapsed)}
                 onCloseMobile={() => setSidebarOpen(false)}
             />
 
@@ -58,14 +43,7 @@ export const Layout: React.FC = () => {
                 </header>
 
                 <div className="flex-1 min-h-0 overflow-hidden relative">
-                    <Outlet context={{
-                        visibleTileIds,
-                        setVisibleTileIds,
-                        tileOrder,
-                        setTileOrder,
-                        theme,
-                        setTheme,
-                    } satisfies LayoutContext} />
+                    <Outlet />
                 </div>
             </main>
 
@@ -75,6 +53,10 @@ export const Layout: React.FC = () => {
                     className="fixed inset-0 bg-black/50 z-40 md:hidden glass"
                     onClick={() => setSidebarOpen(false)}
                 />
+            )}
+
+            {hasConflict && (
+                <MultiTabModal />
             )}
         </div>
     );

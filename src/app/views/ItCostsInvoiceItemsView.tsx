@@ -6,7 +6,8 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ExportFAB } from '../components/ui/ExportFAB';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { SummaryCard } from '../components/ui/SummaryCard';
-import * as XLSX from 'xlsx';
+import { getPreviousPeriod } from '../../lib/utils/dateUtils';
+import { exportToExcel } from '../../lib/utils/exportUtils';
 import type { InvoiceItem } from '../../types';
 
 interface ItCostsInvoiceItemsViewProps {
@@ -15,16 +16,6 @@ interface ItCostsInvoiceItemsViewProps {
     onBack: () => void;
     onViewHistory: (item: InvoiceItem) => void;
 }
-
-// Helper to get previous period (assuming YYYY-MM format)
-const getPreviousPeriod = (currentPeriod: string) => {
-    const [year, month] = currentPeriod.split('-').map(Number);
-    const date = new Date(year, month - 1, 1);
-    date.setMonth(date.getMonth() - 1);
-    const prevYear = date.getFullYear();
-    const prevMonth = String(date.getMonth() + 1).padStart(2, '0');
-    return `${prevYear}-${prevMonth}`;
-};
 
 export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = ({ invoiceId, period, onBack, onViewHistory }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -147,10 +138,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             'Amount': p.Amount
         }));
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Invoice Positions");
-        XLSX.writeFile(wb, `Invoice_${invoiceId}_${period}.xlsx`);
+        exportToExcel(exportData, `Invoice_${invoiceId}_${period}`, "Invoice Positions");
     };
 
     const columns: Column<any>[] = [

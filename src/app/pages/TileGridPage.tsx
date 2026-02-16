@@ -1,10 +1,9 @@
 import React from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { TileGrid } from '../TileGrid';
-import type { LayoutContext } from '../Layout';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
 export const TileGridPage: React.FC = () => {
-    const { visibleTileIds, tileOrder, setTileOrder, setVisibleTileIds } = useOutletContext<LayoutContext>();
+    const { visibleTileIds, tileOrder, setTileOrder, setVisibleTileIds } = useDashboard();
 
     return (
         <div className="h-full overflow-y-auto animate-in fade-in duration-500">
