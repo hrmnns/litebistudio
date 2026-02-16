@@ -7,7 +7,7 @@ import { useDashboard } from '../../lib/context/DashboardContext';
 
 export const SettingsView: React.FC = () => {
     const { theme, setTheme } = useThemeContext();
-    const { visibleTileIds, setVisibleTileIds, tileOrder } = useDashboard();
+    const { visibleTileIds, setVisibleTileIds, visibleSidebarItemIds, setVisibleSidebarItemIds, tileOrder } = useDashboard();
     const [webhookUrl, setWebhookUrl] = useState('');
     const [isTestingWebhook, setIsTestingWebhook] = useState(false);
 
@@ -54,115 +54,149 @@ export const SettingsView: React.FC = () => {
     ];
 
     return (
-        <div className="h-full overflow-y-auto p-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-8">Settings</h2>
+        <div className="h-full w-full overflow-y-auto animate-in slide-in-from-bottom-4 duration-500">
+            <div className="max-w-2xl mx-auto p-8">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-8">Settings</h2>
 
-            {/* Appearance Section */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                        {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
-                    </span>
-                    Appearance
-                </h3>
-                <div className="space-y-4">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Customize how the IT Dashboard looks on your device.
-                    </p>
+                {/* Appearance Section */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                            {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
+                        </span>
+                        Appearance
+                    </h3>
+                    <div className="space-y-4">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Customize how the IT Dashboard looks on your device.
+                        </p>
 
-                    <div className="grid grid-cols-3 gap-3">
-                        {themeOptions.map(({ value, emoji, label }) => (
-                            <button
-                                key={value}
-                                onClick={() => setTheme(value)}
-                                className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === value
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
-                                    : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
-                                    }`}
+                        <div className="grid grid-cols-3 gap-3">
+                            {themeOptions.map(({ value, emoji, label }) => (
+                                <button
+                                    key={value}
+                                    onClick={() => setTheme(value)}
+                                    className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === value
+                                        ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
+                                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
+                                        }`}
+                                >
+                                    <span className="text-xl">{emoji}</span>
+                                    <span className="text-sm font-medium">{label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Dashboard Customization Section */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                            🧩
+                        </span>
+                        Dashboard Customization
+                    </h3>
+                    <div className="flex items-center justify-between px-4 mb-4">
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Komponente</span>
+                        <div className="flex gap-12 mr-2">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Overview</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sidebar</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                        {tileOrder.map(id => TILES.find(t => t.id === id)).filter(Boolean).map((tile) => (
+                            <div
+                                key={tile!.id}
+                                className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 transition-colors"
                             >
-                                <span className="text-xl">{emoji}</span>
-                                <span className="text-sm font-medium">{label}</span>
-                            </button>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-2 h-2 rounded-full ${visibleTileIds.includes(tile!.id) ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{tile!.title}</span>
+                                        {!tile!.targetView && <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Nur Kachel</span>}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-10">
+                                    {/* Overview Toggle */}
+                                    <button
+                                        onClick={() => {
+                                            if (visibleTileIds.includes(tile!.id)) {
+                                                setVisibleTileIds(visibleTileIds.filter(id => id !== tile!.id));
+                                            } else {
+                                                setVisibleTileIds([...visibleTileIds, tile!.id]);
+                                            }
+                                        }}
+                                        title="Im Dashboard anzeigen/verstecken"
+                                        className={`w-12 h-6 rounded-full transition-colors relative ${visibleTileIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleTileIds.includes(tile!.id) ? 'left-7' : 'left-1'}`} />
+                                    </button>
+
+                                    {/* Sidebar Toggle */}
+                                    <button
+                                        disabled={!tile!.targetView}
+                                        onClick={() => {
+                                            if (visibleSidebarItemIds.includes(tile!.id)) {
+                                                setVisibleSidebarItemIds(visibleSidebarItemIds.filter(id => id !== tile!.id));
+                                            } else {
+                                                setVisibleSidebarItemIds([...visibleSidebarItemIds, tile!.id]);
+                                            }
+                                        }}
+                                        title={tile!.targetView ? "In der Sidebar anzeigen/verstecken" : "Keine Detailansicht verfügbar"}
+                                        className={`w-12 h-6 rounded-full transition-colors relative ${tile!.targetView ? (visibleSidebarItemIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700') : 'bg-slate-100 dark:bg-slate-800 opacity-50 cursor-not-allowed'}`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleSidebarItemIds.includes(tile!.id) && tile!.targetView ? 'left-7' : 'left-1'}`} />
+                                    </button>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </div>
-            </div>
 
-            {/* Dashboard Customization Section */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                        🧩
-                    </span>
-                    Dashboard Customization
-                </h3>
-                <div className="grid grid-cols-1 gap-2">
-                    {tileOrder.map(id => TILES.find(t => t.id === id)).filter(Boolean).map((tile) => (
-                        <div
-                            key={tile!.id}
-                            className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 transition-colors"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`w-2 h-2 rounded-full ${visibleTileIds.includes(tile!.id) ? 'bg-blue-500' : 'bg-slate-300'}`} />
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{tile!.title}</span>
-                            </div>
+                {/* Global Notification Settings Section */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mt-6">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                            <Bell className="w-4 h-4 text-blue-500" />
+                        </span>
+                        Global Notification Settings
+                    </h3>
+                    <div className="space-y-6">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Configure how you receive automated alerts for system outages and anomalies.
+                        </p>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Webhook URL (Slack/Teams)</label>
+                            <input
+                                type="url"
+                                placeholder="https://hooks.slack.com/services/..."
+                                className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl focus:border-blue-500 focus:ring-0 outline-none transition-all text-slate-900 dark:text-white font-bold"
+                                value={webhookUrl}
+                                onChange={(e) => setWebhookUrl(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-3">
                             <button
-                                onClick={() => {
-                                    if (visibleTileIds.includes(tile!.id)) {
-                                        setVisibleTileIds(visibleTileIds.filter(id => id !== tile!.id));
-                                    } else {
-                                        setVisibleTileIds([...visibleTileIds, tile!.id]);
-                                    }
-                                }}
-                                className={`w-12 h-6 rounded-full transition-colors relative ${visibleTileIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                onClick={handleSaveWebhook}
+                                className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 hover:bg-slate-800 dark:hover:bg-slate-100"
                             >
-                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleTileIds.includes(tile!.id) ? 'left-7' : 'left-1'}`} />
+                                <Save className="w-5 h-5" />
+                                Save Settings
+                            </button>
+                            <button
+                                onClick={handleTestWebhook}
+                                disabled={isTestingWebhook || !webhookUrl}
+                                className="px-6 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-900 dark:text-white font-black rounded-xl transition-all flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-5 h-5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
+                                Test
                             </button>
                         </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Global Notification Settings Section */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mt-6">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                        <Bell className="w-4 h-4 text-blue-500" />
-                    </span>
-                    Global Notification Settings
-                </h3>
-                <div className="space-y-6">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Configure how you receive automated alerts for system outages and anomalies.
-                    </p>
-
-                    <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Webhook URL (Slack/Teams)</label>
-                        <input
-                            type="url"
-                            placeholder="https://hooks.slack.com/services/..."
-                            className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl focus:border-blue-500 focus:ring-0 outline-none transition-all text-slate-900 dark:text-white font-bold"
-                            value={webhookUrl}
-                            onChange={(e) => setWebhookUrl(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={handleSaveWebhook}
-                            className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 hover:bg-slate-800 dark:hover:bg-slate-100"
-                        >
-                            <Save className="w-5 h-5" />
-                            Save Settings
-                        </button>
-                        <button
-                            onClick={handleTestWebhook}
-                            disabled={isTestingWebhook || !webhookUrl}
-                            className="px-6 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-900 dark:text-white font-black rounded-xl transition-all flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
-                        >
-                            <RefreshCw className={`w-5 h-5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
-                            Test
-                        </button>
                     </div>
                 </div>
             </div>

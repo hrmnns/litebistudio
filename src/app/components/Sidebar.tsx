@@ -2,6 +2,8 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, Bookmark, ShieldCheck } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
+import { useDashboard } from '../../lib/context/DashboardContext';
+import { TILES } from '../../config/tiles';
 
 interface SidebarProps {
     isCollapsed: boolean;
@@ -26,10 +28,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onToggleCollapse,
     onCloseMobile,
 }) => {
-    const navItems: NavItem[] = [
+    const { visibleSidebarItemIds } = useDashboard();
+
+    // Map component names to Lucide icons
+    const iconMap: Record<string, React.ReactNode> = {
+        'ItCostsTile': <Database className="w-5 h-5 flex-shrink-0" />,
+        'SystemsTile': <ShieldCheck className="w-5 h-5 flex-shrink-0" />,
+        'AnomalyRadarTile': <ShieldCheck className="w-5 h-5 flex-shrink-0 text-rose-500" />,
+        'WorklistTile': <Bookmark className="w-5 h-5 flex-shrink-0 text-amber-500" />,
+        'DataInspectorTile': <Database className="w-5 h-5 flex-shrink-0 text-indigo-500" />,
+    };
+
+    const staticTopItems: NavItem[] = [
         { to: '/', icon: <LayoutDashboard className="w-5 h-5 flex-shrink-0" />, label: 'Overview' },
-        { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: 'Data Source' },
-        { to: '/worklist', icon: <Bookmark className="w-5 h-5 flex-shrink-0 text-amber-500" />, label: 'Arbeitsvorrat' },
+    ];
+
+    const dynamicItems: NavItem[] = TILES
+        .filter(tile => tile.targetView && visibleSidebarItemIds.includes(tile.id))
+        .map(tile => ({
+            to: tile.targetView!,
+            icon: iconMap[tile.component] || <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
+            label: tile.title
+        }));
+
+    const staticBottomItems: NavItem[] = [
         { to: '/settings', icon: <Settings className="w-5 h-5 flex-shrink-0" />, label: 'Settings' },
     ];
 
@@ -66,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <div className="flex flex-col h-[calc(100%-80px)] justify-between">
                 <nav className="p-4 space-y-1">
-                    {navItems.map(({ to, icon, label }) => (
+                    {[...staticTopItems, ...dynamicItems, ...staticBottomItems].map(({ to, icon, label }) => (
                         <NavLink
                             key={to}
                             to={to}

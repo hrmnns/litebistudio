@@ -5,6 +5,8 @@ import { TILES } from '../../config/tiles';
 interface DashboardContextType {
     visibleTileIds: string[];
     setVisibleTileIds: (ids: string[] | ((prev: string[]) => string[])) => void;
+    visibleSidebarItemIds: string[];
+    setVisibleSidebarItemIds: (ids: string[] | ((prev: string[]) => string[])) => void;
     tileOrder: string[];
     setTileOrder: (order: string[] | ((prev: string[]) => string[])) => void;
     isSidebarCollapsed: boolean;
@@ -22,6 +24,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     // Merge existing tiles into the slots at initialization
     const [visibleTileIds, setVisibleTileIds] = useLocalStorage<string[]>('visibleTileIds', TILES.map(t => t.id));
+    const [visibleSidebarItemIds, setVisibleSidebarItemIds] = useLocalStorage<string[]>('visibleSidebarItemIds', TILES.filter(t => t.targetView).map(t => t.id));
     const [tileOrder, setTileOrder] = useLocalStorage<string[]>('tileOrder', initialOrder);
     const [isSidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
 
@@ -44,13 +47,21 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
                 return [...next, ...missingTiles.slice(missingIdx)];
             });
             setVisibleTileIds(prev => [...new Set([...prev, ...missingTiles])]);
+
+            // Also sync sidebar items for tiles that have a view
+            const missingSidebarTiles = missingTiles.filter(id => TILES.find(t => t.id === id)?.targetView);
+            if (missingSidebarTiles.length > 0) {
+                setVisibleSidebarItemIds(prev => [...new Set([...prev, ...missingSidebarTiles])]);
+            }
         }
-    }, [tileOrder, setTileOrder, visibleTileIds, setVisibleTileIds]);
+    }, [tileOrder, setTileOrder, visibleTileIds, setVisibleTileIds, setVisibleSidebarItemIds]);
 
     return (
         <DashboardContext.Provider value={{
             visibleTileIds,
             setVisibleTileIds,
+            visibleSidebarItemIds,
+            setVisibleSidebarItemIds,
             tileOrder,
             setTileOrder,
             isSidebarCollapsed,

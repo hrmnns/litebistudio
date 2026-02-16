@@ -15,7 +15,7 @@ export const DataInspectorTile: React.FC<{ onRemove?: () => void; dragHandleProp
     if (error) {
         return (
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-red-200 dark:border-red-900/50 p-4 h-full flex items-center justify-center text-center">
-                <p className="text-red-500 font-bold text-sm">Fehler beim Laden</p>
+                <p className="text-red-500 font-bold text-[10px] uppercase">Fehler</p>
             </div>
         );
     }
@@ -30,20 +30,22 @@ export const DataInspectorTile: React.FC<{ onRemove?: () => void; dragHandleProp
             dragHandleProps={dragHandleProps}
             backgroundIcon={Database}
         >
-            <div className="flex flex-col h-full items-center justify-around py-2">
+            <div className="flex flex-col h-full items-center justify-around py-0.5">
                 {/* Primary Metric: Total Records */}
                 <div className="text-center group-hover:scale-105 transition-transform duration-500">
-                    <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Records</div>
-                    <div className="text-4xl font-black text-indigo-600 dark:text-indigo-500 tracking-tighter tabular-nums leading-none">
-                        {loading || !stats ? <Skeleton className="h-9 w-24" /> : stats.records.toLocaleString('de-DE')}
+                    <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-0.5">Records Gesamt</div>
+                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums leading-none">
+                        {loading || !stats ? <Skeleton className="h-8 w-20 mx-auto" /> : stats.records.toLocaleString('de-DE')}
                     </div>
                 </div>
 
-                {/* Secondary Metric: Tables */}
-                <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800/50 text-center">
-                    <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Tabellen</div>
-                    <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums leading-none">
-                        {loading || !stats ? <Skeleton className="h-6 w-12 mx-auto" /> : stats.tables}
+                {/* Secondary Metrics - High Density Tables Pill */}
+                <div className="w-full pt-3 border-t border-slate-100 dark:border-slate-800/50 flex justify-center">
+                    <div className="flex flex-col items-center px-4 py-1 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
+                        <span className="text-[6px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-tighter mb-0.5">Tabellen</span>
+                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                            {loading || !stats ? '...' : stats.tables}
+                        </span>
                     </div>
                 </div>
             </div>
