@@ -13,7 +13,7 @@ export const TILES: TileConfig[] = [
         title: 'Systems Availability',
         component: 'SystemsTile',
         targetView: '/systems',
-        defaultSize: 'medium',
+        defaultSize: 'small',
     },
     {
         id: 'it-forecast',

@@ -71,7 +71,7 @@ export interface SystemRecord {
 
 // ─── Worklist ─────────────────────────────────────────────────
 
-export type WorklistStatus = 'open' | 'done';
+export type WorklistStatus = 'open' | 'ok' | 'error' | 'clarification';
 
 export interface WorklistEntry {
     id: number;

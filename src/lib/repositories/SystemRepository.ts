@@ -6,6 +6,11 @@ export const SystemRepository = {
         return await runQuery('SELECT * FROM systems ORDER BY sort_order ASC, name ASC') as unknown as SystemRecord[];
     },
 
+    async getCount(): Promise<number> {
+        const result = await runQuery('SELECT COUNT(*) as count FROM systems');
+        return (result[0]?.count as number) || 0;
+    },
+
     async add(system: Omit<SystemRecord, 'id' | 'sort_order' | 'is_favorite' | 'status'>): Promise<void> {
         // Get max sort order
         const maxSort = await runQuery('SELECT MAX(sort_order) as maxCorner FROM systems');

@@ -5,9 +5,15 @@ import { WorklistRepository } from '../../lib/repositories/WorklistRepository';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { RecordDetailModal } from '../components/RecordDetailModal';
-import { Bookmark, ExternalLink, Trash2, Calendar, Tag } from 'lucide-react';
-import type { WorklistEntry } from '../../types';
+import { Bookmark, ExternalLink, Trash2, CheckCircle, AlertCircle, HelpCircle, RotateCcw } from 'lucide-react';
+import type { WorklistEntry, WorklistStatus } from '../../types';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs));
+}
 
 interface WorklistViewProps {
     onBack: () => void;
@@ -67,26 +73,33 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
         setSelectedDetailId(item.source_id);
     };
 
+    const handleStatusUpdate = async (e: React.MouseEvent, item: WorklistEntry, status: WorklistStatus) => {
+        e.stopPropagation();
+        await WorklistRepository.updateStatus(item.source_table, item.source_id, status);
+        refresh();
+        window.dispatchEvent(new Event('db-updated'));
+    };
+
     const columns: Column<WorklistEntry>[] = [
         {
-            header: 'Datum hinzugefügt',
-            accessor: 'added_at',
-            render: (item: WorklistEntry) => (
-                <div className="flex items-center gap-2 text-slate-500">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span className="text-xs font-medium">{new Date(item.added_at).toLocaleString()}</span>
-                </div>
-            )
-        },
-        {
-            header: 'Quelle',
-            accessor: 'source_table',
-            render: (item: WorklistEntry) => (
-                <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 w-fit">
-                    <Tag className="w-3 h-3" />
-                    {item.source_table}
-                </div>
-            )
+            header: 'Status',
+            accessor: 'status',
+            render: (item: WorklistEntry) => {
+                const config: Record<WorklistStatus, { label: string; icon: any; color: string }> = {
+                    open: { label: 'Offen', icon: Bookmark, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800' },
+                    ok: { label: 'OK', icon: CheckCircle, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800' },
+                    error: { label: 'Fehlerhaft', icon: AlertCircle, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800' },
+                    clarification: { label: 'In Klärung', icon: HelpCircle, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800' }
+                };
+                const { label, icon: Icon, color } = config[item.status] || config.open;
+
+                return (
+                    <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider w-fit", color)}>
+                        <Icon className="w-3 h-3" />
+                        {label}
+                    </div>
+                );
+            }
         },
         {
             header: 'Bezeichnung',
@@ -97,9 +110,14 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
                     <span className="font-bold text-slate-900 dark:text-white line-clamp-1">
                         {item.display_label}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                        ID: {item.source_id}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                            ID: {item.source_id}
+                        </span>
+                        <span className="text-[9px] px-1 bg-slate-100 dark:bg-slate-800 rounded font-black text-slate-500 uppercase">
+                            {item.source_table}
+                        </span>
+                    </div>
                 </div>
             )
         },
@@ -117,7 +135,39 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
             accessor: 'id',
             align: 'right',
             render: (item: WorklistEntry) => (
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-1.5">
+                    {/* Status Actions */}
+                    <div className="flex items-center gap-1 mr-2 pr-2 border-r border-slate-100 dark:border-slate-800">
+                        <button
+                            onClick={(e) => handleStatusUpdate(e, item, 'ok')}
+                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'ok' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40" : "text-slate-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600")}
+                            title="Als OK markieren"
+                        >
+                            <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={(e) => handleStatusUpdate(e, item, 'error')}
+                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'error' ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40" : "text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600")}
+                            title="Als Fehlerhaft markieren"
+                        >
+                            <AlertCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={(e) => handleStatusUpdate(e, item, 'clarification')}
+                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'clarification' ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40" : "text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600")}
+                            title="In Klärung setzen"
+                        >
+                            <HelpCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={(e) => handleStatusUpdate(e, item, 'open')}
+                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'open' ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40" : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-600")}
+                            title="Status zurücksetzen (Offen)"
+                        >
+                            <RotateCcw className="w-4 h-4" />
+                        </button>
+                    </div>
+
                     <button
                         onClick={() => handleRowClick(item)}
                         className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"

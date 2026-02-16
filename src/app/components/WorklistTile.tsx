@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Bookmark, ListChecks } from 'lucide-react';
-import { getWorklistCount } from '../../lib/db';
+import { WorklistRepository } from '../../lib/repositories/WorklistRepository';
 import { DashboardTile } from './ui/DashboardTile';
+import type { WorklistStatus } from '../../types';
 
 interface WorklistTileProps {
     onClick?: () => void;
@@ -10,18 +11,20 @@ interface WorklistTileProps {
 }
 
 export const WorklistTile: React.FC<WorklistTileProps> = ({ onClick, onRemove, dragHandleProps }) => {
-    const [count, setCount] = useState<number | null>(null);
+    const [counts, setCounts] = useState<Record<WorklistStatus, number> | null>(null);
 
-    const updateCount = async () => {
-        const c = await getWorklistCount();
-        setCount(c);
+    const updateCounts = async () => {
+        const c = await WorklistRepository.getStatusCounts();
+        setCounts(c);
     };
 
     useEffect(() => {
-        updateCount();
-        window.addEventListener('db-updated', updateCount);
-        return () => window.removeEventListener('db-updated', updateCount);
+        updateCounts();
+        window.addEventListener('db-updated', updateCounts);
+        return () => window.removeEventListener('db-updated', updateCounts);
     }, []);
+
+    const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0;
 
     return (
         <DashboardTile
@@ -31,18 +34,50 @@ export const WorklistTile: React.FC<WorklistTileProps> = ({ onClick, onRemove, d
             onClick={onClick}
             onRemove={onRemove}
             dragHandleProps={dragHandleProps}
-            footerLeft={
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                    <ListChecks className="w-3 h-3" />
-                    Review Tasks
-                </div>
-            }
+            backgroundIcon={ListChecks}
         >
-            <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-4xl font-black text-slate-900 dark:text-white">
-                    {count === null ? '...' : count}
-                </span>
-                <span className="text-xs font-bold text-slate-400">OFFEN</span>
+            <div className="flex flex-col h-full items-center justify-around py-0.5">
+                {/* Main Metric: Total - Slightly more compact */}
+                <div className="text-center group-hover:scale-105 transition-transform duration-500">
+                    <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-0.5">Einträge Gesamt</div>
+                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums leading-none">
+                        {counts === null ? '...' : total}
+                    </div>
+                </div>
+
+                {/* Status Breakdown Row - High Density Horizontal Design */}
+                <div className="w-full pt-3 border-t border-slate-100 dark:border-slate-800/50">
+                    <div className="grid grid-cols-4 gap-1">
+                        {/* Offen */}
+                        <div className="flex flex-col items-center p-1 rounded-lg bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100/50 dark:border-amber-800/30">
+                            <span className="text-[6px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-tighter mb-0.5">Offen</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                                {counts?.open ?? 0}
+                            </span>
+                        </div>
+                        {/* OK */}
+                        <div className="flex flex-col items-center p-1 rounded-lg bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100/50 dark:border-emerald-800/30">
+                            <span className="text-[6px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter mb-0.5">OK</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                                {counts?.ok ?? 0}
+                            </span>
+                        </div>
+                        {/* Fehler */}
+                        <div className="flex flex-col items-center p-1 rounded-lg bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100/50 dark:border-rose-800/30">
+                            <span className="text-[6px] font-black text-rose-600 dark:text-rose-500 uppercase tracking-tighter mb-0.5">Fehler</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                                {counts?.error ?? 0}
+                            </span>
+                        </div>
+                        {/* Klärung */}
+                        <div className="flex flex-col items-center p-1 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
+                            <span className="text-[6px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-tighter mb-0.5">Klärung</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                                {counts?.clarification ?? 0}
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </DashboardTile>
     );

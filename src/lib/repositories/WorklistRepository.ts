@@ -1,5 +1,5 @@
 import { runQuery } from '../db';
-import type { WorklistEntry } from '../../types';
+import type { WorklistEntry, WorklistStatus } from '../../types';
 
 export const WorklistRepository = {
     async getAll(): Promise<WorklistEntry[]> {
@@ -42,5 +42,35 @@ export const WorklistRepository = {
             [sourceTable, sourceId]
         );
         return result.length > 0;
+    },
+
+    async updateStatus(sourceTable: string, sourceId: number, status: WorklistStatus): Promise<void> {
+        await runQuery(
+            'UPDATE worklist SET status = ? WHERE source_table = ? AND source_id = ?',
+            [status, sourceTable, sourceId]
+        );
+    },
+
+    async getStatusCounts(): Promise<Record<WorklistStatus, number>> {
+        const rows = await runQuery(`
+            SELECT status, COUNT(*) as count 
+            FROM worklist 
+            GROUP BY status
+        `);
+
+        const counts: Record<WorklistStatus, number> = {
+            open: 0,
+            ok: 0,
+            error: 0,
+            clarification: 0
+        };
+
+        rows.forEach((row: any) => {
+            if (row.status in counts) {
+                counts[row.status as WorklistStatus] = row.count;
+            }
+        });
+
+        return counts;
     }
 };
