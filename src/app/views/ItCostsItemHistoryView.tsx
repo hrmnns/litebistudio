@@ -3,6 +3,7 @@ import { useQuery } from '../../hooks/useQuery';
 import { TrendingUp, AlertCircle, Info, Tag, Layers, Receipt } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ViewHeader } from '../components/ui/ViewHeader';
+import { RecordDetailModal } from '../components/RecordDetailModal';
 import { SummaryCard } from '../components/ui/SummaryCard';
 import { RecordComparison } from '../components/ui/RecordComparison';
 
@@ -76,6 +77,16 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
             };
         });
     }, [history, referencePeriod, ambiguityMap]);
+
+    // 2.5 Sorted records for navigation (Newest first)
+    const sortedRecords = useMemo(() => {
+        return [...records].sort((a, b) => b.Period.localeCompare(a.Period));
+    }, [records]);
+
+    const referenceIndex = useMemo(() => {
+        const refId = referenceItem.id ?? referenceItem.ID;
+        return sortedRecords.findIndex((r: any) => (r.id ?? r.ID) === refId);
+    }, [sortedRecords, referenceItem]);
 
 
 
@@ -183,7 +194,10 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                     <div className="flex items-center gap-8 shrink-0">
                         {!record.isCurrent && (
                             <div className="flex flex-col items-end">
-                                <div className={`text-[11px] font-black flex items-center gap-1 ${delta > 0 ? 'text-red-500' : delta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                <div
+                                    title={`Differenz zum Referenzmonat (${referenceItem.Period})`}
+                                    className={`text-[11px] font-black flex items-center gap-1 ${delta > 0 ? 'text-red-500' : delta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}
+                                >
                                     {delta !== 0 ? (
                                         <>
                                             {delta > 0 ? '+' : ''}{delta.toLocaleString()}€
@@ -358,27 +372,14 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                 ) : null}
             </Modal>
 
-            {/* Raw Details Modal */}
-            <Modal
+            {/* Raw Details Modal - Standardized with Navigation */}
+            <RecordDetailModal
                 isOpen={showRawDetails}
                 onClose={() => setShowRawDetails(false)}
+                items={sortedRecords}
+                initialIndex={referenceIndex >= 0 ? referenceIndex : 0}
                 title="Datensatz-Details"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                    {Object.entries(referenceItem).map(([key, value]) => (
-                        <div key={key} className="border-b border-slate-100 dark:border-slate-700 pb-2">
-                            <dt className="text-[10px] font-bold uppercase text-slate-400 mb-1">{key}</dt>
-                            <dd className="text-sm font-medium text-slate-900 dark:text-white break-all">
-                                {value === null || value === undefined || value === '' ? (
-                                    <span className="text-slate-300 italic">&lt;leer&gt;</span>
-                                ) : (
-                                    String(value)
-                                )}
-                            </dd>
-                        </div>
-                    ))}
-                </div>
-            </Modal>
+            />
         </div>
     );
 };

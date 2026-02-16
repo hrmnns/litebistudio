@@ -260,69 +260,71 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     ];
 
     return (
-        <div className="p-6 md:p-8 space-y-6 print:space-y-4">
-            <ViewHeader
-                title={vendorName}
-                subtitle={`${period}`}
-                onBack={onBack}
-                badges={
-                    <>
-                        <div className={`px-2 py-0.5 text-white text-[10px] font-black uppercase rounded flex items-center gap-1.5 shadow-sm ${invoiceId.startsWith('GEN-') ? 'bg-orange-600' : 'bg-slate-900'}`}>
-                            <Receipt className="w-3 h-3" />
-                            Invoice {invoiceId}
-                        </div>
-                        {invoiceId.startsWith('GEN-') && (
-                            <div className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black uppercase rounded shadow-sm flex items-center gap-1">
-                                <AlertTriangle className="w-2.5 h-2.5" />
-                                Auto-ID: Missing Data
+        <div className="p-6 md:p-8 h-full flex flex-col space-y-6 print:space-y-4">
+            <div className="flex-none space-y-6">
+                <ViewHeader
+                    title={vendorName}
+                    subtitle={`${period}`}
+                    onBack={onBack}
+                    badges={
+                        <>
+                            <div className={`px-2 py-0.5 text-white text-[10px] font-black uppercase rounded flex items-center gap-1.5 shadow-sm ${invoiceId.startsWith('GEN-') ? 'bg-orange-600' : 'bg-slate-900'}`}>
+                                <Receipt className="w-3 h-3" />
+                                Invoice {invoiceId}
                             </div>
-                        )}
-                    </>
-                }
-                actions={
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 px-5 shadow-sm flex flex-col min-w-[160px]">
-                        <span className="text-[9px] font-black text-slate-400 uppercase text-left tracking-widest">Total Position Value</span>
-                        <span className="text-2xl font-black text-blue-600 dark:text-blue-400 text-right mt-1">€{totalAmount.toLocaleString()}</span>
-                    </div>
-                }
-            />
-
-            {/* Quality Summary Strip */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 no-print">
-                <SummaryCard
-                    title="Total Items"
-                    value={items.length}
-                    icon={Receipt}
-                    color="text-slate-500"
+                            {invoiceId.startsWith('GEN-') && (
+                                <div className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black uppercase rounded shadow-sm flex items-center gap-1">
+                                    <AlertTriangle className="w-2.5 h-2.5" />
+                                    Auto-ID: Missing Data
+                                </div>
+                            )}
+                        </>
+                    }
+                    actions={
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 px-5 shadow-sm flex flex-col min-w-[160px]">
+                            <span className="text-[9px] font-black text-slate-400 uppercase text-left tracking-widest">Total Position Value</span>
+                            <span className="text-2xl font-black text-blue-600 dark:text-blue-400 text-right mt-1">€{totalAmount.toLocaleString()}</span>
+                        </div>
+                    }
                 />
 
-                <SummaryCard
-                    title="New Discoveries"
-                    value={anomalySummary.new}
-                    icon={PlusCircle}
-                    color={anomalySummary.new > 0 ? 'text-blue-600' : 'text-slate-400'}
-                    className={anomalySummary.new > 0 ? 'bg-blue-50/50 border-blue-100 dark:bg-blue-900/10' : 'opacity-60'}
-                />
+                {/* Quality Summary Strip */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 no-print">
+                    <SummaryCard
+                        title="Total Items"
+                        value={items.length}
+                        icon={Receipt}
+                        color="text-slate-500"
+                    />
 
-                <SummaryCard
-                    title="Value Drift"
-                    value={anomalySummary.changed}
-                    icon={AlertTriangle}
-                    color={anomalySummary.changed > 0 ? 'text-orange-600' : 'text-slate-400'}
-                    className={anomalySummary.changed > 0 ? 'bg-orange-50/50 border-orange-100 dark:bg-orange-900/10' : 'opacity-60'}
-                />
+                    <SummaryCard
+                        title="New Discoveries"
+                        value={anomalySummary.new}
+                        icon={PlusCircle}
+                        color={anomalySummary.new > 0 ? 'text-blue-600' : 'text-slate-400'}
+                        className={anomalySummary.new > 0 ? 'bg-blue-50/50 border-blue-100 dark:bg-blue-900/10' : 'opacity-60'}
+                    />
 
-                <SummaryCard
-                    title="Key Conflicts"
-                    value={anomalySummary.ambiguous}
-                    icon={Copy}
-                    color={anomalySummary.ambiguous > 0 ? 'text-red-600' : 'text-slate-400'}
-                    className={anomalySummary.ambiguous > 0 ? 'bg-red-50/50 border-red-100 dark:bg-red-900/10 ring-2 ring-red-500 animate-pulse' : 'opacity-60'}
-                />
+                    <SummaryCard
+                        title="Value Drift"
+                        value={anomalySummary.changed}
+                        icon={AlertTriangle}
+                        color={anomalySummary.changed > 0 ? 'text-orange-600' : 'text-slate-400'}
+                        className={anomalySummary.changed > 0 ? 'bg-orange-50/50 border-orange-100 dark:bg-orange-900/10' : 'opacity-60'}
+                    />
+
+                    <SummaryCard
+                        title="Key Conflicts"
+                        value={anomalySummary.ambiguous}
+                        icon={Copy}
+                        color={anomalySummary.ambiguous > 0 ? 'text-red-600' : 'text-slate-400'}
+                        className={anomalySummary.ambiguous > 0 ? 'bg-red-50/50 border-red-100 dark:bg-red-900/10 ring-2 ring-red-500 animate-pulse' : 'opacity-60'}
+                    />
+                </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden print:border-0 print:shadow-none">
-                <div className="p-4 px-6 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden print:border-0 print:shadow-none flex flex-col">
+                <div className="flex-none p-4 px-6 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-3">
                         <div className="p-1 bg-slate-200 dark:bg-slate-700 rounded-lg">
                             <Receipt className="w-4 h-4 text-slate-500" />
@@ -337,13 +339,41 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <DataTable
-                    data={enhancedItems}
-                    columns={columns}
-                    searchTerm={searchTerm}
-                    searchFields={['Description', 'CostCenter', 'GLAccount', 'Category']}
-                    emptyMessage="No positions found matching your search"
-                />
+
+                <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+                    <DataTable
+                        data={enhancedItems}
+                        columns={columns}
+                        searchTerm={searchTerm}
+                        searchFields={['Description', 'CostCenter', 'GLAccount', 'Category']}
+                        emptyMessage="No positions found matching your search"
+                    />
+                </div>
+
+                {/* Status Footer */}
+                <div className="flex-none px-4 py-3 border-t border-slate-100 dark:border-slate-700 text-[10px] flex justify-between items-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1.5 font-medium">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            {items.length} Positions Total
+                        </div>
+                        {anomalySummary.ambiguous > 0 && (
+                            <div className="flex items-center gap-1.5 text-red-500 font-black">
+                                <AlertTriangle className="w-3 h-3" />
+                                {anomalySummary.ambiguous} Conflicts Detected
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-6 font-bold uppercase tracking-widest">
+                        <div className="flex items-center gap-1.5 hover:text-slate-600 transition-colors">
+                            <Receipt className="w-3 h-3" />
+                            Inv: {invoiceId}
+                        </div>
+                        <div className="text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-700/50 px-2 py-1 rounded">
+                            Σ €{totalAmount.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
             </div>
 
 

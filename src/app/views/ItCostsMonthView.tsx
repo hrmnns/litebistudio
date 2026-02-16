@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { Search, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle, Copy, ShieldCheck, Box, FileText } from 'lucide-react';
+import { Search, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle, Copy, ShieldCheck, Box, FileText, Layers } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ExportFAB } from '../../components/ui/ExportFAB';
 import { ViewHeader } from '../components/ui/ViewHeader';
@@ -293,58 +293,60 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     const avgInvoiceAmount = totalAmount / (invoices.length || 1);
 
     return (
-        <div className="p-6 md:p-8 space-y-6">
-            <ViewHeader
-                title={`Monthly Analysis: ${period}`}
-                subtitle={`Comparing to ${previousPeriod}`}
-                onBack={onBack}
-                badges={totalAnomalies > 0 ? (
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-full">
-                        {totalAnomalies} Anomalies Detected
-                    </span>
-                ) : null}
-            />
-
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <SummaryCard
-                    title="Period Total"
-                    value={`€${totalAmount.toLocaleString()}`}
-                    icon={TrendingUp}
-                    color="text-blue-500"
-                    className="bg-slate-900 text-white dark:bg-slate-900 border-slate-800"
+        <div className="p-6 md:p-8 h-full flex flex-col space-y-6">
+            <div className="flex-none space-y-6">
+                <ViewHeader
+                    title={`Monthly Analysis: ${period}`}
+                    subtitle={`Comparing to ${previousPeriod}`}
+                    onBack={onBack}
+                    badges={totalAnomalies > 0 ? (
+                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-full">
+                            {totalAnomalies} Anomalies Detected
+                        </span>
+                    ) : null}
                 />
 
-                <SummaryCard
-                    title="Volume"
-                    value={invoices.length}
-                    icon={Box}
-                    color="text-purple-500"
-                    subtext={`(${totalPositions} Positions total)`}
-                    trendLabel="Invoices"
-                />
+                {/* Quick Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <SummaryCard
+                        title="Period Total"
+                        value={`€${totalAmount.toLocaleString()}`}
+                        icon={TrendingUp}
+                        color="text-blue-500"
+                        className="bg-slate-900 text-white dark:bg-slate-900 border-slate-800"
+                    />
 
-                <SummaryCard
-                    title="Data Integrity"
-                    value={`${dataCoverage}%`}
-                    icon={ShieldCheck}
-                    color={dataCoverage > 90 ? 'text-emerald-500' : 'text-orange-500'}
-                    subtext={`${autoGenInvoicesCount} Synthetic IDs`}
-                    trendLabel="Coverage"
-                />
+                    <SummaryCard
+                        title="Volume"
+                        value={invoices.length}
+                        icon={Box}
+                        color="text-purple-500"
+                        subtext={`(${totalPositions} Positions total)`}
+                        trendLabel="Invoices"
+                    />
 
-                <SummaryCard
-                    title="Avg. Invoice"
-                    value={`€${Math.round(avgInvoiceAmount).toLocaleString()}`}
-                    icon={FileText}
-                    color="text-blue-500"
-                    trendLabel="per Document"
-                />
+                    <SummaryCard
+                        title="Data Integrity"
+                        value={`${dataCoverage}%`}
+                        icon={ShieldCheck}
+                        color={dataCoverage > 90 ? 'text-emerald-500' : 'text-orange-500'}
+                        subtext={`${autoGenInvoicesCount} Synthetic IDs`}
+                        trendLabel="Coverage"
+                    />
+
+                    <SummaryCard
+                        title="Avg. Invoice"
+                        value={`€${Math.round(avgInvoiceAmount).toLocaleString()}`}
+                        icon={FileText}
+                        color="text-blue-500"
+                        trendLabel="per Document"
+                    />
+                </div>
             </div>
 
             {/* Search and Table */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col md:flex-row gap-4 justify-between">
+            <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+                <div className="flex-none p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col md:flex-row gap-4 justify-between">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
@@ -357,14 +359,43 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
                     </div>
                 </div>
 
-                <DataTable
-                    data={invoices}
-                    columns={columns}
-                    searchTerm={searchTerm}
-                    searchFields={['VendorName', 'DocumentId', 'primary_description']}
-                    emptyMessage="No invoices found matching your search"
-                    onRowClick={(item) => onDrillDown?.(item.DocumentId)}
-                />
+                <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+                    <DataTable
+                        data={invoices}
+                        columns={columns}
+                        searchTerm={searchTerm}
+                        searchFields={['VendorName', 'DocumentId', 'primary_description']}
+                        emptyMessage="No invoices found matching your search"
+                        onRowClick={(item) => onDrillDown?.(item.DocumentId)}
+                    />
+                </div>
+
+                {/* Status Footer */}
+                <div className="flex-none px-4 py-3 border-t border-slate-100 dark:border-slate-700 text-[10px] flex justify-between items-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1.5 font-medium">
+                            <ShieldCheck className={`w-3 h-3 ${dataCoverage > 90 ? 'text-emerald-500' : 'text-orange-500'}`} />
+                            {dataCoverage}% Integrity
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="w-3 h-3 text-orange-400" />
+                            {autoGenInvoicesCount} Synthetic Header IDs
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-6 font-bold uppercase tracking-widest">
+                        <div className="flex items-center gap-1.5 hover:text-slate-600 transition-colors">
+                            <Box className="w-3 h-3" />
+                            {invoices.length} Documents
+                        </div>
+                        <div className="flex items-center gap-1.5 hover:text-slate-600 transition-colors">
+                            <Layers className="w-3 h-3" />
+                            {totalPositions} Positions
+                        </div>
+                        <div className="text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-700/50 px-2 py-1 rounded">
+                            Σ €{totalAmount.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
             </div>
 
 

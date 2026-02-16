@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '../../hooks/useQuery';
 import { DataTable } from '../../components/ui/DataTable';
-import { Modal } from '../components/Modal';
+import { RecordDetailModal } from '../components/RecordDetailModal';
 import { Download, RefreshCw, AlertCircle, ArrowLeft, Search, Database, Table as TableIcon, Code, Play } from 'lucide-react';
 import { runQuery } from '../../lib/db';
 import * as XLSX from 'xlsx';
@@ -283,32 +283,15 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 </div>
             </div>
 
-            <Modal
+            {/* Universal Record Detail Modal - Standardized with List Navigation */}
+            <RecordDetailModal
                 isOpen={!!selectedItem}
                 onClose={() => setSelectedItem(null)}
-                title="Record Details"
-            >
-                {selectedItem && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                            {Object.entries(selectedItem).map(([key, value]) => (
-                                <div key={key} className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-600/50">
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                        {key}
-                                    </div>
-                                    <div className="text-slate-900 dark:text-slate-100 font-mono text-xs break-all">
-                                        {value === null || value === undefined || value === '' ? (
-                                            <span className="text-slate-400 italic font-light">&lt;empty&gt;</span>
-                                        ) : (
-                                            String(value)
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </Modal>
+                items={items || []}
+                initialIndex={items && selectedItem ? items.indexOf(selectedItem) : 0}
+                title="Datensatz-Details"
+                infoLabel="Inspector-Daten"
+            />
 
             {/* Error Toast / Floating Alert */}
             {error && (
