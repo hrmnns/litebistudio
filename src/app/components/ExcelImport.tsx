@@ -1,19 +1,14 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import Ajv2020 from 'ajv/dist/2020';
-import addFormats from 'ajv-formats';
 import { Upload, Check, AlertCircle } from 'lucide-react';
 import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearDatabase } from '../../lib/db';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
+import validateInvoiceItems from '../../lib/validators/invoice-items-validator.js';
 import { ColumnMapper } from './ColumnMapper';
 import type { MappingConfig } from './ColumnMapper';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { applyTransform } from '../../lib/transformers';
 import { KeySelectionModal } from './KeySelectionModal';
-
-const ajv = new Ajv2020({ allErrors: true, useDefaults: true });
-addFormats(ajv);
-const validateInvoiceItems = ajv.compile(invoiceItemsSchema);
 
 interface ExcelImportProps {
     onImportComplete?: () => void;
@@ -205,6 +200,9 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
             for (const key in newRow) {
                 if (newRow[key] instanceof Date) {
                     newRow[key] = newRow[key].toISOString().split('T')[0];
+                } else if (typeof newRow[key] === 'string') {
+                    // Security Hardening: Trim whitespace and control characters from all string inputs
+                    newRow[key] = newRow[key].trim().replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '');
                 }
             }
             return newRow;
