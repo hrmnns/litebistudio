@@ -47,6 +47,10 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                 action: { label: 'Erneut versuchen', onClick: () => window.location.reload() },
             }] : undefined}
             footer={footerText}
+            breadcrumbs={[
+                { label: 'IT Kosten', href: '#/costs' },
+                { label: 'Jahresanalyse' }
+            ]}
         >
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

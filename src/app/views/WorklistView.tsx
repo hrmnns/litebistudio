@@ -199,6 +199,9 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
                 ),
             }}
             footer={footerText}
+            breadcrumbs={[
+                { label: 'Arbeitsvorrat' }
+            ]}
         >
             <PageSection title="Datensätze" noPadding>
                 <DataTable

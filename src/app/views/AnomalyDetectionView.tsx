@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
 import { Search, Filter, ArrowUpRight, PlusCircle, AlertTriangle, TrendingUp } from 'lucide-react';
-import { ViewHeader } from '../components/ui/ViewHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
+import { PageLayout } from '../components/ui/PageLayout';
 import type { Anomaly } from '../../types';
 
 interface AnomalyDetectionViewProps {
@@ -37,9 +37,12 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
         medium: items.filter((i: Anomaly) => i.RiskScore < 50).length
     }), [items]);
 
+    const now = new Date();
+    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+
     const columns: Column<Anomaly>[] = [
         {
-            header: 'Risk Score',
+            header: 'Risiko',
             accessor: 'RiskScore',
             align: 'center',
             render: (item: Anomaly) => (
@@ -54,7 +57,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
             )
         },
         {
-            header: 'Anomaly Type',
+            header: 'Anomalie-Typ',
             accessor: 'AnomalyType',
             render: (item: Anomaly) => (
                 <div className="flex items-center gap-2">
@@ -66,7 +69,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
             )
         },
         {
-            header: 'Description / Vendor',
+            header: 'Beschreibung / Lieferant',
             accessor: 'Description',
             render: (item: Anomaly) => (
                 <div className="flex flex-col max-w-md">
@@ -79,15 +82,15 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
                         <span>{item.Period}</span>
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 font-mono">
-                        <span title="Document ID">DOC: {item.DocumentId}</span>
+                        <span title="Dokument-ID">DOC: {item.DocumentId}</span>
                         <span className="text-slate-300">|</span>
-                        <span title="Line ID">LN: {item.LineId || '#'}</span>
+                        <span title="Zeile">LN: {item.LineId || '#'}</span>
                     </div>
                 </div>
             )
         },
         {
-            header: 'Impact',
+            header: 'Auswirkung',
             accessor: 'Amount',
             align: 'right',
             render: (item: Anomaly) => (
@@ -109,7 +112,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
             )
         },
         {
-            header: 'Action',
+            header: 'Aktion',
             accessor: 'DocumentId',
             align: 'right',
             render: (item: Anomaly) => (
@@ -130,25 +133,36 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
     );
 
     return (
-        <div className="p-6 md:p-8 space-y-8 h-full flex flex-col">
-            <ViewHeader
-                title="Anomaly Radar"
-                subtitle="Artificial Intelligence Risk Assessment"
-                onBack={onBack}
-                badges={
+        <PageLayout
+            header={{
+                title: 'Anomalie Radar',
+                subtitle: 'KI-gestützte Risikobewertung',
+                onBack,
+                actions: (
                     <div className="flex gap-2">
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold uppercase rounded-full">
-                            {stats.critical} Critical
+                        <span className="px-2.5 py-1 bg-red-100 text-red-700 text-[10px] font-bold uppercase rounded-full dark:bg-red-900/30 dark:text-red-400">
+                            {stats.critical} Kritisch
                         </span>
-                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-full">
-                            {stats.high} High Risk
+                        <span className="px-2.5 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-full dark:bg-orange-900/30 dark:text-orange-400">
+                            {stats.high} Hoch
                         </span>
                     </div>
-                }
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {['All', 'Cost Drift', 'New Item', 'Data Quality'].map(type => (
+                ),
+            }}
+            footer={footerText}
+            breadcrumbs={[
+                { label: 'Anomalie Radar' }
+            ]}
+            fillHeight
+        >
+            {/* Filter Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-shrink-0">
+                {[
+                    { type: 'All', label: 'Gesamt erkannt' },
+                    { type: 'Cost Drift', label: 'Cost Drift' },
+                    { type: 'New Item', label: 'New Item' },
+                    { type: 'Data Quality', label: 'Data Quality' },
+                ].map(({ type, label }) => (
                     <button
                         key={type}
                         onClick={() => setFilterType(type)}
@@ -159,7 +173,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
                     >
                         <span className={`text-[10px] font-black uppercase tracking-wider block mb-1 ${filterType === type ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 group-hover:text-blue-400'
                             }`}>
-                            {type === 'All' ? 'Total Detected' : type}
+                            {label}
                         </span>
                         <span className={`text-2xl font-black ${filterType === type ? 'text-blue-700 dark:text-blue-300' : 'text-slate-900 dark:text-white'
                             }`}>
@@ -169,13 +183,14 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
                 ))}
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
+            {/* Table */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col overflow-hidden min-h-0">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center flex-shrink-0">
                     <div className="relative max-w-md w-full">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search anomalies..."
+                            placeholder="Anomalien suchen..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -183,7 +198,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
                     </div>
                     <div className="flex items-center gap-2 text-slate-500 text-xs font-medium">
                         <Filter className="w-4 h-4" />
-                        <span>Sorted by Risk Score</span>
+                        <span>Sortiert nach Risiko-Score</span>
                     </div>
                 </div>
                 <DataTable
@@ -193,6 +208,6 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
                     searchFields={['Description', 'VendorName', 'Period', 'DocumentId', 'LineId']}
                 />
             </div>
-        </div>
+        </PageLayout>
     );
 };

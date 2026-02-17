@@ -71,6 +71,9 @@ export const SettingsView: React.FC = () => {
                 onBack: () => window.history.back(),
             }}
             footer={footerText}
+            breadcrumbs={[
+                { label: 'Einstellungen' }
+            ]}
         >
             <div className="max-w-2xl space-y-6">
 

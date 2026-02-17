@@ -19,11 +19,9 @@ export const ItCostsItemHistoryPage: React.FC = () => {
     }
 
     return (
-        <div className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-500">
-            <ItCostsItemHistoryView
-                item={item}
-                onBack={() => navigate(`/costs/${period}/${invoiceId}`)}
-            />
-        </div>
+        <ItCostsItemHistoryView
+            item={item}
+            onBack={() => navigate(`/costs/${period}/${invoiceId}`)}
+        />
     );
 };

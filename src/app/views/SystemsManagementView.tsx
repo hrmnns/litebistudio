@@ -235,6 +235,9 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                 ),
             }}
             footer={footerText}
+            breadcrumbs={[
+                { label: 'Systeme' }
+            ]}
         >
             {/* Print Only Header */}
             <div className="hidden print-only mb-8 border-b-4 border-slate-900 pb-6">

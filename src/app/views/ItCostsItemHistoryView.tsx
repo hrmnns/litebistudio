@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
-import { TrendingUp, AlertCircle, Info, Tag, Layers, Receipt } from 'lucide-react';
+import { TrendingUp, AlertCircle, Info, Tag, Layers, Receipt, Layout, FileText, Activity } from 'lucide-react';
 import { Modal } from '../components/Modal';
-import { ViewHeader } from '../components/ui/ViewHeader';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { SummaryCard } from '../components/ui/SummaryCard';
 import { RecordComparison } from '../components/ui/RecordComparison';
+import { PageLayout } from '../components/ui/PageLayout';
 import type { InvoiceItem } from '../../types';
 
 interface ItCostsItemHistoryViewProps {
@@ -29,7 +29,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
         }
     }, []);
 
-    const { data: historyData, loading, error } = useAsync<InvoiceItem[]>(
+    const { data: historyData, loading, error: loadError } = useAsync<InvoiceItem[]>(
         () => InvoiceRepository.getItemHistory(referenceItem, keyFields),
         [referenceItem, keyFields]
     );
@@ -49,9 +49,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     const referencePeriod = referenceItem.Period;
     const records = useMemo(() => {
         return history.map((i: InvoiceItem) => {
-            const currentId = i.id;
-            const referenceId = referenceItem.id;
-            const isMatch = currentId !== undefined && currentId !== null && currentId === referenceId;
+            const isMatch = i.id !== undefined && i.id !== null && i.id === referenceItem.id;
 
             return {
                 ...i,
@@ -61,7 +59,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                 isAmbiguousInPeriod: ambiguityMap[i.Period] > 1
             };
         });
-    }, [history, referencePeriod, ambiguityMap]);
+    }, [history, referencePeriod, referenceItem.id, ambiguityMap]);
 
     // 2.5 Sorted records for navigation (Newest first)
     const sortedRecords = useMemo(() => {
@@ -69,11 +67,8 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     }, [records]);
 
     const referenceIndex = useMemo(() => {
-        const refId = referenceItem.id;
-        return sortedRecords.findIndex((r: InvoiceItem) => r.id === refId);
-    }, [sortedRecords, referenceItem]);
-
-
+        return sortedRecords.findIndex((r: any) => r.id === referenceItem.id);
+    }, [sortedRecords, referenceItem.id]);
 
     // 3. Advanced Metrics (Avg, Stability, Volatility)
     const metrics = useMemo(() => {
@@ -96,24 +91,22 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
         };
     }, [history]);
 
+    const now = new Date();
+    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+
     if (loading) return (
         <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
     );
 
-    if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
-
-
     // Timeline Component
-    const TimelineItem = ({ record }: { record: InvoiceItem & { isFuture: boolean; isCurrent: boolean; isPast: boolean; isAmbiguousInPeriod: boolean }, previousRecord?: InvoiceItem }) => {
-        // Delta now relative to the REFERENCE item, not the previous month
+    const TimelineItem = ({ record }: { record: any }) => {
         const delta = record.Amount - referenceItem.Amount;
         const deltaPercent = referenceItem.Amount !== 0 ? (delta / Math.abs(referenceItem.Amount)) * 100 : 0;
 
         return (
             <div className="relative pb-[3px]">
-
                 <div
                     onClick={record.isCurrent ? undefined : () => setSelectedItem(record)}
                     className={`flex flex-col md:flex-row md:items-center justify-between gap-4 group/item p-5 rounded-xl transition-all ${record.isCurrent
@@ -121,7 +114,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         : 'bg-slate-50/50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-800 cursor-pointer'
                         }`}
                 >
-                    <div>
+                    <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${record.isCurrent ? 'text-slate-600 dark:text-slate-300' :
                                 record.isFuture ? 'text-indigo-500' : 'text-slate-500'
@@ -136,15 +129,15 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                         Dublette
                                     </span>
                                 )}
-                                {record.isFuture && " (Future Insight 🔮)"}
+                                {record.isFuture && " (Zukunfts-Prognose 🔮)"}
                             </span>
                         </div>
 
                         <div className="flex items-center gap-4 flex-wrap">
                             <div className="flex items-center gap-1.5">
-                                <Layers className={`w-3.5 h-3.5 ${record.isCurrent ? 'text-slate-400' : 'text-slate-400'}`} />
+                                <Layers className="w-3.5 h-3.5 text-slate-400" />
                                 <span className={`text-[10px] uppercase tracking-tighter ${record.isCurrent ? 'font-black text-slate-700 dark:text-slate-200' : 'font-bold text-slate-500'}`}>
-                                    Pos: #{record.LineId || 'NoID'}
+                                    Pos: #{record.LineId || 'k.A.'}
                                 </span>
                             </div>
                             <div className="flex items-center gap-1.5 opacity-60">
@@ -185,7 +178,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                 >
                                     {delta !== 0 ? (
                                         <>
-                                            {delta > 0 ? '+' : ''}{delta.toLocaleString()}€
+                                            {delta > 0 ? '+' : ''}{delta.toLocaleString('de-DE')}€
                                             <span className="opacity-60 font-medium">({delta > 0 ? '+' : ''}{deltaPercent.toFixed(1)}%)</span>
                                         </>
                                     ) : (
@@ -198,7 +191,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
                         <div className="flex flex-col items-end min-w-[100px]">
                             <div className={`text-xl font-black ${record.isCurrent ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>
-                                €{record.Amount.toLocaleString()}
+                                €{record.Amount.toLocaleString('de-DE')}
                             </div>
                             <span className="text-[9px] uppercase font-bold text-slate-400 tracking-tighter">Abrechnungsbetrag</span>
                         </div>
@@ -209,64 +202,80 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     };
 
     return (
-        <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">
-            {/* Header with Navigation */}
-            <ViewHeader
-                title={referenceItem.Description || 'Item Record'}
-                subtitle={`${referenceItem.VendorName || referenceItem.VendorId || 'Global Vendor'}`}
-                onBack={onBack}
-                badges={
-                    <span className="px-2 py-0.5 bg-blue-600 text-white text-[10px] font-black uppercase rounded shadow-sm">Lifetime Analysis</span>
-                }
-            />
-
+        <PageLayout
+            header={{
+                title: referenceItem.Description || 'Datensatz',
+                subtitle: `${referenceItem.VendorName || referenceItem.VendorId || 'Globaler Lieferant'}`,
+                onBack,
+                actions: (
+                    <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full dark:bg-blue-900/30 dark:text-blue-400">
+                            Lebenszyklus-Analyse
+                        </span>
+                        <button
+                            onClick={() => setShowRawDetails(true)}
+                            className="h-10 flex items-center gap-2 px-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
+                        >
+                            <Layout className="w-4 h-4" />
+                            <span className="hidden sm:inline">Datensatz-Details</span>
+                        </button>
+                    </div>
+                )
+            }}
+            alerts={loadError ? [{
+                level: 'error',
+                message: `Daten konnten nicht geladen werden: ${loadError.message}`,
+                action: { label: 'Erneut versuchen', onClick: () => window.location.reload() }
+            }] : undefined}
+            footer={footerText}
+            breadcrumbs={[
+                { label: 'IT Kosten', href: '#/costs' },
+                { label: 'Jahresanalyse', href: `#/costs` },
+                { label: 'Monatsanalyse', href: `#/costs/${referenceItem.Period}` },
+                { label: 'Rechnungsdetails', onClick: onBack },
+                { label: 'Lebenszyklus-Analyse' }
+            ]}
+        >
             {/* Hero Metrics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-shrink-0">
                 <SummaryCard
-                    title="Lifetime Total"
-                    value={`€${metrics?.total.toLocaleString()}`}
+                    title="Lebenszyklus Gesamt"
+                    value={`€${metrics?.total.toLocaleString('de-DE')}`}
                     icon={TrendingUp}
                     color="text-blue-500"
-                    subtext="Sum of all tracked entries"
+                    subtext="Summe aller erfassten Einträge"
                     className="overflow-hidden"
                 />
 
                 <SummaryCard
-                    title="Monthly Average"
-                    value={`€${Math.round(metrics?.avg || 0).toLocaleString()}`}
-                    icon={TrendingUp} // Or create a new "Avg" icon
+                    title="Monatlicher Durchschnitt"
+                    value={`€${Math.round(metrics?.avg || 0).toLocaleString('de-DE')}`}
+                    icon={FileText}
                     color="text-slate-900 dark:text-white"
-                    trendValue={referenceItem.Amount > (metrics?.avg || 0) ? `+${Math.round(referenceItem.Amount - (metrics?.avg || 0))}€` : 'Below Avg'}
+                    trendValue={referenceItem.Amount > (metrics?.avg || 0) ? `+${Math.round(referenceItem.Amount - (metrics?.avg || 0))}€` : 'Unter Durchschnitt'}
                     trend={referenceItem.Amount > (metrics?.avg || 0) ? 'up' : 'down'}
-                    trendLabel="vs Average"
+                    trendLabel="vs Durchschnitt"
                 />
 
                 <SummaryCard
-                    title="Stability Check"
-                    value={metrics?.isStable ? 'Stable' : metrics?.isVolatile ? 'Volatile' : 'Normal'}
-                    icon={metrics?.isVolatile ? AlertCircle : Info}
+                    title="Stabilitätscheck"
+                    value={metrics?.isStable ? 'Stabil' : metrics?.isVolatile ? 'Volatil' : 'Normal'}
+                    icon={Activity}
                     color={metrics?.isStable ? 'text-emerald-500' : metrics?.isVolatile ? 'text-red-500' : 'text-amber-500'}
-                    subtext={`Variation: ${metrics?.volatility.toFixed(1)}%`}
-                    trendLabel={metrics?.isVolatile ? 'High Risk' : ''}
+                    subtext={`Varianz: ${metrics?.volatility.toFixed(1)}%`}
+                    trendLabel={metrics?.isVolatile ? 'Hohes Risiko' : ''}
                 />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-
                 {/* Left Side: Timeline / Journal */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="text-lg font-black flex items-center gap-2">
                                 <Layers className="w-5 h-5 text-blue-500" />
-                                Growth Timeline
+                                Wachstums-Timeline
                             </h3>
-                            <button
-                                onClick={() => setShowRawDetails(true)}
-                                className="text-[10px] font-black uppercase text-blue-600 hover:text-blue-700 transition-colors"
-                            >
-                                Item Details...
-                            </button>
                         </div>
 
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-5 max-w-2xl leading-relaxed">
@@ -274,11 +283,10 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         </p>
 
                         <div className="space-y-[3px]">
-                            {records.sort((a, b) => b.Period.localeCompare(a.Period)).map((rec, idx, arr) => (
+                            {sortedRecords.map((rec, idx) => (
                                 <TimelineItem
                                     key={`${rec.Period}-${rec.id}-${idx}`}
                                     record={rec}
-                                    previousRecord={arr[idx + 1]}
                                 />
                             ))}
                         </div>
@@ -291,18 +299,18 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
                         <h3 className="text-xs font-black uppercase tracking-widest text-blue-400 mb-6 flex items-center gap-2">
                             <Info className="w-4 h-4" />
-                            Technical Identity
+                            Technische Identität
                         </h3>
 
                         <div className="grid grid-cols-1 gap-5 relative z-10">
                             {[
-                                { label: 'Internal DB ID', value: referenceItem?.id, icon: AlertCircle },
-                                { label: 'Dokument ID', value: referenceItem?.DocumentId, icon: Receipt },
-                                { label: 'Line ID', value: referenceItem?.LineId, icon: Layers },
-                                { label: 'Period', value: referenceItem?.Period, icon: Info },
-                                { label: 'Cost Center', value: referenceItem?.CostCenter, icon: Layers },
-                                { label: 'Quantity / Unit', value: referenceItem?.Quantity !== undefined && referenceItem?.Quantity !== null ? `${referenceItem.Quantity} ${referenceItem.Unit || ''}` : null, icon: Info },
-                                { label: 'Amount / Currency', value: referenceItem?.Amount !== undefined && referenceItem?.Amount !== null ? `${referenceItem.Amount.toLocaleString()} ${referenceItem.Currency || ''}` : null, icon: Receipt },
+                                { label: 'Interne DB ID', value: referenceItem?.id, icon: AlertCircle },
+                                { label: 'Belegnummer', value: referenceItem?.DocumentId, icon: Receipt },
+                                { label: 'Zeilennummer', value: referenceItem?.LineId, icon: Layers },
+                                { label: 'Periode', value: referenceItem?.Period, icon: Info },
+                                { label: 'Kostenstelle', value: referenceItem?.CostCenter, icon: Layers },
+                                { label: 'Menge / Einheit', value: referenceItem?.Quantity !== undefined && referenceItem?.Quantity !== null ? `${referenceItem.Quantity} ${referenceItem.Unit || ''}` : null, icon: Info },
+                                { label: 'Betrag / Währung', value: referenceItem?.Amount !== undefined && referenceItem?.Amount !== null ? `${referenceItem.Amount.toLocaleString('de-DE')} ${referenceItem.Currency || ''}` : null, icon: Receipt },
                             ].map((prop, i) => (
                                 <div key={i} className="group">
                                     <div className="text-[9px] font-black uppercase text-slate-500 tracking-tighter mb-1">{prop.label}</div>
@@ -311,7 +319,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                             <prop.icon className="w-3.5 h-3.5" />
                                         </div>
                                         <span className={`text-sm font-mono break-all ${!prop.value ? 'text-slate-600 italic' : 'text-slate-200'}`}>
-                                            {prop.value || '<Not Provided>'}
+                                            {prop.value || '<Nicht angegeben>'}
                                         </span>
                                     </div>
                                 </div>
@@ -323,10 +331,10 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         <div className="bg-amber-50 dark:bg-amber-900/10 border-2 border-dashed border-amber-200 dark:border-amber-900/30 rounded-2xl p-6">
                             <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-black text-xs uppercase mb-2">
                                 <AlertCircle className="w-4 h-4" />
-                                Identity Conflict
+                                Identitäts-Konflikt
                             </div>
                             <p className="text-xs text-amber-800 dark:text-amber-200/70 leading-relaxed">
-                                This item has multiple records in some periods. This usually happens when the "Primary Keys" are not set correctly during import.
+                                Für diesen Zeitraum existieren mehrere Datensätze mit dem gleichen Schlüssel. Dies deutet auf unzureichende Primärschlüssel-Definitionen beim Import hin.
                             </p>
                         </div>
                     )}
@@ -357,7 +365,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                 ) : null}
             </Modal>
 
-            {/* Raw Details Modal - Standardized with Navigation */}
+            {/* Raw Details Modal */}
             <RecordDetailModal
                 isOpen={showRawDetails}
                 onClose={() => setShowRawDetails(false)}
@@ -366,6 +374,6 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                 title="Datensatz-Details"
                 tableName="invoice_items"
             />
-        </div>
+        </PageLayout>
     );
 };

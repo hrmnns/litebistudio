@@ -10,13 +10,11 @@ export const ItCostsInvoicePage: React.FC = () => {
     if (!period || !invoiceId) return null;
 
     return (
-        <div className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-500">
-            <ItCostsInvoiceItemsView
-                invoiceId={invoiceId}
-                period={period}
-                onBack={() => navigate(`/costs/${period}`)}
-                onViewHistory={(item: InvoiceItem) => navigate(`/costs/${period}/${invoiceId}/history`, { state: { item } })}
-            />
-        </div>
+        <ItCostsInvoiceItemsView
+            invoiceId={invoiceId}
+            period={period}
+            onBack={() => navigate(`/costs/${period}`)}
+            onViewHistory={(item: InvoiceItem) => navigate(`/costs/${period}/${invoiceId}/history`, { state: { item } })}
+        />
     );
 };

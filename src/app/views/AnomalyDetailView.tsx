@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { AnomalyRepository } from '../../lib/repositories/AnomalyRepository';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
-import { ViewHeader } from '../components/ui/ViewHeader';
+import { PageLayout } from '../components/ui/PageLayout';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { ShieldAlert, TrendingUp, AlertTriangle, PlusCircle, FileText, Calendar, Wallet } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -105,6 +105,9 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
         return reasons;
     }, [anomaly]);
 
+    const now = new Date();
+    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+
     if (loading) return (
         <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -119,25 +122,30 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
     );
 
     return (
-        <div className="p-6 md:p-8 space-y-8 h-full flex flex-col max-w-5xl mx-auto">
-            <ViewHeader
-                title="Anomaly Investigation"
-                subtitle={`Case #${anomaly.DocumentId}`}
-                onBack={onBack}
-                badges={
-                    <span className={`px-3 py-1 rounded-full text-white text-xs font-bold uppercase ${anomaly.RiskScore >= 80 ? 'bg-red-600' :
+        <PageLayout
+            header={{
+                title: 'Anomalie-Analyse',
+                subtitle: `Fall #${anomaly.DocumentId}`,
+                onBack,
+                actions: (
+                    <span className={`px-3 py-1 rounded-full text-white text-[10px] font-black uppercase ${anomaly.RiskScore >= 80 ? 'bg-red-600' :
                         anomaly.RiskScore >= 50 ? 'bg-orange-600' : 'bg-blue-600'
                         }`}>
-                        Risk Score: {anomaly.RiskScore}
+                        Risiko-Score: {anomaly.RiskScore}
                     </span>
-                }
-            />
-
+                )
+            }}
+            footer={footerText}
+            breadcrumbs={[
+                { label: 'Anomalie Radar', href: '#/anomalies' },
+                { label: 'Anomalie-Details' }
+            ]}
+        >
             {/* Top Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
                     <div>
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Item Details</div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Position-Details</div>
                         <div className="text-lg font-bold text-slate-900 dark:text-white line-clamp-2" title={anomaly.Description ?? undefined}>
                             {anomaly.Description}
                         </div>
@@ -156,7 +164,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                 <div className="md:col-span-2 bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <ShieldAlert className="w-4 h-4 text-blue-500" />
-                        AI Reasoning Engine
+                        KI-Analyse-Engine
                     </div>
                     <div className="space-y-3">
                         {reasoning.map((reason, i) => (
@@ -170,7 +178,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                                         {reason.description}
                                     </div>
                                     <div className="mt-2 text-[11px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded inline-block">
-                                        Suggested Action: {reason.action}
+                                        Empfehlung: {reason.action}
                                     </div>
                                 </div>
                             </div>
@@ -185,14 +193,13 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                     <div>
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-slate-400" />
-                            Historical Context
+                            Historischer Kontext
                         </h3>
                         <p className="text-xs text-slate-500 mt-1">
-                            Use this chart to check if this is a one-time spike or a recurring trend.
-                            It shows the cost history of this specific item (same Vendor & Description).
+                            Vergleiche die Kostenentwicklung dieser Position über die letzten 6 Monate.
                         </p>
                     </div>
-                    <div className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">Past 6 Months</div>
+                    <div className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">Letzte 6 Monate</div>
                 </div>
                 <div className="w-full h-full pb-8 cursor-pointer">
                     <ResponsiveContainer width="100%" height="100%">
@@ -335,16 +342,16 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                 </div>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 no-print">
                 <button className="px-6 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                    Mark as Safe
+                    Als sicher markieren
                 </button>
                 <button
                     onClick={onOpenInvoice}
                     className="px-6 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2"
                 >
                     <FileText className="w-4 h-4" />
-                    Open Invoice
+                    Beleg öffnen
                 </button>
             </div>
 
@@ -357,6 +364,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                 title="Historischer Datensatz"
                 tableName="invoice_items"
             />
-        </div>
+        </PageLayout>
     );
 };
+

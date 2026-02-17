@@ -19,6 +19,12 @@ interface PageHeaderProps {
     actions?: React.ReactNode;
 }
 
+export interface PageBreadcrumb {
+    label: string;
+    href?: string;
+    onClick?: () => void;
+}
+
 interface PageLayoutProps {
     /** Header configuration */
     header: PageHeaderProps;
@@ -28,8 +34,10 @@ interface PageLayoutProps {
     children: React.ReactNode;
     /** Optional right sidebar (e.g. filters) */
     sidebar?: React.ReactNode;
-    /** Footer text, e.g. "Letzte Aktualisierung: ..." */
-    footer?: string;
+    /** Footer content or text */
+    footer?: React.ReactNode;
+    /** Breadcrumbs to show in the footer */
+    breadcrumbs?: PageBreadcrumb[];
     /** Extra CSS classes on the root element */
     className?: string;
     /** If true, children fill remaining height (no outer scroll). Useful for views with internal scroll like data tables. */
@@ -71,6 +79,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     children,
     sidebar,
     footer,
+    breadcrumbs,
     className,
     fillHeight,
 }) => {
@@ -161,11 +170,40 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
             </div>
 
             {/* ── Footer ── */}
-            {footer && (
+            {(footer || (breadcrumbs && breadcrumbs.length > 0)) && (
                 <footer className="flex-shrink-0 px-6 md:px-8 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                        {footer}
-                    </p>
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="text-xs text-slate-400 dark:text-slate-500">
+                            {footer}
+                        </div>
+                        {breadcrumbs && breadcrumbs.length > 0 && (
+                            <nav className="flex items-center gap-1.5 text-[10px] uppercase font-black tracking-wider">
+                                {breadcrumbs.map((crumb, i) => (
+                                    <React.Fragment key={i}>
+                                        {i > 0 && <span className="text-slate-300 dark:text-slate-600">/</span>}
+                                        {crumb.href || crumb.onClick ? (
+                                            <a
+                                                href={crumb.href || '#'}
+                                                onClick={(e) => {
+                                                    if (crumb.onClick) {
+                                                        e.preventDefault();
+                                                        crumb.onClick();
+                                                    }
+                                                }}
+                                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                                            >
+                                                {crumb.label}
+                                            </a>
+                                        ) : (
+                                            <span className="text-slate-600 dark:text-slate-300">
+                                                {crumb.label}
+                                            </span>
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                            </nav>
+                        )}
+                    </div>
                 </footer>
             )}
         </div>

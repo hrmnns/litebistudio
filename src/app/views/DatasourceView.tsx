@@ -21,6 +21,9 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 onBack: () => window.history.back(),
             }}
             footer={footerText}
+            breadcrumbs={[
+                { label: 'Datenverwaltung' }
+            ]}
         >
             <div className="max-w-3xl space-y-6">
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 p-6">

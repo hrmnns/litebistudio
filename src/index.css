@@ -74,18 +74,7 @@ body,
 @layer base {
     @media print {
 
-        /* Hide navigational and interactive elements */
-        aside,
-        nav,
-        header,
-        footer,
-        button,
-        .no-print,
-        .z-50,
-        .fixed,
-        .absolute-actions {
-            display: none !important;
-        }
+
 
         body {
             background: white !important;
@@ -147,6 +136,19 @@ body,
         .shadow-xl {
             box-shadow: none !important;
             border: 1px solid #e2e8f0 !important;
+        }
+
+        /* Hide navigational and interactive elements - Always Last to ensure priority */
+        aside,
+        nav,
+        header,
+        footer,
+        button,
+        .no-print,
+        .z-50,
+        .fixed,
+        .absolute-actions {
+            display: none !important;
         }
     }
 }

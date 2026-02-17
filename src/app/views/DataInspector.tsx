@@ -144,6 +144,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 ),
             }}
             footer={footerText}
+            breadcrumbs={[
+                { label: 'Daten-Inspektor' }
+            ]}
             fillHeight
         >
             {/* Loading Bar at Top */}

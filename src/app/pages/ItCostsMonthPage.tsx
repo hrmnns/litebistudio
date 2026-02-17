@@ -9,12 +9,10 @@ export const ItCostsMonthPage: React.FC = () => {
     if (!period) return null;
 
     return (
-        <div className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-500">
-            <ItCostsMonthView
-                period={period}
-                onBack={() => navigate('/costs')}
-                onDrillDown={(invoiceId: string) => navigate(`/costs/${period}/${invoiceId}`)}
-            />
-        </div>
+        <ItCostsMonthView
+            period={period}
+            onBack={() => navigate('/costs')}
+            onDrillDown={(invoiceId: string) => navigate(`/costs/${period}/${invoiceId}`)}
+        />
     );
 };
