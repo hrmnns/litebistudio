@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bookmark, ListChecks } from 'lucide-react';
+import { ClipboardList, ListChecks } from 'lucide-react';
 import { WorklistRepository } from '../../../lib/repositories/WorklistRepository';
 import { DashboardComponent } from '../ui/DashboardComponent';
 import type { WorklistStatus } from '../../../types';
@@ -30,7 +30,7 @@ export const WorklistComponent: React.FC<WorklistComponentProps> = ({ onClick, o
     return (
         <DashboardComponent
             title="Arbeitsvorrat"
-            icon={Bookmark}
+            icon={ClipboardList}
             iconColor="amber"
             onClick={onClick}
             onRemove={onRemove}

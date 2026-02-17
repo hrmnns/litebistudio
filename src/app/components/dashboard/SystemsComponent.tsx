@@ -33,7 +33,7 @@ export const SystemsComponent: React.FC<{ onRemove?: () => void; dragHandleProps
         <DashboardComponent
             title="Systeme"
             icon={Server}
-            iconColor="slate"
+            iconColor="blue"
             onClick={onClick}
             onRemove={onRemove}
             targetView={targetView}

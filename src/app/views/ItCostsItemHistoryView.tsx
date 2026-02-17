@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
-import { TrendingUp, AlertCircle, Info, Tag, Layers, Receipt, Layout, FileText, Activity } from 'lucide-react';
+import { getSmartKeyFields } from '../../lib/utils/invoiceUtils';
+import { TrendingUp, AlertCircle, FileText, Receipt, Layers, Info, Tag, Layout, Activity } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { SummaryCard } from '../components/ui/SummaryCard';
@@ -18,16 +19,10 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     const [selectedItem, setSelectedItem] = useState<InvoiceItem | null>(null);
     const [showRawDetails, setShowRawDetails] = useState(false);
 
-    // Retrieve custom key fields
+    // Retrieve custom key fields or determine smart defaults
     const keyFields = useMemo(() => {
-        try {
-            const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
-            const firstMappingWithKeys = Object.values(savedMappings as Record<string, Record<string, unknown>>).find(m => m.__keyFields);
-            return (firstMappingWithKeys?.__keyFields as string[] | undefined) || ['DocumentId', 'LineId'];
-        } catch (e) {
-            return ['DocumentId', 'LineId'];
-        }
-    }, []);
+        return getSmartKeyFields(referenceItem);
+    }, [referenceItem]);
 
     const { data: historyData, loading, error: loadError } = useAsync<InvoiceItem[]>(
         () => InvoiceRepository.getItemHistory(referenceItem, keyFields),
@@ -305,6 +300,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         <div className="grid grid-cols-1 gap-5 relative z-10">
                             {[
                                 { label: 'Interne DB ID', value: referenceItem?.id, icon: AlertCircle },
+                                { label: 'Einkaufsbeleg', value: referenceItem?.POId, icon: FileText },
                                 { label: 'Belegnummer', value: referenceItem?.DocumentId, icon: Receipt },
                                 { label: 'Zeilennummer', value: referenceItem?.LineId, icon: Layers },
                                 { label: 'Periode', value: referenceItem?.Period, icon: Info },
@@ -324,6 +320,21 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                     </div>
                                 </div>
                             ))}
+
+                            <div className="pt-4 mt-4 border-t border-slate-800">
+                                <div className="text-[9px] font-black uppercase text-slate-500 tracking-tighter mb-2">Matching-Strategie</div>
+                                <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                                        <span className="text-xs font-bold text-emerald-400">
+                                            {keyFields.join(' + ')}
+                                        </span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 leading-relaxed font-mono">
+                                        {keyFields.map(k => `${k}: ${referenceItem[k] ?? 'NULL'}`).join(', ')}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

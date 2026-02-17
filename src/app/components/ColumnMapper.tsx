@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Save, Wand2, AlertCircle, Settings2 } from 'lucide-react';
+import { ArrowRight, Save, Wand2, AlertCircle, Settings2, Plus, ArrowDownUp } from 'lucide-react';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 import { transformers } from '../../lib/transformers';
 
@@ -7,6 +7,9 @@ export interface MappingConfig {
     sourceColumn: string;
     transformId?: string;
     constantValue?: string;
+    operation?: 'direct' | 'coalesce' | 'concat';
+    secondaryColumn?: string;
+    separator?: string;
 }
 
 interface ColumnMapperProps {
@@ -38,7 +41,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
                 col.toLowerCase().replace(/[^a-z0-9]/g, '') === field.key.toLowerCase().replace(/[^a-z0-9]/g, '')
             );
             if (match) {
-                newMapping[field.key] = { sourceColumn: match };
+                newMapping[field.key] = { sourceColumn: match, operation: 'direct' };
             }
         });
         setMapping(prev => ({ ...prev, ...newMapping }));
@@ -57,6 +60,10 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
             if (!m) return false;
             // If Constant, must have a constantValue
             if (m.sourceColumn === '__CONSTANT__') return !!m.constantValue;
+
+            // If Concat, must have secondaryColumn
+            if (m.operation === 'concat' && !m.secondaryColumn) return false;
+
             return !!m.sourceColumn;
         });
 
@@ -66,13 +73,14 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
             const m = mapping[f.key];
             if (!m) return true;
             if (m.sourceColumn === '__CONSTANT__') return !m.constantValue;
+            if (m.operation === 'concat' && !m.secondaryColumn) return true;
             return !m.sourceColumn;
         }).length;
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
                 <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <div>
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Map Columns & Transforms</h2>
@@ -90,10 +98,10 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
                 </div>
 
                 <div className="flex-1 overflow-auto p-6">
-                    <div className="grid grid-cols-[1fr,auto,1fr,1fr] gap-4 items-start mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <div className="grid grid-cols-[1fr,auto,2fr,1fr] gap-4 items-start mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
                         <div>Required Field</div>
                         <div className="w-8"></div>
-                        <div>Your File Column</div>
+                        <div>Source Configuration</div>
                         <div>Transformation</div>
                     </div>
 
@@ -101,10 +109,11 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
                         {targetFields.map((field) => {
                             const availableTransforms = transformers[field.key] || [];
                             const currentMapping = mapping[field.key];
+                            const op = currentMapping?.operation || 'direct';
 
                             return (
                                 <div key={field.key} className={`
-                                    grid grid-cols-[1fr,auto,1fr,1fr] gap-4 items-center p-4 rounded-xl border transition-colors
+                                    grid grid-cols-[1fr,auto,2fr,1fr] gap-4 items-start p-4 rounded-xl border transition-colors
                                     ${currentMapping?.sourceColumn
                                         ? 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-700'
                                         : field.required
@@ -112,7 +121,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
                                             : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100'
                                     }
                                 `}>
-                                    <div>
+                                    <div className="mt-2">
                                         <div className="flex items-center gap-2">
                                             <span className={`font-semibold ${field.required ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
                                                 {field.key}
@@ -126,53 +135,122 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
                                         </div>
                                     </div>
 
-                                    <ArrowRight className={`w-4 h-4 ${currentMapping?.sourceColumn ? 'text-blue-500' : 'text-slate-300'}`} />
+                                    <ArrowRight className={`w-4 h-4 mt-3 ${currentMapping?.sourceColumn ? 'text-blue-500' : 'text-slate-300'}`} />
 
-                                    <select
-                                        value={currentMapping?.sourceColumn || ''}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setMapping(prev => {
-                                                const next = { ...prev };
-                                                if (val) {
-                                                    // If switching to constant, auto-select first available transform if possible
-                                                    let initialTransform = next[field.key]?.transformId;
-                                                    if (val === '__CONSTANT__' && !initialTransform && availableTransforms.length > 0) {
-                                                        initialTransform = availableTransforms[0].id;
+                                    <div className="space-y-2">
+                                        {/* Primary Input / Operation Selector */}
+                                        <div className="flex gap-2">
+                                            <select
+                                                value={currentMapping?.sourceColumn || ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setMapping(prev => {
+                                                        const next = { ...prev };
+                                                        if (val) {
+                                                            let initialTransform = next[field.key]?.transformId;
+                                                            if (val === '__CONSTANT__' && !initialTransform && availableTransforms.length > 0) {
+                                                                initialTransform = availableTransforms[0].id;
+                                                            }
+                                                            next[field.key] = {
+                                                                sourceColumn: val,
+                                                                transformId: initialTransform,
+                                                                operation: 'direct' // Default to direct on change
+                                                            };
+                                                        } else {
+                                                            delete next[field.key];
+                                                        }
+                                                        return next;
+                                                    });
+                                                }}
+                                                className={`
+                                                    flex-1 p-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all
+                                                    ${currentMapping?.sourceColumn
+                                                        ? 'border-blue-200 bg-white dark:bg-slate-900 dark:border-blue-900/50'
+                                                        : 'border-slate-200 bg-slate-50 dark:bg-slate-800 dark:border-slate-600'
                                                     }
+                                                `}
+                                            >
+                                                <option value="">-- Ignored --</option>
+                                                <option value="__CONSTANT__" className="font-bold text-blue-600">-- Set Constant Value --</option>
+                                                <optgroup label="Source Columns">
+                                                    {sourceColumns.map(col => (
+                                                        <option key={col} value={col}>{col}</option>
+                                                    ))}
+                                                </optgroup>
+                                            </select>
 
-                                                    next[field.key] = {
-                                                        sourceColumn: val,
-                                                        transformId: initialTransform
-                                                    };
-                                                } else {
-                                                    delete next[field.key];
-                                                }
-                                                return next;
-                                            });
-                                        }}
-                                        className={`
-                                            w-full p-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all
-                                            ${currentMapping?.sourceColumn
-                                                ? 'border-blue-200 bg-white dark:bg-slate-900 dark:border-blue-900/50'
-                                                : 'border-slate-200 bg-slate-50 dark:bg-slate-800 dark:border-slate-600'
-                                            }
-                                        `}
-                                    >
-                                        <option value="">-- Ignored --</option>
-                                        <option value="__CONSTANT__" className="font-bold text-blue-600">-- Set Constant Value --</option>
-                                        <optgroup label="Source Columns">
-                                            {sourceColumns.map(col => (
-                                                <option key={col} value={col}>
-                                                    {col}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    </select>
+                                            {currentMapping?.sourceColumn && currentMapping.sourceColumn !== '__CONSTANT__' && (
+                                                <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 border border-slate-200 dark:border-slate-600">
+                                                    <button
+                                                        onClick={() => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, operation: 'direct' } }))}
+                                                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${op === 'direct' ? 'bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                                        title="Direct Mapping"
+                                                    >
+                                                        1:1
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, operation: 'coalesce' } }))}
+                                                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${op === 'coalesce' ? 'bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                                        title="Fallback if empty (Coalesce)"
+                                                    >
+                                                        Fallback
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, operation: 'concat', separator: ' ' } }))}
+                                                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${op === 'concat' ? 'bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                                        title="Combine Columns (Concat)"
+                                                    >
+                                                        Combine
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    {/* Transformation or Constant Input */}
-                                    <div>
-                                        {currentMapping?.sourceColumn === '__CONSTANT__' ? (
+                                        {/* Configuration for Operations */}
+                                        {op === 'coalesce' && (
+                                            <div className="flex items-center gap-2 animate-in slide-in-from-top-2">
+                                                <ArrowDownUp className="w-4 h-4 text-slate-400 rotate-45" />
+                                                <span className="text-xs font-bold text-slate-400">ELSE USE</span>
+                                                <select
+                                                    value={currentMapping?.secondaryColumn || ''}
+                                                    onChange={(e) => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, secondaryColumn: e.target.value } }))}
+                                                    className="flex-1 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="">-- Select Fallback Column --</option>
+                                                    {sourceColumns.map(col => (
+                                                        <option key={col} value={col}>{col}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        {op === 'concat' && (
+                                            <div className="flex items-center gap-2 animate-in slide-in-from-top-2">
+                                                <Plus className="w-4 h-4 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Separator (space)"
+                                                    value={currentMapping?.separator ?? ' '}
+                                                    onChange={(e) => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, separator: e.target.value } }))}
+                                                    className="w-16 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center text-sm"
+                                                    title="Separator"
+                                                />
+                                                <Plus className="w-4 h-4 text-slate-400" />
+                                                <select
+                                                    value={currentMapping?.secondaryColumn || ''}
+                                                    onChange={(e) => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, secondaryColumn: e.target.value } }))}
+                                                    className="flex-1 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="">-- Select 2nd Column --</option>
+                                                    {sourceColumns.map(col => (
+                                                        <option key={col} value={col}>{col}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        {/* Constant Value Input */}
+                                        {currentMapping?.sourceColumn === '__CONSTANT__' && (
                                             <div className="relative animate-in fade-in zoom-in-95">
                                                 <input
                                                     type="text"
@@ -194,30 +272,33 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
                                                     `}
                                                 />
                                             </div>
-                                        ) : (
-                                            (availableTransforms.length > 0) && (currentMapping?.sourceColumn || field.key === 'Currency') && (
-                                                <div className="relative">
-                                                    <Settings2 className="absolute left-2 top-2.5 w-3.5 h-3.5 text-slate-400" />
-                                                    <select
-                                                        value={currentMapping?.transformId || ''}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setMapping(prev => ({
-                                                                ...prev,
-                                                                [field.key]: { ...prev[field.key]!, transformId: val || undefined }
-                                                            }));
-                                                        }}
-                                                        className="w-full pl-8 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
-                                                    >
-                                                        <option value="">No Transformation</option>
-                                                        {availableTransforms.map(t => (
-                                                            <option key={t.id} value={t.id}>
-                                                                {t.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            )
+                                        )}
+                                    </div>
+
+                                    {/* Transformation */}
+                                    <div className="mt-2">
+                                        {(availableTransforms.length > 0) && (currentMapping?.sourceColumn || field.key === 'Currency') && (
+                                            <div className="relative">
+                                                <Settings2 className="absolute left-2 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                                                <select
+                                                    value={currentMapping?.transformId || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setMapping(prev => ({
+                                                            ...prev,
+                                                            [field.key]: { ...prev[field.key]!, transformId: val || undefined }
+                                                        }));
+                                                    }}
+                                                    className="w-full pl-8 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="">No Transformation</option>
+                                                    {availableTransforms.map(t => (
+                                                        <option key={t.id} value={t.id}>
+                                                            {t.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         )}
                                     </div>
                                 </div>

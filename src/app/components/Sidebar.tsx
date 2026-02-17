@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, Bookmark, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
@@ -32,11 +32,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // Map component names to Lucide icons
     const iconMap: Record<string, React.ReactNode> = {
-        'ItCostsComponent': <Database className="w-5 h-5 flex-shrink-0" />,
-        'SystemsComponent': <ShieldCheck className="w-5 h-5 flex-shrink-0" />,
-        'AnomalyRadarComponent': <ShieldCheck className="w-5 h-5 flex-shrink-0 text-rose-500" />,
-        'WorklistComponent': <Bookmark className="w-5 h-5 flex-shrink-0 text-amber-500" />,
-        'DataInspectorComponent': <Database className="w-5 h-5 flex-shrink-0 text-indigo-500" />,
+        'ItCostsComponent': <Wallet className="w-5 h-5 flex-shrink-0 text-emerald-500" />,
+        'SystemsComponent': <Server className="w-5 h-5 flex-shrink-0 text-blue-500" />,
+        'AnomalyRadarComponent': <Radar className="w-5 h-5 flex-shrink-0 text-rose-500" />,
+        'WorklistComponent': <ClipboardList className="w-5 h-5 flex-shrink-0 text-amber-500" />,
+        'DataInspectorComponent': <Search className="w-5 h-5 flex-shrink-0 text-indigo-500" />,
     };
 
     const staticTopItems: NavItem[] = [

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { DashboardComponent } from '../ui/DashboardComponent';
 import { Skeleton } from '../ui/Skeleton';
@@ -23,13 +23,13 @@ export const DataInspectorComponent: React.FC<{ onRemove?: () => void; dragHandl
     return (
         <DashboardComponent
             title="Inspector"
-            icon={Database}
+            icon={Search}
             iconColor="indigo"
             onClick={onClick}
             onRemove={onRemove}
             targetView={targetView}
             dragHandleProps={dragHandleProps}
-            backgroundIcon={Database}
+            backgroundIcon={Search}
         >
             <div className="flex flex-col h-full items-center justify-around py-0.5">
                 {/* Primary Metric: Total Records */}

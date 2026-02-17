@@ -8,6 +8,7 @@ import { SummaryCard } from '../components/ui/SummaryCard';
 import { getPreviousPeriod } from '../../lib/utils/dateUtils';
 import { exportToExcel } from '../../lib/utils/exportUtils';
 import type { InvoiceItem } from '../../types';
+import { getSmartKeyFields } from '../../lib/utils/invoiceUtils';
 
 interface ItCostsInvoiceItemsViewProps {
     invoiceId: string;
@@ -26,42 +27,20 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
         [period, invoiceId]
     );
 
-    // 3. Fetch previous month items by DocumentId ONLY (Key-Centric)
+    // ... imports
+
+    // 3. Fetch previous month items strictly by Period (to find matches across different DocumentIds)
     const { data: previousItems, loading: loadingPrevious } = useAsync<InvoiceItem[]>(
-        () => InvoiceRepository.getItemsByInvoice(previousPeriod, invoiceId),
-        [previousPeriod, invoiceId]
+        () => InvoiceRepository.getMonthlyOverview(previousPeriod),
+        [previousPeriod]
     );
 
     const currentItems = items || [];
     const prevItems = previousItems || [];
 
-    // 2. Retrieve keyFields (now items is safely defined)
+    // 2. Retrieve keyFields using smart logic (based on first item)
     const keyFields = useMemo(() => {
-        try {
-            const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
-
-            if (currentItems.length > 0) {
-                const currentFields = Object.keys(currentItems[0]);
-                let bestMapping = null;
-                let maxOverlap = -1;
-
-                for (const mapping of Object.values(savedMappings) as any[]) {
-                    if (!mapping.__keyFields) continue;
-                    const mappedFields = Object.keys(mapping);
-                    const overlap = mappedFields.filter(f => currentFields.includes(f)).length;
-                    if (overlap > maxOverlap) {
-                        maxOverlap = overlap;
-                        bestMapping = mapping;
-                    }
-                }
-                if (bestMapping) return (bestMapping as any).__keyFields;
-            }
-
-            const firstMappingWithKeys = Object.values(savedMappings as Record<string, Record<string, unknown>>).find(m => m.__keyFields);
-            return (firstMappingWithKeys?.__keyFields as string[] | undefined) || ['DocumentId', 'LineId'];
-        } catch (e) {
-            return ['DocumentId', 'LineId'];
-        }
+        return getSmartKeyFields(currentItems[0]);
     }, [currentItems]);
 
     // Intra-month duplicate detection (ambiguity check)

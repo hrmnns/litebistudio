@@ -233,7 +233,22 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
                         newRow[targetField] = applyTransform(null, config.transformId, targetField);
                     }
                 } else {
-                    const sourceValue = row[config.sourceColumn];
+                    let sourceValue = row[config.sourceColumn];
+
+                    // Advanced Operations
+                    if (config.operation === 'coalesce' && config.secondaryColumn) {
+                        // Fallback if primary is empty/null/undefined
+                        if (!sourceValue && sourceValue !== 0) {
+                            sourceValue = row[config.secondaryColumn];
+                        }
+                    } else if (config.operation === 'concat' && config.secondaryColumn) {
+                        // Combine columns
+                        const val1 = sourceValue ?? '';
+                        const val2 = row[config.secondaryColumn] ?? '';
+                        const sep = config.separator ?? ' ';
+                        sourceValue = `${val1}${sep}${val2}`.trim();
+                    }
+
                     if (sourceValue !== undefined) {
                         let finalValue = sourceValue;
 

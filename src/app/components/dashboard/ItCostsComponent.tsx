@@ -25,7 +25,7 @@ export const ItCostsComponent: React.FC<{ onRemove?: () => void; dragHandleProps
         <DashboardComponent
             title="IT Kosten"
             icon={Wallet}
-            iconColor="amber"
+            iconColor="emerald"
             onClick={onClick}
             onRemove={onRemove}
             targetView={targetView}

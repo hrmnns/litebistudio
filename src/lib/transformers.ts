@@ -91,7 +91,67 @@ export const transformers: Record<string, Transformer[]> = {
                 return value;
             }
         }
-    ]
+    ],
+    // Text Transformers
+    ...['VendorName', 'VendorId', 'DocumentId', 'CostCenter', 'Category', 'SubCategory', 'Service', 'System', 'Description'].reduce((acc, field) => ({
+        ...acc,
+        [field]: [
+            {
+                id: 'Trim',
+                label: 'Trim Whitespace',
+                description: 'Removes leading and trailing spaces',
+                apply: (value: any) => String(value || '').trim()
+            },
+            {
+                id: 'UpperCase',
+                label: 'UPPER CASE',
+                description: 'Converts to uppercase',
+                apply: (value: any) => String(value || '').toUpperCase()
+            },
+            {
+                id: 'LowerCase',
+                label: 'lower case',
+                description: 'Converts to lowercase',
+                apply: (value: any) => String(value || '').toLowerCase()
+            },
+            {
+                id: 'TitleCase',
+                label: 'Title Case',
+                description: 'Capitalize First Letters',
+                apply: (value: any) => String(value || '').replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())
+            }
+        ]
+    }), {}),
+    // Numeric Transformers
+    ...['Amount', 'UnitPrice', 'Quantity'].reduce((acc, field) => ({
+        ...acc,
+        [field]: [
+            {
+                id: 'ParseDeCurrency',
+                label: 'German Currency (1.234,56)',
+                description: 'Parses 1.234,56 to 1234.56',
+                apply: (value: any) => {
+                    if (typeof value === 'number') return value;
+                    if (!value) return 0;
+                    // Remove dots, replace comma with dot
+                    const clean = String(value).replace(/\./g, '').replace(',', '.');
+                    const num = parseFloat(clean);
+                    return isNaN(num) ? 0 : num;
+                }
+            },
+            {
+                id: 'CleanNumber',
+                label: 'Clean Number (Remove Symbols)',
+                description: 'Keep only digits, dots and minus',
+                apply: (value: any) => {
+                    if (typeof value === 'number') return value;
+                    const clean = String(value).replace(/[^0-9.-]/g, '');
+                    const num = parseFloat(clean);
+                    return isNaN(num) ? 0 : num;
+                }
+            }
+        ]
+    }), {})
 };
 
 export const applyTransform = (value: any, transformId: string, fieldType: string) => {
