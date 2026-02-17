@@ -7,6 +7,7 @@ import { RecordDetailModal } from '../components/RecordDetailModal';
 import { ShieldAlert, TrendingUp, AlertTriangle, PlusCircle, FileText, Calendar, Receipt } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import type { InvoiceItem, Anomaly, InvoiceItemHistory } from '../../types';
+import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 
 interface AnomalyDetailViewProps {
     anomalyId: string; // DocumentId
@@ -20,7 +21,8 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
     // 1. Fetch the specific anomaly details
     const { data: anomaly, loading } = useAsync<Anomaly | null>(
         () => AnomalyRepository.getAnomalyDetail(anomalyId, period),
-        [anomalyId, period]
+        [anomalyId, period],
+        { cacheKey: `anomaly-${anomalyId}-${period}` }
     );
 
     // 2. Fetch Report / History for this item (Context)
@@ -35,7 +37,8 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
             );
             return result as unknown as InvoiceItemHistory[];
         },
-        [anomaly]
+        [anomaly],
+        { cacheKey: `history-${anomalyId}` }
     );
 
     const history = useMemo(() => historyData || [], [historyData]);
@@ -108,7 +111,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
     const now = new Date();
     const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
-    if (loading) return (
+    if (loading && !anomaly) return (
         <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
@@ -379,6 +382,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                 initialIndex={selectedHistory?.index || 0}
                 title="Historischer Datensatz"
                 tableName="invoice_items"
+                schema={invoiceItemsSchema}
             />
         </PageLayout>
     );

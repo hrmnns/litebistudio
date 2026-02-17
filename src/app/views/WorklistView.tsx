@@ -9,6 +9,7 @@ import { Bookmark, ExternalLink, Trash2, CheckCircle, AlertCircle, HelpCircle, R
 import type { WorklistEntry, WorklistStatus } from '../../types';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { cn } from '../../lib/utils';
+import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 
 interface WorklistViewProps {
     onBack: () => void;
@@ -20,9 +21,10 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
     const [loadingDetail, setLoadingDetail] = useState(false);
 
     // Fetch all worklist items
-    const { data: worklistItems, refresh } = useAsync<WorklistEntry[]>(
+    const { data: worklistItems, refresh, loading: loadingWorklistItems } = useAsync<WorklistEntry[]>(
         () => WorklistRepository.getAll(),
-        []
+        [],
+        { cacheKey: 'worklist-all' }
     );
 
     const handleRemove = async (e: React.MouseEvent, item: WorklistEntry) => {
@@ -185,6 +187,26 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
     const now = new Date();
     const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
+    if (loadingWorklistItems && !worklistItems) {
+        return (
+            <PageLayout
+                header={{
+                    title: 'Arbeitsvorrat',
+                    subtitle: 'Lade Einträge...',
+                    onBack,
+                }}
+                footer={footerText}
+                breadcrumbs={[
+                    { label: 'Arbeitsvorrat' }
+                ]}
+            >
+                <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+            </PageLayout>
+        );
+    }
+
     return (
         <PageLayout
             header={{
@@ -219,6 +241,7 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
                 initialIndex={resolvedRecords.findIndex(r => r.id === selectedDetailId)}
                 title="Datensatz-Prüfung"
                 tableName="invoice_items"
+                schema={invoiceItemsSchema}
             />
 
             {/* Global Loading Spinner for resolving details */}

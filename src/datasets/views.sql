@@ -36,8 +36,24 @@ CREATE VIEW view_anomalies AS
 WITH ItemHistory AS (
     SELECT 
         *,
-        LAG(Amount) OVER (PARTITION BY VendorName, Description ORDER BY Period) as PrevAmount,
-        LAG(Period) OVER (PARTITION BY VendorName, Description ORDER BY Period) as PrevPeriod
+        LAG(Amount) OVER (
+            PARTITION BY 
+                CASE 
+                    WHEN POId IS NOT NULL AND LineId IS NOT NULL THEN 'PO:' || POId || ':' || LineId
+                    WHEN ContractId IS NOT NULL AND LineId IS NOT NULL THEN 'CT:' || ContractId || ':' || LineId
+                    ELSE 'V:' || COALESCE(VendorName, '') || ':' || COALESCE(Description, '')
+                END 
+            ORDER BY Period
+        ) as PrevAmount,
+        LAG(Period) OVER (
+            PARTITION BY 
+                CASE 
+                    WHEN POId IS NOT NULL AND LineId IS NOT NULL THEN 'PO:' || POId || ':' || LineId
+                    WHEN ContractId IS NOT NULL AND LineId IS NOT NULL THEN 'CT:' || ContractId || ':' || LineId
+                    ELSE 'V:' || COALESCE(VendorName, '') || ':' || COALESCE(Description, '')
+                END 
+            ORDER BY Period
+        ) as PrevPeriod
     FROM invoice_items
 ),
 ScoredItems AS (

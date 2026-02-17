@@ -27,7 +27,8 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
     const { data: historyData, loading, error: loadError } = useAsync<InvoiceItem[]>(
         () => InvoiceRepository.getItemHistory(referenceItem, keyFields),
-        [referenceItem, keyFields]
+        [referenceItem, keyFields],
+        { cacheKey: `item-history-${referenceItem.id}` }
     );
 
     const history = historyData || [];
@@ -90,7 +91,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     const now = new Date();
     const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
-    if (loading) return (
+    if (loading && !historyData) return (
         <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
@@ -275,7 +276,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         </div>
 
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-5 max-w-2xl leading-relaxed">
-                            Diese Timeline visualisiert die Kostenentwicklung dieses spezifischen Elements (identifiziert durch seinen Composite Key) über alle berichteten Perioden hinweg. Sie hilft dabei, Anomalien, Preissprünge oder Änderungen in der Kostenstellen-Zuordnung auf einen Blick zu erfassen.
+                            Diese Timeline visualisiert die Kostenentwicklung dieser spezifischen Rechnungsposition über alle monatlichen Rechnungen hinweg.
                         </p>
 
                         <div className="space-y-[3px]">
@@ -333,6 +334,12 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                     </div>
                                     <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-mono">
                                         {keyFields.map(k => `${k}: ${referenceItem[k] ?? 'NULL'}`).join(', ')}
+                                    </div>
+                                    <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 text-[9px] text-slate-400 dark:text-slate-500 leading-tight">
+                                        Diese Strategie verknüpft Belegpositionen über Rechnungen hinweg.
+                                        {referenceItem.POId ? ' Da eine Bestellnummer (POId) vorhanden ist, wird strikt nach dieser und der Positionsnummer (LineId) gefiltert.' :
+                                            referenceItem.ContractId ? ' Da eine Vertragsnummer vorhanden ist, wird strikt nach dieser und der Positionsnummer (LineId) gefiltert.' :
+                                                ' Da keine eindeutige ID vorhanden ist, wird ein zusammengesetzter Schlüssel aus fachlichen Attributen verwendet.'}
                                     </div>
                                 </div>
                             </div>
