@@ -125,6 +125,11 @@ export async function bulkInsertEvents(data: DbRow[]) {
     return send('BULK_INSERT_EVENTS', data);
 }
 
+export async function bulkInsertSystems(data: DbRow[]) {
+    await initDB();
+    return send('BULK_INSERT_SYSTEMS', data);
+}
+
 export async function clearDatabase() {
     await initDB();
     return send('CLEAR');

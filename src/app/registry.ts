@@ -8,6 +8,7 @@ import { AnomalyRadarComponent } from './components/dashboard/AnomalyRadarCompon
 import { SystemStatusComponent } from './components/dashboard/SystemStatusComponent';
 import { WorklistComponent } from './components/dashboard/WorklistComponent';
 import { OperationsComponent } from './components/dashboard/OperationsComponent';
+import { DatabaseStatusComponent } from './components/dashboard/DatabaseStatusComponent';
 
 export const COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
     'ItCostsComponent': ItCostsComponent,
@@ -18,7 +19,8 @@ export const COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
     'AnomalyRadarComponent': AnomalyRadarComponent,
     'SystemStatusComponent': SystemStatusComponent,
     'WorklistComponent': WorklistComponent,
-    'OperationsComponent': OperationsComponent
+    'OperationsComponent': OperationsComponent,
+    'DatabaseStatusComponent': DatabaseStatusComponent
 };
 
 export const getComponent = (name: string) => {

@@ -1,9 +1,14 @@
 import React from 'react';
 import { Info, Database, Upload } from 'lucide-react';
 import { ExcelImport } from '../components/ExcelImport';
-import { SchemaDocumentation } from '../components/SchemaDocumentation';
+import { SchemaTable } from '../components/SchemaDocumentation';
+import { Modal } from '../components/Modal';
 import { PageLayout } from '../components/ui/PageLayout';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
+import systemsSchema from '../../schemas/systems-schema.json';
+import { systemsImportConfig } from '../components/importers/SystemsImportConfig';
+import { MappingManager } from '../components/MappingManager';
+import { useBackupStatus } from '../hooks/useBackupStatus';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -12,6 +17,14 @@ interface DatasourceViewProps {
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
     const now = new Date();
     const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+
+    const [target, setTarget] = React.useState<'invoice_items' | 'systems'>('invoice_items');
+    const [isSchemaOpen, setIsSchemaOpen] = React.useState(false);
+
+    const { isBackupRecommended, changeCount, markBackupComplete } = useBackupStatus();
+
+    const activeConfig = target === 'systems' ? systemsImportConfig : undefined;
+    const activeSchema = target === 'systems' ? systemsSchema : invoiceItemsSchema;
 
     return (
         <PageLayout
@@ -59,12 +72,75 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 </div>
 
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Daten importieren</h3>
-                    <ExcelImport onImportComplete={onImportComplete} />
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Daten importieren</h3>
+                        <div className="flex items-center gap-4">
+                            <MappingManager />
+                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+                            <button
+                                onClick={() => setIsSchemaOpen(true)}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1.5 transition-colors"
+                            >
+                                <Info className="w-3.5 h-3.5" />
+                                Format & Schema ansehen
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Target Selector */}
+                    <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-lg mb-6 w-fit">
+                        <button
+                            onClick={() => setTarget('invoice_items')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${target === 'invoice_items'
+                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                                }`}
+                        >
+                            Rechnungen
+                        </button>
+                        <button
+                            onClick={() => setTarget('systems')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${target === 'systems'
+                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                                }`}
+                        >
+                            Systeme
+                        </button>
+                    </div>
+
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                        {target === 'invoice_items'
+                            ? 'Laden Sie hier Ihre Rechnungsdaten (Excel/CSV) hoch. Das System erkennt automatisch Perioden und Lieferanten.'
+                            : 'Importieren Sie hier Ihre Systemliste. Die Datei muss mindestens eine Spalte "name" enthalten.'}
+                    </p>
+
+                    <ExcelImport
+                        key={target} // Force re-mount on target change
+                        onImportComplete={onImportComplete}
+                        config={activeConfig}
+                    />
                 </div>
 
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                     <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Sicherung & Wiederherstellung</h3>
+
+                    {/* Backup Reminder Banner */}
+                    {isBackupRecommended && (
+                        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-lg flex items-start gap-3">
+                            <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                                    Ungesicherte Änderungen
+                                </h4>
+                                <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                                    Es wurden <strong>{changeCount}</strong> Änderungen seit der letzten Sicherung vorgenommen.
+                                    Ein Backup wird empfohlen.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <button
                             onClick={async () => {
@@ -74,13 +150,17 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 const url = URL.createObjectURL(blob);
                                 const a = document.createElement('a');
                                 a.href = url;
-                                a.download = 'itdashboard.sqlite3';
+                                a.download = `itdashboard_backup_${new Date().toISOString().split('T')[0]}.sqlite3`;
                                 a.click();
                                 URL.revokeObjectURL(url);
+                                markBackupComplete();
                             }}
-                            className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg transition-all shadow-sm"
+                            className={`flex items-center justify-center gap-2 px-4 py-3 border text-sm font-medium rounded-lg transition-all shadow-sm ${isBackupRecommended
+                                ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-100'
+                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-blue-500 text-slate-700 dark:text-slate-200'
+                                }`}
                         >
-                            <Database className="w-4 h-4 text-blue-500" />
+                            <Database className={`w-4 h-4 ${isBackupRecommended ? 'text-amber-600' : 'text-blue-500'}`} />
                             Datenbank herunterladen (.sqlite3)
                         </button>
 
@@ -114,14 +194,20 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                         </div>
                     </div>
                 </div>
-
-                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 p-6">
-                    <SchemaDocumentation
-                        schema={invoiceItemsSchema}
-                        title="Erwartetes Rechnungsformat"
-                    />
-                </div>
             </div>
+
+            <Modal
+                isOpen={isSchemaOpen}
+                onClose={() => setIsSchemaOpen(false)}
+                title={activeSchema.title || 'Datenschema'}
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                        {activeSchema.description}
+                    </p>
+                    <SchemaTable schema={activeSchema} />
+                </div>
+            </Modal>
         </PageLayout>
     );
 };

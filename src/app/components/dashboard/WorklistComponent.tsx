@@ -47,34 +47,34 @@ export const WorklistComponent: React.FC<WorklistComponentProps> = ({ onClick, o
                     </div>
                 </div>
 
-                {/* Status Breakdown Row - High Density Horizontal Design */}
-                <div className="w-full pt-3 border-t border-slate-100 dark:border-slate-800/50">
-                    <div className="grid grid-cols-4 gap-1">
+                {/* Status Breakdown Row - Slightly more prominence as requested */}
+                <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                    <div className="grid grid-cols-4 gap-2">
                         {/* Offen */}
-                        <div className="flex flex-col items-center p-1 rounded-lg bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100/50 dark:border-amber-800/30">
-                            <span className="text-[6px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-tighter mb-0.5">Offen</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                        <div className="flex flex-col items-center py-2.5 px-1 rounded-xl bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100/50 dark:border-amber-800/30">
+                            <span className="text-[8px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-1 leading-none">Offen</span>
+                            <span className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
                                 {counts?.open ?? 0}
                             </span>
                         </div>
                         {/* OK */}
-                        <div className="flex flex-col items-center p-1 rounded-lg bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100/50 dark:border-emerald-800/30">
-                            <span className="text-[6px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter mb-0.5">OK</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                        <div className="flex flex-col items-center py-2.5 px-1 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100/50 dark:border-emerald-800/30">
+                            <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-1 leading-none">OK</span>
+                            <span className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
                                 {counts?.ok ?? 0}
                             </span>
                         </div>
                         {/* Fehler */}
-                        <div className="flex flex-col items-center p-1 rounded-lg bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100/50 dark:border-rose-800/30">
-                            <span className="text-[6px] font-black text-rose-600 dark:text-rose-500 uppercase tracking-tighter mb-0.5">Fehler</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                        <div className="flex flex-col items-center py-2.5 px-1 rounded-xl bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100/50 dark:border-rose-800/30">
+                            <span className="text-[8px] font-black text-rose-600 dark:text-rose-500 uppercase tracking-widest mb-1 leading-none">Fehler</span>
+                            <span className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
                                 {counts?.error ?? 0}
                             </span>
                         </div>
                         {/* Klärung */}
-                        <div className="flex flex-col items-center p-1 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
-                            <span className="text-[6px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-tighter mb-0.5">Klärung</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                        <div className="flex flex-col items-center py-2.5 px-1 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
+                            <span className="text-[8px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-widest mb-1 leading-none">Klärung</span>
+                            <span className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
                                 {counts?.clarification ?? 0}
                             </span>
                         </div>

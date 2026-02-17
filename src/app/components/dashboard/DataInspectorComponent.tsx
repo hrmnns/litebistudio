@@ -40,11 +40,11 @@ export const DataInspectorComponent: React.FC<{ onRemove?: () => void; dragHandl
                     </div>
                 </div>
 
-                {/* Secondary Metrics - High Density Tables Pill */}
-                <div className="w-full pt-3 border-t border-slate-100 dark:border-slate-800/50 flex justify-center">
-                    <div className="flex flex-col items-center px-4 py-1 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
-                        <span className="text-[6px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-tighter mb-0.5">Tabellen</span>
-                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+                {/* Secondary Metrics - Prominent View */}
+                <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800/50 flex justify-center">
+                    <div className="flex flex-col items-center px-6 py-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
+                        <span className="text-[8px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-widest mb-1 leading-none">Tabellen</span>
+                        <span className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
                             {loading || !stats ? '...' : stats.tables}
                         </span>
                     </div>
