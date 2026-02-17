@@ -3,14 +3,17 @@ import { Modal } from './Modal';
 import { ChevronLeft, ChevronRight, Info, Bookmark, Target } from 'lucide-react';
 import { WorklistRepository } from '../../lib/repositories/WorklistRepository';
 
+import { SchemaTable } from './SchemaDocumentation';
+import { usePseudonym } from '../../hooks/usePseudonym';
+
 interface RecordDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
     items: any[];
     initialIndex?: number;
     title?: string;
-    infoLabel?: string;
     tableName?: string;
+    schema?: any;
 }
 
 export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
@@ -19,8 +22,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     items,
     initialIndex = 0,
     title = "Datensatz-Details",
-    infoLabel = "Archiv-Daten",
-    tableName
+    tableName,
+    schema
 }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [previousIndex, setPreviousIndex] = useState<number | null>(null);
@@ -30,6 +33,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 
     // Get table name context (default to invoice_items if not provided)
     const activeTable = tableName || 'invoice_items';
+    const { mask } = usePseudonym();
 
     // Sync index when items change or modal opens
     useEffect(() => {
@@ -114,13 +118,15 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     {/* Toolbar / Menu Bar */}
                     <div className="-mx-6 -mt-6 mb-6 px-6 py-2 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <div className="flex items-center gap-1">
-                            <button
-                                onClick={() => setHelpOpen(true)}
-                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-500"
-                                title="Hilfe anzeigen"
-                            >
-                                <Info className="w-4 h-4" />
-                            </button>
+                            {schema && (
+                                <button
+                                    onClick={() => setHelpOpen(true)}
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-500"
+                                    title="Schema-Definition anzeigen"
+                                >
+                                    <Info className="w-4 h-4" />
+                                </button>
+                            )}
                             <button
                                 onClick={handleToggleWorklist}
                                 className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${isInWorklist
@@ -215,7 +221,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         {value === null || value === undefined || value === '' ? (
                                             <span className="text-slate-300 italic">&lt;leer&gt;</span>
                                         ) : (
-                                            String(value)
+                                            schema?.properties?.[key]?.format === 'email' ? mask(String(value), 'email') :
+                                                (key === 'VendorName' || key === 'Person') ? mask(String(value), 'vendor') :
+                                                    String(value)
                                         )}
                                     </dd>
                                 </div>
@@ -225,41 +233,31 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 </div>
             </Modal>
 
-            {/* Nested Help Modal */}
-            <Modal
-                isOpen={helpOpen}
-                onClose={() => setHelpOpen(false)}
-                title="Hilfe & Informationen"
-            >
-                <div className="space-y-4 py-2">
-                    <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-3">
-                        <Info className="w-5 h-5 shrink-0 mt-0.5" />
-                        <div className="space-y-2">
-                            <p className="font-bold uppercase tracking-tight">🔍 {infoLabel}</p>
-                            <p>
-                                {currentItem.Period
-                                    ? `Dieser Datensatz stammt aus der Periode ${currentItem.Period}. `
-                                    : 'Dieser Datensatz wird in seinem Originalzustand aus der Datenbank angezeigt.'
-                                }
-                            </p>
-                            <div className="pt-2 border-t border-blue-200 dark:border-blue-800/50 space-y-2">
-                                <p className="font-medium italic">
-                                    ✨ <span className="underline decoration-amber-400 underline-offset-2">Diff-Funktion:</span> Unterschiede werden standardmässig zum <strong>zuletzt besuchten Datensatz</strong> angezeigt.
-                                </p>
-                                <p className="font-medium italic">
-                                    🎯 <span className="underline decoration-blue-400 underline-offset-2">Referenz-Modus:</span> Klicke auf das Zielscheiben-Symbol, um den aktuellen Datensatz als <strong>feste Vergleichsbasis</strong> zu fixieren.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => setHelpOpen(false)}
-                        className="w-full py-2.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-bold text-xs transition-opacity hover:opacity-90"
+
+
+            {/* Direct Schema Definition Modal (if available) */}
+            {
+                schema && helpOpen && (
+                    <Modal
+                        isOpen={helpOpen}
+                        onClose={() => setHelpOpen(false)}
+                        title={schema.title || 'Datensatz-Definition'}
                     >
-                        Verstanden
-                    </button>
-                </div>
-            </Modal>
+                        <div className="space-y-6">
+                            <p className="text-sm text-slate-500 dark:text-slate-400 italic">
+                                {schema.description}
+                            </p>
+                            <SchemaTable schema={schema} />
+                            <button
+                                onClick={() => setHelpOpen(false)}
+                                className="w-full py-2.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-bold text-xs transition-opacity hover:opacity-90 mt-4"
+                            >
+                                Schließen
+                            </button>
+                        </div>
+                    </Modal>
+                )
+            }
         </>
     );
 };

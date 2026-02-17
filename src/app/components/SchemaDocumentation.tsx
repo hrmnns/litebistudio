@@ -7,6 +7,74 @@ interface SchemaDocumentationProps {
     title?: string;
 }
 
+export const SchemaTable: React.FC<{ schema: any }> = ({ schema }) => {
+    if (!schema || !schema.items || !schema.items.properties) return null;
+
+    const properties = schema.items.properties;
+    const required = schema.items.required || [];
+    const propertyEntries = Object.entries(properties);
+
+    return (
+        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[11px] font-bold">
+                    <tr>
+                        <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Property</th>
+                        <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Type</th>
+                        <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Constraints</th>
+                        <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {propertyEntries.map(([key, value]: [string, any]) => (
+                        <tr key={key} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0">
+                            <td className="px-4 py-4 align-top">
+                                <div className="font-mono font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                    {key}
+                                    {required.includes(key) && (
+                                        <span className="text-[10px] text-red-500 font-bold px-1.5 py-0.5 bg-red-50 dark:bg-red-900/20 rounded border border-red-100 dark:border-red-900/30">REQ</span>
+                                    )}
+                                </div>
+                            </td>
+                            <td className="px-4 py-4 align-top">
+                                <code className="text-[11px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
+                                    {value.type}
+                                </code>
+                            </td>
+                            <td className="px-4 py-4 align-top">
+                                <div className="flex flex-wrap gap-1">
+                                    {value.enum && (
+                                        <div className="w-full mb-1">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Allowed Values:</span>
+                                            <div className="flex flex-wrap gap-1">
+                                                {value.enum.map((v: string) => (
+                                                    <span key={v} className="text-[10px] px-1 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 rounded">{v}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {value.pattern && (
+                                        <div className="w-full">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Regex Pattern:</span>
+                                            <code className="text-[10px] text-indigo-500 font-mono break-all">{value.pattern}</code>
+                                        </div>
+                                    )}
+                                    {value.format && <span className="text-[10px] px-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded uppercase">{value.format}</span>}
+                                    {value.minimum !== undefined && <span className="text-[10px] px-1 bg-slate-50 dark:bg-slate-700 text-slate-500 rounded font-mono">min: {value.minimum}</span>}
+                                    {value.maximum !== undefined && <span className="text-[10px] px-1 bg-slate-50 dark:bg-slate-700 text-slate-500 rounded font-mono">max: {value.maximum}</span>}
+                                </div>
+                            </td>
+                            <td className="px-4 py-4 align-top text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
+                                {value.description || <span className="opacity-30 italic">No description available</span>}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
 export const SchemaDocumentation: React.FC<SchemaDocumentationProps> = ({ schema, title }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -60,63 +128,7 @@ export const SchemaDocumentation: React.FC<SchemaDocumentationProps> = ({ schema
                 title={schema.title || 'Data Format Details'}
             >
                 <div className="space-y-6">
-                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                        <table className="w-full text-sm text-left border-collapse">
-                            <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[11px] font-bold">
-                                <tr>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Property</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Type</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Constraints</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {propertyEntries.map(([key, value]: [string, any]) => (
-                                    <tr key={key} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0">
-                                        <td className="px-4 py-4 align-top">
-                                            <div className="font-mono font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                                {key}
-                                                {required.includes(key) && (
-                                                    <span className="text-[10px] text-red-500 font-bold px-1.5 py-0.5 bg-red-50 dark:bg-red-900/20 rounded border border-red-100 dark:border-red-900/30">REQ</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 align-top">
-                                            <code className="text-[11px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
-                                                {value.type}
-                                            </code>
-                                        </td>
-                                        <td className="px-4 py-4 align-top">
-                                            <div className="flex flex-wrap gap-1">
-                                                {value.enum && (
-                                                    <div className="w-full mb-1">
-                                                        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Allowed Values:</span>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {value.enum.map((v: string) => (
-                                                                <span key={v} className="text-[10px] px-1 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 rounded">{v}</span>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {value.pattern && (
-                                                    <div className="w-full">
-                                                        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Regex Pattern:</span>
-                                                        <code className="text-[10px] text-indigo-500 font-mono break-all">{value.pattern}</code>
-                                                    </div>
-                                                )}
-                                                {value.format && <span className="text-[10px] px-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded uppercase">{value.format}</span>}
-                                                {value.minimum !== undefined && <span className="text-[10px] px-1 bg-slate-50 dark:bg-slate-700 text-slate-500 rounded font-mono">min: {value.minimum}</span>}
-                                                {value.maximum !== undefined && <span className="text-[10px] px-1 bg-slate-50 dark:bg-slate-700 text-slate-500 rounded font-mono">max: {value.maximum}</span>}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 align-top text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-                                            {value.description || <span className="opacity-30 italic">No description available</span>}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <SchemaTable schema={schema} />
                 </div>
             </Modal>
         </div>

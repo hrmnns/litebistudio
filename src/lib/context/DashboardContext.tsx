@@ -11,6 +11,8 @@ interface DashboardContextType {
     setComponentOrder: (order: string[] | ((prev: string[]) => string[])) => void;
     isSidebarCollapsed: boolean;
     setSidebarCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
+    isPrivacyMode: boolean;
+    setPrivacyMode: (enabled: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -27,6 +29,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [visibleSidebarComponentIds, setVisibleSidebarComponentIds] = useLocalStorage<string[]>('visibleSidebarComponentIds', COMPONENTS.filter(t => t.targetView).map(t => t.id));
     const [componentOrder, setComponentOrder] = useLocalStorage<string[]>('componentOrder', initialOrder);
     const [isSidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
+    const [isPrivacyMode, setPrivacyMode] = useLocalStorage<boolean>('isPrivacyMode', false);
 
     // Sync state if new components are added, but preserve slots
     React.useEffect(() => {
@@ -65,7 +68,9 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             componentOrder,
             setComponentOrder,
             isSidebarCollapsed,
-            setSidebarCollapsed
+            setSidebarCollapsed,
+            isPrivacyMode,
+            setPrivacyMode
         }}>
             {children}
         </DashboardContext.Provider>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePseudonym } from '../../hooks/usePseudonym';
 import { useAsync } from '../../hooks/useAsync';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { Search, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle, Copy, ShieldCheck, Box, FileText, Layers, Download } from 'lucide-react';
@@ -32,6 +33,7 @@ interface ItCostsMonthViewProps {
 export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBack, onDrillDown }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
+    const { mask } = usePseudonym();
 
     // Retrieve custom key fields from saved mappings
     const keyFields: string[] = useMemo(() => {
@@ -162,7 +164,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
         const exportData = invoices.map(inv => ({
             'Belegdatum': inv.PostingDate,
             'Belegnummer': inv.DocumentId,
-            'Kreditor': inv.VendorName,
+            'Kreditor': mask(inv.VendorName, 'vendor'),
             'Kreditor-ID': inv.VendorId,
             'Beschreibung': inv.primary_description,
             'Gesamtbetrag': inv.total_amount,
@@ -205,9 +207,9 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             render: (item: InvoiceGroup) => (
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-xs">
-                        {item.VendorName?.charAt(0) ?? '?'}
+                        {mask(item.VendorName, 'vendor')?.charAt(0) ?? '?'}
                     </div>
-                    <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{item.VendorName}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{mask(item.VendorName, 'vendor')}</span>
                 </div>
             )
         },

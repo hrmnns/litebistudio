@@ -6,6 +6,9 @@ import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
 import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
+import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
+import systemsSchema from '../../schemas/systems-schema.json';
+import worklistSchema from '../../schemas/worklist-schema.json';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -268,6 +271,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 title="Datensatz-Details"
                 infoLabel="Inspector-Daten"
                 tableName={selectedTable}
+                schema={
+                    selectedTable === 'invoice_items' ? invoiceItemsSchema :
+                        selectedTable === 'systems' ? systemsSchema :
+                            selectedTable === 'worklist' ? worklistSchema :
+                                undefined
+                }
             />
 
             {/* Error Toast / Floating Alert */}

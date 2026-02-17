@@ -9,6 +9,7 @@ import { SummaryCard } from '../components/ui/SummaryCard';
 import { RecordComparison } from '../components/ui/RecordComparison';
 import { PageLayout } from '../components/ui/PageLayout';
 import type { InvoiceItem } from '../../types';
+import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 
 interface ItCostsItemHistoryViewProps {
     item: InvoiceItem;
@@ -384,6 +385,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                 initialIndex={referenceIndex >= 0 ? referenceIndex : 0}
                 title="Datensatz-Details"
                 tableName="invoice_items"
+                schema={invoiceItemsSchema}
             />
         </PageLayout>
     );

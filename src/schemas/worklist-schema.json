@@ -1,0 +1,56 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Worklist Items",
+    "description": "Task management list for flagged records requiring attention or review.",
+    "type": "object",
+    "items": {
+        "type": "object",
+        "required": [
+            "source_table",
+            "source_id"
+        ],
+        "properties": {
+            "id": {
+                "type": "integer",
+                "description": "Unique worklist item identifier."
+            },
+            "source_table": {
+                "type": "string",
+                "enum": [
+                    "invoice_items",
+                    "systems",
+                    "kpi_data"
+                ],
+                "description": "Name of the table where the flagged record belongs."
+            },
+            "source_id": {
+                "type": "integer",
+                "description": "Primary key ID of the record in the source table."
+            },
+            "display_label": {
+                "type": "string",
+                "description": "Human-readable title or summary of the flagged item."
+            },
+            "display_context": {
+                "type": "string",
+                "description": "Additional context (e.g., period, category) to help identify the item."
+            },
+            "added_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp when the item was added to the worklist."
+            },
+            "status": {
+                "type": "string",
+                "enum": [
+                    "open",
+                    "in_progress",
+                    "resolved",
+                    "ignored"
+                ],
+                "default": "open",
+                "description": "Current processing status of the worklist item."
+            }
+        }
+    }
+}

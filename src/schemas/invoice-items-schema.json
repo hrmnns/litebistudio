@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://example.local/schemas/it-costs-sheet1.schema.json",
-    "title": "IT Costs - Sheet 1 (IT_Costs_2026)",
+    "title": "Invoice Items (Rechnunspositionen)",
     "description": "Schema for the Excel sheet 'IT_Costs_2026'. Each row represents a single invoice line item (DocumentId + LineId). This schema validates the JSON representation after Excel import (array of rows).",
     "type": "array",
     "minItems": 1,

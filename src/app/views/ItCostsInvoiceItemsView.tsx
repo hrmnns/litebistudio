@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePseudonym } from '../../hooks/usePseudonym';
 import { useAsync } from '../../hooks/useAsync';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 import { Search, Receipt, AlertTriangle, PlusCircle, Copy, Download, Wallet, Printer } from 'lucide-react';
@@ -102,7 +103,8 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     );
 
     const totalAmount = currentItems.reduce((acc: number, item: InvoiceItem) => acc + item.Amount, 0);
-    const vendorName = currentItems[0]?.VendorName || 'Unbekannter Lieferant';
+    const { mask } = usePseudonym();
+    const vendorName = mask(currentItems[0]?.VendorName || 'Unbekannter Lieferant', 'vendor');
 
     const now = new Date();
     const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
