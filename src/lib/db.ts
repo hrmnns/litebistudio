@@ -135,6 +135,16 @@ export async function clearDatabase() {
     return send('CLEAR');
 }
 
+export async function clearSystemsTable() {
+    await initDB();
+    return send('CLEAR_SYSTEMS');
+}
+
+export async function clearInvoiceData() {
+    await initDB();
+    return send('CLEAR_INVOICE_DATA');
+}
+
 export async function exportDatabase(): Promise<Uint8Array> {
     await initDB();
     return send<Uint8Array>('EXPORT');

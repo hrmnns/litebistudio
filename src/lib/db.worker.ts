@@ -219,6 +219,18 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
+            case 'CLEAR_SYSTEMS':
+                if (!db) await initDB();
+                db.exec('DELETE FROM systems;');
+                result = true;
+                break;
+
+            case 'CLEAR_INVOICE_DATA':
+                if (!db) await initDB();
+                db.exec('DELETE FROM kpi_data; DELETE FROM operations_events; DELETE FROM invoice_items;');
+                result = true;
+                break;
+
             case 'LOAD_DEMO':
                 if (!db) await initDB();
                 await loadDemoData();

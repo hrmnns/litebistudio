@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Check, AlertCircle } from 'lucide-react';
-import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearDatabase } from '../../lib/db';
+import { Upload, Check, AlertCircle, PlusCircle, RotateCcw } from 'lucide-react';
+import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearDatabase, clearInvoiceData } from '../../lib/db';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 // @ts-ignore - AJV generated validator
 import { validate as validateInvoiceItems } from '../../lib/validators/invoice-items-validator.js';
@@ -24,6 +24,7 @@ export interface ImportConfig {
     importFn: (data: any[]) => Promise<void>;
     processRow?: (row: any, index: number) => any; // Post-mapping enrichment
     sheetNameKeyword?: string; // Heuristic to find sheet
+    clearFn?: () => Promise<void>;
 }
 
 interface ExcelImportProps {
@@ -36,6 +37,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
     const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'warning'>('idle');
     const [message, setMessage] = useState('');
     const [errors, setErrors] = useState<string[]>([]);
+    const [importMode, setImportMode] = useState<'append' | 'overwrite'>('append');
 
     // Mapping State
     const [mapperOpen, setMapperOpen] = useState(false);
@@ -254,6 +256,12 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
 
             // Validation Passed - Import
             try {
+                if (importMode === 'overwrite' && config.clearFn) {
+                    await config.clearFn();
+                    window.dispatchEvent(new CustomEvent('db-changed', {
+                        detail: { type: 'clear', target: config.key }
+                    }));
+                }
                 await config.importFn(finalData);
                 setStatus('success');
                 setMessage(`Successfully imported ${finalData.length} ${config.entityLabel}.`);
@@ -320,7 +328,12 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
         }
 
         try {
-            await clearDatabase();
+            if (importMode === 'overwrite') {
+                await clearInvoiceData();
+                window.dispatchEvent(new CustomEvent('db-changed', {
+                    detail: { type: 'clear', target: 'legacy' }
+                }));
+            }
 
             if (invoiceItems.length > 0) await bulkInsertInvoiceItems(invoiceItems);
             if (kpis.length > 0) await bulkInsertKPIs(kpis);
@@ -502,72 +515,104 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
                 />
             )}
 
-            <div className="relative">
-                <input
-                    type="file"
-                    accept=".xlsx, .xls, .csv"
-                    onChange={handleFileUpload}
-                    disabled={isImporting}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                    id="excel-upload"
-                />
-                <label
-                    htmlFor="excel-upload"
-                    className={`
+            <div className="flex flex-col gap-4">
+                {/* Import Mode Selector */}
+                <div className="flex justify-center">
+                    <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <button
+                            onClick={() => setImportMode('append')}
+                            className={`
+                                flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all
+                                ${importMode === 'append'
+                                    ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}
+                            `}
+                        >
+                            <PlusCircle className="w-3.5 h-3.5" />
+                            Daten Hinzufügen
+                        </button>
+                        <button
+                            onClick={() => setImportMode('overwrite')}
+                            className={`
+                                flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all
+                                ${importMode === 'overwrite'
+                                    ? 'bg-white dark:bg-slate-800 text-amber-600 shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}
+                            `}
+                        >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Überschreiben
+                        </button>
+                    </div>
+                </div>
+
+                <div className="relative">
+                    <input
+                        type="file"
+                        accept=".xlsx, .xls, .csv"
+                        onChange={handleFileUpload}
+                        disabled={isImporting}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        id="excel-upload"
+                    />
+                    <label
+                        htmlFor="excel-upload"
+                        className={`
                         flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-xl transition-all
                         ${isImporting ? 'bg-slate-50 border-slate-200' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/10'}
                     `}
-                >
-                    <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600">
-                        <Upload className="w-6 h-6" />
-                    </div>
-                    <div className="text-center">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {isImporting ? 'Importing...' : 'Click or drag Excel/CSV file here'}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                            {config ? `Importing ${config.entityLabel}` : 'Sheets should contain columns: metric, value, category, date'}
-                        </p>
-                    </div>
-                </label>
-            </div>
-
-            <div className="flex justify-end">
-                <button
-                    onClick={handleResetMappings}
-                    className="text-xs text-slate-400 hover:text-red-500 transition-colors underline"
-                >
-                    Reset Saved Mappings
-                </button>
-            </div>
-
-            {status !== 'idle' && (
-                <div className={`p-4 rounded-lg flex items-start gap-3 ${status === 'success' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'}`}>
-                    {status === 'success' ? <Check className="w-5 h-5 mt-0.5" /> : <AlertCircle className="w-5 h-5 mt-0.5" />}
-                    <div className="text-sm font-medium">{message}</div>
+                    >
+                        <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600">
+                            <Upload className="w-6 h-6" />
+                        </div>
+                        <div className="text-center">
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                {isImporting ? 'Importing...' : 'Click or drag Excel/CSV file here'}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                {config ? `Importing ${config.entityLabel}` : 'Sheets should contain columns: metric, value, category, date'}
+                            </p>
+                        </div>
+                    </label>
                 </div>
-            )}
 
-            {status === 'error' && errors.length > 0 && (
-                <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-semibold mb-2">
-                        <AlertCircle className="w-4 h-4 ml-0.5" />
-                        <span>Detailed Validation Errors ({errors.length})</span>
-                    </div>
-                    <ul className="space-y-1 max-h-40 overflow-auto">
-                        {errors.slice(0, 10).map((err, i) => (
-                            <li key={i} className="text-xs text-red-600 dark:text-red-400 font-mono">
-                                • {err}
-                            </li>
-                        ))}
-                        {errors.length > 10 && (
-                            <li className="text-xs text-red-500 italic">
-                                ... and {errors.length - 10} more errors
-                            </li>
-                        )}
-                    </ul>
+                <div className="flex justify-end">
+                    <button
+                        onClick={handleResetMappings}
+                        className="text-xs text-slate-400 hover:text-red-500 transition-colors underline"
+                    >
+                        Reset Saved Mappings
+                    </button>
                 </div>
-            )}
+
+                {status !== 'idle' && (
+                    <div className={`p-4 rounded-lg flex items-start gap-3 ${status === 'success' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'}`}>
+                        {status === 'success' ? <Check className="w-5 h-5 mt-0.5" /> : <AlertCircle className="w-5 h-5 mt-0.5" />}
+                        <div className="text-sm font-medium">{message}</div>
+                    </div>
+                )}
+
+                {status === 'error' && errors.length > 0 && (
+                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg p-4">
+                        <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-semibold mb-2">
+                            <AlertCircle className="w-4 h-4 ml-0.5" />
+                            <span>Detailed Validation Errors ({errors.length})</span>
+                        </div>
+                        <ul className="space-y-1 max-h-40 overflow-auto">
+                            {errors.slice(0, 10).map((err, i) => (
+                                <li key={i} className="text-xs text-red-600 dark:text-red-400 font-mono">
+                                    • {err}
+                                </li>
+                            ))}
+                            {errors.length > 10 && (
+                                <li className="text-xs text-red-500 italic">
+                                    ... and {errors.length - 10} more errors
+                                </li>
+                            )}
+                        </ul>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

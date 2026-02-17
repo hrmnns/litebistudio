@@ -1,6 +1,6 @@
 import type { ImportConfig } from '../ExcelImport';
 import systemsSchema from '../../../schemas/systems-schema.json';
-import { bulkInsertSystems } from '../../../lib/db';
+import { bulkInsertSystems, clearSystemsTable } from '../../../lib/db';
 
 export const systemsImportConfig: ImportConfig = {
     key: 'systems',
@@ -19,6 +19,9 @@ export const systemsImportConfig: ImportConfig = {
     },
     importFn: async (data: any[]) => {
         await bulkInsertSystems(data);
+    },
+    clearFn: async () => {
+        await clearSystemsTable();
     },
     processRow: (row: any) => {
         // Ensure status has a default if missing
