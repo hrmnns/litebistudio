@@ -80,10 +80,9 @@ async function initDB() {
         log('Schema initialized');
 
         // Check for empty DB and load demo data
-        const kpiCount = db.selectValue('SELECT count(*) FROM kpi_data');
         const invoiceCount = db.selectValue('SELECT count(*) FROM invoice_items');
 
-        if (kpiCount === 0 && invoiceCount === 0) {
+        if (invoiceCount === 0) {
             log('Database empty, loading demo data...');
             await loadDemoData();
         }
@@ -95,39 +94,6 @@ async function initDB() {
 }
 
 async function loadDemoData() {
-    // Clear first just in case
-    db.exec('DELETE FROM kpi_data; DELETE FROM operations_events; DELETE FROM invoice_items;');
-
-    // KPIs
-    const kpiStmt = db.prepare('INSERT INTO kpi_data (metric, value, unit, category, date) VALUES (?, ?, ?, ?, ?)');
-    try {
-        db.exec('BEGIN TRANSACTION');
-        for (const item of demoDataSmall.kpis) {
-            kpiStmt.bind([item.metric, item.value, item.unit, item.category, item.date]);
-            kpiStmt.step();
-            kpiStmt.reset();
-        }
-        db.exec('COMMIT');
-    } finally {
-        kpiStmt.finalize();
-    }
-
-    // Events
-    if (demoDataSmall.events) {
-        const eventStmt = db.prepare('INSERT INTO operations_events (event_name, status, timestamp) VALUES (?, ?, ?)');
-        try {
-            db.exec('BEGIN TRANSACTION');
-            for (const item of demoDataSmall.events) {
-                eventStmt.bind([item.event_name, item.status, item.timestamp]);
-                eventStmt.step();
-                eventStmt.reset();
-            }
-            db.exec('COMMIT');
-        } finally {
-            eventStmt.finalize();
-        }
-    }
-
     // Systems
     if (demoDataSmall.systems) {
         const systemStmt = db.prepare('INSERT INTO systems (name, url, status, category, is_favorite, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
@@ -180,18 +146,6 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
-            case 'BULK_INSERT_KPIS':
-                if (!db) await initDB();
-                insertKPIs(payload);
-                result = true;
-                break;
-
-            case 'BULK_INSERT_EVENTS':
-                if (!db) await initDB();
-                insertEvents(payload);
-                result = true;
-                break;
-
             case 'BULK_INSERT_SYSTEMS':
                 if (!db) await initDB();
                 insertSystems(payload);
@@ -215,7 +169,7 @@ async function handleMessage(e: MessageEvent) {
 
             case 'CLEAR':
                 if (!db) await initDB();
-                db.exec('DELETE FROM kpi_data; DELETE FROM operations_events; DELETE FROM invoice_items;');
+                db.exec('DELETE FROM invoice_items;');
                 result = true;
                 break;
 
@@ -227,7 +181,7 @@ async function handleMessage(e: MessageEvent) {
 
             case 'CLEAR_INVOICE_DATA':
                 if (!db) await initDB();
-                db.exec('DELETE FROM kpi_data; DELETE FROM operations_events; DELETE FROM invoice_items;');
+                db.exec('DELETE FROM invoice_items;');
                 result = true;
                 break;
 
@@ -298,42 +252,6 @@ function insertInvoiceItems(data: any[]) {
     }
 }
 
-function insertKPIs(data: any[]) {
-    const stmt = db.prepare('INSERT INTO kpi_data (metric, value, unit, category, date) VALUES (?, ?, ?, ?, ?)');
-    try {
-        db.exec('BEGIN TRANSACTION');
-        for (const item of data) {
-            stmt.bind([item.metric, item.value, item.unit, item.category, item.date]);
-            stmt.step();
-            stmt.reset();
-        }
-        db.exec('COMMIT');
-    } catch (e) {
-        db.exec('ROLLBACK');
-        throw e;
-    } finally {
-        stmt.finalize();
-    }
-}
-
-function insertEvents(data: any[]) {
-    const stmt = db.prepare('INSERT INTO operations_events (event_name, status, timestamp) VALUES (?, ?, ?)');
-    try {
-        db.exec('BEGIN TRANSACTION');
-        for (const item of data) {
-            stmt.bind([item.event_name, item.status, item.timestamp]);
-            stmt.step();
-            stmt.reset();
-        }
-        db.exec('COMMIT');
-    } catch (e) {
-        db.exec('ROLLBACK');
-        throw e;
-    } finally {
-        stmt.finalize();
-    }
-}
-
 function insertSystems(data: any[]) {
     const stmt = db.prepare('INSERT INTO systems (name, url, status, category, is_favorite, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
     try {
@@ -363,7 +281,7 @@ function getDiagnostics() {
     // For now we'll return basic stats and let the UI request a full check via EXEC if needed.
 
     // 3. Table counts
-    const tables = ['invoice_items', 'kpi_data', 'operations_events', 'systems', 'worklist'];
+    const tables = ['invoice_items', 'systems', 'worklist'];
     const tableStats: Record<string, number> = {};
 
     for (const t of tables) {

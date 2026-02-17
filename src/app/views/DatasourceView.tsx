@@ -216,9 +216,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 defaultValue="invoice_items"
                             >
                                 <option value="invoice_items">Rechnungen (invoice_items)</option>
-                                <option value="kpi_data">KPI Daten (kpi_data)</option>
                                 <option value="systems">Systeme (systems)</option>
-                                <option value="operations_events">Events (operations_events)</option>
                                 <option value="worklist">Arbeitsvorrat (worklist)</option>
                             </select>
                         </div>

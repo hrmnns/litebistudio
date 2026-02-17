@@ -1,46 +1,4 @@
 {
-  "kpis": [
-    {
-      "metric": "IT Costs",
-      "value": 120000,
-      "unit": "EUR",
-      "category": "Finance",
-      "date": "2023-10-01"
-    },
-    {
-      "metric": "IT Costs",
-      "value": 115000,
-      "unit": "EUR",
-      "category": "Finance",
-      "date": "2023-11-01"
-    },
-    {
-      "metric": "IT Costs",
-      "value": 125000,
-      "unit": "EUR",
-      "category": "Finance",
-      "date": "2023-12-01"
-    },
-    {
-      "metric": "Availability",
-      "value": 99.9,
-      "unit": "%",
-      "category": "Operations",
-      "date": "2023-12-01"
-    }
-  ],
-  "events": [
-    {
-      "event_name": "Server Maintenance",
-      "status": "Scheduled",
-      "timestamp": "2023-12-10T02:00:00Z"
-    },
-    {
-      "event_name": "Incident #1234",
-      "status": "Resolved",
-      "timestamp": "2023-12-05T14:30:00Z"
-    }
-  ],
   "systems": [
     {
       "name": "SAP ERP",

@@ -115,16 +115,6 @@ export async function bulkInsertInvoiceItems(data: DbRow[]) {
     return send('BULK_INSERT_INVOICE_ITEMS', data);
 }
 
-export async function bulkInsertKPIs(data: DbRow[]) {
-    await initDB();
-    return send('BULK_INSERT_KPIS', data);
-}
-
-export async function bulkInsertEvents(data: DbRow[]) {
-    await initDB();
-    return send('BULK_INSERT_EVENTS', data);
-}
-
 export async function bulkInsertSystems(data: DbRow[]) {
     await initDB();
     return send('BULK_INSERT_SYSTEMS', data);

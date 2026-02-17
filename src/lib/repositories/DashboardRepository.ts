@@ -1,5 +1,5 @@
 import { runQuery } from '../db';
-import type { ItCostsSummary, KpiRecord, DbRow } from '../../types';
+import type { ItCostsSummary, KpiRecord } from '../../types';
 
 export const DashboardRepository = {
     async getItCostsSummary(): Promise<ItCostsSummary | null> {
@@ -14,9 +14,7 @@ export const DashboardRepository = {
         ) as unknown as KpiRecord[];
     },
 
-    async getRecentOperations(limit: number = 5): Promise<DbRow[]> {
-        return await runQuery("SELECT * FROM operations_events ORDER BY timestamp DESC LIMIT ?", [limit]);
-    },
+
 
     async getItCostsByCategory(limit: number = 3): Promise<{ category: string; amount: number }[]> {
         return await runQuery(

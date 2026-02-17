@@ -1,33 +1,17 @@
 DROP VIEW IF EXISTS kpi_history;
 CREATE VIEW kpi_history AS
-WITH aggregated_invoice_costs AS (
-    SELECT 
-        'IT Costs' as metric, 
-        SUM(Amount) as value, 
-        'EUR' as unit, 
-        'Actuals' as category, 
-        CASE 
-            WHEN Period LIKE '%-13' THEN date(MAX(PostingDate), '+1 day') 
-            ELSE MAX(PostingDate) 
-        END as date,
-        Period as period
-    FROM invoice_items
-    GROUP BY Period
-),
-combined_kpis AS (
-    SELECT metric, value, unit, category, date, strftime('%Y-%m', date) as period FROM kpi_data
-    UNION ALL
-    SELECT metric, value, unit, category, date, period FROM aggregated_invoice_costs
-)
 SELECT 
-    metric, 
-    SUM(value) as value, 
-    MAX(unit) as unit, 
-    MAX(category) as category, 
-    date,
-    period
-FROM combined_kpis
-GROUP BY metric, date, period;
+    'IT Costs' as metric, 
+    SUM(Amount) as value, 
+    'EUR' as unit, 
+    'Actuals' as category, 
+    CASE 
+        WHEN Period LIKE '%-13' THEN date(MAX(PostingDate), '+1 day') 
+        ELSE MAX(PostingDate) 
+    END as date,
+    Period as period
+FROM invoice_items
+GROUP BY Period;
 
 DROP VIEW IF EXISTS latest_kpis;
 CREATE VIEW latest_kpis AS

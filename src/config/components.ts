@@ -56,12 +56,6 @@ export const COMPONENTS: ComponentConfig[] = [
         defaultSize: 'small',
     },
     {
-        id: 'operations',
-        title: 'Performance',
-        component: 'OperationsComponent',
-        defaultSize: 'small'
-    },
-    {
         id: 'database-status',
         title: 'Datenbank Status',
         component: 'DatabaseStatusComponent',

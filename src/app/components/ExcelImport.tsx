@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, Check, AlertCircle, PlusCircle, RotateCcw } from 'lucide-react';
-import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearInvoiceData } from '../../lib/db';
+import { bulkInsertInvoiceItems, clearInvoiceData } from '../../lib/db';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 // @ts-ignore - AJV generated validator
 import { validate as validateInvoiceItems } from '../../lib/validators/invoice-items-validator.js';
@@ -88,37 +88,34 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
         if (config) {
             await processGenericImport(workbook, manualMapping);
         } else {
-            // LEGACY MODE (Invoice Items + KPIs + Events)
-            let kpis: any[] = [];
-            let events: any[] = [];
+            // LEGACY MODE (Invoice Items only)
             let invoiceItems: any[] = [];
             let invoiceItemsSheetName = '';
 
-            // 1. Identify Sheets
-            workbook.SheetNames.forEach(sheetName => {
+            // 1. Identify Invoice Items Sheet (heuristic: first sheet containing 'invoice', 'cost', 'spend' or first non-empty sheet)
+            for (const sheetName of workbook.SheetNames) {
                 const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                if (rawData.length === 0) return;
+                if (rawData.length === 0) continue;
 
                 const lowerName = sheetName.toLowerCase();
-
-                // Heuristics
-                if (lowerName.includes('kpi')) {
-                    kpis = convertDates(rawData);
-                } else if (lowerName.includes('event') || lowerName.includes('operation')) {
-                    events = convertDates(rawData);
-                } else if (lowerName.includes('invoice') || lowerName.includes('cost') || lowerName.includes('spend') || invoiceItems.length === 0) {
-                    // This is our candidate for Invoice Items
-                    if (invoiceItems.length === 0) {
-                        invoiceItems = rawData;
-                        invoiceItemsSheetName = sheetName;
-                    }
+                if (lowerName.includes('invoice') || lowerName.includes('cost') || lowerName.includes('spend')) {
+                    invoiceItemsSheetName = sheetName;
+                    break; // Found a good candidate, use it
+                } else if (!invoiceItemsSheetName) {
+                    // If no specific keyword sheet found yet, use the first non-empty sheet as a fallback
+                    invoiceItemsSheetName = sheetName;
                 }
-            });
+            }
 
-            // 2. Check Mapping for Invoice Items
-            if (invoiceItems.length > 0 && invoiceItemsSheetName) {
+            // 2. Process Identified Sheets
+            if (invoiceItemsSheetName) {
+                const sheet = workbook.Sheets[invoiceItemsSheetName];
+                const rawData = XLSX.utils.sheet_to_json(sheet);
+                invoiceItems = convertDates(rawData);
+            }
+
+            if (invoiceItems.length > 0) {
                 // Robustly get headers from the sheet directly
-                // Object.keys(row[0]) fails if the first row has empty cells for some columns
                 const sheet = workbook.Sheets[invoiceItemsSheetName];
                 const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[];
                 const columns = (headerRow || []).filter(h => h && typeof h === 'string'); // Filter valid headers
@@ -216,7 +213,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
             }
 
             // 3. Validation & Insert
-            await performLegacyImport(invoiceItems, kpis, events);
+            await performLegacyImport(invoiceItems);
         }
     };
 
@@ -312,7 +309,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
     };
 
     // Legacy Import Handler
-    const performLegacyImport = async (invoiceItems: any[], kpis: any[], events: any[]) => {
+    const performLegacyImport = async (invoiceItems: any[]) => {
         // Validation for Invoice Items
         if (invoiceItems.length > 0) {
             const isValid = validateInvoiceItems(invoiceItems);
@@ -336,16 +333,14 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
             }
 
             if (invoiceItems.length > 0) await bulkInsertInvoiceItems(invoiceItems);
-            if (kpis.length > 0) await bulkInsertKPIs(kpis);
-            if (events.length > 0) await bulkInsertEvents(events);
 
             setStatus('success');
-            setMessage(`Successfully imported ${invoiceItems.length} invoice items, ${kpis.length} KPIs and ${events.length} events.`);
+            setMessage(`Successfully imported ${invoiceItems.length} invoice items.`);
             window.dispatchEvent(new Event('db-updated'));
             window.dispatchEvent(new CustomEvent('db-changed', {
                 detail: {
                     type: 'insert',
-                    count: invoiceItems.length + kpis.length + events.length
+                    count: invoiceItems.length
                 }
             }));
             if (onImportComplete) onImportComplete();
@@ -480,7 +475,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
             }));
 
             // Final Perform Import
-            await performLegacyImport(mappedDataCache, [], []);
+            await performLegacyImport(mappedDataCache);
         }
     };
 
@@ -570,7 +565,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete, conf
                                 {isImporting ? 'Importing...' : 'Click or drag Excel/CSV file here'}
                             </p>
                             <p className="text-xs text-slate-500 mt-1">
-                                {config ? `Importing ${config.entityLabel}` : 'Sheets should contain columns: metric, value, category, date'}
+                                {config ? `Importing ${config.entityLabel}` : 'Sheets should contain columns: DocumentId, VendorName, Amount, etc.'}
                             </p>
                         </div>
                     </label>
