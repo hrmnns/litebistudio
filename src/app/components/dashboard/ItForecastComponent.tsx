@@ -1,10 +1,10 @@
 import React from 'react';
-import { useQuery } from '../../hooks/useQuery';
+import { useQuery } from '../../../hooks/useQuery';
 import { TrendingUp, Calculator, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { Skeleton } from '../components/ui/Skeleton';
-import { DashboardTile } from '../components/ui/DashboardTile';
+import { Skeleton } from '../ui/Skeleton';
+import { DashboardComponent } from '../ui/DashboardComponent';
 
-export const ItForecastTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
+export const ItForecastComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
@@ -49,13 +49,18 @@ export const ItForecastTile: React.FC<{ onRemove?: () => void; dragHandleProps?:
     const formatCurrency = (val: number) =>
         new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val);
 
+    function cn(...inputs: any[]) {
+        return inputs.filter(Boolean).join(' ');
+    }
+
     return (
-        <DashboardTile
+        <DashboardComponent
             title="Budget Forecast"
             icon={TrendingUp}
             iconColor="blue"
             onClick={onClick}
             onRemove={onRemove}
+            targetView={targetView}
             dragHandleProps={dragHandleProps}
             footerLeft={
                 <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest italic font-mono">
@@ -113,10 +118,6 @@ export const ItForecastTile: React.FC<{ onRemove?: () => void; dragHandleProps?:
                     </div>
                 </div>
             </div>
-        </DashboardTile>
+        </DashboardComponent>
     );
 };
-
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
-}

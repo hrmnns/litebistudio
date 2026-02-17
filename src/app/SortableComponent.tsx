@@ -2,15 +2,10 @@ import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom';
-import type { TileSize } from '../types';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import type { ComponentSize } from '../types';
+import { cn } from '../lib/utils';
 
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
-
-const getSizeClass = (size: TileSize) => {
+const getSizeClass = (size: ComponentSize) => {
     switch (size) {
         case 'large':
             return 'col-span-1 md:col-span-2 row-span-2';
@@ -23,17 +18,18 @@ const getSizeClass = (size: TileSize) => {
     }
 };
 
-interface SortableTileProps {
+interface SortableComponentProps {
     id: string;
     title: string;
-    size: TileSize;
+    size: ComponentSize;
     targetView?: string;
     onRemove?: (id: string) => void;
     children: React.ReactNode;
+    className?: string;
 }
 
-export const SortableTile: React.FC<SortableTileProps> = ({
-    id, size, targetView, onRemove, children
+export const SortableComponent: React.FC<SortableComponentProps> = ({
+    id, size, targetView, onRemove, children, className
 }) => {
     const navigate = useNavigate();
 
@@ -46,7 +42,7 @@ export const SortableTile: React.FC<SortableTileProps> = ({
         isDragging
     } = useDraggable({ id });
 
-    // Also use Droppable to allow tiles to be swapped with other tiles
+    // Also use Droppable to allow components to be swapped with other components
     const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id });
 
     // Combine refs
@@ -57,7 +53,7 @@ export const SortableTile: React.FC<SortableTileProps> = ({
 
     const style = {
         transform: CSS.Translate.toString(transform),
-        // Significant dimming of source tile to emphasize the overlay
+        // Significant dimming of source component to emphasize the overlay
         opacity: isDragging ? 0.2 : 1,
         zIndex: isDragging ? 10 : 0,
     };
@@ -67,7 +63,8 @@ export const SortableTile: React.FC<SortableTileProps> = ({
             return React.cloneElement(child as React.ReactElement<any>, {
                 onRemove: onRemove ? () => onRemove(id) : undefined,
                 dragHandleProps: listeners,
-                onClick: targetView ? () => navigate(targetView) : undefined
+                onClick: targetView ? () => navigate(targetView) : undefined,
+                targetView: targetView
             });
         }
         return child;
@@ -80,7 +77,8 @@ export const SortableTile: React.FC<SortableTileProps> = ({
             className={cn(
                 getSizeClass(size),
                 "relative transition-all duration-200",
-                isOver && !isDragging && "scale-[1.02] z-10 ring-4 ring-blue-500/30 ring-offset-2 rounded-2xl"
+                isOver && !isDragging && "scale-[1.02] z-10 ring-4 ring-blue-500/30 ring-offset-2 rounded-2xl",
+                className
             )}
             {...attributes}
         >

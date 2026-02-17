@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Zap, Cpu } from 'lucide-react';
-import { DashboardTile } from '../components/ui/DashboardTile';
+import { DashboardComponent } from '../ui/DashboardComponent';
 
-export const SystemStatusTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
+export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const [memory, setMemory] = useState<{ used: number; total: number } | null>(null);
     const [loadTime, setLoadTime] = useState<number | null>(null);
 
@@ -30,13 +30,14 @@ export const SystemStatusTile: React.FC<{ onRemove?: () => void; dragHandleProps
     }, []);
 
     return (
-        <DashboardTile
+        <DashboardComponent
             title="System Status"
             icon={Activity}
             iconColor="emerald"
             onRemove={onRemove}
             dragHandleProps={dragHandleProps}
             onClick={onClick}
+            targetView={targetView}
             backgroundIcon={Activity}
         >
             <div className="flex flex-col h-full items-center justify-around py-2">
@@ -65,6 +66,6 @@ export const SystemStatusTile: React.FC<{ onRemove?: () => void; dragHandleProps
                     </div>
                 </div>
             </div>
-        </DashboardTile>
+        </DashboardComponent>
     );
 };

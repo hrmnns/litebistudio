@@ -1,7 +1,7 @@
 import React from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './app/Layout';
-import { TileGridPage } from './app/pages/TileGridPage';
+import { ComponentGridPage } from './app/pages/ComponentGridPage';
 import { SettingsPage } from './app/pages/SettingsPage';
 import { ItCostsYearPage } from './app/pages/ItCostsYearPage';
 import { ItCostsMonthPage } from './app/pages/ItCostsMonthPage';
@@ -19,7 +19,7 @@ export const AppRouter: React.FC = () => (
     <HashRouter>
         <Routes>
             <Route element={<Layout />}>
-                <Route index element={<TileGridPage />} />
+                <Route index element={<ComponentGridPage />} />
                 <Route path="datasource" element={
                     <DatasourceView onImportComplete={() => { window.location.hash = '#/'; }} />
                 } />

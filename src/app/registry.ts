@@ -1,24 +1,26 @@
-import React from 'react';
-import { ItCostsTile } from './tiles/ItCostsTile';
-import { SystemsTile } from './tiles/SystemsTile';
-import { ItForecastTile } from './tiles/ItForecastTile';
-import { ClockTile } from './tiles/ClockTile';
-import { DataInspectorTile } from './tiles/DataInspectorTile';
-import { AnomalyRadarTile } from './tiles/AnomalyRadarTile';
-import { SystemStatusTile } from './tiles/SystemStatusTile';
-import { WorklistTile } from './components/WorklistTile';
+import type React from 'react';
+import { ItCostsComponent } from './components/dashboard/ItCostsComponent';
+import { SystemsComponent } from './components/dashboard/SystemsComponent';
+import { ItForecastComponent } from './components/dashboard/ItForecastComponent';
+import { ClockComponent } from './components/dashboard/ClockComponent';
+import { DataInspectorComponent } from './components/dashboard/DataInspectorComponent';
+import { AnomalyRadarComponent } from './components/dashboard/AnomalyRadarComponent';
+import { SystemStatusComponent } from './components/dashboard/SystemStatusComponent';
+import { WorklistComponent } from './components/dashboard/WorklistComponent';
+import { OperationsComponent } from './components/dashboard/OperationsComponent';
 
-export const TILE_COMPONENTS: Record<string, React.ComponentType<any>> = {
-    'ItCostsTile': ItCostsTile,
-    'SystemsTile': SystemsTile,
-    'ItForecastTile': ItForecastTile,
-    'ClockTile': ClockTile,
-    'DataInspectorTile': DataInspectorTile,
-    'AnomalyRadarTile': AnomalyRadarTile,
-    'SystemStatusTile': SystemStatusTile,
-    'WorklistTile': WorklistTile,
+export const COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
+    'ItCostsComponent': ItCostsComponent,
+    'SystemsComponent': SystemsComponent,
+    'ItForecastComponent': ItForecastComponent,
+    'ClockComponent': ClockComponent,
+    'DataInspectorComponent': DataInspectorComponent,
+    'AnomalyRadarComponent': AnomalyRadarComponent,
+    'SystemStatusComponent': SystemStatusComponent,
+    'WorklistComponent': WorklistComponent,
+    'OperationsComponent': OperationsComponent
 };
 
-export const getTileComponent = (name: string): React.ComponentType<any> | null => {
-    return TILE_COMPONENTS[name] || null;
+export const getComponent = (name: string) => {
+    return COMPONENT_REGISTRY[name] || null;
 };

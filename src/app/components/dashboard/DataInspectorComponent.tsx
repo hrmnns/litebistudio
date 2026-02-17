@@ -1,11 +1,11 @@
 import React from 'react';
 import { Database } from 'lucide-react';
-import { SystemRepository } from '../../lib/repositories/SystemRepository';
-import { DashboardTile } from '../components/ui/DashboardTile';
-import { Skeleton } from '../components/ui/Skeleton';
-import { useAsync } from '../../hooks/useAsync';
+import { SystemRepository } from '../../../lib/repositories/SystemRepository';
+import { DashboardComponent } from '../ui/DashboardComponent';
+import { Skeleton } from '../ui/Skeleton';
+import { useAsync } from '../../../hooks/useAsync';
 
-export const DataInspectorTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
+export const DataInspectorComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { data: stats, loading, error } = useAsync<{ tables: number; records: number }>(
         () => SystemRepository.getDatabaseStats(),
         [],
@@ -21,12 +21,13 @@ export const DataInspectorTile: React.FC<{ onRemove?: () => void; dragHandleProp
     }
 
     return (
-        <DashboardTile
+        <DashboardComponent
             title="Inspector"
             icon={Database}
             iconColor="indigo"
             onClick={onClick}
             onRemove={onRemove}
+            targetView={targetView}
             dragHandleProps={dragHandleProps}
             backgroundIcon={Database}
         >
@@ -49,6 +50,6 @@ export const DataInspectorTile: React.FC<{ onRemove?: () => void; dragHandleProp
                     </div>
                 </div>
             </div>
-        </DashboardTile>
+        </DashboardComponent>
     );
 };

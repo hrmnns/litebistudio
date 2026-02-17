@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Bookmark, ListChecks } from 'lucide-react';
-import { WorklistRepository } from '../../lib/repositories/WorklistRepository';
-import { DashboardTile } from './ui/DashboardTile';
-import type { WorklistStatus } from '../../types';
+import { WorklistRepository } from '../../../lib/repositories/WorklistRepository';
+import { DashboardComponent } from '../ui/DashboardComponent';
+import type { WorklistStatus } from '../../../types';
 
-interface WorklistTileProps {
+interface WorklistComponentProps {
     onClick?: () => void;
     onRemove?: () => void;
     dragHandleProps?: any;
+    targetView?: string;
 }
 
-export const WorklistTile: React.FC<WorklistTileProps> = ({ onClick, onRemove, dragHandleProps }) => {
+export const WorklistComponent: React.FC<WorklistComponentProps> = ({ onClick, onRemove, dragHandleProps, targetView }) => {
     const [counts, setCounts] = useState<Record<WorklistStatus, number> | null>(null);
 
     const updateCounts = async () => {
@@ -27,12 +28,13 @@ export const WorklistTile: React.FC<WorklistTileProps> = ({ onClick, onRemove, d
     const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0;
 
     return (
-        <DashboardTile
+        <DashboardComponent
             title="Arbeitsvorrat"
             icon={Bookmark}
             iconColor="amber"
             onClick={onClick}
             onRemove={onRemove}
+            targetView={targetView}
             dragHandleProps={dragHandleProps}
             backgroundIcon={ListChecks}
         >
@@ -79,6 +81,6 @@ export const WorklistTile: React.FC<WorklistTileProps> = ({ onClick, onRemove, d
                     </div>
                 </div>
             </div>
-        </DashboardTile>
+        </DashboardComponent>
     );
 };

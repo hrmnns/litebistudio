@@ -1,11 +1,11 @@
 import React from 'react';
-import { useAsync } from '../../hooks/useAsync';
-import { AnomalyRepository } from '../../lib/repositories/AnomalyRepository';
+import { useAsync } from '../../../hooks/useAsync';
+import { AnomalyRepository } from '../../../lib/repositories/AnomalyRepository';
 import { ShieldAlert } from 'lucide-react';
-import { Skeleton } from '../components/ui/Skeleton';
-import { DashboardTile } from '../components/ui/DashboardTile';
+import { Skeleton } from '../ui/Skeleton';
+import { DashboardComponent } from '../ui/DashboardComponent';
 
-export const AnomalyRadarTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
+export const AnomalyRadarComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { data, loading, error } = useAsync<{
         metrics: { totalRisks: number; maxScore: number; criticalRisks: number };
     }>(
@@ -44,12 +44,13 @@ export const AnomalyRadarTile: React.FC<{ onRemove?: () => void; dragHandleProps
     const { metrics } = data;
 
     return (
-        <DashboardTile
+        <DashboardComponent
             title="Anomaly Radar"
             icon={ShieldAlert}
             iconColor="rose"
             onClick={onClick}
             onRemove={onRemove}
+            targetView={targetView}
             dragHandleProps={dragHandleProps}
             backgroundIcon={ShieldAlert}
         >
@@ -78,6 +79,6 @@ export const AnomalyRadarTile: React.FC<{ onRemove?: () => void; dragHandleProps
                     </div>
                 </div>
             </div>
-        </DashboardTile>
+        </DashboardComponent>
     );
 };

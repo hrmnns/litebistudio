@@ -1,11 +1,11 @@
 import React from 'react';
-import { useAsync } from '../../hooks/useAsync';
-import { DashboardRepository } from '../../lib/repositories/DashboardRepository';
-import type { DbRow } from '../../types';
+import { useAsync } from '../../../hooks/useAsync';
+import { DashboardRepository } from '../../../lib/repositories/DashboardRepository';
+import type { DbRow } from '../../../types';
 import { CheckCircle, AlertCircle, Clock, Activity, MessageSquare } from 'lucide-react';
-import { DashboardTile } from '../components/ui/DashboardTile';
+import { DashboardComponent } from '../ui/DashboardComponent';
 
-export const OperationsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
+export const OperationsComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { data, loading, error } = useAsync<DbRow[]>(
         () => DashboardRepository.getRecentOperations(),
         []
@@ -15,12 +15,13 @@ export const OperationsTile: React.FC<{ onRemove?: () => void; dragHandleProps?:
     if (error) return <div className="p-4 text-center text-red-500 text-xs">Error: {error.message}</div>;
 
     return (
-        <DashboardTile
+        <DashboardComponent
             title="Performance"
             icon={Activity}
             iconColor="emerald"
             onClick={onClick}
             onRemove={onRemove}
+            targetView={targetView}
             dragHandleProps={dragHandleProps}
             footerLeft={
                 <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
@@ -48,6 +49,6 @@ export const OperationsTile: React.FC<{ onRemove?: () => void; dragHandleProps?:
                     <p className="text-[10px] text-slate-400 text-center py-4">Keine aktuellen Ereignisse.</p>
                 )}
             </div>
-        </DashboardTile>
+        </DashboardComponent>
     );
 };

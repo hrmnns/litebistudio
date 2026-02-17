@@ -1,13 +1,13 @@
-// ─── Tile Types ───────────────────────────────────────────────
+// ─── Component Types ───────────────────────────────────────────
 
-export type TileSize = 'small' | 'medium' | 'large';
+export type ComponentSize = 'small' | 'medium' | 'large';
 
-export interface TileConfig {
+export interface ComponentConfig {
     id: string;
     title: string;
     component: string;
     targetView?: string;
-    defaultSize: TileSize;
+    defaultSize: ComponentSize;
 }
 
 // ─── Invoice Items ────────────────────────────────────────────

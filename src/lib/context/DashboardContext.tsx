@@ -1,14 +1,14 @@
 import React, { createContext, useContext, type ReactNode } from 'react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { TILES } from '../../config/tiles';
+import { COMPONENTS } from '../../config/components';
 
 interface DashboardContextType {
-    visibleTileIds: string[];
-    setVisibleTileIds: (ids: string[] | ((prev: string[]) => string[])) => void;
-    visibleSidebarItemIds: string[];
-    setVisibleSidebarItemIds: (ids: string[] | ((prev: string[]) => string[])) => void;
-    tileOrder: string[];
-    setTileOrder: (order: string[] | ((prev: string[]) => string[])) => void;
+    visibleComponentIds: string[];
+    setVisibleComponentIds: (ids: string[] | ((prev: string[]) => string[])) => void;
+    visibleSidebarComponentIds: string[];
+    setVisibleSidebarComponentIds: (ids: string[] | ((prev: string[]) => string[])) => void;
+    componentOrder: string[];
+    setComponentOrder: (order: string[] | ((prev: string[]) => string[])) => void;
     isSidebarCollapsed: boolean;
     setSidebarCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
 }
@@ -18,52 +18,52 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const GRID_SIZE = 60;
     const initialOrder = Array.from({ length: GRID_SIZE }, (_, i) => `slot-${i}`);
-    TILES.forEach((tile, i) => {
-        if (i < GRID_SIZE) initialOrder[i] = tile.id;
+    COMPONENTS.forEach((component, i) => {
+        if (i < GRID_SIZE) initialOrder[i] = component.id;
     });
 
-    // Merge existing tiles into the slots at initialization
-    const [visibleTileIds, setVisibleTileIds] = useLocalStorage<string[]>('visibleTileIds', TILES.map(t => t.id));
-    const [visibleSidebarItemIds, setVisibleSidebarItemIds] = useLocalStorage<string[]>('visibleSidebarItemIds', TILES.filter(t => t.targetView).map(t => t.id));
-    const [tileOrder, setTileOrder] = useLocalStorage<string[]>('tileOrder', initialOrder);
+    // Merge existing components into the slots at initialization
+    const [visibleComponentIds, setVisibleComponentIds] = useLocalStorage<string[]>('visibleComponentIds', COMPONENTS.map(t => t.id));
+    const [visibleSidebarComponentIds, setVisibleSidebarComponentIds] = useLocalStorage<string[]>('visibleSidebarComponentIds', COMPONENTS.filter(t => t.targetView).map(t => t.id));
+    const [componentOrder, setComponentOrder] = useLocalStorage<string[]>('componentOrder', initialOrder);
     const [isSidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
 
-    // Sync state if new tiles are added, but preserve slots
+    // Sync state if new components are added, but preserve slots
     React.useEffect(() => {
-        const allTileIds = TILES.map(t => t.id);
-        const missingTiles = allTileIds.filter(id => !tileOrder.includes(id));
+        const allComponentIds = COMPONENTS.map(t => t.id);
+        const missingComponents = allComponentIds.filter(id => !componentOrder.includes(id));
 
-        if (missingTiles.length > 0) {
-            setTileOrder(prev => {
+        if (missingComponents.length > 0) {
+            setComponentOrder(prev => {
                 const next = [...prev];
                 let missingIdx = 0;
                 // Try to fill empty slots first
-                for (let i = 0; i < next.length && missingIdx < missingTiles.length; i++) {
+                for (let i = 0; i < next.length && missingIdx < missingComponents.length; i++) {
                     if (next[i].startsWith('slot-')) {
-                        next[i] = missingTiles[missingIdx++];
+                        next[i] = missingComponents[missingIdx++];
                     }
                 }
                 // If no slots left, append
-                return [...next, ...missingTiles.slice(missingIdx)];
+                return [...next, ...missingComponents.slice(missingIdx)];
             });
-            setVisibleTileIds(prev => [...new Set([...prev, ...missingTiles])]);
+            setVisibleComponentIds(prev => [...new Set([...prev, ...missingComponents])]);
 
-            // Also sync sidebar items for tiles that have a view
-            const missingSidebarTiles = missingTiles.filter(id => TILES.find(t => t.id === id)?.targetView);
-            if (missingSidebarTiles.length > 0) {
-                setVisibleSidebarItemIds(prev => [...new Set([...prev, ...missingSidebarTiles])]);
+            // Also sync sidebar items for components that have a view
+            const missingSidebarComponents = missingComponents.filter(id => COMPONENTS.find(t => t.id === id)?.targetView);
+            if (missingSidebarComponents.length > 0) {
+                setVisibleSidebarComponentIds(prev => [...new Set([...prev, ...missingSidebarComponents])]);
             }
         }
-    }, [tileOrder, setTileOrder, visibleTileIds, setVisibleTileIds, setVisibleSidebarItemIds]);
+    }, [componentOrder, setComponentOrder, visibleComponentIds, setVisibleComponentIds, setVisibleSidebarComponentIds]);
 
     return (
         <DashboardContext.Provider value={{
-            visibleTileIds,
-            setVisibleTileIds,
-            visibleSidebarItemIds,
-            setVisibleSidebarItemIds,
-            tileOrder,
-            setTileOrder,
+            visibleComponentIds,
+            setVisibleComponentIds,
+            visibleSidebarComponentIds,
+            setVisibleSidebarComponentIds,
+            componentOrder,
+            setComponentOrder,
             isSidebarCollapsed,
             setSidebarCollapsed
         }}>

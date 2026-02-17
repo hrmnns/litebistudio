@@ -1,12 +1,12 @@
 import React from 'react';
-import { useAsync } from '../../hooks/useAsync';
-import { SystemRepository } from '../../lib/repositories/SystemRepository';
-import type { SystemRecord } from '../../types';
+import { useAsync } from '../../../hooks/useAsync';
+import { SystemRepository } from '../../../lib/repositories/SystemRepository';
+import type { SystemRecord } from '../../../types';
 import { Server } from 'lucide-react';
-import { Skeleton } from '../components/ui/Skeleton';
-import { DashboardTile } from '../components/ui/DashboardTile';
+import { Skeleton } from '../ui/Skeleton';
+import { DashboardComponent } from '../ui/DashboardComponent';
 
-export const SystemsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
+export const SystemsComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { data, loading, error } = useAsync<{ favorites: SystemRecord[]; count: number }>(
         async () => {
             const [favorites, count] = await Promise.all([
@@ -30,12 +30,13 @@ export const SystemsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: an
     };
 
     return (
-        <DashboardTile
+        <DashboardComponent
             title="Systeme"
             icon={Server}
             iconColor="slate"
             onClick={onClick}
             onRemove={onRemove}
+            targetView={targetView}
             dragHandleProps={dragHandleProps}
             backgroundIcon={Server}
         >
@@ -70,6 +71,6 @@ export const SystemsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: an
                     </div>
                 </div>
             </div>
-        </DashboardTile>
+        </DashboardComponent>
     );
 };

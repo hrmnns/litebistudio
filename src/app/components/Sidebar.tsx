@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, Bookmark, ShieldCheck } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
-import { TILES } from '../../config/tiles';
+import { COMPONENTS } from '../../config/components';
 
 interface SidebarProps {
     isCollapsed: boolean;
@@ -28,27 +28,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onToggleCollapse,
     onCloseMobile,
 }) => {
-    const { visibleSidebarItemIds } = useDashboard();
+    const { visibleSidebarComponentIds } = useDashboard();
 
     // Map component names to Lucide icons
     const iconMap: Record<string, React.ReactNode> = {
-        'ItCostsTile': <Database className="w-5 h-5 flex-shrink-0" />,
-        'SystemsTile': <ShieldCheck className="w-5 h-5 flex-shrink-0" />,
-        'AnomalyRadarTile': <ShieldCheck className="w-5 h-5 flex-shrink-0 text-rose-500" />,
-        'WorklistTile': <Bookmark className="w-5 h-5 flex-shrink-0 text-amber-500" />,
-        'DataInspectorTile': <Database className="w-5 h-5 flex-shrink-0 text-indigo-500" />,
+        'ItCostsComponent': <Database className="w-5 h-5 flex-shrink-0" />,
+        'SystemsComponent': <ShieldCheck className="w-5 h-5 flex-shrink-0" />,
+        'AnomalyRadarComponent': <ShieldCheck className="w-5 h-5 flex-shrink-0 text-rose-500" />,
+        'WorklistComponent': <Bookmark className="w-5 h-5 flex-shrink-0 text-amber-500" />,
+        'DataInspectorComponent': <Database className="w-5 h-5 flex-shrink-0 text-indigo-500" />,
     };
 
     const staticTopItems: NavItem[] = [
         { to: '/', icon: <LayoutDashboard className="w-5 h-5 flex-shrink-0" />, label: 'Overview' },
     ];
 
-    const dynamicItems: NavItem[] = TILES
-        .filter(tile => tile.targetView && visibleSidebarItemIds.includes(tile.id))
-        .map(tile => ({
-            to: tile.targetView!,
-            icon: iconMap[tile.component] || <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
-            label: tile.title
+    const dynamicItems: NavItem[] = COMPONENTS
+        .filter(comp => comp.targetView && visibleSidebarComponentIds.includes(comp.id))
+        .map(comp => ({
+            to: comp.targetView!,
+            icon: iconMap[comp.component] || <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
+            label: comp.title
         }));
 
     const staticBottomItems: NavItem[] = [
@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <nav className="p-4 space-y-1">
                     {[...staticTopItems, ...dynamicItems, ...staticBottomItems].map(({ to, icon, label }) => (
                         <NavLink
-                            key={to}
+                            key={`${label}-${to}`}
                             to={to}
                             end={to === '/'}
                             onClick={onCloseMobile}

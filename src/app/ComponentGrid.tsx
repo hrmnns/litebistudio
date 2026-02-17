@@ -1,6 +1,6 @@
 import React from 'react';
-import { TILES } from '../config/tiles';
-import { getTileComponent } from './registry';
+import { COMPONENTS } from '../config/components';
+import { getComponent } from './registry';
 import {
     DndContext,
     closestCenter,
@@ -12,27 +12,21 @@ import {
     type DragEndEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { SortableTile } from './SortableTile';
-import { PlaceholderTile } from './components/ui/PlaceholderTile';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { SortableComponent } from './SortableComponent';
+import { cn } from '../lib/utils';
 
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
-
-interface TileGridProps {
-    visibleTileIds: string[];
-    tileOrder: string[];
+interface ComponentGridProps {
+    visibleComponentIds: string[];
+    componentOrder: string[];
     onOrderChange: (newOrder: string[]) => void;
-    onRemoveTile: (id: string) => void;
+    onRemoveComponent: (id: string) => void;
 }
 
-export const TileGrid: React.FC<TileGridProps> = ({
-    visibleTileIds,
-    tileOrder,
+export const ComponentGrid: React.FC<ComponentGridProps> = ({
+    visibleComponentIds,
+    componentOrder,
     onOrderChange,
-    onRemoveTile
+    onRemoveComponent
 }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -56,11 +50,11 @@ export const TileGrid: React.FC<TileGridProps> = ({
         setActiveId(null);
 
         if (over && active.id !== over.id) {
-            const oldIndex = tileOrder.indexOf(active.id as string);
-            const newIndex = tileOrder.indexOf(over.id as string);
+            const oldIndex = componentOrder.indexOf(active.id as string);
+            const newIndex = componentOrder.indexOf(over.id as string);
 
             // True Swap behavior: we exchange the contents of the indices
-            const nextOrder = [...tileOrder];
+            const nextOrder = [...componentOrder];
             [nextOrder[oldIndex], nextOrder[newIndex]] = [nextOrder[newIndex], nextOrder[oldIndex]];
             onOrderChange(nextOrder);
         }
@@ -70,7 +64,7 @@ export const TileGrid: React.FC<TileGridProps> = ({
         setActiveId(null);
     };
 
-    const activeTile = activeId ? TILES.find(t => t.id === activeId) : null;
+    const activeComponent = activeId ? COMPONENTS.find(t => t.id === activeId) : null;
 
     return (
         <DndContext
@@ -87,28 +81,23 @@ export const TileGrid: React.FC<TileGridProps> = ({
                     "[--cols:1] md:[--cols:2] lg:[--cols:3] xl:[--cols:4]",
                     "grid-auto-rows-[calc((100cqw-((var(--cols)-1)*1.5rem)-3rem)/var(--cols))]"
                 )}>
-                    {tileOrder.map((id) => {
-                        const tile = TILES.find(t => t.id === id);
-
-                        // If it's an empty slot OR a hidden tile, render placeholder
-                        if (!tile || !visibleTileIds.includes(tile.id)) {
-                            return <PlaceholderTile key={id} id={id} />;
-                        }
-
-                        const Component = getTileComponent(tile.component);
-                        if (!Component) return <PlaceholderTile key={id} id={id} />;
+                    {componentOrder.map((id) => {
+                        const component = COMPONENTS.find(t => t.id === id);
+                        const isVisible = component && visibleComponentIds.includes(component.id);
+                        const Component = isVisible ? getComponent(component.component) : null;
 
                         return (
-                            <SortableTile
-                                key={tile.id}
-                                id={tile.id}
-                                title={tile.title}
-                                size={tile.defaultSize}
-                                targetView={tile.targetView}
-                                onRemove={onRemoveTile}
+                            <SortableComponent
+                                key={id}
+                                id={id}
+                                title={component?.title || `Slot ${id}`}
+                                size={component?.defaultSize || 'small'}
+                                targetView={component?.targetView}
+                                onRemove={onRemoveComponent}
+                                className={cn(!isVisible && "hidden md:block")}
                             >
-                                <Component />
-                            </SortableTile>
+                                {Component ? <Component /> : <div className="w-full h-full" />}
+                            </SortableComponent>
                         );
                     })}
                 </div>
@@ -116,8 +105,8 @@ export const TileGrid: React.FC<TileGridProps> = ({
 
             {/* Drag Overlay for high-fidelity preview */}
             <DragOverlay adjustScale={true} zIndex={100}>
-                {activeId && activeTile ? (() => {
-                    const Component = getTileComponent(activeTile.component);
+                {activeId && activeComponent ? (() => {
+                    const Component = getComponent(activeComponent.component);
                     return Component ? (
                         <div className="w-full h-full opacity-80 cursor-grabbing shadow-2xl scale-105 transition-transform">
                             <Component isOverlay={true} />

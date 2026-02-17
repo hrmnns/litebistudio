@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Save, RefreshCw } from 'lucide-react';
 import { SettingsRepository } from '../../lib/repositories/SettingsRepository';
-import { TILES } from '../../config/tiles';
+import { COMPONENTS } from '../../config/components';
 import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
 import { useDashboard } from '../../lib/context/DashboardContext';
 
 export const SettingsView: React.FC = () => {
     const { theme, setTheme } = useThemeContext();
-    const { visibleTileIds, setVisibleTileIds, visibleSidebarItemIds, setVisibleSidebarItemIds, tileOrder } = useDashboard();
+    const {
+        visibleComponentIds,
+        setVisibleComponentIds,
+        visibleSidebarComponentIds,
+        setVisibleSidebarComponentIds,
+        componentOrder
+    } = useDashboard();
     const [webhookUrl, setWebhookUrl] = useState('');
     const [isTestingWebhook, setIsTestingWebhook] = useState(false);
 
@@ -89,13 +95,13 @@ export const SettingsView: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Dashboard Customization Section */}
+                {/* Komponenten-Management Section */}
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                         <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             🧩
                         </span>
-                        Dashboard Customization
+                        Komponenten-Management
                     </h3>
                     <div className="flex items-center justify-between px-4 mb-4">
                         <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Komponente</span>
@@ -106,16 +112,16 @@ export const SettingsView: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 gap-2">
-                        {tileOrder.map(id => TILES.find(t => t.id === id)).filter(Boolean).map((tile) => (
+                        {componentOrder.map(id => COMPONENTS.find(t => t.id === id)).filter(Boolean).map((component) => (
                             <div
-                                key={tile!.id}
+                                key={component!.id}
                                 className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-2 rounded-full ${visibleTileIds.includes(tile!.id) ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                    <div className={`w-2 h-2 rounded-full ${visibleComponentIds.includes(component!.id) ? 'bg-blue-500' : 'bg-slate-300'}`} />
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{tile!.title}</span>
-                                        {!tile!.targetView && <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Nur Kachel</span>}
+                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{component!.title}</span>
+                                        {!component!.targetView && <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Nur Kachel</span>}
                                     </div>
                                 </div>
 
@@ -123,32 +129,32 @@ export const SettingsView: React.FC = () => {
                                     {/* Overview Toggle */}
                                     <button
                                         onClick={() => {
-                                            if (visibleTileIds.includes(tile!.id)) {
-                                                setVisibleTileIds(visibleTileIds.filter(id => id !== tile!.id));
+                                            if (visibleComponentIds.includes(component!.id)) {
+                                                setVisibleComponentIds(visibleComponentIds.filter(id => id !== component!.id));
                                             } else {
-                                                setVisibleTileIds([...visibleTileIds, tile!.id]);
+                                                setVisibleComponentIds([...visibleComponentIds, component!.id]);
                                             }
                                         }}
                                         title="Im Dashboard anzeigen/verstecken"
-                                        className={`w-12 h-6 rounded-full transition-colors relative ${visibleTileIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                        className={`w-12 h-6 rounded-full transition-colors relative ${visibleComponentIds.includes(component!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
                                     >
-                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleTileIds.includes(tile!.id) ? 'left-7' : 'left-1'}`} />
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleComponentIds.includes(component!.id) ? 'left-7' : 'left-1'}`} />
                                     </button>
 
                                     {/* Sidebar Toggle */}
                                     <button
-                                        disabled={!tile!.targetView}
+                                        disabled={!component!.targetView}
                                         onClick={() => {
-                                            if (visibleSidebarItemIds.includes(tile!.id)) {
-                                                setVisibleSidebarItemIds(visibleSidebarItemIds.filter(id => id !== tile!.id));
+                                            if (visibleSidebarComponentIds.includes(component!.id)) {
+                                                setVisibleSidebarComponentIds(visibleSidebarComponentIds.filter(id => id !== component!.id));
                                             } else {
-                                                setVisibleSidebarItemIds([...visibleSidebarItemIds, tile!.id]);
+                                                setVisibleSidebarComponentIds([...visibleSidebarComponentIds, component!.id]);
                                             }
                                         }}
-                                        title={tile!.targetView ? "In der Sidebar anzeigen/verstecken" : "Keine Detailansicht verfügbar"}
-                                        className={`w-12 h-6 rounded-full transition-colors relative ${tile!.targetView ? (visibleSidebarItemIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700') : 'bg-slate-100 dark:bg-slate-800 opacity-50 cursor-not-allowed'}`}
+                                        title={component!.targetView ? "In der Sidebar anzeigen/verstecken" : "Keine Detailansicht verfügbar"}
+                                        className={`w-12 h-6 rounded-full transition-colors relative ${component!.targetView ? (visibleSidebarComponentIds.includes(component!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700') : 'bg-slate-100 dark:bg-slate-800 opacity-50 cursor-not-allowed'}`}
                                     >
-                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleSidebarItemIds.includes(tile!.id) && tile!.targetView ? 'left-7' : 'left-1'}`} />
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleSidebarComponentIds.includes(component!.id) && component!.targetView ? 'left-7' : 'left-1'}`} />
                                     </button>
                                 </div>
                             </div>

@@ -25,6 +25,22 @@ export const DashboardRepository = {
         ) as unknown as { category: string; amount: number }[];
     },
 
+    async getKpiByYear(year: number): Promise<KpiRecord[]> {
+        return await runQuery(`
+            SELECT 
+                'IT Costs' as metric,
+                SUM(Amount) as value,
+                'EUR' as unit,
+                'Total' as category,
+                MAX(PostingDate) as date,
+                Period as period
+            FROM invoice_items 
+            WHERE FiscalYear = ? 
+            GROUP BY Period
+            ORDER BY Period ASC
+        `, [year]) as unknown as KpiRecord[];
+    },
+
     async getItCostsMetrics(): Promise<{ totalAmount: number; vendorCount: number; avgMonthlySpend: number; monthCount: number }> {
         const result = await runQuery(`
             SELECT 
