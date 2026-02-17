@@ -1,8 +1,10 @@
+import React from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
-import { ViewHeader } from '../components/ui/ViewHeader';
+import { PageLayout } from '../components/ui/PageLayout';
+import { PageSection } from '../components/ui/PageSection';
 import { SummaryCard } from '../components/ui/SummaryCard';
-import { TrendingUp, TrendingDown, DollarSign, Calendar, Filter } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import type { ItCostsTrend } from '../../types';
 
 interface ItCostsYearViewProps {
@@ -11,8 +13,6 @@ interface ItCostsYearViewProps {
 }
 
 export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDrillDown }) => {
-    // Fetch last 12 months of IT Costs
-    // Fetch last 12 months of IT Costs
     const { data, loading, error } = useAsync<ItCostsTrend[]>(
         () => InvoiceRepository.getYearlyTrend(),
         []
@@ -24,57 +24,58 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
         </div>
     );
 
-    if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
-
     const tableData = [...(data || [])].reverse();
-    // Exclude Period 13 from the chart to avoid visual anomalies
     const chartData = tableData.filter(d => !d.Period.endsWith('-13'));
 
     const maxVal = Math.max(...chartData.map(d => d.total), 1);
     const avgVal = chartData.reduce((acc, d) => acc + d.total, 0) / (chartData.length || 1);
     const minVal = Math.min(...chartData.map(d => d.total));
 
-    return (
-        <div className="p-6 md:p-8 space-y-8">
-            <ViewHeader
-                title="IT Costs Analysis"
-                subtitle="Monthly breakdown for the last 15 reported periods"
-                onBack={onBack}
-            />
+    const now = new Date();
+    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
+    return (
+        <PageLayout
+            header={{
+                title: 'Kostenanalyse',
+                subtitle: `Zeitraum: ${chartData.length} Perioden`,
+                onBack,
+            }}
+            alerts={error ? [{
+                level: 'error' as const,
+                message: `Daten konnten nicht geladen werden: ${error.message}`,
+                action: { label: 'Erneut versuchen', onClick: () => window.location.reload() },
+            }] : undefined}
+            footer={footerText}
+        >
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <SummaryCard
-                    title="Average / Month"
-                    value={`€${Math.round(avgVal).toLocaleString()}`}
+                    title="Durchschnitt / Monat"
+                    value={`€${Math.round(avgVal).toLocaleString('de-DE')}`}
                     icon={DollarSign}
                     color="text-blue-500"
                 />
                 <SummaryCard
-                    title="Lowest Month"
-                    value={`€${Math.round(minVal).toLocaleString()}`}
+                    title="Niedrigster Monat"
+                    value={`€${Math.round(minVal).toLocaleString('de-DE')}`}
                     icon={TrendingDown}
                     color="text-emerald-500"
                 />
                 <SummaryCard
-                    title="Peak Month"
-                    value={`€${Math.round(maxVal).toLocaleString()}`}
+                    title="Höchster Monat"
+                    value={`€${Math.round(maxVal).toLocaleString('de-DE')}`}
                     icon={TrendingUp}
                     color="text-red-500"
                 />
             </div>
 
-
             {/* Bar Chart */}
-            <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-indigo-500" />
-                        Cost Development (Recent Periods)
-                    </h3>
+            <PageSection title="Kostenentwicklung">
+                <div className="flex items-center justify-end mb-4">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-                        <span className="text-xs text-slate-500 font-medium">Actuals</span>
+                        <span className="text-xs text-slate-500 font-medium">Ist-Kosten</span>
                     </div>
                 </div>
 
@@ -84,12 +85,11 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                         className="absolute left-0 right-0 border-t border-dashed border-slate-200 dark:border-slate-700 z-0 flex items-center"
                         style={{ bottom: `${(avgVal / maxVal) * 100}%` }}
                     >
-                        <span className="bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400 font-bold ml-2">AVG</span>
+                        <span className="bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400 font-bold ml-2">Ø</span>
                     </div>
 
                     {chartData.map((d, i) => (
                         <div key={i} className="flex-1 flex flex-col items-center gap-3 group/bar z-10 relative">
-                            {/* Bar */}
                             <div className="relative w-full flex flex-col items-center group">
                                 <div
                                     className={`w-full max-w-[40px] rounded-t-lg transition-all duration-500 hover:brightness-110 shadow-lg ${d.total === maxVal
@@ -104,36 +104,29 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                                 >
                                     {/* Tooltip */}
                                     <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 font-bold">
-                                        {d.total < 0 ? '-' : ''}€{Math.round(Math.abs(d.total)).toLocaleString()}
+                                        {d.total < 0 ? '-' : ''}€{Math.round(Math.abs(d.total)).toLocaleString('de-DE')}
                                     </div>
                                 </div>
                             </div>
-                            {/* Label */}
                             <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate w-full text-center">
                                 {d.Period}
                             </span>
                         </div>
                     ))}
                 </div>
-            </div>
+            </PageSection>
 
-            {/* List View for Deeper Analysis */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                    <h3 className="font-bold flex items-center gap-2">
-                        <Filter className="w-5 h-5 text-slate-400" />
-                        Monthly Details
-                    </h3>
-                </div>
+            {/* Detailansicht */}
+            <PageSection title="Detailansicht" noPadding>
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-900/50">
                         <tr>
                             <th className="px-6 py-3 w-16 text-center">Trend</th>
-                            <th className="px-6 py-3">Month / Period</th>
-                            <th className="px-6 py-3 text-center">Volume</th>
-                            <th className="px-6 py-3">Data Quality</th>
-                            <th className="px-6 py-3 text-right">Total Amount</th>
-                            <th className="px-6 py-3 text-center">Action</th>
+                            <th className="px-6 py-3">Monat / Periode</th>
+                            <th className="px-6 py-3 text-center">Volumen</th>
+                            <th className="px-6 py-3">Datenqualität</th>
+                            <th className="px-6 py-3 text-right">Gesamtbetrag</th>
+                            <th className="px-6 py-3 text-center">Aktion</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -141,14 +134,14 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                             <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                                 <td className="px-6 py-4 text-center">
                                     {d.total === maxVal && (
-                                        <div className="flex justify-center" title="Peak Month">
+                                        <div className="flex justify-center" title="Höchster Monat">
                                             <div className="p-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full">
                                                 <TrendingUp className="w-4 h-4" />
                                             </div>
                                         </div>
                                     )}
                                     {d.total === minVal && (
-                                        <div className="flex justify-center" title="Lowest Month">
+                                        <div className="flex justify-center" title="Niedrigster Monat">
                                             <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full">
                                                 <TrendingDown className="w-4 h-4" />
                                             </div>
@@ -159,17 +152,17 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                                 <td className="px-6 py-4 text-center">
                                     <div className="flex flex-col items-center">
                                         <div className="text-sm font-bold text-slate-900 dark:text-white">
-                                            {d.invoice_count} <span className="text-slate-400 text-xs font-normal">Inv</span>
+                                            {d.invoice_count} <span className="text-slate-400 text-xs font-normal">Rg.</span>
                                         </div>
                                         <div className="text-[10px] text-slate-500 uppercase tracking-wide">
-                                            {d.item_count} Pos
+                                            {d.item_count} Pos.
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col gap-1.5 w-full max-w-[140px]">
                                         <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-500">
-                                            <span>Completeness</span>
+                                            <span>Vollständigkeit</span>
                                             <span className={d.synthetic_invoices > 0 ? 'text-orange-500' : 'text-emerald-500'}>
                                                 {Math.round(((d.invoice_count - d.synthetic_invoices) / (d.invoice_count || 1)) * 100)}%
                                             </span>
@@ -182,27 +175,27 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                                         </div>
                                         {d.synthetic_invoices > 0 && (
                                             <div className="text-[9px] text-orange-600 font-medium">
-                                                {d.synthetic_invoices} Synthetic IDs
+                                                {d.synthetic_invoices} Synthetische IDs
                                             </div>
                                         )}
                                     </div>
                                 </td>
                                 <td className={`px-6 py-4 text-right font-bold ${d.total < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
-                                    {d.total < 0 ? '-' : ''}€{Math.round(Math.abs(d.total)).toLocaleString()}
+                                    {d.total < 0 ? '-' : ''}€{Math.round(Math.abs(d.total)).toLocaleString('de-DE')}
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                     <button
                                         onClick={() => onDrillDown?.(d.Period)}
                                         className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 hover:underline px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md transition-colors"
                                     >
-                                        Analyze Month
+                                        Analysieren
                                     </button>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            </div>
-        </div>
+            </PageSection>
+        </PageLayout>
     );
 };

@@ -5,9 +5,10 @@ import { SettingsRepository } from '../../lib/repositories/SettingsRepository';
 import type { SystemRecord } from '../../types';
 import {
     Plus, Save, RefreshCw, HelpCircle, CheckCircle2, XCircle,
-    Globe2, ShieldCheck, Cpu, ExternalLink, Star, ArrowLeft, Search, Filter, Settings
+    Globe2, ShieldCheck, Cpu, ExternalLink, Star, Search, Filter, Settings
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { PageLayout } from '../components/ui/PageLayout';
 import {
     DndContext,
     closestCenter,
@@ -197,52 +198,44 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
         }
     };
 
+    const now = new Date();
+    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+
     return (
-        <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={onBack}
-                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                            Systems Management
-                        </h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Configure and monitor your IT infrastructure and core business applications.
-                        </p>
+        <PageLayout
+            header={{
+                title: 'Systemverwaltung',
+                subtitle: `${filteredSystems?.length || 0} Systeme konfiguriert`,
+                onBack,
+                actions: (
+                    <div className="flex items-center gap-2 no-print">
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-all"
+                            title="Webhooks konfigurieren"
+                        >
+                            <Settings className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={handleCheckHealth}
+                            disabled={isScanning}
+                            className="h-10 flex items-center gap-2 px-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">{isScanning ? 'Scanne...' : 'Scan'}</span>
+                        </button>
+                        <button
+                            onClick={() => setIsAddModalOpen(true)}
+                            className="h-10 flex items-center gap-2 px-4 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-all shadow-sm active:scale-[0.97]"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Hinzufügen</span>
+                        </button>
                     </div>
-                </div>
-
-                <div className="flex items-center gap-2 no-print">
-                    <button
-                        onClick={() => setShowSettings(true)}
-                        className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                        title="Configure Webhooks"
-                    >
-                        <Settings className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={handleCheckHealth}
-                        disabled={isScanning}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-                        <span className="hidden sm:inline">{isScanning ? 'Scanning...' : 'Scan Systems'}</span>
-                    </button>
-                    <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none active:scale-95"
-                    >
-                        <Plus className="w-4 h-4" />
-                        <span>Add System</span>
-                    </button>
-                </div>
-            </div>
-
+                ),
+            }}
+            footer={footerText}
+        >
             {/* Print Only Header */}
             <div className="hidden print-only mb-8 border-b-4 border-slate-900 pb-6">
                 <div className="flex justify-between items-end">
@@ -253,11 +246,11 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                             </div>
                             <span className="text-lg font-black tracking-tight text-slate-900">IT DASHBOARD</span>
                         </div>
-                        <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Infrastructure Health Report</h1>
-                        <p className="text-slate-500 font-bold">Current System Status Overview • {new Date().toLocaleDateString('de-DE')}</p>
+                        <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Infrastruktur-Statusbericht</h1>
+                        <p className="text-slate-500 font-bold">Aktueller Systemstatus • {new Date().toLocaleDateString('de-DE')}</p>
                     </div>
                     <div className="text-right">
-                        <div className="text-[10px] font-black uppercase text-slate-400 mt-2">Managed Systems</div>
+                        <div className="text-[10px] font-black uppercase text-slate-400 mt-2">Verwaltete Systeme</div>
                         <div className="text-2xl font-black text-slate-900">{filteredSystems?.length || 0} Assets</div>
                     </div>
                 </div>
@@ -331,7 +324,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search systems by name..."
+                        placeholder="Systeme suchen..."
                         className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -344,9 +337,9 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
                     >
-                        <option value="All">All Categories</option>
-                        <option value="IT">IT Infrastructure</option>
-                        <option value="Business">Business Process</option>
+                        <option value="All">Alle Kategorien</option>
+                        <option value="IT">IT Infrastruktur</option>
+                        <option value="Business">Business Prozess</option>
                         <option value="Sales">Sales & CRM</option>
                     </select>
                 </div>
@@ -360,7 +353,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {loading ? (
-                        <div className="col-span-full py-20 text-center animate-pulse text-slate-400 font-bold">Loading Infrastructure Data...</div>
+                        <div className="col-span-full py-20 text-center animate-pulse text-slate-400 font-bold">Lade Infrastrukturdaten...</div>
                     ) : (
                         <SortableContext
                             items={filteredSystems?.map((s: SystemRecord) => s.id.toString()) || []}
@@ -496,6 +489,6 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
             </Modal>
 
             <ExportFAB />
-        </div>
+        </PageLayout>
     );
 };

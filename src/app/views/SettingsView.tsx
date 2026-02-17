@@ -4,6 +4,7 @@ import { SettingsRepository } from '../../lib/repositories/SettingsRepository';
 import { COMPONENTS } from '../../config/components';
 import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import { PageLayout } from '../components/ui/PageLayout';
 
 export const SettingsView: React.FC = () => {
     const { theme, setTheme } = useThemeContext();
@@ -29,11 +30,11 @@ export const SettingsView: React.FC = () => {
 
     const handleSaveWebhook = async () => {
         await SettingsRepository.set('webhook_url', webhookUrl);
-        alert('Notification settings saved successfully!');
+        alert('Benachrichtigungseinstellungen gespeichert!');
     };
 
     const handleTestWebhook = async () => {
-        if (!webhookUrl) return alert('Please enter a Webhook URL first.');
+        if (!webhookUrl) return alert('Bitte zuerst eine Webhook-URL eingeben.');
         setIsTestingWebhook(true);
         try {
             await fetch(webhookUrl, {
@@ -44,37 +45,46 @@ export const SettingsView: React.FC = () => {
                     text: `🧪 *IT Dashboard Test Notification*\nYour Webhook integration is working perfectly! ✅\n*Time:* ${new Date().toLocaleString()}`
                 })
             });
-            alert('Test notification sent manually! Check your Slack/Teams channel.');
+            alert('Test-Benachrichtigung gesendet! Prüfe deinen Slack/Teams-Kanal.');
         } catch (err) {
             console.error('Test failed', err);
-            alert('Failed to send test notification. Check console for errors.');
+            alert('Fehler beim Senden der Test-Benachrichtigung.');
         } finally {
             setIsTestingWebhook(false);
         }
     };
 
     const themeOptions: { value: ThemeMode; emoji: string; label: string }[] = [
-        { value: 'light', emoji: '🌞', label: 'Light' },
-        { value: 'dark', emoji: '🌚', label: 'Dark' },
+        { value: 'light', emoji: '🌞', label: 'Hell' },
+        { value: 'dark', emoji: '🌚', label: 'Dunkel' },
         { value: 'system', emoji: '💻', label: 'System' },
     ];
 
+    const now = new Date();
+    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+
     return (
-        <div className="h-full w-full overflow-y-auto animate-in slide-in-from-bottom-4 duration-500">
-            <div className="max-w-2xl mx-auto p-8">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-8">Settings</h2>
+        <PageLayout
+            header={{
+                title: 'Einstellungen',
+                subtitle: 'Dashboard-Konfiguration und Benachrichtigungen',
+                onBack: () => window.history.back(),
+            }}
+            footer={footerText}
+        >
+            <div className="max-w-2xl space-y-6">
 
                 {/* Appearance Section */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                         <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
                         </span>
-                        Appearance
+                        Darstellung
                     </h3>
                     <div className="space-y-4">
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Customize how the IT Dashboard looks on your device.
+                            Passe das Erscheinungsbild des Dashboards an.
                         </p>
 
                         <div className="grid grid-cols-3 gap-3">
@@ -163,16 +173,16 @@ export const SettingsView: React.FC = () => {
                 </div>
 
                 {/* Global Notification Settings Section */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mt-6">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                         <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             <Bell className="w-4 h-4 text-blue-500" />
                         </span>
-                        Global Notification Settings
+                        Benachrichtigungen
                     </h3>
                     <div className="space-y-6">
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Configure how you receive automated alerts for system outages and anomalies.
+                            Konfiguriere automatische Benachrichtigungen bei Systemausfällen und Anomalien.
                         </p>
 
                         <div className="space-y-2">
@@ -189,23 +199,23 @@ export const SettingsView: React.FC = () => {
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={handleSaveWebhook}
-                                className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 hover:bg-slate-800 dark:hover:bg-slate-100"
+                                className="flex-1 h-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-100"
                             >
-                                <Save className="w-5 h-5" />
-                                Save Settings
+                                <Save className="w-4 h-4" />
+                                Speichern
                             </button>
                             <button
                                 onClick={handleTestWebhook}
                                 disabled={isTestingWebhook || !webhookUrl}
-                                className="px-6 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-900 dark:text-white font-black rounded-xl transition-all flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                                className="h-10 px-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
                             >
-                                <RefreshCw className={`w-5 h-5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`w-4 h-4 ${isTestingWebhook ? 'animate-spin' : ''}`} />
                                 Test
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </PageLayout>
     );
 };

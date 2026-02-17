@@ -9,7 +9,6 @@ import { ItCostsInvoicePage } from './app/pages/ItCostsInvoicePage';
 import { ItCostsItemHistoryPage } from './app/pages/ItCostsItemHistoryPage';
 import { AnomalyDetectionPage } from './app/pages/AnomalyDetectionPage';
 import { AnomalyDetailPage } from './app/pages/AnomalyDetailPage';
-import { SimplePage } from './app/pages/SimplePage';
 import { DatasourceView } from './app/views/DatasourceView';
 import { DataInspector } from './app/views/DataInspector';
 import { SystemsManagementView } from './app/views/SystemsManagementView';
@@ -25,17 +24,17 @@ export const AppRouter: React.FC = () => (
                 } />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="worklist" element={
-                    <SimplePage animation="slide"><WorklistView onBack={() => window.history.back()} /></SimplePage>
+                    <WorklistView onBack={() => window.history.back()} />
                 } />
                 <Route path="costs" element={<ItCostsYearPage />} />
                 <Route path="costs/:period" element={<ItCostsMonthPage />} />
                 <Route path="costs/:period/:invoiceId" element={<ItCostsInvoicePage />} />
                 <Route path="costs/:period/:invoiceId/history" element={<ItCostsItemHistoryPage />} />
                 <Route path="inspector" element={
-                    <SimplePage animation="slide"><DataInspector onBack={() => window.history.back()} /></SimplePage>
+                    <DataInspector onBack={() => window.history.back()} />
                 } />
                 <Route path="systems" element={
-                    <SimplePage animation="slide" className="p-6 md:p-8"><SystemsManagementView onBack={() => window.history.back()} /></SimplePage>
+                    <SystemsManagementView onBack={() => window.history.back()} />
                 } />
                 <Route path="anomalies" element={<AnomalyDetectionPage />} />
                 <Route path="anomalies/:period/:anomalyId" element={<AnomalyDetailPage />} />
