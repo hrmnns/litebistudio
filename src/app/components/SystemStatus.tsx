@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Activity, HardDrive, Cpu, Info, ChevronRight } from 'lucide-react';
+import { Database, Activity, ChevronRight } from 'lucide-react';
 import { useQuery } from '../../hooks/useQuery';
-import { Modal } from './Modal';
+
+import { SystemHealthModal } from './SystemHealthModal';
 
 interface SystemStatusProps {
     isCollapsed?: boolean;
@@ -17,7 +18,6 @@ export const SystemStatus: React.FC<SystemStatusProps> = ({ isCollapsed }) => {
 
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const version = __APP_VERSION__;
-    const buildDate = __BUILD_DATE__;
 
     // Refresh every 30s to keep stats updated
     useEffect(() => {
@@ -57,69 +57,10 @@ export const SystemStatus: React.FC<SystemStatusProps> = ({ isCollapsed }) => {
                 )}
             </button>
 
-            <Modal
+            <SystemHealthModal
                 isOpen={isDetailsOpen}
                 onClose={() => setIsDetailsOpen(false)}
-                title="System Information"
-            >
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                                <Cpu className="w-4 h-4 text-indigo-500" />
-                                Application
-                            </h4>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                                    <span className="text-slate-500 dark:text-slate-400">Version</span>
-                                    <span className="font-mono font-medium text-blue-600 dark:text-blue-400">{version}</span>
-                                </div>
-                                <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                                    <span className="text-slate-500 dark:text-slate-400">Build Date</span>
-                                    <span className="font-mono font-medium text-blue-600 dark:text-blue-400">{buildDate}</span>
-                                </div>
-                                <div className="flex justify-between pb-1">
-                                    <span className="text-slate-500 dark:text-slate-400">Environment</span>
-                                    <span className="font-mono font-medium text-blue-600 dark:text-blue-400 uppercase text-[10px] tracking-wider">{import.meta.env.MODE}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                                <HardDrive className="w-4 h-4 text-emerald-500" />
-                                Database (SQLite OPFS)
-                            </h4>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                                    <span className="text-slate-500 dark:text-slate-400">Total Records</span>
-                                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{totalRecords.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between pb-1 text-xs text-slate-500 dark:text-slate-400">
-                                    <span>KPIs</span>
-                                    <span className="font-mono text-blue-500/80 dark:text-blue-400/80">{stats.kpis?.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between pb-1 text-xs text-slate-500 dark:text-slate-400">
-                                    <span>Invoices</span>
-                                    <span className="font-mono text-blue-500/80 dark:text-blue-400/80">{stats.invoices?.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between pb-1 text-xs text-slate-500 dark:text-slate-400">
-                                    <span>Events</span>
-                                    <span className="font-mono text-blue-500/80 dark:text-blue-400/80">{stats.events?.toLocaleString()}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30 flex items-start gap-3">
-                        <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                        <div className="text-sm text-blue-800 dark:text-blue-300">
-                            <p className="font-semibold mb-1">Storage Info</p>
-                            Your data is stored locally in your browser using <strong>Origin Private File System (OPFS)</strong>. This ensures high performance and persistence. The database is never sent to any cloud server.
-                        </div>
-                    </div>
-                </div>
-            </Modal>
+            />
         </>
     );
 };

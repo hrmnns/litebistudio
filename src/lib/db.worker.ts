@@ -198,6 +198,11 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
+            case 'GET_DIAGNOSTICS':
+                if (!db) await initDB();
+                result = getDiagnostics();
+                break;
+
             case 'EXPORT':
                 if (!db) await initDB();
                 result = sqlite3.capi.sqlite3_js_db_export(db.pointer);
@@ -322,6 +327,36 @@ function insertSystems(data: any[]) {
     } finally {
         stmt.finalize();
     }
+}
+
+function getDiagnostics() {
+    // 1. Size estimate
+    const pageCount = db.selectValue('PRAGMA page_count') as number;
+    const pageSize = db.selectValue('PRAGMA page_size') as number;
+    const dbSize = pageCount * pageSize;
+
+    // 2. Integrity check (lightweight)
+    // Note: 'PRAGMA integrity_check' can be slow on large DBs, maybe make it optional or on-demand?
+    // For now we'll return basic stats and let the UI request a full check via EXEC if needed.
+
+    // 3. Table counts
+    const tables = ['invoice_items', 'kpi_data', 'operations_events', 'systems', 'worklist'];
+    const tableStats: Record<string, number> = {};
+
+    for (const t of tables) {
+        try {
+            tableStats[t] = db.selectValue(`SELECT count(*) FROM ${t}`) as number;
+        } catch (e) {
+            tableStats[t] = 0;
+        }
+    }
+
+    return {
+        dbSize,
+        pageCount,
+        pageSize,
+        tableStats
+    };
 }
 
 async function importDatabase(buffer: ArrayBuffer) {

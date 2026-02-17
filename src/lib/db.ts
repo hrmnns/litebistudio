@@ -150,6 +150,11 @@ export async function initSchema() {
     return send('INIT_SCHEMA');
 }
 
+export async function getDiagnostics() {
+    await initDB();
+    return send('GET_DIAGNOSTICS');
+}
+
 export async function toggleWorklist(sourceTable: string, sourceId: number, label?: string, context?: string) {
     await initDB();
     const existing = await runQuery(

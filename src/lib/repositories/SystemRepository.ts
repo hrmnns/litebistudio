@@ -56,6 +56,16 @@ export const SystemRepository = {
         return { tables: tables.length, records: totalRecords };
     },
 
+    async getDiagnostics(): Promise<any> {
+        // We need to bypass runQuery wrappers to hit the worker directly for this custom message type if possible,
+        // OR we can add a helper in db.ts. 
+        // For now, let's assume we update db.ts to expose a way, OR we cheat and use runQuery for parts of it?
+        // Actually, the cleanest way is to add a specific method in db.ts.
+        // Let's modify db.ts first to export `getDiagnostics`.
+        const result = await import('../db').then(m => m.getDiagnostics());
+        return result;
+    },
+
     async getTables(): Promise<string[]> {
         const result = await runQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
         return result.map((r: any) => r.name as string);

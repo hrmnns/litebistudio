@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
-import { ChevronLeft, ChevronRight, Info, Bookmark } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Bookmark, Target } from 'lucide-react';
 import { WorklistRepository } from '../../lib/repositories/WorklistRepository';
 
 interface RecordDetailModalProps {
@@ -24,6 +24,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [previousIndex, setPreviousIndex] = useState<number | null>(null);
+    const [referenceIndex, setReferenceIndex] = useState<number | null>(null);
     const [helpOpen, setHelpOpen] = useState(false);
     const [isInWorklist, setIsInWorklist] = useState(false);
 
@@ -33,11 +34,11 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     // Sync index when items change or modal opens
     useEffect(() => {
         if (isOpen && items && items.length > 0) {
-            // Only update if current index is out of bounds or it's a fresh open
-            if (currentIndex < 0 || currentIndex >= items.length) {
-                setCurrentIndex(Math.max(0, initialIndex));
-            }
-            setPreviousIndex(null); // Reset when modal re-opens or data changes significantly
+            // Always sync provided index when modal opens or items/index change
+            const val = Math.max(0, initialIndex);
+            setCurrentIndex(val);
+            setReferenceIndex(val); // Auto-set initial item as reference logic
+            setPreviousIndex(null);
             setHelpOpen(false);
         }
     }, [isOpen, initialIndex, items]);
@@ -72,6 +73,14 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         window.dispatchEvent(new Event('db-updated'));
     };
 
+    const handleToggleReference = () => {
+        if (referenceIndex === currentIndex) {
+            setReferenceIndex(null); // Toggle off if clicking active reference
+        } else {
+            setReferenceIndex(currentIndex); // Set current as reference
+        }
+    };
+
     const handleNavigate = (newIndex: number) => {
         setPreviousIndex(currentIndex);
         setCurrentIndex(newIndex);
@@ -80,7 +89,14 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     if (!items || items.length === 0) return null;
 
     const currentItem = items[currentIndex];
-    const previousItem = (previousIndex !== null && previousIndex >= 0 && previousIndex < items.length) ? items[previousIndex] : null;
+
+    // Comparison Logic: Reference > Previous Visited
+    const comparisonItem = referenceIndex !== null
+        ? items[referenceIndex]
+        : (previousIndex !== null && previousIndex >= 0 && previousIndex < items.length) ? items[previousIndex] : null;
+
+    const isReferenceActive = referenceIndex !== null;
+    const isCurrentReference = referenceIndex === currentIndex;
 
     if (!currentItem) return null;
 
@@ -115,6 +131,26 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                             >
                                 <Bookmark className={`w-4 h-4 ${isInWorklist ? 'fill-current' : ''}`} />
                             </button>
+
+                            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
+
+                            <button
+                                onClick={handleToggleReference}
+                                className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 group relative ${isReferenceActive
+                                    ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
+                                    }`}
+                                title={isCurrentReference ? "Referenz-Modus beenden" : "Als Referenz für Vergleich setzen"}
+                            >
+                                <Target className={`w-4 h-4 ${isReferenceActive ? 'fill-current' : ''}`} />
+                                {isReferenceActive && !isCurrentReference && (
+                                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                                    </span>
+                                )}
+                            </button>
+
                             <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">
                                 Navigieren
@@ -142,12 +178,22 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                         </div>
                     </div>
 
+                    {isReferenceActive && !isCurrentReference && (
+                        <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg px-3 py-2 text-[10px] text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-4">
+                            <Target className="w-3.5 h-3.5" />
+                            <span className="font-bold">Vergleich aktiv:</span>
+                            <span>
+                                Unterschiede werden relativ zu <span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">#{items[referenceIndex].id || referenceIndex + 1}</span> angezeigt.
+                            </span>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                         {Object.entries(currentItem).map(([key, value]) => {
                             // Skip internal tracking fields if they exist and are boolean/utility
                             if (key.startsWith('is') || key === 'compositeKey' || key === 'status') return null;
 
-                            const isChanged = previousItem && String(value) !== String(previousItem[key]);
+                            const isChanged = comparisonItem && String(value) !== String(comparisonItem[key]);
 
                             return (
                                 <div
@@ -196,15 +242,14 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                     : 'Dieser Datensatz wird in seinem Originalzustand aus der Datenbank angezeigt.'
                                 }
                             </p>
-                            {items.length > 1 && (
-                                <p>
-                                    Du betrachtest gerade eins von <strong>{items.length} Elementen</strong>.
-                                    Nutze die Pfeiltasten in der Navigation, um durch die Liste zu blättern.
+                            <div className="pt-2 border-t border-blue-200 dark:border-blue-800/50 space-y-2">
+                                <p className="font-medium italic">
+                                    ✨ <span className="underline decoration-amber-400 underline-offset-2">Diff-Funktion:</span> Unterschiede werden standardmässig zum <strong>zuletzt besuchten Datensatz</strong> angezeigt.
                                 </p>
-                            )}
-                            <p className="pt-2 border-t border-blue-200 dark:border-blue-800/50 font-medium italic">
-                                ✨ <span className="underline decoration-amber-400 underline-offset-2">Wichtig:</span> Wenn du innerhalb eines Modals navigierst, werden Unterschiede zum jeweils *vorherigen* Datensatz mit einem gelben <strong>"DIFF"</strong>-Label markiert.
-                            </p>
+                                <p className="font-medium italic">
+                                    🎯 <span className="underline decoration-blue-400 underline-offset-2">Referenz-Modus:</span> Klicke auf das Zielscheiben-Symbol, um den aktuellen Datensatz als <strong>feste Vergleichsbasis</strong> zu fixieren.
+                                </p>
+                            </div>
                         </div>
                     </div>
                     <button
