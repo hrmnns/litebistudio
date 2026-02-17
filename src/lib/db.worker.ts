@@ -175,7 +175,13 @@ async function loadDemoData(demoContent?: any) {
         }
 
         db.exec('COMMIT');
-        log('Demo data loaded successfully');
+        const totalRows = (data.systems?.length || 0) +
+            (data.invoice_items?.length || 0) +
+            (data.settings?.length || 0) +
+            (data.worklist?.length || 0);
+
+        log(`Demo data loaded successfully: ${totalRows} rows`);
+        return totalRows;
     } catch (e) {
         db.exec('ROLLBACK');
         error('Failed to load demo data', e);
@@ -250,9 +256,18 @@ async function handleMessage(e: MessageEvent) {
 
             case 'CLEAR':
                 if (!db) await initDB();
-                db.exec('DELETE FROM invoice_items;');
-                db.exec('DELETE FROM systems;');
-                db.exec('DELETE FROM worklist;');
+                try {
+                    db.exec('BEGIN TRANSACTION');
+                    db.exec('DELETE FROM invoice_items;');
+                    db.exec('DELETE FROM systems;');
+                    db.exec('DELETE FROM worklist;');
+                    db.exec('DELETE FROM settings;');
+                    db.exec('COMMIT');
+                    log('Database cleared (all tables)');
+                } catch (err) {
+                    db.exec('ROLLBACK');
+                    throw err;
+                }
                 result = true;
                 break;
 
@@ -327,8 +342,7 @@ async function handleMessage(e: MessageEvent) {
 
             case 'LOAD_DEMO':
                 if (!db) await initDB();
-                await loadDemoData(payload);
-                result = true;
+                result = await loadDemoData(payload);
                 break;
 
             case 'CLOSE':

@@ -152,7 +152,7 @@ export async function importDatabase(buffer: ArrayBuffer) {
 
 export async function loadDemoData() {
     await initDB();
-    return send('LOAD_DEMO');
+    return send<number>('LOAD_DEMO');
 }
 
 export async function exportDemoData(): Promise<any> {

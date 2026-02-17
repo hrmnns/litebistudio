@@ -218,7 +218,6 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
                 items={resolvedRecords}
                 initialIndex={resolvedRecords.findIndex(r => r.id === selectedDetailId)}
                 title="Datensatz-Prüfung"
-                infoLabel="Arbeitsvorrat"
                 tableName="invoice_items"
             />
 

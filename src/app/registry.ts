@@ -1,7 +1,6 @@
 import type React from 'react';
 import { ItCostsComponent } from './components/dashboard/ItCostsComponent';
 import { SystemsComponent } from './components/dashboard/SystemsComponent';
-import { ItForecastComponent } from './components/dashboard/ItForecastComponent';
 import { ClockComponent } from './components/dashboard/ClockComponent';
 import { DataInspectorComponent } from './components/dashboard/DataInspectorComponent';
 import { AnomalyRadarComponent } from './components/dashboard/AnomalyRadarComponent';
@@ -12,7 +11,6 @@ import { DatabaseStatusComponent } from './components/dashboard/DatabaseStatusCo
 export const COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
     'ItCostsComponent': ItCostsComponent,
     'SystemsComponent': SystemsComponent,
-    'ItForecastComponent': ItForecastComponent,
     'ClockComponent': ClockComponent,
     'DataInspectorComponent': DataInspectorComponent,
     'AnomalyRadarComponent': AnomalyRadarComponent,

@@ -16,13 +16,6 @@ export const COMPONENTS: ComponentConfig[] = [
         defaultSize: 'small',
     },
     {
-        id: 'it-forecast',
-        title: 'IT Forecast',
-        component: 'ItForecastComponent',
-        targetView: '/costs',
-        defaultSize: 'small',
-    },
-    {
         id: 'clock',
         title: 'Status & Uhrzeit',
         component: 'ClockComponent',

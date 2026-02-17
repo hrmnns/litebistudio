@@ -58,10 +58,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         const { loadDemoData, initSchema, initDB } = await import('../../lib/db');
                                         await initDB();
                                         await initSchema();
-                                        await loadDemoData();
+                                        const count = await loadDemoData();
                                         setShowSuccess(true);
                                         setTimeout(() => setShowSuccess(false), 3000);
                                         window.dispatchEvent(new Event('db-updated'));
+                                        window.dispatchEvent(new CustomEvent('db-changed', {
+                                            detail: { type: 'insert', count }
+                                        }));
                                         onImportComplete();
                                     } catch (e) {
                                         console.error(e);
@@ -237,59 +240,77 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
                         Hier können Sie gezielt Tabelleninhalte löschen. Diese Aktion kann nicht rückgängig gemacht werden.
                     </p>
+                    <div className="space-y-4">
+                        {/* Tabellenspezifisch */}
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Einzelne Tabellen leeren</h4>
+                            <div className="flex flex-col md:flex-row items-end gap-4">
+                                <div className="flex-1 w-full">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
+                                        Tabelle auswählen
+                                    </label>
+                                    <select
+                                        id="table-to-clear"
+                                        className="w-full h-11 px-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all appearance-none cursor-pointer"
+                                        defaultValue="invoice_items"
+                                    >
+                                        <option value="invoice_items">Rechnungen (invoice_items)</option>
+                                        <option value="systems">Systeme (systems)</option>
+                                        <option value="worklist">Arbeitsvorrat (worklist)</option>
+                                    </select>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        const select = document.getElementById('table-to-clear') as HTMLSelectElement;
+                                        const tableName = select.value;
+                                        const tableLabel = select.options[select.selectedIndex].text.split(' (')[0];
 
-                    <div className="flex flex-col md:flex-row items-end gap-4 max-w-xl">
-                        <div className="flex-1 w-full">
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
-                                Tabelle auswählen
-                            </label>
-                            <select
-                                id="table-to-clear"
-                                className="w-full h-11 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all appearance-none cursor-pointer"
-                                defaultValue="invoice_items"
-                            >
-                                <option value="invoice_items">Rechnungen (invoice_items)</option>
-                                <option value="systems">Systeme (systems)</option>
-                                <option value="worklist">Arbeitsvorrat (worklist)</option>
-                            </select>
+                                        if (confirm(`Möchten Sie wirklich alle Einträge aus der Tabelle "${tableLabel}" löschen?`)) {
+                                            const { clearTable } = await import('../../lib/db');
+                                            await clearTable(tableName);
+                                            window.dispatchEvent(new Event('db-updated'));
+                                            window.dispatchEvent(new CustomEvent('db-changed', {
+                                                detail: { type: 'clear', target: tableName }
+                                            }));
+                                            onImportComplete();
+                                        }
+                                    }}
+                                    className="h-11 flex items-center justify-center gap-2 px-6 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-700 dark:bg-rose-900/10 dark:hover:bg-rose-600 dark:text-rose-400 text-sm font-black rounded-xl border border-rose-100 dark:border-rose-900/30 transition-all uppercase tracking-wider shadow-sm"
+                                >
+                                    Tabelle leeren
+                                    <Database className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
 
-                        <button
-                            onClick={async () => {
-                                const select = document.getElementById('table-to-clear') as HTMLSelectElement;
-                                const tableName = select.value;
-                                const tableLabel = select.options[select.selectedIndex].text.split(' (')[0];
-
-                                if (confirm(`Möchten Sie wirklich alle Einträge aus der Tabelle "${tableLabel}" löschen?`)) {
-                                    const { clearTable } = await import('../../lib/db');
-                                    await clearTable(tableName);
-                                    window.dispatchEvent(new Event('db-updated'));
-                                    window.dispatchEvent(new CustomEvent('db-changed', {
-                                        detail: { type: 'clear', target: tableName }
-                                    }));
-                                    onImportComplete();
-                                }
-                            }}
-                            className="h-11 flex items-center justify-center gap-2 px-6 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-700 dark:bg-rose-900/10 dark:hover:bg-rose-600 dark:text-rose-400 text-sm font-black rounded-xl border border-rose-100 dark:border-rose-900/30 transition-all uppercase tracking-wider shadow-sm"
-                        >
-                            Tabelle leeren
-                            <Database className="w-4 h-4" />
-                        </button>
-
-                        <button
-                            onClick={async () => {
-                                if (confirm('Möchten Sie wirklich ALLE Daten aus ALLEN Tabellen löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')) {
-                                    const { clearDatabase } = await import('../../lib/db');
-                                    await clearDatabase();
-                                    window.dispatchEvent(new Event('db-updated'));
-                                    onImportComplete();
-                                }
-                            }}
-                            className="h-11 flex items-center justify-center gap-2 px-6 bg-rose-600 hover:bg-rose-700 text-white text-sm font-black rounded-xl transition-all uppercase tracking-wider shadow-md"
-                        >
-                            Daten löschen
-                            <Database className="w-4 h-4" />
-                        </button>
+                        {/* Systemweit */}
+                        <div className="p-4 bg-rose-50/50 dark:bg-rose-900/5 rounded-xl border border-rose-100/50 dark:border-rose-900/20">
+                            <h4 className="text-xs font-black text-rose-500/70 uppercase tracking-widest mb-2">Gesamte Datenbank</h4>
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                                <p className="text-xs text-rose-700/70 dark:text-rose-400/60 max-w-sm">
+                                    Löscht alle Inhalte aus sämtlichen Tabellen. Diese Aktion ist destruktiv und unwiderruflich.
+                                </p>
+                                <button
+                                    onClick={async () => {
+                                        if (confirm('Möchten Sie wirklich ALLE Daten aus ALLEN Tabellen löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')) {
+                                            const { clearDatabase } = await import('../../lib/db');
+                                            await clearDatabase();
+                                            setShowSuccess(true);
+                                            setTimeout(() => setShowSuccess(false), 3000);
+                                            window.dispatchEvent(new Event('db-updated'));
+                                            window.dispatchEvent(new CustomEvent('db-changed', {
+                                                detail: { type: 'clear' }
+                                            }));
+                                            onImportComplete();
+                                        }
+                                    }}
+                                    className="h-11 flex items-center justify-center gap-2 px-6 bg-rose-600 hover:bg-rose-700 text-white text-sm font-black rounded-xl transition-all uppercase tracking-wider shadow-md whitespace-nowrap"
+                                >
+                                    Alle Daten löschen
+                                    <Database className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
