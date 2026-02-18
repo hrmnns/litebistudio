@@ -1,7 +1,7 @@
 import React from 'react';
 import { Database, Save, AlertCircle, Settings } from 'lucide-react';
 import { DashboardComponent } from '../ui/DashboardComponent';
-import { useBackupStatus } from '../../hooks/useBackupStatus';
+import { useBackupStatus } from '../../../hooks/useBackupStatus';
 
 interface DatabaseStatusComponentProps {
     onRemove?: () => void;

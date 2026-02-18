@@ -1,59 +1,88 @@
-# IT Dashboard
+# 📊 IT Dashboard
 
-A modular, static, browser-based IT Dashboard using SQLite WASM.
+A high-performance, browser-based IT management platform with local SQLite persistence and no-code reporting capabilities.
 
-## Tech Stack
+![IT Dashboard Preview](https://via.placeholder.com/800x400?text=IT+Dashboard+Preview)
 
-- **Framework**: React + TypeScript (Vite)
-- **Styling**: Tailwind CSS
-- **Database**: SQLite WASM (Local browser database)
-- **Icons**: Lucide React
+## 🚀 Key Features
 
-## Getting Started
+- **Multi-Dashboard Support**: Create, manage, and arrange multiple dashboards with a drag-and-drop grid system.
+- **Visual & SQL Query Builder**: 
+  - **Visual Mode**: Drag-and-drop interface for table selection, filtering, and aggregation.
+  - **SQL Mode**: Full SQL editor for advanced users with real-time preview and charting.
+- **Modular Data Import**: 
+  - **Smart Import**: Automated schema generation from Excel files.
+  - **Generic Import**: Direct mapping of Excel data to existing database structures with pre-import validation.
+- **Interactive Worklist**: 
+  - Centralized management of flagged records.
+  - Integrated status tracking and commenting.
+  - Automatic existence checks for source records.
+- **Advanced Visualization**: 
+  - Responsive charts (Pie, Bar, Line, Area) with multi-series support.
+  - Direct integration into dashboards as custom widgets.
+- **Reporting & Export**:
+  - High-quality PDF and Image export of dashboards and query results.
+  - **Presentation Mode** for clean, distractions-free screen sharing.
+- **Security & Privacy**:
+  - **App Lock**: Optional password protection for the entire interface.
+  - **Encrypted Backups**: Password-protected database exports using AES encryption.
+- **Zero-Backend Architecture**: Runs entirely in the browser using SQLite WASM + OPFS for maximum performance and data sovereignty.
 
-1.  **Install Dependencies**:
+## 🛠️ Tech Stack
+
+- **Framework**: React 18 + TypeScript (Vite)
+- **Styling**: Tailwind CSS (Modular Utility First)
+- **Database**: SQLite WASM + OPFS (Persistent Browser Storage)
+- **Visualization**: Recharts & Lucide Icons
+- **PDF Core**: html2canvas & jsPDF
+
+## 📦 Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v16.x or later)
+- [npm](https://www.npmjs.com/)
+
+### Installation & Development
+
+1.  **Clone & Install**:
     ```bash
+    git clone https://github.com/itdashboard/itdashboard.git
+    cd itdashboard
     npm install
     ```
 
-2.  **Start Development Server**:
+2.  **Run Locally**:
     ```bash
     npm run dev
     ```
 
-3.  **Open in Browser**:
-    http://localhost:5173
+3.  **Build Phase**:
+    ```bash
+    npm run build
+    ```
 
-## How to Use
+## 🏗️ Project Architecture
 
-- When the app starts, the database is empty.
-- Click **"Load Demo Data"** in the sidebar to populate the local SQLite database with sample data.
-- The tiles will automatically update to show the new data.
+- `src/app/`: Primary UI layer including views, components, and dashboard registry.
+- `src/hooks/`: Unified infrastructure hooks for data fetching, reporting, and state.
+- `src/lib/`: Core system logic (Database worker, Cryptography, Repositories).
+- `src/config/`: Component definitions and registry configurations.
+- `src/datasets/`: Initial SQL schemas, views, and demo data structures.
 
-## Project Structure
+## 🌍 Deployment (GitHub Pages)
 
-- `src/app/`: UI Components, Shell, and Tiles.
-- `src/config/`: Configuration files (Tile Registry).
-- `src/datasets/`: Static data and SQL schemas.
-- `src/lib/`: Core utilities (Database wrapper).
-- `src/hooks/`: Custom React hooks (`useQuery`).
+This project is optimized for static hosting while maintaining full database features.
 
-## GitHub Pages Deployment
+1.  **Build**: Execute `npm run build`.
+2.  **COI Headers**: Uses `coi-serviceworker.js` to enable SharedArrayBuffer/OPFS support on GitHub Pages without server-side header configuration.
+3.  **Fallback**: Gracefully falls back to an in-memory database if OPFS is unavailable.
 
-To deploy to GitHub Pages:
+## 🔒 Security & Data Privacy
 
-1.  **Repository Name**: Ensure your repository is named `itdashboard` (or update `base` in `vite.config.ts` if it differs).
-2.  **Build**: Run `npm run build`.
-3.  **Deploy**: Push the contents of the `dist/` folder to the `gh-pages` branch.
+- **No External Tracking**: No telemetry or external API calls are made.
+- **Local Only**: Your data never leaves your browser unless you explicitly export a backup.
+- **AES-GCM Encryption**: Used for protecting backups and the application lock.
 
-### Service Worker Workaround
-SQLite WASM requires specific HTTP headers (`Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy`) for persistent storage (OPFS). Since GitHub Pages doesn't support custom headers, this project uses `coi-serviceworker.js` to enable these headers in the browser. 
-
-- This allows the app to run with full OPFS support on GitHub Pages.
-- If the service worker fails to load, the app will gracefully fall back to an in-memory database.
-
-
-## Troubleshooting
-
-- **SQLite Error**: Check browser console. Ensure `sqlite3.wasm` is loaded correctly (network tab).
-- **Styles missing**: Ensure PostCSS and Tailwind are running.
+---
+Built with ❤️ for IT Management and Data Sovereignty.

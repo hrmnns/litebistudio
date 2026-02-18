@@ -57,7 +57,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
 
     return (
         <div className={cn(
-            "group relative flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden h-full",
+            "group relative flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden h-full",
             onClick && "cursor-pointer active:scale-[0.98]",
             className
         )}>

@@ -6,9 +6,6 @@ import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
 import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
-import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
-import systemsSchema from '../../schemas/systems-schema.json';
-import worklistSchema from '../../schemas/worklist-schema.json';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -20,13 +17,19 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedTable, setSelectedTable] = useState('invoice_items');
+    const [selectedTable, setSelectedTable] = useState('');
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const limit = 500;
 
     // Fetch available tables
     const { data: tables } = useAsync<string[]>(
-        () => SystemRepository.getTables(),
+        async () => {
+            const availableTables = await SystemRepository.getTables();
+            if (availableTables.length > 0 && !selectedTable) {
+                setSelectedTable(availableTables[0]);
+            }
+            return availableTables;
+        },
         []
     );
 
@@ -34,6 +37,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const { data: items, loading, error, refresh: execute } = useAsync<any[]>(
         async () => {
             if (mode === 'table') {
+                if (!selectedTable) return [];
                 return await SystemRepository.inspectTable(selectedTable, limit, searchTerm);
             } else {
                 if (!inputSql) return []; // Don't run empty SQL
@@ -93,7 +97,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     return (
         <PageLayout
             header={{
-                title: 'Daten-Inspektor',
+                title: 'Data Inspector',
                 subtitle: `${items?.length || 0} Ergebnisse${mode === 'table' ? ` · ${selectedTable}` : ' · SQL-Abfrage'}`,
                 onBack,
                 actions: (
@@ -148,7 +152,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             }}
             footer={footerText}
             breadcrumbs={[
-                { label: 'Daten-Inspektor' }
+                { label: 'Data Inspector' }
             ]}
             fillHeight
         >
@@ -270,12 +274,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 initialIndex={items && selectedItem ? Math.max(0, items.indexOf(selectedItem)) : 0}
                 title="Datensatz-Details"
                 tableName={selectedTable}
-                schema={
-                    selectedTable === 'invoice_items' ? invoiceItemsSchema :
-                        selectedTable === 'systems' ? systemsSchema :
-                            selectedTable === 'worklist' ? worklistSchema :
-                                undefined
-                }
+                schema={undefined}
             />
 
             {/* Error Toast / Floating Alert */}

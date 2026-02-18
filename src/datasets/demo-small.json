@@ -1,30 +1,4 @@
 {
-  "systems": [
-    {
-      "name": "cherware.de - From IT. Not from theory.",
-      "url": "https://www.cherware.de/",
-      "status": "unknown",
-      "category": "Business",
-      "is_favorite": 0,
-      "sort_order": 1
-    },
-    {
-      "name": "bluesky - @hrmnns.bsky.social",
-      "url": "https://bsky.app/profile/hrmnns.bsky.social",
-      "status": "unknown",
-      "category": "IT",
-      "is_favorite": 0,
-      "sort_order": 2
-    },
-    {
-      "name": "mastodon - @hrmnns ",
-      "url": "https://mastodon.social/@hrmnns",
-      "status": "unknown",
-      "category": "IT",
-      "is_favorite": 0,
-      "sort_order": 3
-    }
-  ],
   "invoice_items": [
     {
       "FiscalYear": 2026,
@@ -21997,6 +21971,6 @@
       "SourceTag": "ADHOC"
     }
   ],
-  "settings": [],
-  "worklist": []
+  "sys_settings": [],
+  "sys_worklist": []
 }

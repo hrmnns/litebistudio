@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search } from 'lucide-react';
+import { Search, Database, Table as TableIcon } from 'lucide-react';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { DashboardComponent } from '../ui/DashboardComponent';
 import { Skeleton } from '../ui/Skeleton';
@@ -20,33 +20,62 @@ export const DataInspectorComponent: React.FC<{ onRemove?: () => void; dragHandl
         );
     }
 
+    const handleClick = () => {
+        if (onClick) onClick();
+        // If we have a target view and no external click handler, we could navigate
+        // But DashboardComponent usually handles targetView via Link if provided? 
+        // Actually DashboardComponent uses onClick. 
+        // We want the whole tile to likely trigger the same or just the footer.
+        // The user asked for a footer link, so we'll add that specifically.
+        // But for consistency, let's make the whole tile actionable if desired, 
+        // though the footer link is the explicit request.
+        window.location.hash = '#/inspector';
+    };
+
     return (
         <DashboardComponent
             title="Inspector"
             icon={Search}
             iconColor="indigo"
-            onClick={onClick}
+            onClick={onClick || handleClick}
             onRemove={onRemove}
             targetView={targetView}
             dragHandleProps={dragHandleProps}
             backgroundIcon={Search}
+            className="cursor-pointer"
+            footerLeft={
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.hash = '#/inspector';
+                    }}
+                    className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors group/footer"
+                >
+                    Details
+                    <Search className="w-3 h-3 transition-transform group-hover/footer:scale-110" />
+                </button>
+            }
         >
-            <div className="flex flex-col h-full items-center justify-around py-0.5">
+            <div className="flex flex-col h-full items-center justify-around py-2">
                 {/* Primary Metric: Total Records */}
                 <div className="text-center group-hover:scale-105 transition-transform duration-500">
-                    <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-0.5">Records Gesamt</div>
-                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums leading-none">
+                    <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1">
+                        <TableIcon className="w-3 h-3" />
+                        <span>Records Gesamt</span>
+                    </div>
+                    <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums leading-none">
                         {loading || !stats ? <Skeleton className="h-8 w-20 mx-auto" /> : stats.records.toLocaleString('de-DE')}
                     </div>
                 </div>
 
-                {/* Secondary Metrics - Prominent View */}
-                <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800/50 flex justify-center">
-                    <div className="flex flex-col items-center px-6 py-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
-                        <span className="text-[8px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-widest mb-1 leading-none">Tabellen</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums leading-none">
-                            {loading || !stats ? '...' : stats.tables}
-                        </span>
+                {/* Secondary Metric: Tables */}
+                <div className="w-full pt-4 border-t border-slate-200 dark:border-slate-800/50 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest mb-1">
+                        <Database className="w-3 h-3" />
+                        <span>Tabellen</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-700 dark:text-slate-300 tabular-nums leading-none">
+                        {loading || !stats ? '...' : stats.tables}
                     </div>
                 </div>
             </div>

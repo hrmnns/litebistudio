@@ -11,11 +11,14 @@ interface DashboardContextType {
     setComponentOrder: (order: string[] | ((prev: string[]) => string[])) => void;
     isSidebarCollapsed: boolean;
     setSidebarCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
-    isPrivacyMode: boolean;
-    setPrivacyMode: (enabled: boolean | ((prev: boolean) => boolean)) => void;
     changeCount: number;
     lastBackup: string | null;
     markBackupComplete: () => void;
+    isLocked: boolean;
+    lockApp: () => void;
+    unlockApp: () => void;
+    isPresentationMode: boolean;
+    togglePresentationMode: () => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -32,7 +35,6 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [visibleSidebarComponentIds, setVisibleSidebarComponentIds] = useLocalStorage<string[]>('visibleSidebarComponentIds', COMPONENTS.filter(t => t.targetView).map(t => t.id));
     const [componentOrder, setComponentOrder] = useLocalStorage<string[]>('componentOrder', initialOrder);
     const [isSidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
-    const [isPrivacyMode, setPrivacyMode] = useLocalStorage<boolean>('isPrivacyMode', false);
 
     // Backup State
     const [lastBackup, setLastBackup] = useLocalStorage<string | null>('itdashboard_last_backup', null);
@@ -88,6 +90,19 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         }
     }, [componentOrder, setComponentOrder, visibleComponentIds, setVisibleComponentIds, setVisibleSidebarComponentIds]);
 
+    // Lock State
+    const [isLocked, setIsLocked] = React.useState<boolean>(() => {
+        // Init locked if PIN exists
+        return !!localStorage.getItem('itdashboard_app_pin');
+    });
+
+    const lockApp = React.useCallback(() => setIsLocked(true), []);
+    const unlockApp = React.useCallback(() => setIsLocked(false), []);
+
+    // Presentation Mode
+    const [isPresentationMode, setIsPresentationMode] = React.useState(false);
+    const togglePresentationMode = React.useCallback(() => setIsPresentationMode(prev => !prev), []);
+
     return (
         <DashboardContext.Provider value={{
             visibleComponentIds,
@@ -98,11 +113,14 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             setComponentOrder,
             isSidebarCollapsed,
             setSidebarCollapsed,
-            isPrivacyMode,
-            setPrivacyMode,
             changeCount,
             lastBackup,
-            markBackupComplete
+            markBackupComplete,
+            isLocked,
+            lockApp,
+            unlockApp,
+            isPresentationMode,
+            togglePresentationMode
         }}>
             {children}
         </DashboardContext.Provider>

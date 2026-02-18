@@ -1,257 +1,222 @@
-import React, { useState } from 'react';
-import { useAsync } from '../../hooks/useAsync';
-import { WorklistRepository } from '../../lib/repositories/WorklistRepository';
-import { DataTable, type Column } from '../../components/ui/DataTable';
+import React, { useState, useEffect } from 'react';
+import { ClipboardList, Trash2, ExternalLink, AlertCircle, CheckCircle2, Circle, Clock, Tag, Search, MessageSquare } from 'lucide-react';
+import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { PageLayout } from '../components/ui/PageLayout';
-import { PageSection } from '../components/ui/PageSection';
 import { RecordDetailModal } from '../components/RecordDetailModal';
-import { Bookmark, ExternalLink, Trash2, CheckCircle, AlertCircle, HelpCircle, RotateCcw } from 'lucide-react';
-import type { WorklistEntry, WorklistStatus } from '../../types';
-import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
-import { cn } from '../../lib/utils';
-import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 
-interface WorklistViewProps {
-    onBack: () => void;
-}
+export const WorklistView: React.FC = () => {
+    const [items, setItems] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState('all');
+    const [search, setSearch] = useState('');
 
-export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
-    const [selectedDetailId, setSelectedDetailId] = useState<number | null>(null);
-    const [resolvedRecords, setResolvedRecords] = useState<any[]>([]);
-    const [loadingDetail, setLoadingDetail] = useState(false);
+    // Detail Modal State
+    const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [sourceData, setSourceData] = useState<any[]>([]);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-    // Fetch all worklist items
-    const { data: worklistItems, refresh, loading: loadingWorklistItems } = useAsync<WorklistEntry[]>(
-        () => WorklistRepository.getAll(),
-        [],
-        { cacheKey: 'worklist-all' }
-    );
+    const loadWorklist = async () => {
+        setLoading(true);
+        const data = await SystemRepository.getWorklist();
 
-    const handleRemove = async (e: React.MouseEvent, item: WorklistEntry) => {
-        e.stopPropagation();
-        if (confirm('Diesen Eintrag aus dem Arbeitsvorrat entfernen?')) {
-            await WorklistRepository.toggle(item.source_table, item.source_id);
-            refresh();
-            window.dispatchEvent(new Event('db-updated'));
-        }
+        // Add existence check for each item
+        const enriched = await Promise.all(data.map(async (item) => {
+            const exists = await SystemRepository.checkRecordExists(item.source_table, item.source_id);
+            return { ...item, _exists: exists };
+        }));
+
+        setItems(enriched);
+        setLoading(false);
     };
 
-    // Resolve all worklist items to full records for navigation
-    React.useEffect(() => {
-        const resolveAll = async () => {
-            if (!worklistItems || worklistItems.length === 0) {
-                setResolvedRecords([]);
-                return;
-            }
-
-            setLoadingDetail(true);
-            try {
-                const results = await Promise.all(
-                    worklistItems.map(async (item) => {
-                        if (item.source_table === 'invoice_items') {
-                            const records = await InvoiceRepository.getByIdOrDocumentId(item.source_id);
-                            return records[0] || null;
-                        }
-                        return null;
-                    })
-                );
-                setResolvedRecords(results.filter(r => r !== null));
-            } catch (err) {
-                console.error('Failed to resolve worklist items', err);
-            } finally {
-                setLoadingDetail(false);
-            }
+    useEffect(() => {
+        loadWorklist();
+        window.addEventListener('db-updated', loadWorklist);
+        window.addEventListener('db-changed', loadWorklist);
+        return () => {
+            window.removeEventListener('db-updated', loadWorklist);
+            window.removeEventListener('db-changed', loadWorklist);
         };
+    }, []);
 
-        resolveAll();
-    }, [worklistItems]);
-
-    const handleRowClick = (item: WorklistEntry) => {
-        setSelectedDetailId(item.source_id);
+    const handleRemove = async (id: number) => {
+        await SystemRepository.executeRaw('DELETE FROM sys_worklist WHERE id = ?', [id]);
+        loadWorklist();
     };
 
-    const handleStatusUpdate = async (e: React.MouseEvent, item: WorklistEntry, status: WorklistStatus) => {
-        e.stopPropagation();
-        await WorklistRepository.updateStatus(item.source_table, item.source_id, status);
-        refresh();
-        window.dispatchEvent(new Event('db-updated'));
-    };
-
-    const columns: Column<WorklistEntry>[] = [
-        {
-            header: 'Status',
-            accessor: 'status',
-            render: (item: WorklistEntry) => {
-                const config: Record<WorklistStatus, { label: string; icon: any; color: string }> = {
-                    open: { label: 'Offen', icon: Bookmark, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800' },
-                    ok: { label: 'OK', icon: CheckCircle, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800' },
-                    error: { label: 'Fehlerhaft', icon: AlertCircle, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800' },
-                    clarification: { label: 'In Klärung', icon: HelpCircle, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800' }
-                };
-                const { label, icon: Icon, color } = config[item.status] || config.open;
-
-                return (
-                    <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider w-fit", color)}>
-                        <Icon className="w-3 h-3" />
-                        {label}
-                    </div>
-                );
-            }
-        },
-        {
-            header: 'Bezeichnung',
-            accessor: 'display_label',
-            className: 'w-[40%]',
-            render: (item: WorklistEntry) => (
-                <div className="flex flex-col gap-0.5">
-                    <span className="font-bold text-slate-900 dark:text-white line-clamp-1">
-                        {item.display_label}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-slate-400 font-medium">
-                            ID: {item.source_id}
-                        </span>
-                        <span className="text-[9px] px-1 bg-slate-100 dark:bg-slate-800 rounded font-black text-slate-500 uppercase">
-                            {item.source_table}
-                        </span>
-                    </div>
-                </div>
-            )
-        },
-        {
-            header: 'Kontext',
-            accessor: 'display_context',
-            render: (item: WorklistEntry) => (
-                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
-                    {item.display_context}
-                </span>
-            )
-        },
-        {
-            header: 'Aktionen',
-            accessor: 'id',
-            align: 'right',
-            render: (item: WorklistEntry) => (
-                <div className="flex justify-end gap-1.5">
-                    {/* Status Actions */}
-                    <div className="flex items-center gap-1 mr-2 pr-2 border-r border-slate-100 dark:border-slate-800">
-                        <button
-                            onClick={(e) => handleStatusUpdate(e, item, 'ok')}
-                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'ok' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40" : "text-slate-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600")}
-                            title="Als OK markieren"
-                        >
-                            <CheckCircle className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={(e) => handleStatusUpdate(e, item, 'error')}
-                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'error' ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40" : "text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600")}
-                            title="Als Fehlerhaft markieren"
-                        >
-                            <AlertCircle className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={(e) => handleStatusUpdate(e, item, 'clarification')}
-                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'clarification' ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40" : "text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600")}
-                            title="In Klärung setzen"
-                        >
-                            <HelpCircle className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={(e) => handleStatusUpdate(e, item, 'open')}
-                            className={cn("p-1.5 rounded-lg transition-colors", item.status === 'open' ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40" : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-600")}
-                            title="Status zurücksetzen (Offen)"
-                        >
-                            <RotateCcw className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <button
-                        onClick={() => handleRowClick(item)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                        title="Details öffnen"
-                    >
-                        <ExternalLink className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={(e) => handleRemove(e, item)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                        title="Entfernen"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                </div>
-            )
-        }
-    ];
-
-    const now = new Date();
-    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
-
-    if (loadingWorklistItems && !worklistItems) {
-        return (
-            <PageLayout
-                header={{
-                    title: 'Arbeitsvorrat',
-                    subtitle: 'Lade Einträge...',
-                    onBack,
-                }}
-                footer={footerText}
-                breadcrumbs={[
-                    { label: 'Arbeitsvorrat' }
-                ]}
-            >
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-            </PageLayout>
+    const handleOpenDetail = async (item: any) => {
+        const results = await SystemRepository.executeRaw(
+            `SELECT * FROM "${item.source_table}" WHERE id = ?`,
+            [item.source_id]
         );
-    }
+
+        if (results.length > 0) {
+            setSourceData(results);
+            setSelectedItem(item);
+            setIsDetailOpen(true);
+        } else {
+            // Even if deleted, maybe show the worklist item info? 
+            // For now, if source record is gone, we can still show the modal if we have a way to handle missing data.
+            // But RecordDetailModal expects source data.
+            setSourceData([{ id: item.source_id, _deleted: true, ...item }]);
+            setSelectedItem(item);
+            setIsDetailOpen(true);
+        }
+    };
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'done': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+            case 'in_progress': return <Clock className="w-4 h-4 text-blue-500" />;
+            case 'error': return <AlertCircle className="w-4 h-4 text-rose-500" />;
+            case 'obsolete': return <Circle className="w-4 h-4 text-slate-400 opacity-50" />;
+            default: return <Circle className="w-4 h-4 text-amber-500" />;
+        }
+    };
+
+    const filteredItems = items
+        .filter(item => filter === 'all' || item.status === filter)
+        .filter(item =>
+            item.display_label?.toLowerCase().includes(search.toLowerCase()) ||
+            item.source_table?.toLowerCase().includes(search.toLowerCase()) ||
+            item.comment?.toLowerCase().includes(search.toLowerCase())
+        );
 
     return (
         <PageLayout
             header={{
                 title: 'Arbeitsvorrat',
-                subtitle: `${worklistItems?.length || 0} Einträge markiert`,
-                onBack,
-                actions: (
-                    <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-black uppercase rounded-full border border-amber-200 dark:border-amber-800 flex items-center gap-1.5">
-                        <Bookmark className="w-3 h-3 fill-current" />
-                        {worklistItems?.length || 0} Einträge
-                    </span>
-                ),
+                subtitle: 'Gemerkte Datensätze und Prüfungsergebnisse',
+                onBack: () => window.history.back()
             }}
-            footer={footerText}
-            breadcrumbs={[
-                { label: 'Arbeitsvorrat' }
-            ]}
         >
-            <PageSection title="Datensätze" noPadding>
-                <DataTable
-                    data={worklistItems || []}
-                    columns={columns}
-                    emptyMessage="Dein Arbeitsvorrat ist aktuell leer. Markiere Datensätze in den Detail-Ansichten, um sie hier zu sammeln."
-                    onRowClick={handleRowClick}
-                />
-            </PageSection>
+            <div className="max-w-5xl mx-auto space-y-6">
+                {/* Filters & Search */}
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Suche..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 w-64 text-sm font-medium"
+                            />
+                        </div>
+                        <div className="flex items-center gap-1 p-1 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                            {[
+                                { id: 'all', label: 'Alle' },
+                                { id: 'pending', label: 'Offen' },
+                                { id: 'in_progress', label: 'In Arbeit' },
+                                { id: 'done', label: 'Erledigt' }
+                            ].map(f => (
+                                <button
+                                    key={f.id}
+                                    onClick={() => setFilter(f.id)}
+                                    className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${filter === f.id ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    {f.label.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-            <RecordDetailModal
-                isOpen={!!selectedDetailId}
-                onClose={() => setSelectedDetailId(null)}
-                items={resolvedRecords}
-                initialIndex={resolvedRecords.findIndex(r => r.id === selectedDetailId)}
-                title="Datensatz-Prüfung"
-                tableName="invoice_items"
-                schema={invoiceItemsSchema}
-            />
-
-            {/* Global Loading Spinner for resolving details */}
-            {loadingDetail && (
-                <div className="fixed inset-0 bg-white/40 dark:bg-slate-900/40 backdrop-blur-[1px] z-[100] flex items-center justify-center">
-                    <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col items-center gap-3">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <span className="text-xs font-bold text-slate-500">Lade Objektdaten...</span>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {filteredItems.length} Einträge gefunden
                     </div>
                 </div>
+
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+                        <div className="w-12 h-12 bg-slate-200 dark:bg-slate-800 rounded-full mb-4" />
+                        <div className="h-4 w-32 bg-slate-200 dark:bg-slate-800 rounded mb-2" />
+                        <div className="h-3 w-48 bg-slate-200 dark:bg-slate-800 rounded opacity-50" />
+                    </div>
+                ) : filteredItems.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-full mb-4">
+                            <ClipboardList className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Keine Einträge</h3>
+                        <p className="text-xs text-slate-500 max-w-xs text-center">
+                            Ihr Arbeitsvorrat ist aktuell leer oder durch die Filter eingeschränkt.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                        {filteredItems.map(item => (
+                            <div
+                                key={item.id}
+                                className={`
+                                    group flex items-center gap-4 p-4 bg-white dark:bg-slate-800/80 rounded-xl border transition-all hover:border-blue-300 dark:hover:border-blue-900 shadow-sm
+                                    ${!item._exists ? 'border-red-200 dark:border-red-900/40 bg-red-50/10' : 'border-slate-200 dark:border-slate-700'}
+                                `}
+                            >
+                                <div className="shrink-0">
+                                    {getStatusIcon(item.status)}
+                                </div>
+
+                                <div className="flex-1 min-w-0" onClick={() => handleOpenDetail(item)}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-blue-600 transition-colors">
+                                            {item.display_label || `Eintrag #${item.source_id}`}
+                                        </h4>
+                                        {!item._exists && (
+                                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-[9px] font-black text-red-600 dark:text-red-400 rounded uppercase tracking-tighter shadow-sm animate-pulse">
+                                                <AlertCircle className="w-2.5 h-2.5" /> Gelöscht
+                                            </span>
+                                        )}
+                                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700/50 text-[9px] font-bold text-slate-500 rounded uppercase tracking-wider">
+                                            {item.source_table}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-4 text-[11px] text-slate-500">
+                                        <span className="flex items-center gap-1">
+                                            <Tag className="w-3 h-3 opacity-60" /> {item.display_context}
+                                        </span>
+                                        {item.comment && (
+                                            <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 italic">
+                                                <MessageSquare className="w-3 h-3 opacity-60" /> Kommentar vorhanden
+                                            </span>
+                                        )}
+                                        <span className="flex items-center gap-1 ml-auto opacity-40">
+                                            {new Date(item.created_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => handleOpenDetail(item)}
+                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all"
+                                        title="Details öffnen"
+                                    >
+                                        <ExternalLink className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleRemove(item.id)}
+                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                        title="Vom Arbeitsvorrat entfernen"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {isDetailOpen && selectedItem && (
+                <RecordDetailModal
+                    isOpen={isDetailOpen}
+                    onClose={() => setIsDetailOpen(false)}
+                    items={sourceData}
+                    initialIndex={0}
+                    tableName={selectedItem.source_table}
+                    title={selectedItem.display_label}
+                />
             )}
         </PageLayout>
     );

@@ -1,7 +1,6 @@
 import React from 'react';
 import { AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import type { InvoiceItem } from '../../../types';
-import { usePseudonym } from '../../../hooks/usePseudonym';
 
 interface RecordComparisonProps {
     leftItem: InvoiceItem;
@@ -30,7 +29,6 @@ export const RecordComparison: React.FC<RecordComparisonProps> = ({
         return String(val);
     };
 
-    const { mask } = usePseudonym();
 
     return (
         <div className="overflow-hidden border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
@@ -58,12 +56,12 @@ export const RecordComparison: React.FC<RecordComparisonProps> = ({
                             </div>
 
                             <div className={`px-4 py-3 text-sm font-medium border-l border-slate-100 dark:border-slate-800 break-all ${hasDiff ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-400'}`}>
-                                {(key === 'VendorName' || key === 'Person') ? mask(String(leftVal), 'vendor') : formatValue(leftVal)}
+                                {formatValue(leftVal)}
                             </div>
 
                             <div className={`px-4 py-3 text-sm font-mono border-l border-slate-100 dark:border-slate-800 break-all flex items-center gap-2 ${hasDiff ? 'text-indigo-600 dark:text-indigo-400 font-black' : 'text-slate-600 dark:text-slate-400'}`}>
                                 {hasDiff && <ArrowRight className="w-3 h-3 text-amber-500 shrink-0" />}
-                                {(key === 'VendorName' || key === 'Person') ? mask(String(rightVal), 'vendor') : formatValue(rightVal)}
+                                {formatValue(rightVal)}
                             </div>
                         </div>
                     );

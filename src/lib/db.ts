@@ -7,17 +7,13 @@ let msgId = 0;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pending = new Map<number, { resolve: (val: any) => void, reject: (err: any) => void }>();
 
-// BroadcastChannel to warn about multiple tabs
-// Using v2 name to avoid cache issues from old logic
 const channel = new BroadcastChannel('itdashboard_db_v2');
 const conflictListeners = new Set<(hasConflict: boolean) => void>();
 
 let hasConflict = false;
 
 channel.onmessage = (event) => {
-    // console.log('[DB Sync] Received:', event.data);
     if (event.data === 'PING') {
-        // console.log('[DB Sync] Responding with PONG');
         channel.postMessage('PONG');
     } else if (event.data === 'PONG') {
         processTabConflict();
@@ -33,7 +29,6 @@ function processTabConflict() {
 
 export function onTabConflict(callback: (hasConflict: boolean) => void) {
     conflictListeners.add(callback);
-    // console.log('[DB Sync] Listener added. Current conflict state:', hasConflict);
     if (hasConflict) {
         callback(true);
     }
@@ -42,16 +37,11 @@ export function onTabConflict(callback: (hasConflict: boolean) => void) {
     };
 }
 
-// Check for other tabs immediately
 channel.postMessage('PING');
 
 function getWorker(): Promise<Worker> {
     if (!workerReadyPromise) {
         workerReadyPromise = new Promise((resolveWorker) => {
-            // Use navigator.locks to ensure only one tab/instance active at a time
-            // 'itdashboard_db_lifecycle' lock is held as long as the page is open.
-            // On reload, the browser releases the lock from the old page, allowing this new one to proceed.
-            // If another tab is holding it, we wait here until they close it.
             navigator.locks.request('itdashboard_db_lifecycle', async () => {
                 const w = new DBWorker();
                 w.onmessage = (e) => {
@@ -65,8 +55,6 @@ function getWorker(): Promise<Worker> {
                 };
                 worker = w;
                 resolveWorker(w);
-
-                // Hold lock until unload
                 await new Promise(() => { });
             });
         });
@@ -74,14 +62,12 @@ function getWorker(): Promise<Worker> {
     return workerReadyPromise;
 }
 
-// Handle graceful shutdown
 window.addEventListener('beforeunload', () => {
     if (worker) {
         worker.postMessage({ type: 'CLOSE' });
     }
 });
 
-// Handle HMR
 if (import.meta.hot) {
     import.meta.hot.dispose(() => {
         if (worker) {
@@ -101,9 +87,6 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
     });
 }
 
-/**
- * Centrally notifies the system about database changes (used for backup status)
- */
 export function notifyDbChange(count: number = 1, type: string = 'insert') {
     window.dispatchEvent(new CustomEvent('db-changed', {
         detail: { type, count }
@@ -119,29 +102,9 @@ export async function runQuery(sql: string, bind?: (string | number | null | und
     return send<DbRow[]>('EXEC', { sql, bind });
 }
 
-export async function bulkInsertInvoiceItems(data: DbRow[]) {
-    await initDB();
-    return send('BULK_INSERT_INVOICE_ITEMS', data);
-}
-
-export async function bulkInsertSystems(data: DbRow[]) {
-    await initDB();
-    return send('BULK_INSERT_SYSTEMS', data);
-}
-
 export async function clearDatabase() {
     await initDB();
     return send('CLEAR');
-}
-
-export async function clearSystemsTable() {
-    await initDB();
-    return send('CLEAR_SYSTEMS');
-}
-
-export async function clearInvoiceData() {
-    await initDB();
-    return send('CLEAR_INVOICE_DATA');
 }
 
 export async function clearTable(tableName: string) {
@@ -155,13 +118,12 @@ export async function exportDatabase(): Promise<Uint8Array> {
 }
 
 export async function importDatabase(buffer: ArrayBuffer) {
-    // No need to await initDB here as we might be overwriting a broken one
     await send('IMPORT', buffer);
 }
 
-export async function loadDemoData() {
+export async function loadDemoData(data?: any) {
     await initDB();
-    return send<number>('LOAD_DEMO');
+    return send<number>('LOAD_DEMO', data);
 }
 
 export async function exportDemoData(): Promise<any> {
@@ -179,40 +141,6 @@ export async function getDiagnostics() {
     return send('GET_DIAGNOSTICS');
 }
 
-export async function toggleWorklist(sourceTable: string, sourceId: number, label?: string, context?: string) {
-    await initDB();
-    const existing = await runQuery(
-        'SELECT id FROM worklist WHERE source_table = ? AND source_id = ?',
-        [sourceTable, sourceId]
-    );
-
-    let result;
-    if (existing.length > 0) {
-        result = await runQuery(
-            'DELETE FROM worklist WHERE source_table = ? AND source_id = ?',
-            [sourceTable, sourceId]
-        );
-    } else {
-        result = await runQuery(
-            'INSERT INTO worklist (source_table, source_id, display_label, display_context) VALUES (?, ?, ?, ?)',
-            [sourceTable, sourceId, label, context]
-        );
-    }
-    notifyDbChange();
-    return result;
-}
-
-export async function isInWorklist(sourceTable: string, sourceId: number): Promise<boolean> {
-    await initDB();
-    const result = await runQuery(
-        'SELECT id FROM worklist WHERE source_table = ? AND source_id = ?',
-        [sourceTable, sourceId]
-    );
-    return result.length > 0;
-}
-
-export async function getWorklistCount(): Promise<number> {
-    await initDB();
-    const result = await runQuery("SELECT COUNT(*) as count FROM worklist WHERE status = 'open'");
-    return (result[0]?.count as number) || 0;
+export function genericBulkInsert(tableName: string, records: any[]): Promise<number> {
+    return send<number>('GENERIC_BULK_INSERT', { tableName, records });
 }

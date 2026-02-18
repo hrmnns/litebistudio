@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Eye, EyeOff } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
@@ -28,7 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onToggleCollapse,
     onCloseMobile,
 }) => {
-    const { visibleSidebarComponentIds, isPrivacyMode, setPrivacyMode } = useDashboard();
+    const { visibleSidebarComponentIds } = useDashboard();
 
     // Map component names to Lucide icons
     const iconMap: Record<string, React.ReactNode> = {
@@ -53,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const staticBottomItems: NavItem[] = [
         { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: 'Data Management' },
+        { to: '/query', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: 'Query Builder' },
         { to: '/settings', icon: <Settings className="w-5 h-5 flex-shrink-0" />, label: 'Settings' },
     ];
 
@@ -106,26 +107,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     ))}
                 </nav>
 
-                <div className={`p-4 border-t border-slate-300 dark:border-slate-700 transition-all space-y-4 ${isCollapsed ? 'md:p-2' : ''}`}>
+                <div className={`p-4 py-5 border-t border-slate-300 dark:border-slate-700 transition-all space-y-4 ${isCollapsed ? 'md:p-2 md:py-4' : ''}`}>
 
-                    {/* Privacy Toggle */}
-                    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-2`}>
-                        <div className={`flex items-center gap-2 ${isCollapsed ? 'hidden' : 'flex'}`}>
-                            <div className={`p-1 rounded-md ${isPrivacyMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                                {isPrivacyMode ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                            </div>
-                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Privacy Mode</span>
-                        </div>
-                        <button
-                            onClick={() => setPrivacyMode(!isPrivacyMode)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${isPrivacyMode ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                            title={isPrivacyMode ? "Privacy Mode deaktivieren" : "Privacy Mode aktivieren"}
-                        >
-                            <span
-                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isPrivacyMode ? 'translate-x-4.5' : 'translate-x-1'}`}
-                            />
-                        </button>
-                    </div>
 
                     <SystemStatus isCollapsed={isCollapsed} />
                 </div>

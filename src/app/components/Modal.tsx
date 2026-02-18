@@ -1,15 +1,17 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     title: React.ReactNode;
     children: React.ReactNode;
+    noScroll?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, noScroll }) => {
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -35,8 +37,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
             />
 
             {/* Content */}
-            <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200 z-10">
-                <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+            <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200 z-10 overflow-hidden">
+                <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
                     <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                         {title}
                     </h3>
@@ -48,7 +50,10 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6">
+                <div className={cn(
+                    "flex-1 min-h-0 flex flex-col",
+                    !noScroll && "overflow-auto p-6"
+                )}>
                     {children}
                 </div>
             </div>

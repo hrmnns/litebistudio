@@ -1,5 +1,4 @@
-import React from 'react';
-import { Printer, FileSpreadsheet } from 'lucide-react';
+import { Printer, FileText } from 'lucide-react';
 
 interface ExportFABProps {
     onPdfExport?: () => void;
@@ -37,7 +36,7 @@ export const ExportFAB: React.FC<ExportFABProps> = ({
                         className="group relative flex items-center gap-2 px-4 py-3 bg-transparent text-white dark:text-slate-900 rounded-full hover:bg-slate-800 dark:hover:bg-slate-100 transition-all duration-300"
                         title="Export Excel (Download)"
                     >
-                        <FileSpreadsheet className="w-5 h-5 text-emerald-400 dark:text-emerald-600" />
+                        <FileText className="w-5 h-5 text-emerald-400 dark:text-emerald-600" />
                         <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-xs transition-all duration-500 ease-in-out font-black text-xs uppercase tracking-widest">
                             Excel
                         </span>

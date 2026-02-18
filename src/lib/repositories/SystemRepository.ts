@@ -1,73 +1,25 @@
 import { runQuery, notifyDbChange } from '../db';
-import type { SystemRecord, TableColumn } from '../../types';
+import type { TableColumn } from '../../types';
 import { isValidIdentifier } from '../utils';
 
 export const SystemRepository = {
-    async getAll(): Promise<SystemRecord[]> {
-        return await runQuery('SELECT * FROM systems ORDER BY sort_order ASC, name ASC') as unknown as SystemRecord[];
-    },
-
-    async getCount(): Promise<number> {
-        const result = await runQuery('SELECT COUNT(*) as count FROM systems');
-        return (result[0]?.count as number) || 0;
-    },
-
-    async add(system: Omit<SystemRecord, 'id' | 'sort_order' | 'is_favorite' | 'status'>): Promise<void> {
-        // Get max sort order
-        const maxSort = await runQuery('SELECT MAX(sort_order) as maxCorner FROM systems');
-        const nextSort = ((maxSort[0]?.maxCorner as number) || 0) + 1;
-
-        await runQuery(
-            `INSERT INTO systems (name, url, category, sort_order, is_favorite, status) VALUES (?, ?, ?, ?, ?, 'unknown')`,
-            [system.name, system.url, system.category, nextSort, 0]
-        );
-        notifyDbChange();
-    },
-
-    async update(id: number, system: Partial<SystemRecord>): Promise<void> {
-        const updates: string[] = [];
-        const params: (string | number | null)[] = [];
-
-        if (system.name !== undefined) { updates.push('name = ?'); params.push(system.name); }
-        if (system.url !== undefined) { updates.push('url = ?'); params.push(system.url); }
-        if (system.category !== undefined) { updates.push('category = ?'); params.push(system.category); }
-        if (system.sort_order !== undefined) { updates.push('sort_order = ?'); params.push(system.sort_order); }
-        if (system.is_favorite !== undefined) { updates.push('is_favorite = ?'); params.push(system.is_favorite); }
-
-        if (updates.length === 0) return;
-
-        params.push(id);
-        await runQuery(`UPDATE systems SET ${updates.join(', ')} WHERE id = ?`, params);
-        notifyDbChange();
-    },
-
-    async delete(id: number): Promise<void> {
-        await runQuery('DELETE FROM systems WHERE id = ?', [id]);
-        notifyDbChange();
-    },
-
-    async getFavorites(limit: number = 4): Promise<SystemRecord[]> {
-        return await runQuery('SELECT * FROM systems WHERE is_favorite = 1 ORDER BY sort_order ASC, name ASC LIMIT ?', [limit]) as unknown as SystemRecord[];
-    },
-
     async getDatabaseStats(): Promise<{ tables: number; records: number }> {
-        const tables = await runQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'") as { name: string }[];
+        const tables = await this.getTables();
         let totalRecords = 0;
         for (const table of tables) {
-            const countResult = await runQuery(`SELECT count(*) as count FROM ${table.name}`);
+            const countResult = await runQuery(`SELECT count(*) as count FROM "${table}"`);
             totalRecords += (countResult[0]?.count as number) || 0;
         }
         return { tables: tables.length, records: totalRecords };
     },
 
+    async getTotalRecordCount(): Promise<number> {
+        const stats = await this.getDatabaseStats();
+        return stats.records;
+    },
+
     async getDiagnostics(): Promise<any> {
-        // We need to bypass runQuery wrappers to hit the worker directly for this custom message type if possible,
-        // OR we can add a helper in db.ts. 
-        // For now, let's assume we update db.ts to expose a way, OR we cheat and use runQuery for parts of it?
-        // Actually, the cleanest way is to add a specific method in db.ts.
-        // Let's modify db.ts first to export `getDiagnostics`.
-        const result = await import('../db').then(m => m.getDiagnostics());
-        return result;
+        return await import('../db').then(m => m.getDiagnostics());
     },
 
     async getTables(): Promise<string[]> {
@@ -95,7 +47,6 @@ export const SystemRepository = {
 
             if (searchFilter) {
                 sql += ` WHERE ${searchFilter}`;
-                // Bind the search term for EACH filtered column
                 params.push(...Array(schema.filter(col => col.type.toUpperCase().includes('TEXT') || col.name.toLowerCase().includes('id') || col.name.toLowerCase().includes('name')).length).fill(searchTerm));
             }
         }
@@ -106,8 +57,117 @@ export const SystemRepository = {
         return await runQuery(sql, params);
     },
 
-    async executeRaw(sql: string): Promise<any[]> {
-        // Basic safety check could go here, but this is an admin tool
-        return await runQuery(sql);
+    async executeRaw(sql: string, bind?: any[]): Promise<any[]> {
+        const result = await runQuery(sql, bind);
+
+        // Simple heuristic to detect write operations
+        const upperSql = sql.trim().toUpperCase();
+        if (upperSql.startsWith('INSERT') ||
+            upperSql.startsWith('UPDATE') ||
+            upperSql.startsWith('DELETE') ||
+            upperSql.startsWith('DROP') ||
+            upperSql.startsWith('CREATE') ||
+            upperSql.startsWith('ALTER')) {
+            notifyDbChange();
+        }
+
+        return result;
+    },
+
+    async bulkInsert(tableName: string, records: any[]): Promise<number> {
+        const { genericBulkInsert } = await import('../db');
+        const count = await genericBulkInsert(tableName, records);
+        notifyDbChange(count);
+        return count;
+    },
+
+    // User Widgets (Generic BI)
+    async getUserWidgets(): Promise<any[]> {
+        return await runQuery('SELECT * FROM sys_user_widgets ORDER BY created_at DESC');
+    },
+
+    async saveUserWidget(widget: any): Promise<void> {
+        const existing = await runQuery('SELECT id FROM sys_user_widgets WHERE id = ?', [widget.id]);
+        if (existing.length > 0) {
+            await runQuery(
+                'UPDATE sys_user_widgets SET name = ?, description = ?, sql_query = ?, visualization_config = ?, visual_builder_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [widget.name, widget.description, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config), widget.id]
+            );
+        } else {
+            await runQuery(
+                'INSERT INTO sys_user_widgets (id, name, description, sql_query, visualization_config, visual_builder_config) VALUES (?, ?, ?, ?, ?, ?)',
+                [widget.id, widget.name, widget.description, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config)]
+            );
+        }
+        notifyDbChange();
+    },
+
+    async deleteUserWidget(id: string): Promise<void> {
+        await runQuery('DELETE FROM sys_user_widgets WHERE id = ?', [id]);
+        notifyDbChange();
+    },
+
+    // Dashboards (Multi-Dashboard Support)
+    async getDashboards(): Promise<any[]> {
+        return await runQuery('SELECT * FROM sys_dashboards ORDER BY created_at ASC');
+    },
+
+    async saveDashboard(dashboard: any): Promise<void> {
+        const existing = await runQuery('SELECT id FROM sys_dashboards WHERE id = ?', [dashboard.id]);
+        if (existing.length > 0) {
+            await runQuery(
+                'UPDATE sys_dashboards SET name = ?, layout = ?, is_default = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0, dashboard.id]
+            );
+        } else {
+            await runQuery(
+                'INSERT INTO sys_dashboards (id, name, layout, is_default) VALUES (?, ?, ?, ?)',
+                [dashboard.id, dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0]
+            );
+        }
+        notifyDbChange();
+    },
+
+    async deleteDashboard(id: string): Promise<void> {
+        await runQuery('DELETE FROM sys_dashboards WHERE id = ?', [id]);
+        notifyDbChange();
+    },
+
+    // Worklist Management
+    async getWorklist(): Promise<any[]> {
+        return await runQuery('SELECT * FROM sys_worklist ORDER BY created_at DESC');
+    },
+
+    async updateWorklistItem(id: number | string, data: { status?: string; comment?: string }): Promise<void> {
+        const fields: string[] = [];
+        const params: any[] = [];
+
+        if (data.status !== undefined) {
+            fields.push('status = ?');
+            params.push(data.status);
+        }
+        if (data.comment !== undefined) {
+            fields.push('comment = ?');
+            params.push(data.comment);
+        }
+
+        if (fields.length === 0) return;
+
+        fields.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(Number(id)); // Force number for ID consistency
+
+        const sql = `UPDATE sys_worklist SET ${fields.join(', ')} WHERE id = ?`;
+        await runQuery(sql, params);
+        notifyDbChange();
+    },
+
+    async checkRecordExists(tableName: string, id: string | number): Promise<boolean> {
+        if (!isValidIdentifier(tableName)) return false;
+        try {
+            const result = await runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ?`, [id]);
+            return result.length > 0;
+        } catch (e) {
+            return false;
+        }
     }
 };

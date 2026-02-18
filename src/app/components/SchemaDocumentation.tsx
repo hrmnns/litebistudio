@@ -8,10 +8,15 @@ interface SchemaDocumentationProps {
 }
 
 export const SchemaTable: React.FC<{ schema: any }> = ({ schema }) => {
-    if (!schema || !schema.items || !schema.items.properties) return null;
+    if (!schema) return null;
 
-    const properties = schema.items.properties;
-    const required = schema.items.required || [];
+    // Handle both array/list schemas (with .items) and direct object schemas
+    const target = schema.items || schema;
+    const properties = target.properties;
+    const required = target.required || [];
+
+    if (!properties) return <div className="p-4 text-center text-slate-400 italic text-sm">Keine Feld-Informationen verfügbar.</div>;
+
     const propertyEntries = Object.entries(properties);
 
     return (
@@ -78,12 +83,16 @@ export const SchemaTable: React.FC<{ schema: any }> = ({ schema }) => {
 export const SchemaDocumentation: React.FC<SchemaDocumentationProps> = ({ schema, title }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    if (!schema || !schema.items || !schema.items.properties) {
-        return <div className="text-slate-500 italic">Invalid schema format.</div>;
+    if (!schema) {
+        return <div className="text-slate-500 italic">Kein Schema vorhanden.</div>;
     }
 
-    const properties = schema.items.properties;
-    const required = schema.items.required || [];
+    const target = schema.items || schema;
+    const properties = target.properties;
+    const required = target.required || [];
+
+    if (!properties) return null;
+
     const propertyEntries = Object.entries(properties);
 
     return (

@@ -1,4 +1,4 @@
-import { useDashboard } from '../../lib/context/DashboardContext';
+import { useDashboard } from '../lib/context/DashboardContext';
 
 export const useBackupStatus = () => {
     const { lastBackup, changeCount, markBackupComplete } = useDashboard();
