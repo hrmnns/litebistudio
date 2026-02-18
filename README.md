@@ -2,8 +2,6 @@
 
 A high-performance, browser-based business intelligence platform with local SQLite persistence and no-code reporting capabilities.
 
-![LiteBI Studio Preview](https://via.placeholder.com/800x400?text=LiteBI+Studio+Preview)
-
 ## 🚀 Key Features
 
 - **Multi-Dashboard Support**: Create, manage, and arrange multiple dashboards with a drag-and-drop grid system.
