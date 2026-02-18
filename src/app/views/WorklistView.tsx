@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ClipboardList, Trash2, ExternalLink, AlertCircle, CheckCircle2, Circle, Clock, Tag, Search, MessageSquare } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { PageLayout } from '../components/ui/PageLayout';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 
 export const WorklistView: React.FC = () => {
+    const { t } = useTranslation();
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
@@ -85,8 +87,8 @@ export const WorklistView: React.FC = () => {
     return (
         <PageLayout
             header={{
-                title: 'Arbeitsvorrat',
-                subtitle: 'Gemerkte Datensätze und Prüfungsergebnisse',
+                title: t('sidebar.worklist'),
+                subtitle: t('worklist.subtitle'),
                 onBack: () => window.history.back()
             }}
         >
@@ -98,7 +100,7 @@ export const WorklistView: React.FC = () => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Suche..."
+                                placeholder={t('common.search')}
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 className="pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 w-64 text-sm font-medium"
@@ -106,10 +108,10 @@ export const WorklistView: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1 p-1 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
                             {[
-                                { id: 'all', label: 'Alle' },
-                                { id: 'pending', label: 'Offen' },
-                                { id: 'in_progress', label: 'In Arbeit' },
-                                { id: 'done', label: 'Erledigt' }
+                                { id: 'all', label: t('worklist.filter_all') },
+                                { id: 'pending', label: t('worklist.filter_pending') },
+                                { id: 'in_progress', label: t('worklist.filter_in_prog') },
+                                { id: 'done', label: t('worklist.filter_done') }
                             ].map(f => (
                                 <button
                                     key={f.id}
@@ -123,7 +125,7 @@ export const WorklistView: React.FC = () => {
                     </div>
 
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        {filteredItems.length} Einträge gefunden
+                        {t('worklist.found_count', { count: filteredItems.length })}
                     </div>
                 </div>
 
@@ -138,9 +140,9 @@ export const WorklistView: React.FC = () => {
                         <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-full mb-4">
                             <ClipboardList className="w-8 h-8 text-slate-300" />
                         </div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Keine Einträge</h3>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">{t('worklist.empty_msg')}</h3>
                         <p className="text-xs text-slate-500 max-w-xs text-center">
-                            Ihr Arbeitsvorrat ist aktuell leer oder durch die Filter eingeschränkt.
+                            {t('worklist.empty_hint')}
                         </p>
                     </div>
                 ) : (
@@ -160,11 +162,11 @@ export const WorklistView: React.FC = () => {
                                 <div className="flex-1 min-w-0" onClick={() => handleOpenDetail(item)}>
                                     <div className="flex items-center gap-2 mb-1">
                                         <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-blue-600 transition-colors">
-                                            {item.display_label || `Eintrag #${item.source_id}`}
+                                            {item.display_label || t('worklist.entry_id', { id: item.source_id })}
                                         </h4>
                                         {!item._exists && (
                                             <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-[9px] font-black text-red-600 dark:text-red-400 rounded uppercase tracking-tighter shadow-sm animate-pulse">
-                                                <AlertCircle className="w-2.5 h-2.5" /> Gelöscht
+                                                <AlertCircle className="w-2.5 h-2.5" /> {t('common.deleted')}
                                             </span>
                                         )}
                                         <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700/50 text-[9px] font-bold text-slate-500 rounded uppercase tracking-wider">
@@ -177,7 +179,7 @@ export const WorklistView: React.FC = () => {
                                         </span>
                                         {item.comment && (
                                             <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 italic">
-                                                <MessageSquare className="w-3 h-3 opacity-60" /> Kommentar vorhanden
+                                                <MessageSquare className="w-3 h-3 opacity-60" /> {t('worklist.comment_present')}
                                             </span>
                                         )}
                                         <span className="flex items-center gap-1 ml-auto opacity-40">
@@ -190,14 +192,14 @@ export const WorklistView: React.FC = () => {
                                     <button
                                         onClick={() => handleOpenDetail(item)}
                                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all"
-                                        title="Details öffnen"
+                                        title={t('worklist.details_btn')}
                                     >
                                         <ExternalLink className="w-4 h-4" />
                                     </button>
                                     <button
                                         onClick={() => handleRemove(item.id)}
                                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                        title="Vom Arbeitsvorrat entfernen"
+                                        title={t('worklist.remove_btn')}
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>

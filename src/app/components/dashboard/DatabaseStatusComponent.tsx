@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Database, Save, AlertCircle, Settings } from 'lucide-react';
 import { DashboardComponent } from '../ui/DashboardComponent';
 import { useBackupStatus } from '../../../hooks/useBackupStatus';
@@ -18,11 +19,12 @@ export const DatabaseStatusComponent: React.FC<DatabaseStatusComponentProps> = (
     targetView,
     isOverlay
 }) => {
+    const { t, i18n } = useTranslation();
     const { lastBackup, changeCount, isBackupRecommended } = useBackupStatus();
 
     const formatDate = (date: Date | null) => {
-        if (!date) return 'Nie';
-        return date.toLocaleString('de-DE', {
+        if (!date) return t('widgets.database_status.never');
+        return date.toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-US', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -38,7 +40,7 @@ export const DatabaseStatusComponent: React.FC<DatabaseStatusComponentProps> = (
 
     return (
         <DashboardComponent
-            title="Datenbank Status"
+            title={t('widgets.database_status.title')}
             icon={Database}
             iconColor={isBackupRecommended ? "amber" : "emerald"}
             onRemove={onRemove}
@@ -52,7 +54,7 @@ export const DatabaseStatusComponent: React.FC<DatabaseStatusComponentProps> = (
                     onClick={handleNavigate}
                     className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors group/footer"
                 >
-                    Datenverwaltung
+                    {t('widgets.database_status.data_management')}
                     <Settings className="w-3 h-3 transition-transform group-hover/footer:rotate-90" />
                 </button>
             }
@@ -62,7 +64,7 @@ export const DatabaseStatusComponent: React.FC<DatabaseStatusComponentProps> = (
                 <div className="text-center">
                     <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">
                         <Save className="w-3 h-3" />
-                        <span>Letztes Backup</span>
+                        <span>{t('widgets.database_status.last_backup')}</span>
                     </div>
                     <div className="text-xl font-black text-slate-900 dark:text-white tracking-tight tabular-nums leading-none">
                         {formatDate(lastBackup)}
@@ -74,14 +76,14 @@ export const DatabaseStatusComponent: React.FC<DatabaseStatusComponentProps> = (
                     <div className={`flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-1 ${isBackupRecommended ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                         }`}>
                         {isBackupRecommended ? <AlertCircle className="w-3 h-3" /> : <Database className="w-3 h-3" />}
-                        <span>Änderungen</span>
+                        <span>{t('widgets.database_status.modifications')}</span>
                     </div>
                     <div className={`text-4xl font-black tabular-nums leading-none tracking-tighter ${isBackupRecommended ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'
                         }`}>
                         {changeCount}
                     </div>
                     <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">
-                        Datensätze seit Backup
+                        {t('widgets.database_status.records_since_backup')}
                     </div>
                 </div>
             </div>

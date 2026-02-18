@@ -1,6 +1,6 @@
-import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
@@ -28,7 +28,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onToggleCollapse,
     onCloseMobile,
 }) => {
+    const { t, i18n } = useTranslation();
     const { visibleSidebarComponentIds } = useDashboard();
+
+    const toggleLanguage = () => {
+        const nextLng = i18n.language.startsWith('de') ? 'en' : 'de';
+        i18n.changeLanguage(nextLng);
+    };
 
     // Map component names to Lucide icons
     const iconMap: Record<string, React.ReactNode> = {
@@ -40,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
 
     const staticTopItems: NavItem[] = [
-        { to: '/', icon: <LayoutDashboard className="w-5 h-5 flex-shrink-0" />, label: 'Overview' },
+        { to: '/', icon: <LayoutDashboard className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.dashboard') },
     ];
 
     const dynamicItems: NavItem[] = COMPONENTS
@@ -48,13 +54,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .map(comp => ({
             to: comp.targetView!,
             icon: iconMap[comp.component] || <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
-            label: comp.title
+            label: t(`sidebar.${comp.id.replace(/-/g, '_')}`, comp.title)
         }));
 
     const staticBottomItems: NavItem[] = [
-        { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: 'Data Management' },
-        { to: '/query', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: 'Query Builder' },
-        { to: '/settings', icon: <Settings className="w-5 h-5 flex-shrink-0" />, label: 'Settings' },
+        { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.datasource') },
+        { to: '/query', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.query_builder') },
+        { to: '/settings', icon: <Settings className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.settings') },
     ];
 
     return (
@@ -72,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
                             IT <span className="text-blue-600">Dashboard</span>
                         </h1>
-                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest whitespace-nowrap">Analytics Platform</p>
+                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest whitespace-nowrap">{t('sidebar.analytics_platform')}</p>
                     </div>
                 </div>
                 <button onClick={onCloseMobile} className="md:hidden p-1 text-slate-500 hover:text-slate-700">
@@ -108,7 +114,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </nav>
 
                 <div className={`p-4 py-5 border-t border-slate-300 dark:border-slate-700 transition-all space-y-4 ${isCollapsed ? 'md:p-2 md:py-4' : ''}`}>
-
+                    <button
+                        onClick={toggleLanguage}
+                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
+                        title={i18n.language.startsWith('de') ? 'Switch to English' : 'Auf Deutsch umstellen'}
+                    >
+                        <Globe className="w-5 h-5 flex-shrink-0" />
+                        <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>
+                            {i18n.language.startsWith('de') ? 'English' : 'Deutsch'}
+                        </span>
+                    </button>
 
                     <SystemStatus isCollapsed={isCollapsed} />
                 </div>

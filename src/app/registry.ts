@@ -18,18 +18,18 @@ export const COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
 
 export interface SystemWidgetMetadata {
     id: string;
-    title: string;
-    description: string;
+    titleKey: string;
+    descriptionKey: string;
     icon: LucideIcon;
     defaultColSpan?: number;
 }
 
 export const SYSTEM_WIDGETS: SystemWidgetMetadata[] = [
-    { id: 'SystemStatusComponent', title: 'System-Status', description: 'Gesundheitsstatus der Plattform', icon: Activity, defaultColSpan: 1 },
-    { id: 'DataInspectorComponent', title: 'Data Inspector', description: 'Direkter Zugriff auf Tabellendaten', icon: Search, defaultColSpan: 1 },
-    { id: 'DatabaseStatusComponent', title: 'Datenbank-Info', description: 'Speichernutzung und Statistiken', icon: HardDrive, defaultColSpan: 1 },
-    { id: 'ClockComponent', title: 'Uhrzeit', description: 'Einfache Uhr', icon: Clock, defaultColSpan: 1 },
-    { id: 'WorklistComponent', title: 'Arbeitsvorrat', description: 'Statistik gemerkter Datensätze', icon: ClipboardList, defaultColSpan: 1 },
+    { id: 'SystemStatusComponent', titleKey: 'widgets.system_status.title', descriptionKey: 'widgets.system_status.description', icon: Activity, defaultColSpan: 1 },
+    { id: 'DataInspectorComponent', titleKey: 'widgets.data_inspector.title', descriptionKey: 'widgets.data_inspector.description', icon: Search, defaultColSpan: 1 },
+    { id: 'DatabaseStatusComponent', titleKey: 'widgets.database_status.title', descriptionKey: 'widgets.database_status.description', icon: HardDrive, defaultColSpan: 1 },
+    { id: 'ClockComponent', titleKey: 'widgets.clock.title', descriptionKey: 'widgets.clock.description', icon: Clock, defaultColSpan: 1 },
+    { id: 'WorklistComponent', titleKey: 'widgets.worklist.title', descriptionKey: 'widgets.worklist.description', icon: ClipboardList, defaultColSpan: 1 },
 ];
 
 export const getComponent = (name: string) => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
@@ -83,6 +84,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     className,
     fillHeight,
 }) => {
+    const { t } = useTranslation();
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
@@ -93,7 +95,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             <button
                                 onClick={header.onBack}
                                 className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-all"
-                                title="Zurück"
+                                title={t('common.back')}
                             >
                                 <ArrowLeft className="w-4 h-4" />
                             </button>

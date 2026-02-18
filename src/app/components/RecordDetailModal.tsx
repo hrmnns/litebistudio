@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from './Modal';
 import { ChevronLeft, ChevronRight, Info, Bookmark, Target, AlertCircle } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -20,10 +21,11 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     onClose,
     items,
     initialIndex = 0,
-    title = "Datensatz-Details",
+    title,
     tableName,
     schema
 }) => {
+    const { t } = useTranslation();
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [previousIndex, setPreviousIndex] = useState<number | null>(null);
     const [referenceIndex, setReferenceIndex] = useState<number | null>(null);
@@ -32,6 +34,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     const [worklistItem, setWorklistItem] = useState<any>(null);
     const [recordExists, setRecordExists] = useState<boolean | null>(null);
     const [resolvedSchema, setResolvedSchema] = useState<any>(null);
+
+    const modalTitle = title || t('record_detail.title');
 
     // Get table name context
     const activeTable = tableName || 'unknown';
@@ -70,13 +74,13 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 const cols = await SystemRepository.getTableSchema(tableName);
                 if (cols && cols.length > 0) {
                     const dynamicSchema = {
-                        title: `Tabelle: ${tableName}`,
-                        description: `Schema-Informationen für die Tabelle "${tableName}".`,
+                        title: `${t('datasource.tab_structure')}: ${tableName}`,
+                        description: t('datasource.user_tables_hint'),
                         type: 'object',
                         properties: cols.reduce((acc, col) => {
                             acc[col.name] = {
                                 type: col.type.toLowerCase().includes('int') || col.type.toLowerCase().includes('real') ? 'number' : 'string',
-                                description: `Feld: ${col.name} (Typ: ${col.type})`
+                                description: `${col.name} (${col.type})`
                             };
                             return acc;
                         }, {} as any)
@@ -90,7 +94,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         } else {
             setResolvedSchema(null);
         }
-    }, [isOpen, tableName, schema]);
+    }, [isOpen, tableName, schema, t]);
 
     // Check if current item is in worklist and if it exists
     useEffect(() => {
@@ -123,7 +127,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         if (!currentItem?.id) return;
 
         // Label: Use Description or fallback to ID
-        const label = currentItem.Description || currentItem.VendorName || `Eintrag #${currentItem.id}`;
+        const label = currentItem.Description || currentItem.VendorName || t('worklist.entry_id', { id: currentItem.id });
         // Context: Use Period or Table
         const context = currentItem.Period || activeTable;
 
@@ -191,8 +195,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 isOpen={isOpen}
                 onClose={onClose}
                 title={items.length > 1
-                    ? `${title} (${currentIndex + 1} von ${items.length})`
-                    : title
+                    ? `${modalTitle} (${currentIndex + 1} / ${items.length})`
+                    : modalTitle
                 }
                 noScroll
             >
@@ -204,7 +208,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 <button
                                     onClick={() => setHelpOpen(true)}
                                     className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-500"
-                                    title="Schema-Definition anzeigen"
+                                    title={t('record_detail.schema_definition')}
                                 >
                                     <Info className="w-4 h-4" />
                                 </button>
@@ -215,7 +219,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                     ? 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
                                     : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
                                     }`}
-                                title={isInWorklist ? "Vom Arbeitsvorrat entfernen" : "Zum Arbeitsvorrat hinzufügen"}
+                                title={isInWorklist ? t('record_detail.remove_worklist') : t('record_detail.add_worklist')}
                             >
                                 <Bookmark className={`w-4 h-4 ${isInWorklist ? 'fill-current' : ''}`} />
                             </button>
@@ -228,7 +232,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                     ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
                                     : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
                                     }`}
-                                title={isCurrentReference ? "Referenz-Modus beenden" : "Als Referenz für Vergleich setzen"}
+                                title={isCurrentReference ? t('record_detail.clear_reference') : t('record_detail.set_reference')}
                             >
                                 <Target className={`w-4 h-4 ${isReferenceActive ? 'fill-current' : ''}`} />
                                 {isReferenceActive && !isCurrentReference && (
@@ -241,14 +245,14 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 
                             <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">
-                                Navigieren
+                                {t('record_detail.navigation')}
                             </div>
                         </div>
 
                         <div className="flex items-center gap-2">
                             {recordExists === false && (
                                 <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg text-[10px] font-black animate-pulse">
-                                    <AlertCircle className="w-3.5 h-3.5" /> GELOESCHT
+                                    <AlertCircle className="w-3.5 h-3.5" /> {t('record_detail.deleted_badge')}
                                 </div>
                             )}
                             <button
@@ -276,7 +280,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                         <div className="shrink-0 px-6 py-4 bg-amber-50/30 dark:bg-amber-900/5 border-b border-slate-200 dark:border-slate-700 space-y-3">
                             <div className="flex items-start gap-4">
                                 <div className="w-48 shrink-0">
-                                    <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">Bearbeitungsstatus</label>
+                                    <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.status_label')}</label>
                                     <select
                                         value={worklistItem?.status || 'pending'}
                                         onChange={async (e) => {
@@ -294,15 +298,15 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         }}
                                         className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
                                     >
-                                        <option value="pending">Offen / Neu</option>
-                                        <option value="in_progress">In Arbeit</option>
-                                        <option value="error">Fehlerhaft</option>
-                                        <option value="obsolete">Obsolet</option>
-                                        <option value="done">Abgeschlossen (OK)</option>
+                                        <option value="pending">{t('record_detail.status_pending')}</option>
+                                        <option value="in_progress">{t('record_detail.status_in_progress')}</option>
+                                        <option value="error">{t('record_detail.status_error')}</option>
+                                        <option value="obsolete">{t('record_detail.status_obsolete')}</option>
+                                        <option value="done">{t('record_detail.status_done')}</option>
                                     </select>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">Bemerkung / Notiz</label>
+                                    <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.comment_label')}</label>
                                     <textarea
                                         value={worklistItem?.comment || ''}
                                         onChange={(e) => setWorklistItem({ ...worklistItem, comment: e.target.value })}
@@ -317,7 +321,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                                 }
                                             }
                                         }}
-                                        placeholder="Geben Sie hier Ihre Notizen oder Prüfungsergebnisse ein..."
+                                        placeholder={t('record_detail.comment_placeholder')}
                                         className="w-full p-2 h-[37px] bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/20 transition-all resize-none overflow-hidden hover:overflow-y-auto"
                                     />
                                 </div>
@@ -330,9 +334,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                         {isReferenceActive && !isCurrentReference && (
                             <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg px-3 py-2 text-[10px] text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-6">
                                 <Target className="w-3.5 h-3.5" />
-                                <span className="font-bold">Vergleich aktiv:</span>
+                                <span className="font-bold">{t('record_detail.comparison_active')}</span>
                                 <span>
-                                    Unterschiede werden relativ zu <span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">#{items[referenceIndex].id || referenceIndex + 1}</span> angezeigt.
+                                    {t('record_detail.differences_relative', { id: items[referenceIndex].id || referenceIndex + 1 })}
                                 </span>
                             </div>
                         )}
@@ -362,7 +366,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         </dt>
                                         <dd className={`text-sm font-semibold break-all ${isChanged ? 'text-amber-900 dark:text-amber-100' : 'text-slate-900 dark:text-white'}`}>
                                             {value === null || value === undefined || value === '' ? (
-                                                <span className="text-slate-300 italic">&lt;leer&gt;</span>
+                                                <span className="text-slate-300 italic">{t('record_detail.empty_value')}</span>
                                             ) : (
                                                 String(value)
                                             )}
@@ -383,7 +387,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     <Modal
                         isOpen={helpOpen}
                         onClose={() => setHelpOpen(false)}
-                        title={resolvedSchema.title || 'Datensatz-Definition'}
+                        title={resolvedSchema.title || modalTitle}
                     >
                         <div className="space-y-6">
                             <p className="text-sm text-slate-500 dark:text-slate-400 italic">
@@ -394,7 +398,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 onClick={() => setHelpOpen(false)}
                                 className="w-full py-2.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-bold text-xs transition-opacity hover:opacity-90 mt-4"
                             >
-                                Schließen
+                                {t('record_detail.close')}
                             </button>
                         </div>
                     </Modal>

@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Activity, Zap, Cpu } from 'lucide-react';
 import { DashboardComponent } from '../ui/DashboardComponent';
 import { SystemHealthModal } from '../SystemHealthModal';
 
 export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
+    const { t } = useTranslation();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // We can use the same metrics logic or simplify it. 
-    // For consistency, let's keep the lightweight display but make the click open the modal.
-
-    // Reuse existing memory logic maybe? Or just keep it as is, but handle the click.
     const [memory, setMemory] = useState<{ used: number; total: number } | null>(null);
     const [loadTime, setLoadTime] = useState<number | null>(null);
 
@@ -39,13 +37,13 @@ export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandle
     return (
         <>
             <DashboardComponent
-                title="System Status"
+                title={t('widgets.system_status.title')}
                 icon={Activity}
                 iconColor="emerald"
                 onRemove={onRemove}
                 dragHandleProps={dragHandleProps}
                 onClick={handleClick}
-                targetView={targetView} // likely undefined, which is fine
+                targetView={targetView}
                 backgroundIcon={Activity}
                 className="cursor-pointer"
                 footerLeft={
@@ -56,7 +54,7 @@ export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandle
                         }}
                         className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors group/footer"
                     >
-                        Details
+                        {t('widgets.system_status.details')}
                         <Activity className="w-3 h-3 transition-transform group-hover/footer:scale-110" />
                     </button>
                 }
@@ -66,13 +64,13 @@ export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandle
                     <div className="text-center group-hover:scale-105 transition-transform duration-500">
                         <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1">
                             <Cpu className="w-3 h-3" />
-                            <span>Memory Usage</span>
+                            <span>{t('widgets.system_status.memory_usage')}</span>
                         </div>
                         <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums leading-none">
                             {memory ? `${memory.used} MB` : '---'}
                         </div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">
-                            von {memory ? memory.total : '---'} MB Heap
+                            {t('widgets.system_status.heap_from', { total: memory ? memory.total : '---' })}
                         </div>
                     </div>
 
@@ -80,7 +78,7 @@ export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandle
                     <div className="w-full pt-4 border-t border-slate-200 dark:border-slate-800/50 text-center">
                         <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mb-1">
                             <Zap className="w-3 h-3" />
-                            <span>Load Time</span>
+                            <span>{t('widgets.system_status.load_time')}</span>
                         </div>
                         <div className="text-2xl font-black text-slate-700 dark:text-slate-300 tabular-nums leading-none">
                             {loadTime ? `${loadTime} ms` : '---'}

@@ -1,5 +1,5 @@
-
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { Play, Save, BarChart2, Table as TableIcon, TrendingUp, AlertCircle, Layout, Maximize2, Minimize2, Settings, History, Folder, Trash2, Edit3, X, Check, Download } from 'lucide-react';
@@ -30,6 +30,7 @@ interface WidgetConfig {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
 export const QueryBuilderView: React.FC = () => {
+    const { t } = useTranslation();
     const [sql, setSql] = useState('SELECT * FROM invoice_items LIMIT 10');
     const [results, setResults] = useState<any[]>([]);
     const [error, setError] = useState('');
@@ -160,15 +161,15 @@ export const QueryBuilderView: React.FC = () => {
             setSaveModalOpen(false);
             if (!activeWidgetId) setWidgetName('');
             refreshWidgets();
-            alert(activeWidgetId ? 'Widget aktualisiert!' : 'Widget gespeichert!');
+            alert(activeWidgetId ? t('querybuilder.success_update') : t('querybuilder.success_save'));
             setActiveWidgetId(widget.id);
         } catch (err: any) {
-            alert('Fehler beim Speichern: ' + err.message);
+            alert(t('querybuilder.error_save') + err.message);
         }
     };
 
     const deleteWidget = async (id: string) => {
-        if (confirm('Diesen Bericht wirklich löschen?')) {
+        if (confirm(t('dashboard.confirm_delete_report'))) {
             await SystemRepository.deleteUserWidget(id);
             refreshWidgets();
             if (activeWidgetId === id) {
@@ -194,14 +195,14 @@ export const QueryBuilderView: React.FC = () => {
     return (
         <PageLayout
             header={{
-                title: 'Abfrage & Reporting Builder',
-                subtitle: 'Erstellen Sie SQL-Abfragen und Visualisierungen.',
+                title: t('sidebar.query_builder'),
+                subtitle: t('querybuilder.subtitle'),
                 actions: (
                     <div className="flex items-center gap-2">
                         <button
                             onClick={togglePresentationMode}
                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                            title="Präsentationsmodus"
+                            title={t('dashboard.presentation_mode')}
                         >
                             <Maximize2 className="w-5 h-5" />
                         </button>
@@ -211,14 +212,14 @@ export const QueryBuilderView: React.FC = () => {
                             className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
                         >
                             <Download className="w-4 h-4" />
-                            {isExporting ? 'Export...' : 'PDF'}
+                            {isExporting ? t('common.exporting') : t('common.export_pdf')}
                         </button>
                         {activeWidgetId && (
                             <button
                                 onClick={() => setActiveWidgetId(null)}
                                 className="px-4 py-2 text-slate-400 hover:text-slate-600 font-medium text-sm transition-colors"
                             >
-                                Neu erstellen
+                                {t('querybuilder.new_report')}
                             </button>
                         )}
                         <button
@@ -227,7 +228,7 @@ export const QueryBuilderView: React.FC = () => {
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
                         >
                             <Save className="w-4 h-4" />
-                            {activeWidgetId ? 'Aktualisieren' : 'Als Widget speichern'}
+                            {activeWidgetId ? t('querybuilder.update_widget') : t('querybuilder.save_as_widget')}
                         </button>
                     </div>
                 )
@@ -244,19 +245,19 @@ export const QueryBuilderView: React.FC = () => {
                                     onClick={() => setSidebarTab('archive')}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'archive' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    <Folder className="w-4 h-4" /> Archiv
+                                    <Folder className="w-4 h-4" /> {t('querybuilder.archive')}
                                 </button>
                                 <button
                                     onClick={() => setSidebarTab('query')}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'query' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    <History className="w-4 h-4" /> Abfrage
+                                    <History className="w-4 h-4" /> {t('querybuilder.query')}
                                 </button>
                                 <button
                                     onClick={() => setSidebarTab('vis')}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'vis' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    <Settings className="w-4 h-4" /> Grafik
+                                    <Settings className="w-4 h-4" /> {t('querybuilder.graph')}
                                 </button>
                             </div>
 
@@ -264,7 +265,7 @@ export const QueryBuilderView: React.FC = () => {
                                 {sidebarTab === 'archive' ? (
                                     <div className="space-y-2 animate-in fade-in duration-300">
                                         <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
-                                            Gespeicherte Berichte
+                                            {t('querybuilder.saved_reports')}
                                             <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">{savedWidgets?.length || 0}</span>
                                         </h3>
                                         <div className="space-y-1">
@@ -279,6 +280,7 @@ export const QueryBuilderView: React.FC = () => {
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }}
                                                             className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"
+                                                            title={t('common.delete')}
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
@@ -294,7 +296,7 @@ export const QueryBuilderView: React.FC = () => {
                                             {(!savedWidgets || savedWidgets.length === 0) && (
                                                 <div className="p-8 text-center border-2 border-dashed border-slate-100 rounded-xl text-slate-300">
                                                     <Folder className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                                    <p className="text-[10px] font-black uppercase">Noch keine Berichte</p>
+                                                    <p className="text-[10px] font-black uppercase">{t('dashboard.no_reports')}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -305,7 +307,7 @@ export const QueryBuilderView: React.FC = () => {
                                             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 flex items-center justify-between">
                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                     <Edit3 className="w-4 h-4 flex-shrink-0" />
-                                                    <span className="text-xs font-bold truncate">Bearbeite: {widgetName}</span>
+                                                    <span className="text-xs font-bold truncate">{t('querybuilder.editing', { name: widgetName })}</span>
                                                 </div>
                                                 <button onClick={() => setActiveWidgetId(null)} className="p-1 hover:bg-amber-100 rounded text-amber-500"><X className="w-3.5 h-3.5" /></button>
                                             </div>
@@ -316,20 +318,20 @@ export const QueryBuilderView: React.FC = () => {
                                                 onClick={() => setBuilderMode('visual')}
                                                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${builderMode === 'visual' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                                             >
-                                                <Layout className="w-3.5 h-3.5" /> Visual Builder
+                                                <Layout className="w-3.5 h-3.5" /> {t('querybuilder.visual_builder')}
                                             </button>
                                             <button
                                                 onClick={() => setBuilderMode('sql')}
                                                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${builderMode === 'sql' ? 'bg-slate-900 dark:bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
                                             >
-                                                <span className="font-mono text-[10px]">SQL</span> Direct Editor
+                                                <span className="font-mono text-[10px]">SQL</span> {t('querybuilder.direct_editor')}
                                             </button>
                                         </div>
 
                                         <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-2">
                                             {builderMode === 'sql' ? (
                                                 <>
-                                                    <label className="text-[10px] font-black uppercase text-slate-400 text-left">SQL Abfrage</label>
+                                                    <label className="text-[10px] font-black uppercase text-slate-400 text-left">{t('querybuilder.sql_query')}</label>
                                                     <textarea
                                                         value={sql}
                                                         onChange={e => setSql(e.target.value)}
@@ -353,7 +355,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs transition-all shadow-md shadow-blue-200 disabled:opacity-50"
                                                 >
                                                     <Play className="w-3.5 h-3.5" />
-                                                    {loading ? 'Laden...' : 'Anwenden'}
+                                                    {loading ? t('common.loading') : t('querybuilder.apply')}
                                                 </button>
                                             </div>
                                         </div>
@@ -363,16 +365,16 @@ export const QueryBuilderView: React.FC = () => {
                                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-4 animate-in slide-in-from-right-4 duration-300">
                                         <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2">
                                             <Layout className="w-3.5 h-3.5 text-blue-500" />
-                                            Grafik-Typ
+                                            {t('querybuilder.graph_type')}
                                         </h3>
 
                                         <div className="grid grid-cols-3 gap-2">
                                             {[
-                                                { id: 'table', icon: TableIcon, label: 'Tabelle' },
-                                                { id: 'bar', icon: BarChart2, label: 'Balken' },
-                                                { id: 'line', icon: TrendingUp, label: 'Linie' },
-                                                { id: 'area', icon: Layout, label: 'Fläche' },
-                                                { id: 'pie', icon: Layout, label: 'Kreis' },
+                                                { id: 'table', icon: TableIcon, label: t('querybuilder.table') },
+                                                { id: 'bar', icon: BarChart2, label: t('querybuilder.bar') },
+                                                { id: 'line', icon: TrendingUp, label: t('querybuilder.line') },
+                                                { id: 'area', icon: Layout, label: t('querybuilder.area') },
+                                                { id: 'pie', icon: Layout, label: t('querybuilder.pie') },
                                             ].map(type => (
                                                 <button
                                                     key={type.id}
@@ -389,20 +391,20 @@ export const QueryBuilderView: React.FC = () => {
                                             <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                                                 <div>
                                                     <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">
-                                                        {visType === 'pie' ? 'Beschriftung' : 'X-Achse'}
+                                                        {visType === 'pie' ? t('querybuilder.label') : t('querybuilder.x_axis')}
                                                     </label>
                                                     <select
                                                         value={visConfig.xAxis || ''}
                                                         onChange={e => setVisConfig({ ...visConfig, xAxis: e.target.value })}
                                                         className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-800 outline-none focus:ring-1 focus:ring-blue-500"
                                                     >
-                                                        <option value="">Bitte wählen...</option>
+                                                        <option value="">{t('querybuilder.please_select')}</option>
                                                         {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
                                                     </select>
                                                 </div>
                                                 <div>
                                                     <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-2">
-                                                        {visType === 'pie' ? 'Wert' : 'Y-Achsen'}
+                                                        {visType === 'pie' ? t('querybuilder.value') : t('querybuilder.y_axis')}
                                                     </label>
                                                     <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
                                                         {resultColumns.map(col => {
@@ -446,13 +448,13 @@ export const QueryBuilderView: React.FC = () => {
                         {/* Preview */}
                         <div id="query-visualization" className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full relative">
                             <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Vorschau ({results.length})</h3>
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('querybuilder.preview', { count: results.length })}</h3>
                                 <button
                                     onClick={() => setIsMaximized(!isMaximized)}
                                     className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md text-slate-400 transition-all flex items-center gap-1.5"
                                 >
                                     {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                                    <span className="text-[9px] font-black uppercase">{isMaximized ? "Zentriert" : "Fokus"}</span>
+                                    <span className="text-[9px] font-black uppercase">{isMaximized ? t('querybuilder.centered') : t('querybuilder.focus')}</span>
                                 </button>
                             </div>
 
@@ -470,7 +472,7 @@ export const QueryBuilderView: React.FC = () => {
                                     ) : (
                                         <div className="h-full flex flex-col items-center justify-center text-slate-300">
                                             <Play className="w-12 h-12 mb-4 opacity-10" />
-                                            <p className="text-xs font-black uppercase tracking-widest text-center">Keine Daten<br />Abfrage ausführen</p>
+                                            <p className="text-xs font-black uppercase tracking-widest text-center whitespace-pre-wrap">{t('querybuilder.no_data_prompt')}</p>
                                         </div>
                                     )
                                 ) : (
@@ -537,17 +539,17 @@ export const QueryBuilderView: React.FC = () => {
                 </div>
 
                 {/* Save/Update Modal */}
-                <Modal isOpen={saveModalOpen} onClose={() => setSaveModalOpen(false)} title={activeWidgetId ? "Bericht aktualisieren" : "Bericht speichern"}>
+                <Modal isOpen={saveModalOpen} onClose={() => setSaveModalOpen(false)} title={activeWidgetId ? t('querybuilder.update_title') : t('querybuilder.save_title')}>
                     <div className="space-y-4">
                         <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-3">
                             <Folder className="w-8 h-8 text-blue-500" />
                             <div>
-                                <p className="text-[10px] font-black uppercase text-blue-400">Archivierungs-Name</p>
+                                <p className="text-[10px] font-black uppercase text-blue-400">{t('querybuilder.archive_name')}</p>
                                 <input
                                     autoFocus
                                     value={widgetName}
                                     onChange={e => setWidgetName(e.target.value)}
-                                    placeholder="z.B. Monatliche Hardware-Kosten"
+                                    placeholder={t('querybuilder.archive_placeholder')}
                                     className="w-full bg-transparent border-none outline-none font-bold text-blue-900 placeholder:text-blue-200"
                                 />
                             </div>
@@ -558,7 +560,7 @@ export const QueryBuilderView: React.FC = () => {
                                     onClick={() => { setActiveWidgetId(null); handleSaveWidget(); }}
                                     className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg flex items-center gap-2"
                                 >
-                                    Neu speichern
+                                    {t('querybuilder.save_new')}
                                 </button>
                             )}
                             <button
@@ -566,7 +568,7 @@ export const QueryBuilderView: React.FC = () => {
                                 disabled={!widgetName}
                                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs shadow-lg shadow-blue-100 flex items-center gap-2"
                             >
-                                <Check className="w-4 h-4" /> Speichern
+                                <Check className="w-4 h-4" /> {t('common.save')}
                             </button>
                         </div>
                     </div>

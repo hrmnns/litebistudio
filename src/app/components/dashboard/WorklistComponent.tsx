@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ClipboardList, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { DashboardComponent } from '../ui/DashboardComponent';
@@ -18,6 +19,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
     targetView,
     isOverlay
 }) => {
+    const { t } = useTranslation();
     const [stats, setStats] = useState({ total: 0, pending: 0 });
     const [loading, setLoading] = useState(true);
 
@@ -51,7 +53,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
 
     return (
         <DashboardComponent
-            title="Arbeitsvorrat"
+            title={t('widgets.worklist.title')}
             icon={ClipboardList}
             iconColor={stats.pending > 0 ? "amber" : "emerald"}
             onRemove={onRemove}
@@ -65,7 +67,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
                     onClick={handleNavigate}
                     className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors group/footer"
                 >
-                    Liste öffnen
+                    {t('widgets.worklist.open_list')}
                     <ArrowRight className="w-3 h-3 transition-transform group-hover/footer:translate-x-1" />
                 </button>
             }
@@ -75,7 +77,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
                 <div className="text-center">
                     <div className={`flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-1 ${stats.pending > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                         {stats.pending > 0 ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
-                        <span>{stats.pending > 0 ? 'Offene Aufgaben' : 'Alles Erledigt'}</span>
+                        <span>{stats.pending > 0 ? t('widgets.worklist.open_tasks') : t('widgets.worklist.all_done')}</span>
                     </div>
                     <div className={`text-4xl font-black tracking-tighter tabular-nums leading-none ${stats.pending > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
                         {loading ? '---' : stats.pending}
@@ -86,7 +88,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
                 <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800/50 text-center">
                     <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">
                         <ClipboardList className="w-3 h-3" />
-                        <span>Gesamteinträge</span>
+                        <span>{t('widgets.worklist.total_entries')}</span>
                     </div>
                     <div className="text-xl font-black text-slate-700 dark:text-slate-300 tabular-nums leading-none">
                         {loading ? '---' : stats.total}

@@ -1,4 +1,6 @@
+
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
 import { X, GripVertical, type LucideIcon, Maximize2, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +43,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
     className,
     backgroundIcon: BackgroundIcon,
 }) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
 
     // Smart Footer Logic: If targetView is present and no footer is provided, show "Detailansicht"
@@ -50,7 +53,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
             onClick={(e) => { e.stopPropagation(); navigate(targetView); }}
             className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors group/footer"
         >
-            Detailansicht
+            {t('common.open_details')}
             <ChevronRight className="w-3 h-3 transition-transform group-hover/footer:translate-x-0.5" />
         </button>
     ) : null);
@@ -85,7 +88,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
                         <button
                             onClick={(e) => { e.stopPropagation(); onClick(); }}
                             className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                            title="Expand"
+                            title={t('common.expand')}
                         >
                             <Maximize2 className="w-3.5 h-3.5" />
                         </button>
@@ -100,7 +103,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
                         <button
                             onClick={(e) => { e.stopPropagation(); onRemove(); }}
                             className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                            title="Remove"
+                            title={t('common.remove')}
                         >
                             <X className="w-3.5 h-3.5" />
                         </button>

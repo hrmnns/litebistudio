@@ -2,8 +2,6 @@
 
 A high-performance, browser-based IT management platform with local SQLite persistence and no-code reporting capabilities.
 
-![IT Dashboard Preview](https://via.placeholder.com/800x400?text=IT+Dashboard+Preview)
-
 ## 🚀 Key Features
 
 - **Multi-Dashboard Support**: Create, manage, and arrange multiple dashboards with a drag-and-drop grid system.
@@ -23,6 +21,7 @@ A high-performance, browser-based IT management platform with local SQLite persi
 - **Reporting & Export**:
   - High-quality PDF and Image export of dashboards and query results.
   - **Presentation Mode** for clean, distractions-free screen sharing.
+- **Multi-Language Support**: Full internationalization support with instant switching between English and German.
 - **Security & Privacy**:
   - **App Lock**: Optional password protection for the entire interface.
   - **Encrypted Backups**: Password-protected database exports using AES encryption.
@@ -34,6 +33,7 @@ A high-performance, browser-based IT management platform with local SQLite persi
 - **Styling**: Tailwind CSS (Modular Utility First)
 - **Database**: SQLite WASM + OPFS (Persistent Browser Storage)
 - **Visualization**: Recharts & Lucide Icons
+- **Internationalization**: i18next & react-i18next
 - **PDF Core**: html2canvas & jsPDF
 
 ## 📦 Getting Started
@@ -68,6 +68,7 @@ A high-performance, browser-based IT management platform with local SQLite persi
 - `src/hooks/`: Unified infrastructure hooks for data fetching, reporting, and state.
 - `src/lib/`: Core system logic (Database worker, Cryptography, Repositories).
 - `src/config/`: Component definitions and registry configurations.
+- `src/locales/`: Translation files (JSON) for all supported languages.
 - `src/datasets/`: Initial SQL schemas, views, and demo data structures.
 
 ## 🌍 Deployment (GitHub Pages)

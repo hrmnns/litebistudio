@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useAsync } from '../../hooks/useAsync';
@@ -25,6 +25,7 @@ interface DashboardDef {
 }
 
 export const CustomDashboardView: React.FC = () => {
+    const { t } = useTranslation();
     // Dashboards State
     const [dashboards, setDashboards] = useState<DashboardDef[]>([]);
     const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export const CustomDashboardView: React.FC = () => {
             if (dbDashboards.length === 0) {
                 const defaultDash: DashboardDef = {
                     id: crypto.randomUUID(),
-                    name: 'Mein Dashboard',
+                    name: t('dashboard.default_name'),
                     layout: legacyLayout ? JSON.parse(legacyLayout) : [],
                     is_default: true
                 };
@@ -112,7 +113,7 @@ export const CustomDashboardView: React.FC = () => {
     };
 
     const deleteCustomWidget = async (id: string) => {
-        if (confirm('Report wirklich löschen?')) {
+        if (confirm(t('dashboard.confirm_delete_report'))) {
             await SystemRepository.executeRaw(`DELETE FROM sys_user_widgets WHERE id = '${id}'`);
             refreshCustomWidgets();
             removeFromDashboard(id);
@@ -136,7 +137,7 @@ export const CustomDashboardView: React.FC = () => {
 
     const removeDashboard = async (id: string) => {
         if (dashboards.length <= 1) return;
-        if (!confirm('Dieses Dashboard wirklich löschen?')) return;
+        if (!confirm(t('dashboard.delete_confirm'))) return;
 
         await SystemRepository.deleteDashboard(id);
         const filtered = dashboards.filter(d => d.id !== id);
@@ -151,14 +152,14 @@ export const CustomDashboardView: React.FC = () => {
     return (
         <PageLayout
             header={{
-                title: 'Mein Dashboard',
-                subtitle: 'Kategorisierte Auswertungen und Kacheln.',
+                title: t('dashboard.title'),
+                subtitle: t('dashboard.subtitle'),
                 actions: (
                     <div className="flex items-center gap-2">
                         <button
                             onClick={togglePresentationMode}
                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                            title="Präsentationsmodus"
+                            title={t('dashboard.presentation_mode')}
                         >
                             <Maximize2 className="w-5 h-5" />
                         </button>
@@ -168,14 +169,14 @@ export const CustomDashboardView: React.FC = () => {
                             className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
                         >
                             <Download className="w-4 h-4" />
-                            {isExporting ? 'Export...' : 'PDF'}
+                            {isExporting ? t('common.exporting') : t('common.export_pdf')}
                         </button>
                         <button
                             onClick={() => setIsAddModalOpen(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm"
                         >
                             <Plus className="w-4 h-4" />
-                            Widget hinzufügen
+                            {t('dashboard.add_title')}
                         </button>
                     </div>
                 )
@@ -199,7 +200,7 @@ export const CustomDashboardView: React.FC = () => {
                     <button
                         onClick={() => { setIsCreating(true); setEditName(''); }}
                         className="px-4 py-2.5 text-slate-400 hover:text-blue-600 transition-all border-b-2 border-transparent"
-                        title="Neues Dashboard erstellen"
+                        title={t('dashboard.new_dashboard_title')}
                     >
                         <Plus className="w-4 h-4" />
                     </button>
@@ -208,110 +209,114 @@ export const CustomDashboardView: React.FC = () => {
                 <button
                     onClick={() => setIsManageModalOpen(true)}
                     className="p-2 text-slate-400 hover:text-slate-600"
-                    title="Dashboards verwalten"
+                    title={t('dashboard.manage_title')}
                 >
                     <Settings className="w-4 h-4" />
                 </button>
             </div>
 
             {/* Dashboard Name Editor (Inline Create) */}
-            {isCreating && (
-                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-3">
-                    <Layout className="w-5 h-5 text-slate-400" />
-                    <input
-                        autoFocus
-                        type="text"
-                        placeholder="Name des Dashboards (z.B. Kosten für Kunden X)"
-                        className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 dark:text-slate-200"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && createDashboard()}
-                    />
-                    <div className="flex items-center gap-1">
-                        <button onClick={createDashboard} className="p-1.5 text-green-600 hover:bg-green-50 rounded"><Check className="w-4 h-4" /></button>
-                        <button onClick={() => setIsCreating(false)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded"><X className="w-4 h-4" /></button>
+            {
+                isCreating && (
+                    <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-3">
+                        <Layout className="w-5 h-5 text-slate-400" />
+                        <input
+                            autoFocus
+                            type="text"
+                            placeholder={t('dashboard.new_dashboard_placeholder')}
+                            className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 dark:text-slate-200"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && createDashboard()}
+                        />
+                        <div className="flex items-center gap-1">
+                            <button onClick={createDashboard} className="p-1.5 text-green-600 hover:bg-green-50 rounded"><Check className="w-4 h-4" /></button>
+                            <button onClick={() => setIsCreating(false)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded"><X className="w-4 h-4" /></button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-            {activeDashboard && activeDashboard.layout.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-slate-400">
-                    <Layout className="w-12 h-12 mb-4 opacity-50" />
-                    <h3 className="font-bold text-lg text-slate-600">"{activeDashboard.name}" ist noch leer</h3>
-                    <p className="mb-4 text-sm text-center">Fügen Sie Kacheln hinzu, um dieses Dashboard individuell zu gestalten.</p>
-                    <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-blue-600 font-bold hover:shadow-sm transition-all text-sm"
-                    >
-                        Widget hinzufügen
-                    </button>
-                </div>
-            ) : activeDashboard ? (
-                <div id="dashboard-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 auto-rows-[300px]">
-                    {activeDashboard.layout.map((widgetRef, idx) => {
-                        // Render System Widget
-                        if (widgetRef.type === 'system') {
-                            const meta = SYSTEM_WIDGETS.find(w => w.id === widgetRef.id);
-                            if (!meta) return null;
-                            const Component = getComponent(meta.id);
-                            if (!Component) return null;
+            {
+                activeDashboard && activeDashboard.layout.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-slate-400">
+                        <Layout className="w-12 h-12 mb-4 opacity-50" />
+                        <h3 className="font-bold text-lg text-slate-600">{t('dashboard.empty_msg', { name: activeDashboard.name })}</h3>
+                        <p className="mb-4 text-sm text-center">{t('dashboard.empty_hint')}</p>
+                        <button
+                            onClick={() => setIsAddModalOpen(true)}
+                            className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-blue-600 font-bold hover:shadow-sm transition-all text-sm"
+                        >
+                            {t('dashboard.add_title')}
+                        </button>
+                    </div>
+                ) : activeDashboard ? (
+                    <div id="dashboard-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 auto-rows-[300px]">
+                        {activeDashboard.layout.map((widgetRef, idx) => {
+                            // Render System Widget
+                            if (widgetRef.type === 'system') {
+                                const meta = SYSTEM_WIDGETS.find(w => w.id === widgetRef.id);
+                                if (!meta) return null;
+                                const Component = getComponent(meta.id);
+                                if (!Component) return null;
+
+                                return (
+                                    <div key={widgetRef.id + idx} className={`relative group h-full ${meta.defaultColSpan === 2 ? 'md:col-span-2' : ''}`}>
+                                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); removeFromDashboard(widgetRef.id); }}
+                                                className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
+                                                title={t('common.remove')}
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <div className="h-full">
+                                            <Component
+                                                onRemove={() => removeFromDashboard(widgetRef.id)}
+                                                targetView={COMPONENTS.find(c => c.component === meta.id)?.targetView}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            // Render Custom Widget
+                            const dbWidget = customWidgets?.find(w => w.id === widgetRef.id);
+                            if (!dbWidget) return null;
+
+                            let config;
+                            try {
+                                config = JSON.parse(dbWidget.visualization_config);
+                            } catch (e) {
+                                config = { type: 'table' };
+                            }
 
                             return (
-                                <div key={widgetRef.id + idx} className={`relative group h-full ${meta.defaultColSpan === 2 ? 'md:col-span-2' : ''}`}>
+                                <div key={widgetRef.id + idx} className="relative group md:col-span-1 xl:col-span-2 h-full">
                                     <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); removeFromDashboard(widgetRef.id); }}
+                                            onClick={() => removeFromDashboard(widgetRef.id)}
                                             className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
                                             title="Entfernen"
                                         >
                                             <Trash2 className="w-3 h-3" />
                                         </button>
                                     </div>
-                                    <div className="h-full">
-                                        <Component
-                                            onRemove={() => removeFromDashboard(widgetRef.id)}
-                                            targetView={COMPONENTS.find(c => c.component === meta.id)?.targetView}
-                                        />
-                                    </div>
+                                    <WidgetRenderer
+                                        title={dbWidget.name}
+                                        sql={dbWidget.sql_query}
+                                        config={config}
+                                    />
                                 </div>
                             );
-                        }
-
-                        // Render Custom Widget
-                        const dbWidget = customWidgets?.find(w => w.id === widgetRef.id);
-                        if (!dbWidget) return null;
-
-                        let config;
-                        try {
-                            config = JSON.parse(dbWidget.visualization_config);
-                        } catch (e) {
-                            config = { type: 'table' };
-                        }
-
-                        return (
-                            <div key={widgetRef.id + idx} className="relative group md:col-span-1 xl:col-span-2 h-full">
-                                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => removeFromDashboard(widgetRef.id)}
-                                        className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
-                                        title="Entfernen"
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
-                                </div>
-                                <WidgetRenderer
-                                    title={dbWidget.name}
-                                    sql={dbWidget.sql_query}
-                                    config={config}
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
-            ) : null}
+                        })}
+                    </div>
+                ) : null
+            }
 
             {/* Manage Dashboards Modal */}
-            <Modal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} title="Dashboards verwalten">
+            <Modal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} title={t('dashboard.manage_title')}>
                 <div className="space-y-3">
                     {dashboards.map(d => (
                         <div key={d.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg group">
@@ -355,20 +360,20 @@ export const CustomDashboardView: React.FC = () => {
             <Modal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
-                title="Widget hinzufügen"
+                title={t('dashboard.add_title')}
             >
                 <div className="flex gap-4 mb-4 border-b border-slate-200">
                     <button
                         onClick={() => setActiveTab('system')}
                         className={`pb-2 text-sm font-bold ${activeTab === 'system' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
                     >
-                        System Widgets
+                        {t('dashboard.system_widgets')}
                     </button>
                     <button
                         onClick={() => setActiveTab('custom')}
                         className={`pb-2 text-sm font-bold ${activeTab === 'custom' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
                     >
-                        Custom Reports
+                        {t('dashboard.custom_widgets')}
                     </button>
                 </div>
 
@@ -388,8 +393,8 @@ export const CustomDashboardView: React.FC = () => {
                                                 <w.icon className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <div className="font-bold text-slate-700">{w.title}</div>
-                                                <div className="text-xs text-slate-400">{w.description}</div>
+                                                <div className="font-bold text-slate-700">{t(w.titleKey)}</div>
+                                                <div className="text-xs text-slate-400">{t(w.descriptionKey)}</div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -404,7 +409,7 @@ export const CustomDashboardView: React.FC = () => {
                                                             setVisibleSidebarComponentIds([...visibleSidebarComponentIds, componentConfig!.id]);
                                                         }
                                                     }}
-                                                    title={isPinned ? "Aus dem Menü entfernen" : "Zum Menü hinzufügen"}
+                                                    title={isPinned ? t('dashboard.unpin_sidebar') : t('dashboard.pin_sidebar')}
                                                     className={`p-1.5 rounded-md border transition-all ${isPinned ? 'bg-amber-50 border-amber-200 text-amber-500' : 'bg-white border-slate-200 text-slate-300 hover:text-amber-400'}`}
                                                 >
                                                     <Star className={`w-4 h-4 ${isPinned ? 'fill-current' : ''}`} />
@@ -416,7 +421,7 @@ export const CustomDashboardView: React.FC = () => {
                                                 disabled={isAdded}
                                                 className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
                                             >
-                                                {isAdded ? 'Aktiv' : 'Hinzufügen'}
+                                                {isAdded ? t('dashboard.active') : t('common.add')}
                                             </button>
                                         </div>
                                     </div>
@@ -444,7 +449,7 @@ export const CustomDashboardView: React.FC = () => {
                                             <button
                                                 onClick={() => deleteCustomWidget(w.id)}
                                                 className="p-2 text-slate-400 hover:text-red-500"
-                                                title="Löschen"
+                                                title={t('common.delete')}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -453,18 +458,18 @@ export const CustomDashboardView: React.FC = () => {
                                                 disabled={isAdded}
                                                 className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
                                             >
-                                                {isAdded ? 'Hinzugefügt' : 'Hinzufügen'}
+                                                {isAdded ? t('dashboard.active') : t('common.add')}
                                             </button>
                                         </div>
                                     </div>
                                 );
                             }) : (
-                                <p className="text-center text-slate-400 py-4">Keine gespeicherten Reports gefunden.</p>
+                                <p className="text-center text-slate-400 py-4">{t('dashboard.no_reports')}</p>
                             )}
                         </div>
                     )}
                 </div>
             </Modal>
-        </PageLayout>
+        </PageLayout >
     );
 };

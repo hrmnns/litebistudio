@@ -1,5 +1,5 @@
-
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable } from '../../components/ui/DataTable';
@@ -27,6 +27,7 @@ interface WidgetRendererProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config }) => {
+    const { t } = useTranslation();
     const { data: results, loading, error } = useAsync<any[]>(
         async () => {
             if (!sql) return [];
@@ -48,7 +49,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
 
             const schema = {
                 title: title,
-                description: `Datenquelle: ${tableName}`,
+                description: `${t('widgets.data_inspector.description')}: ${tableName}`,
                 type: 'object',
                 properties: Object.keys(results[0]).reduce((acc, key) => {
                     const val = results[0][key];
@@ -94,7 +95,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
     if (!results || results.length === 0) {
         return (
             <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                Keine Daten
+                {t('common.no_data')}
             </div>
         );
     }

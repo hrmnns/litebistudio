@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Clock, Calendar } from 'lucide-react';
 import { DashboardComponent } from '../ui/DashboardComponent';
 
 export const ClockComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
+    const { t, i18n } = useTranslation();
     const [time, setTime] = useState(new Date());
 
     useEffect(() => {
@@ -11,20 +13,20 @@ export const ClockComponent: React.FC<{ onRemove?: () => void; dragHandleProps?:
     }, []);
 
     const dateStr = useMemo(() => {
-        return new Intl.DateTimeFormat('de-DE', {
+        return new Intl.DateTimeFormat(i18n.language === 'de' ? 'de-DE' : 'en-US', {
             weekday: 'long',
             day: '2-digit',
             month: 'long'
         }).format(time);
-    }, [time]);
+    }, [time, i18n.language]);
 
     // Prominent Time formatting with timezone
-    const timeStr = time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const timeStr = time.toLocaleTimeString(i18n.language === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' });
     const timeZone = 'CET'; // Central European Time
 
     return (
         <DashboardComponent
-            title="Uhrzeit"
+            title={t('widgets.clock.title')}
             icon={Clock}
             iconColor="indigo"
             onRemove={onRemove}

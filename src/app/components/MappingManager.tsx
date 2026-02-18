@@ -1,9 +1,11 @@
 import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, Upload, Trash2, Check, AlertCircle } from 'lucide-react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import type { MappingConfig } from './ColumnMapper';
 
 export const MappingManager: React.FC = () => {
+    const { t } = useTranslation();
     // Shared key with ExcelImport
     const [savedMappings, setSavedMappings] = useLocalStorage<Record<string, Record<string, MappingConfig>>>('excel_mappings_v2', {});
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -21,10 +23,10 @@ export const MappingManager: React.FC = () => {
             a.click();
             URL.revokeObjectURL(url);
             setStatus('success');
-            setMessage('Mappings exported successfully.');
+            setMessage(t('common.success'));
         } catch (e: any) {
             setStatus('error');
-            setMessage('Export failed: ' + e.message);
+            setMessage(t('common.error') + ': ' + e.message);
         }
     };
 
@@ -43,10 +45,10 @@ export const MappingManager: React.FC = () => {
                 setSavedMappings((prev: Record<string, Record<string, MappingConfig>>) => ({ ...prev, ...json }));
 
                 setStatus('success');
-                setMessage(`Imported ${Object.keys(json).length} mapping configurations.`);
+                setMessage(t('common.success'));
             } catch (err: any) {
                 setStatus('error');
-                setMessage('Import failed: ' + err.message);
+                setMessage(t('common.error') + ': ' + err.message);
             }
         };
         reader.readAsText(file);
@@ -55,10 +57,10 @@ export const MappingManager: React.FC = () => {
     };
 
     const handleClear = () => {
-        if (confirm('Are you sure you want to delete ALL saved mappings? This cannot be undone.')) {
+        if (confirm(t('datasource.clear_mappings_confirm'))) {
             setSavedMappings({});
             setStatus('success');
-            setMessage('All mappings cleared.');
+            setMessage(t('common.success'));
         }
     };
 
@@ -89,14 +91,14 @@ export const MappingManager: React.FC = () => {
 
             <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400 mr-2">
-                    {count} Mappings gespeichert
+                    {t('datasource.mappings_saved', { count })}
                 </span>
 
                 <button
                     onClick={handleExport}
                     disabled={count === 0}
                     className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Mappings exportieren (JSON)"
+                    title={t('datasource.export_mappings')}
                 >
                     <Download className="w-4 h-4" />
                 </button>
@@ -108,7 +110,7 @@ export const MappingManager: React.FC = () => {
                         ref={fileInputRef}
                         onChange={handleImport}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        title="Mappings importieren (JSON)"
+                        title={t('datasource.import_mappings')}
                     />
                     <button className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded transition-colors pointer-events-none">
                         <Upload className="w-4 h-4" />
@@ -121,7 +123,7 @@ export const MappingManager: React.FC = () => {
                     onClick={handleClear}
                     disabled={count === 0}
                     className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Alle Mappings löschen"
+                    title={t('datasource.clear_mappings')}
                 >
                     <Trash2 className="w-4 h-4" />
                 </button>

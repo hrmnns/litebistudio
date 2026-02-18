@@ -1,16 +1,18 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
 import { PageLayout } from '../components/ui/PageLayout';
 import { Lock, Shield, Trash2, Check, X } from 'lucide-react';
 import { hashPin } from '../../lib/utils/crypto';
 
 export const SettingsView: React.FC = () => {
+    const { t, i18n } = useTranslation();
     const { theme, setTheme } = useThemeContext();
 
     const themeOptions: { value: ThemeMode; emoji: string; label: string }[] = [
-        { value: 'light', emoji: '🌞', label: 'Hell' },
-        { value: 'dark', emoji: '🌚', label: 'Dunkel' },
-        { value: 'system', emoji: '💻', label: 'System' },
+        { value: 'light', emoji: '🌞', label: t('settings.theme_light') },
+        { value: 'dark', emoji: '🌚', label: t('settings.theme_dark') },
+        { value: 'system', emoji: '💻', label: t('settings.theme_system') },
     ];
 
     const [hasPin, setHasPin] = React.useState(!!localStorage.getItem('itdashboard_app_pin'));
@@ -19,7 +21,7 @@ export const SettingsView: React.FC = () => {
 
     const handleSavePin = async () => {
         if (pinInput.length < 4) {
-            alert('Die PIN muss mindestens 4 Stellen haben.');
+            alert(t('settings.pin_error_min'));
             return;
         }
         const hash = await hashPin(pinInput);
@@ -27,29 +29,33 @@ export const SettingsView: React.FC = () => {
         setHasPin(true);
         setIsEditingPin(false);
         setPinInput('');
-        alert('PIN-Schutz aktiviert.');
+        alert(t('settings.pin_success'));
     };
 
     const handleRemovePin = () => {
-        if (window.confirm('Möchten Sie den PIN-Schutz wirklich entfernen?')) {
+        if (window.confirm(t('settings.pin_confirm_remove'))) {
             localStorage.removeItem('itdashboard_app_pin');
             setHasPin(false);
         }
     };
 
     const now = new Date();
-    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    const lang = i18n.language.startsWith('de') ? 'de-DE' : 'en-US';
+    const footerText = t('settings.last_update', {
+        date: now.toLocaleDateString(lang),
+        time: now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
+    });
 
     return (
         <PageLayout
             header={{
-                title: 'Einstellungen',
-                subtitle: 'Dashboard-Konfiguration und Benachrichtigungen',
+                title: t('sidebar.settings'),
+                subtitle: t('settings.subtitle'),
                 onBack: () => window.history.back(),
             }}
             footer={footerText}
             breadcrumbs={[
-                { label: 'Einstellungen' }
+                { label: t('sidebar.settings') }
             ]}
         >
             <div className="max-w-2xl space-y-6">
@@ -60,11 +66,11 @@ export const SettingsView: React.FC = () => {
                         <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
                         </span>
-                        Darstellung
+                        {t('settings.appearance')}
                     </h3>
                     <div className="space-y-4">
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Passe das Erscheinungsbild des Dashboards an.
+                            {t('settings.appearance_hint')}
                         </p>
 
                         <div className="grid grid-cols-3 gap-3">
@@ -91,11 +97,11 @@ export const SettingsView: React.FC = () => {
                         <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             <Shield className="w-4 h-4 text-emerald-500" />
                         </span>
-                        Sicherheit
+                        {t('settings.security')}
                     </h3>
                     <div className="space-y-4">
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Schützen Sie den Zugriff auf das Dashboard.
+                            {t('settings.security_hint')}
                         </p>
 
                         {!hasPin && !isEditingPin && (
@@ -104,7 +110,7 @@ export const SettingsView: React.FC = () => {
                                 className="w-full h-12 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-medium"
                             >
                                 <Lock className="w-4 h-4" />
-                                PIN-Schutz aktivieren
+                                {t('settings.enable_pin')}
                             </button>
                         )}
 
@@ -114,7 +120,7 @@ export const SettingsView: React.FC = () => {
                                     type="password"
                                     inputMode="numeric"
                                     pattern="[0-9]*"
-                                    placeholder="Neue PIN (min. 4 Stellen)"
+                                    placeholder={t('settings.pin_placeholder')}
                                     className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                     value={pinInput}
                                     onChange={(e) => setPinInput(e.target.value)}
@@ -123,14 +129,14 @@ export const SettingsView: React.FC = () => {
                                 <button
                                     onClick={handleSavePin}
                                     className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
-                                    title="Speichern"
+                                    title={t('common.save')}
                                 >
                                     <Check className="w-5 h-5" />
                                 </button>
                                 <button
                                     onClick={() => { setIsEditingPin(false); setPinInput(''); }}
                                     className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
-                                    title="Abbrechen"
+                                    title={t('common.cancel')}
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -144,14 +150,14 @@ export const SettingsView: React.FC = () => {
                                         <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                                     </div>
                                     <div>
-                                        <div className="font-semibold text-emerald-900 dark:text-emerald-100">PIN-Schutz aktiv</div>
-                                        <div className="text-xs text-emerald-700 dark:text-emerald-400">Dashboard ist gesperrt beim Neustart</div>
+                                        <div className="font-semibold text-emerald-900 dark:text-emerald-100">{t('settings.pin_active')}</div>
+                                        <div className="text-xs text-emerald-700 dark:text-emerald-400">{t('settings.pin_active_hint')}</div>
                                     </div>
                                 </div>
                                 <button
                                     onClick={handleRemovePin}
                                     className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                    title="Schutz entfernen"
+                                    title={t('common.remove')}
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>

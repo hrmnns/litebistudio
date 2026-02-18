@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable } from '../../components/ui/DataTable';
@@ -12,6 +13,7 @@ interface DataInspectorProps {
 }
 
 export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
+    const { t } = useTranslation();
     const [mode, setMode] = useState<'table' | 'sql'>('table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
 
@@ -92,13 +94,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     }, [items]);
 
     const now = new Date();
-    const footerText = `Letzte Aktualisierung: ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    const footerText = `${t('common.loading').replace('...', '')} ${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
     return (
         <PageLayout
             header={{
-                title: 'Data Inspector',
-                subtitle: `${items?.length || 0} Ergebnisse${mode === 'table' ? ` · ${selectedTable}` : ' · SQL-Abfrage'}`,
+                title: t('sidebar.data_inspector'),
+                subtitle: t('datainspector.subtitle', { count: items?.length || 0, mode: mode === 'table' ? selectedTable : t('datainspector.sql_mode') }),
                 onBack,
                 actions: (
                     <>
@@ -112,7 +114,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'table' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <TableIcon className="w-4 h-4" />
-                                Tabelle
+                                {t('datainspector.table_mode')}
                             </button>
                             <button
                                 onClick={() => {
@@ -122,7 +124,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'sql' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <Code className="w-4 h-4" />
-                                SQL
+                                {t('datainspector.sql_mode')}
                             </button>
                         </div>
 
@@ -130,7 +132,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <button
                             onClick={execute}
                             className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-all"
-                            title="Daten aktualisieren"
+                            title={t('datainspector.refresh_title')}
                         >
                             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                         </button>
@@ -145,7 +147,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             className="h-10 flex items-center gap-2 px-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                         >
                             <Download className="w-4 h-4" />
-                            <span className="hidden sm:inline">Export Excel</span>
+                            <span className="hidden sm:inline">{t('datainspector.export_excel')}</span>
                         </button>
                     </>
                 ),
@@ -187,7 +189,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <div className="relative max-w-md w-full ml-4">
                             <input
                                 type="text"
-                                placeholder="In sichtbaren Spalten suchen..."
+                                placeholder={t('datainspector.search_placeholder')}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -196,7 +198,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         </div>
                     </div>
                     <div className="text-xs text-slate-400 font-medium">
-                        Auto-Limit: {limit}
+                        {t('datainspector.auto_limit', { limit })}
                     </div>
                 </div>
             ) : (
@@ -205,7 +207,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <textarea
                             value={inputSql}
                             onChange={(e) => setInputSql(e.target.value)}
-                            placeholder="SELECT * FROM ..."
+                            placeholder={t('datainspector.sql_placeholder')}
                             className="w-full h-24 p-4 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-slate-800 dark:text-slate-200"
                         />
                         <div className="absolute bottom-4 right-4 flex gap-2">
@@ -213,14 +215,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 onClick={() => setInputSql('')}
                                 className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                             >
-                                Leeren
+                                {t('datainspector.clear_sql')}
                             </button>
                             <button
                                 onClick={handleRunSql}
                                 className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
                             >
                                 {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
-                                Ausführen
+                                {t('datainspector.run_sql')}
                             </button>
                         </div>
                     </div>
@@ -242,7 +244,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <div className="flex-1 flex items-center justify-center p-12 text-center text-slate-400 animate-pulse">
                             <div className="flex flex-col items-center gap-4">
                                 <Search className="w-12 h-12 opacity-20" />
-                                <p className="text-lg">Daten werden geladen...</p>
+                                <p className="text-lg">{t('common.loading')}</p>
                             </div>
                         </div>
                     ) : (
@@ -250,18 +252,18 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             data={items || []}
                             columns={columns}
                             searchTerm=""
-                            emptyMessage={mode === 'sql' && !inputSql ? "SQL-Abfrage eingeben und ausführen." : "Keine Ergebnisse gefunden."}
+                            emptyMessage={mode === 'sql' && !inputSql ? t('datainspector.empty_sql') : t('common.no_data')}
                             onRowClick={(item) => setSelectedItem(item)}
                         />
                     )}
                 </div>
                 <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-[10px] flex justify-between items-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="font-medium">
-                        {mode === 'table' ? `Auto-Limit: ${limit}` : 'SQL-Abfrage'}
+                        {mode === 'table' ? t('datainspector.auto_limit', { limit }) : t('datainspector.sql_mode')}
                     </div>
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1"><Database className="w-3 h-3" /> IT Dashboard DB</span>
-                        <span className="font-medium">{items?.length || 0} Ergebnisse</span>
+                        <span className="font-medium">{t('common.results_count', { count: items?.length || 0 })}</span>
                     </div>
                 </div>
             </div>
@@ -272,7 +274,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 onClose={() => setSelectedItem(null)}
                 items={items || []}
                 initialIndex={items && selectedItem ? Math.max(0, items.indexOf(selectedItem)) : 0}
-                title="Datensatz-Details"
+                title={t('common.details')}
                 tableName={selectedTable}
                 schema={undefined}
             />
@@ -283,7 +285,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                     <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-2 fade-in">
                         <AlertCircle className="w-5 h-5 shrink-0" />
                         <div className="flex flex-col">
-                            <p className="text-sm font-bold">SQL-Fehler</p>
+                            <p className="text-sm font-bold">{t('datainspector.sql_error')}</p>
                             <p className="text-xs opacity-90">{String(error)}</p>
                         </div>
                         <button onClick={execute} className="ml-auto p-1.5 hover:bg-red-200 dark:hover:bg-red-800 rounded-md transition-colors">
