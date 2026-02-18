@@ -36,7 +36,8 @@
         "clock": "Status & Clock",
         "database_status": "Database Status",
         "system_status": "System Status",
-        "records_count": "{{count}}k Records"
+        "records_count": "{{count}}k Records",
+        "about": "About"
     },
     "dashboard": {
         "title": "My Dashboard",
@@ -239,6 +240,22 @@
             "drop_hint": "Click or drag file here",
             "none_selected": "No table selected"
         }
+    },
+    "about": {
+        "title": "About LiteBI Studio",
+        "subtitle": "Information about the project and system",
+        "tagline": "The lightweight business intelligence platform directly in your browser.",
+        "philosophy_title": "Our Philosophy",
+        "philosophy_description": "LiteBI Studio was developed with the goal of making data analysis as simple and secure as possible. Unlike traditional BI tools, your data never leaves your browser with LiteBI Studio.",
+        "point_privacy_title": "Privacy First",
+        "point_privacy_desc": "No server storage, no cloud constraints.",
+        "point_speed_title": "Speed",
+        "point_speed_desc": "Local processing using SQLite WASM technology.",
+        "point_offline_title": "Offline-Ready",
+        "point_offline_desc": "Works even without an active internet connection.",
+        "tech_stack_title": "Tech Stack",
+        "settings_hint": "Learn more about the project, the version and the vision behind LiteBI Studio.",
+        "view_info": "Project Information"
     },
     "record_detail": {
         "title": "Record Details",

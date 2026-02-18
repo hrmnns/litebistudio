@@ -2,7 +2,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
 import { PageLayout } from '../components/ui/PageLayout';
-import { Lock, Shield, Trash2, Check, X } from 'lucide-react';
+import { Lock, Shield, Trash2, Check, X, Info, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { hashPin } from '../../lib/utils/crypto';
 
 export const SettingsView: React.FC = () => {
@@ -163,6 +164,37 @@ export const SettingsView: React.FC = () => {
                                 </button>
                             </div>
                         )}
+                    </div>
+                </div>
+
+                {/* About Section */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                            <Info className="w-4 h-4 text-blue-500" />
+                        </span>
+                        {t('about.title', 'Über LiteBI Studio')}
+                    </h3>
+                    <div className="space-y-4">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            {t('about.settings_hint', 'Erfahren Sie mehr über das Projekt, die Version und die Vision hinter LiteBI Studio.')}
+                        </p>
+
+                        <Link
+                            to="/about"
+                            className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                    <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-slate-900 dark:text-white">{t('about.view_info', 'Projekt-Informationen')}</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">Version 0.1.0-beta</div>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                        </Link>
                     </div>
                 </div>
 
