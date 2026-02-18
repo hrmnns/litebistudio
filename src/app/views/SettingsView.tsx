@@ -190,7 +190,7 @@ export const SettingsView: React.FC = () => {
                                 </div>
                                 <div>
                                     <div className="font-semibold text-slate-900 dark:text-white">{t('about.view_info', 'Projekt-Informationen')}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400">Version 0.1.0-beta</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">Version 1.0.0</div>
                                 </div>
                             </div>
                             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />

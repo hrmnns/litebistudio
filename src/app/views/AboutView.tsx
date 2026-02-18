@@ -49,7 +49,7 @@ export const AboutView: React.FC = () => {
                             </p>
                             <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-3">
                                 <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider border border-white/30">
-                                    Version 0.1.0-beta
+                                    Version 1.0.0
                                 </span>
                                 <span className="px-3 py-1 bg-emerald-500/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider border border-emerald-500/20 text-emerald-100">
                                     {t('about.status_stable', 'Stabil (Lokal)')}
