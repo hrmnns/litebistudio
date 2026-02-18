@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, FileSpreadsheet, Check, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2 as Check, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export interface ImportConfig {

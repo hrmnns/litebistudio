@@ -37,8 +37,8 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [isSidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
 
     // Backup State
-    const [lastBackup, setLastBackup] = useLocalStorage<string | null>('itdashboard_last_backup', null);
-    const [changeCount, setChangeCount] = useLocalStorage<number>('itdashboard_changes_since_backup', 0);
+    const [lastBackup, setLastBackup] = useLocalStorage<string | null>('litebistudio_last_backup', null);
+    const [changeCount, setChangeCount] = useLocalStorage<number>('litebistudio_changes_since_backup', 0);
 
     const markBackupComplete = React.useCallback(() => {
         setLastBackup(new Date().toISOString());
@@ -93,7 +93,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     // Lock State
     const [isLocked, setIsLocked] = React.useState<boolean>(() => {
         // Init locked if PIN exists
-        return !!localStorage.getItem('itdashboard_app_pin');
+        return !!localStorage.getItem('litebistudio_app_pin');
     });
 
     const lockApp = React.useCallback(() => setIsLocked(true), []);

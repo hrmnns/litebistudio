@@ -7,7 +7,7 @@ let msgId = 0;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pending = new Map<number, { resolve: (val: any) => void, reject: (err: any) => void }>();
 
-const channel = new BroadcastChannel('itdashboard_db_v2');
+const channel = new BroadcastChannel('litebistudio_db_v1');
 const conflictListeners = new Set<(hasConflict: boolean) => void>();
 
 let hasConflict = false;
@@ -42,7 +42,7 @@ channel.postMessage('PING');
 function getWorker(): Promise<Worker> {
     if (!workerReadyPromise) {
         workerReadyPromise = new Promise((resolveWorker) => {
-            navigator.locks.request('itdashboard_db_lifecycle', async () => {
+            navigator.locks.request('litebistudio_db_lifecycle', async () => {
                 const w = new DBWorker();
                 w.onmessage = (e) => {
                     const { id, result, error } = e.data;

@@ -15,7 +15,7 @@ export const SettingsView: React.FC = () => {
         { value: 'system', emoji: '💻', label: t('settings.theme_system') },
     ];
 
-    const [hasPin, setHasPin] = React.useState(!!localStorage.getItem('itdashboard_app_pin'));
+    const [hasPin, setHasPin] = React.useState(!!localStorage.getItem('litebistudio_app_pin'));
     const [isEditingPin, setIsEditingPin] = React.useState(false);
     const [pinInput, setPinInput] = React.useState('');
 
@@ -25,7 +25,7 @@ export const SettingsView: React.FC = () => {
             return;
         }
         const hash = await hashPin(pinInput);
-        localStorage.setItem('itdashboard_app_pin', hash);
+        localStorage.setItem('litebistudio_app_pin', hash);
         setHasPin(true);
         setIsEditingPin(false);
         setPinInput('');
@@ -34,7 +34,7 @@ export const SettingsView: React.FC = () => {
 
     const handleRemovePin = () => {
         if (window.confirm(t('settings.pin_confirm_remove'))) {
-            localStorage.removeItem('itdashboard_app_pin');
+            localStorage.removeItem('litebistudio_app_pin');
             setHasPin(false);
         }
     };

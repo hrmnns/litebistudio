@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                     <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
                         <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
-                            IT <span className="text-blue-600">Dashboard</span>
+                            LiteBI <span className="text-blue-600">Studio</span>
                         </h1>
                         <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest whitespace-nowrap">{t('sidebar.analytics_platform')}</p>
                     </div>

@@ -1,4 +1,4 @@
-# itdashboard – Agent Briefing
+# LiteBI Studio – Agent Briefing
 
 ## Ziel
 Eine rein browserbasierte, modular erweiterbare IT-Controlling-WebApp (Dashboard-Shell) mit Kachel-Startseite.

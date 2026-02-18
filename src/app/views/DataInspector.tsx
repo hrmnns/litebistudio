@@ -262,7 +262,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         {mode === 'table' ? t('datainspector.auto_limit', { limit }) : t('datainspector.sql_mode')}
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1"><Database className="w-3 h-3" /> IT Dashboard DB</span>
+                        <span className="flex items-center gap-1"><Database className="w-3 h-3" /> LiteBI Studio DB</span>
                         <span className="font-medium">{t('common.results_count', { count: items?.length || 0 })}</span>
                     </div>
                 </div>

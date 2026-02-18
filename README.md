@@ -1,6 +1,8 @@
-# 📊 IT Dashboard
+# 📊 LiteBI Studio
 
-A high-performance, browser-based IT management platform with local SQLite persistence and no-code reporting capabilities.
+A high-performance, browser-based business intelligence platform with local SQLite persistence and no-code reporting capabilities.
+
+![LiteBI Studio Preview](https://via.placeholder.com/800x400?text=LiteBI+Studio+Preview)
 
 ## 🚀 Key Features
 
@@ -47,8 +49,8 @@ A high-performance, browser-based IT management platform with local SQLite persi
 
 1.  **Clone & Install**:
     ```bash
-    git clone https://github.com/itdashboard/itdashboard.git
-    cd itdashboard
+    git clone https://github.com/litebistudio/litebistudio.git
+    cd litebistudio
     npm install
     ```
 
@@ -86,4 +88,4 @@ This project is optimized for static hosting while maintaining full database fea
 - **AES-GCM Encryption**: Used for protecting backups and the application lock.
 
 ---
-Built with ❤️ for IT Management and Data Sovereignty.
+Built with ❤️ for Data Sovereignty and Insights.

@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Upload, Trash2, Check, AlertCircle } from 'lucide-react';
+import { Download, Upload, Trash2, CheckCircle2 as Check, AlertCircle } from 'lucide-react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import type { MappingConfig } from './ColumnMapper';
 

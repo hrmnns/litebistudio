@@ -19,7 +19,7 @@ export const MultiTabModal: React.FC<MultiTabModalProps> = () => {
                     </h2>
 
                     <p className="text-slate-600 dark:text-slate-400 text-center mb-8 leading-relaxed">
-                        Das IT Dashboard ist bereits in einem anderen Tab geöffnet. Um Datenverlust zu vermeiden, ist der Zugriff auf <span className="font-semibold text-slate-900 dark:text-white">einen aktiven Tab</span> beschränkt.
+                        LiteBI Studio ist bereits in einem anderen Tab geöffnet. Um Datenverlust zu vermeiden, ist der Zugriff auf <span className="font-semibold text-slate-900 dark:text-white">einen aktiven Tab</span> beschränkt.
                     </p>
 
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-4 flex gap-3 items-start mb-6">

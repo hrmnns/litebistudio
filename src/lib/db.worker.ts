@@ -33,7 +33,7 @@ async function initDB() {
 
             if (sqlite3.oo1.OpfsDb) {
                 try {
-                    db = new sqlite3.oo1.OpfsDb('/itdashboard.sqlite3');
+                    db = new sqlite3.oo1.OpfsDb('/litebistudio.sqlite3');
                     log('Opened OPFS database');
                 } catch (e) {
                     error('OPFS unavailable, falling back to memory', e);
@@ -326,10 +326,10 @@ async function importDatabase(buffer: ArrayBuffer) {
         try {
             const root = await navigator.storage.getDirectory();
             try {
-                await root.removeEntry('itdashboard.sqlite3');
+                await root.removeEntry('litebistudio.sqlite3');
             } catch (e) { /* ignore */ }
 
-            const fileHandle = await root.getFileHandle('itdashboard.sqlite3', { create: true });
+            const fileHandle = await root.getFileHandle('litebistudio.sqlite3', { create: true });
             const writable = await fileHandle.createWritable();
             await writable.write(buffer);
             await writable.close();

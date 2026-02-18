@@ -43,7 +43,7 @@ export const Layout: React.FC = () => {
                         <button onClick={() => setSidebarOpen(true)} className="p-1 text-slate-500 hover:text-slate-700">
                             <Menu className="w-6 h-6" />
                         </button>
-                        <h1 className="text-lg font-bold">IT Dashboard</h1>
+                        <h1 className="text-lg font-bold">LiteBI Studio</h1>
                     </header>
                 )}
 

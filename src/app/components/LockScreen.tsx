@@ -15,7 +15,7 @@ export const LockScreen: React.FC = () => {
     const handleUnlock = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
-        const storedHash = localStorage.getItem('itdashboard_app_pin');
+        const storedHash = localStorage.getItem('litebistudio_app_pin');
         if (!storedHash) {
             // Should not happen if isLocked is true, but safe fallback
             unlockApp();
@@ -43,7 +43,7 @@ export const LockScreen: React.FC = () => {
                 </div>
 
                 <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-bold text-white">Dashboard gesperrt</h2>
+                    <h2 className="text-2xl font-bold text-white">System gesperrt</h2>
                     <p className="text-slate-400">Bitte geben Sie Ihre PIN ein, um fortzufahren.</p>
                 </div>
 
@@ -84,7 +84,7 @@ export const LockScreen: React.FC = () => {
                 </form>
 
                 <div className="text-xs text-slate-500 mt-4">
-                    IT Dashboard Protected
+                    LiteBI Studio Protected
                 </div>
             </div>
 
