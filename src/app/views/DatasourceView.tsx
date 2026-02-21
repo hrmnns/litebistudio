@@ -4,6 +4,8 @@ import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, Al
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
 import { SmartImport } from '../components/SmartImport';
 import { SchemaTable } from '../components/SchemaDocumentation';
+import { InlineAlert } from '../components/ui/InlineAlert';
+import type { AlertType } from '../components/ui/InlineAlert';
 import { Modal } from '../components/Modal';
 import { PageLayout } from '../components/ui/PageLayout';
 import { MappingManager } from '../components/MappingManager';
@@ -47,6 +49,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     // Backup State
     const [useEncryption, setUseEncryption] = useState(false);
     const [backupPassword, setBackupPassword] = useState('');
+    const [restoreAlert, setRestoreAlert] = useState<{ type: AlertType; message: string; title?: string; details?: string } | null>(null);
 
     // Fetch Tables
     const { data: tables, refresh: refreshTables } = useAsync<string[]>(
@@ -424,46 +427,113 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         {useEncryption ? t('datasource.save_backup_secure') : t('datasource.save_backup_standard')}
                                     </button>
 
-                                    <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-bold transition-colors">
-                                        <input
-                                            type="file"
-                                            accept=".sqlite3"
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            onChange={async (e) => {
-                                                const file = e.target.files?.[0];
-                                                if (!file) return;
+                                    <div className="space-y-4">
+                                        {restoreAlert && (
+                                            <InlineAlert
+                                                type={restoreAlert.type}
+                                                title={restoreAlert.title}
+                                                message={restoreAlert.message}
+                                                details={restoreAlert.details}
+                                                onClose={() => setRestoreAlert(null)}
+                                            />
+                                        )}
+                                        <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-bold transition-colors">
+                                            <input
+                                                type="file"
+                                                accept=".sqlite3"
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                onChange={async (e) => {
+                                                    setRestoreAlert(null);
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
 
-                                                const buffer = await file.arrayBuffer();
-                                                const header = new Uint8Array(buffer.slice(0, 16));
-                                                const headerString = new TextDecoder().decode(header);
-                                                const isSqlite = headerString.startsWith('SQLite format 3');
+                                                    const buffer = await file.arrayBuffer();
+                                                    const header = new Uint8Array(buffer.slice(0, 16));
+                                                    const headerString = new TextDecoder().decode(header);
+                                                    const isSqlite = headerString.startsWith('SQLite format 3');
 
-                                                let finalBuffer = buffer;
+                                                    let finalBuffer = buffer;
 
-                                                if (!isSqlite) {
-                                                    // Assume encrypted
-                                                    const pwd = prompt(t('datasource.restore_encrypted_prompt'));
-                                                    if (!pwd) return;
+                                                    if (!isSqlite) {
+                                                        // Assume encrypted
+                                                        const pwd = prompt(t('datasource.restore_encrypted_prompt'));
+                                                        if (!pwd) return;
 
-                                                    try {
-                                                        const decrypted = await decryptBuffer(buffer, pwd);
-                                                        finalBuffer = decrypted;
-                                                    } catch (err) {
-                                                        alert(t('datasource.restore_failed'));
-                                                        return;
+                                                        try {
+                                                            const decrypted = await decryptBuffer(buffer, pwd);
+                                                            finalBuffer = decrypted;
+                                                        } catch (err) {
+                                                            setRestoreAlert({
+                                                                type: 'error',
+                                                                title: t('common.error'),
+                                                                message: t('datasource.restore_failed')
+                                                            });
+                                                            return;
+                                                        }
                                                     }
-                                                }
 
-                                                if (confirm(t('datasource.restore_confirm'))) {
-                                                    try {
-                                                        const { importDatabase } = await import('../../lib/db');
-                                                        await importDatabase(finalBuffer);
-                                                        window.location.reload();
-                                                    } catch (err: any) { alert(t('common.error') + ': ' + err.message); }
-                                                }
-                                            }}
-                                        />
-                                        <Upload className="w-4 h-4 text-amber-500" /> {t('datasource.restore_backup')}
+                                                    if (confirm(t('datasource.restore_confirm'))) {
+                                                        try {
+                                                            const { importDatabase } = await import('../../lib/db');
+                                                            const report = await importDatabase(finalBuffer) as any;
+
+                                                            if (!report.headerMatch) {
+                                                                setRestoreAlert({
+                                                                    type: 'error',
+                                                                    title: t('datasource.restore_invalid'),
+                                                                    message: report.error || t('datasource.restore_warning_hint')
+                                                                });
+                                                                return;
+                                                            }
+
+                                                            if (report.error) {
+                                                                setRestoreAlert({
+                                                                    type: 'error',
+                                                                    title: t('common.error'),
+                                                                    message: report.error
+                                                                });
+                                                                return;
+                                                            }
+
+                                                            if (!report.isValid) {
+                                                                let details = "";
+                                                                if (report.missingTables.length > 0) {
+                                                                    details += t('datasource.restore_missing_tables') + '\n- ' + report.missingTables.join('\n- ') + '\n\n';
+                                                                }
+
+                                                                if (Object.keys(report.missingColumns).length > 0) {
+                                                                    details += t('datasource.restore_missing_columns') + '\n';
+                                                                    for (const [tbl, cols] of Object.entries(report.missingColumns)) {
+                                                                        details += `- ${tbl}: ${(cols as string[]).join(', ')}\n`;
+                                                                    }
+                                                                }
+
+                                                                setRestoreAlert({
+                                                                    type: 'warning',
+                                                                    title: t('datasource.restore_warning_title'),
+                                                                    message: t('datasource.restore_warning_hint'),
+                                                                    details: details
+                                                                });
+                                                            } else {
+                                                                setRestoreAlert({
+                                                                    type: 'success',
+                                                                    title: t('common.success'),
+                                                                    message: t('datasource.restore_success_reload')
+                                                                });
+                                                                setTimeout(() => window.location.reload(), 2000);
+                                                            }
+                                                        } catch (err: any) {
+                                                            setRestoreAlert({
+                                                                type: 'error',
+                                                                title: t('common.error'),
+                                                                message: err.message
+                                                            });
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                            <Upload className="w-4 h-4 text-amber-500" /> {t('datasource.restore_backup')}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

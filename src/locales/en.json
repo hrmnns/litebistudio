@@ -239,6 +239,12 @@
         "save_backup_standard": "Save Backup",
         "restore_backup": "Restore Backup",
         "restore_confirm": "Warning: This overwrites ALL local data! Continue?",
+        "restore_invalid": "The backup file is invalid or corrupted.",
+        "restore_missing_tables": "The following system tables are missing:",
+        "restore_missing_columns": "The following columns are missing in the tables:",
+        "restore_success_reload": "Backup successfully validated and imported. The page will now reload.",
+        "restore_warning_title": "Compatibility Warning",
+        "restore_warning_hint": "The backup seems to be from an older version. Some features might be limited.",
         "restore_encrypted_prompt": "This file seems to be encrypted. Please enter password:",
         "restore_failed": "Decryption failed! Wrong password or corrupted file.",
         "danger_zone": "Danger Zone",
@@ -285,7 +291,11 @@
             "done_btn": "Done",
             "back_btn": "Back",
             "start_import": "Start Import",
-            "error_analyzing": "Error analyzing file."
+            "error_analyzing": "Error analyzing file.",
+            "step_success": "Completed",
+            "import_success_title": "Import successful!",
+            "import_success_hint": "{{count}} tables have been successfully created and populated.",
+            "finish_btn": "Finish"
         },
         "excel_import": {
             "processing_file": "Processing file...",

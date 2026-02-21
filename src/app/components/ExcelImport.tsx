@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileSpreadsheet, CheckCircle2 as Check, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2 as Check, AlertCircle, RefreshCw, Layers, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export interface ImportConfig {
@@ -140,16 +140,28 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
             </div>
 
             {error && (
-                <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-xs animate-in slide-in-from-top-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span className="font-medium">{error}</span>
+                <div className="p-4 bg-red-50 border-2 border-red-100 rounded-2xl flex items-start gap-3 text-red-600 text-xs animate-in slide-in-from-top-2 relative">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <p className="font-black uppercase tracking-widest text-[10px] mb-1">{t('common.error')}</p>
+                        <p className="font-medium leading-relaxed">{error}</p>
+                    </div>
+                    <button onClick={() => setError(null)} className="p-1 hover:bg-red-100 rounded-lg transition-colors">
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
             )}
 
             {success && (
-                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3 text-emerald-600 text-xs animate-in slide-in-from-top-2">
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span className="font-medium">{success}</span>
+                <div className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl flex items-start gap-3 text-emerald-600 text-xs animate-in slide-in-from-top-2 relative">
+                    <Check className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <p className="font-black uppercase tracking-widest text-[10px] mb-1">{t('common.success')}</p>
+                        <p className="font-medium leading-relaxed">{success}</p>
+                    </div>
+                    <button onClick={() => setSuccess(null)} className="p-1 hover:bg-emerald-100 rounded-lg transition-colors">
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
             )}
         </div>

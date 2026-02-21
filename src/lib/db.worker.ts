@@ -4,7 +4,7 @@ import viewsSql from '../datasets/views.sql?raw';
 
 let db: any = null;
 let sqlite3: any = null;
-let initPromise: Promise<void> | null = null;
+let initPromise: Promise<any> | null = null;
 
 const log = (...args: any[]) => console.log('[DB Worker]', ...args);
 const error = (...args: any[]) => console.error('[DB Worker]', ...args);
@@ -35,8 +35,12 @@ async function initDB() {
                 try {
                     db = new sqlite3.oo1.OpfsDb('/litebistudio.sqlite3');
                     log('Opened OPFS database');
-                } catch (e) {
-                    error('OPFS unavailable, falling back to memory', e);
+                } catch (e: any) {
+                    error('OPFS unavailable OR corrupted, falling back to memory', e);
+                    // Explicitly ignore "is not a database" errors to allow fallback
+                    if (e.message?.includes('is not a database')) {
+                        log('Database file corrupted on disk. User should restore backup.');
+                    }
                     db = new sqlite3.oo1.DB(':memory:');
                 }
             } else {
@@ -111,6 +115,7 @@ async function initDB() {
             }
 
             log('Generic Schema initialized');
+            return true;
         } catch (e) {
             error('Initialization failed', e);
             initPromise = null;
@@ -221,8 +226,7 @@ async function handleMessage(e: MessageEvent) {
                 break;
 
             case 'IMPORT':
-                await importDatabase(payload);
-                result = true;
+                result = await importDatabase(payload);
                 break;
 
             case 'CLEAR':
@@ -333,13 +337,88 @@ function getDiagnostics() {
 }
 
 async function importDatabase(buffer: ArrayBuffer) {
-    if (db) {
-        db.close();
-        db = null;
-    }
+    let tempDb: any = null;
+    const report: any = {
+        isValid: false,
+        headerMatch: false,
+        missingTables: [],
+        missingColumns: {},
+        versionInfo: { current: 1, backup: 0 }
+    };
 
-    if (sqlite3.oo1.OpfsDb) {
+    try {
+        if (!sqlite3) {
+            await initDB();
+        }
+        // 1. Basic SQLite Validation
+        const header = new Uint8Array(buffer.slice(0, 16));
+        const headerString = new TextDecoder().decode(header);
+        if (headerString.startsWith('SQLite format 3')) {
+            report.headerMatch = true;
+        } else {
+            throw new Error('Invalid SQLite header');
+        }
+
+        // 2. Schema Validation using temporary memory DB
+        // We use a fresh module initialization if needed, but since we already have sqlite3, 
+        // we can just open the buffer as a DB.
         try {
+            tempDb = new sqlite3.oo1.DB(buffer);
+        } catch (e: any) {
+            error('Temporary DB open failed', e);
+            report.error = "Memory DB allocation failed or buffer malformed: " + e.message;
+            return report;
+        }
+
+        // Extract expected tables from schemaSql
+        const expectedTables = schemaSql
+            .split(';')
+            .map(stmt => {
+                const match = stmt.match(/CREATE TABLE (?:IF NOT EXISTS )?([a-z0_9_]+)/i);
+                return match ? match[1] : null;
+            })
+            .filter(Boolean) as string[];
+
+        for (const tableName of expectedTables) {
+            const tableExists = tempDb.selectValue("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?", [tableName]);
+            if (!tableExists) {
+                report.missingTables.push(tableName);
+                continue;
+            }
+
+            // Check columns
+            const actualCols: string[] = [];
+            tempDb.exec({
+                sql: `PRAGMA table_info("${tableName}")`,
+                rowMode: 'object',
+                callback: (row: any) => actualCols.push(row.name)
+            });
+
+            // Get desired columns from master schema (we need a way to parse schemaSql properly, 
+            // but for now we'll check the current DB's schema as reference if available)
+            if (db) {
+                const targetCols: string[] = [];
+                db.exec({
+                    sql: `PRAGMA table_info("${tableName}")`,
+                    rowMode: 'object',
+                    callback: (row: any) => targetCols.push(row.name)
+                });
+
+                const missing = targetCols.filter(c => !actualCols.includes(c));
+                if (missing.length > 0) {
+                    report.missingColumns[tableName] = missing;
+                }
+            }
+        }
+
+        report.isValid = report.missingTables.length === 0 && Object.keys(report.missingColumns).length === 0;
+
+        // 3. Finalize Import (write to OPFS)
+        if (sqlite3.oo1.OpfsDb) {
+            if (db) {
+                db.close();
+                db = null;
+            }
             const root = await navigator.storage.getDirectory();
             try {
                 await root.removeEntry('litebistudio.sqlite3');
@@ -349,10 +428,16 @@ async function importDatabase(buffer: ArrayBuffer) {
             const writable = await fileHandle.createWritable();
             await writable.write(buffer);
             await writable.close();
-        } catch (e) {
-            error('Import failed', e);
-            throw e;
+            log('Database imported and validated');
         }
+
+        return report;
+    } catch (e: any) {
+        error('Import failed', e);
+        report.error = e.message;
+        return report;
+    } finally {
+        if (tempDb) tempDb.close();
     }
 }
 

@@ -239,6 +239,12 @@
         "save_backup_standard": "Backup speichern",
         "restore_backup": "Backup wiederherstellen",
         "restore_confirm": "Achtung: Dies überschreibt ALLE lokalen Daten! Fortfahren?",
+        "restore_invalid": "Die Backup-Datei ist ungültig oder beschädigt.",
+        "restore_missing_tables": "Folgende System-Tabellen fehlen:",
+        "restore_missing_columns": "Folgende Spalten fehlen in den Tabellen:",
+        "restore_success_reload": "Backup erfolgreich validiert und eingespielt. Die Seite wird nun neu geladen.",
+        "restore_warning_title": "Kompatibilitäts-Warnung",
+        "restore_warning_hint": "Das Backup scheint aus einer älteren Version zu sein. Einige Funktionen könnten eingeschränkt sein.",
         "restore_encrypted_prompt": "Diese Datei scheint verschlüsselt zu sein. Bitte Passwort eingeben:",
         "restore_failed": "Entschlüsselung fehlgeschlagen! Falsches Passwort oder beschädigte Datei.",
         "danger_zone": "Gefahrenzone",
@@ -285,7 +291,11 @@
             "done_btn": "Fertig",
             "back_btn": "Zurück",
             "start_import": "Import Starten",
-            "error_analyzing": "Fehler beim Analysieren der Datei."
+            "error_analyzing": "Fehler beim Analysieren der Datei.",
+            "step_success": "Abgeschlossen",
+            "import_success_title": "Import erfolgreich!",
+            "import_success_hint": "{{count}} Tabellen wurden erfolgreich angelegt und befüllt.",
+            "finish_btn": "Abschließen"
         },
         "excel_import": {
             "processing_file": "Datei wird verarbeitet...",

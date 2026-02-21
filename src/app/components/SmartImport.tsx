@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, FileSpreadsheet, ChevronRight, AlertCircle, Trash2, Database, Table as TableIcon } from 'lucide-react';
+import { Upload, FileSpreadsheet, ChevronRight, AlertCircle, Trash2, Database, Table as TableIcon, CheckCircle2 as CheckIcon } from 'lucide-react';
 import { analyzeExcelFile } from '../../lib/utils/excelParser';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 
@@ -15,8 +15,9 @@ interface TablePreview {
 
 export const SmartImport: React.FC = () => {
     const { t } = useTranslation();
-    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
     const [previews, setPreviews] = useState<TablePreview[]>([]);
+    const [importedStats, setImportedStats] = useState<{ tables: number; records: number }>({ tables: 0, records: 0 });
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +49,8 @@ export const SmartImport: React.FC = () => {
 
     const handleImport = async () => {
         setIsImporting(true);
+        let totalRecords = 0;
+        let tableCount = 0;
         try {
             for (const preview of previews) {
                 if (!preview.isValid) continue;
@@ -64,8 +67,11 @@ export const SmartImport: React.FC = () => {
                 for (let i = 0; i < preview.rows.length; i += CHUNK_SIZE) {
                     await SystemRepository.bulkInsert(preview.tableName, preview.rows.slice(i, i + CHUNK_SIZE));
                 }
+                tableCount++;
+                totalRecords += preview.rows.length;
             }
-            setStep(1);
+            setImportedStats({ tables: tableCount, records: totalRecords });
+            setStep(4);
             setPreviews([]);
             window.dispatchEvent(new Event('db-updated'));
         } catch (error: any) {
@@ -83,7 +89,7 @@ export const SmartImport: React.FC = () => {
                     { s: 1, label: t('datasource.smart_import.step_upload') },
                     { s: 2, label: t('datasource.smart_import.step_config') },
                     { s: 3, label: t('datasource.smart_import.step_import') }
-                ].map(({ s, label }) => (
+                ].concat(step === 4 ? [{ s: 4, label: t('datasource.smart_import.step_success') }] : []).map(({ s, label }) => (
                     <React.Fragment key={s}>
                         <div className="flex items-center gap-2">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${step >= s ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
@@ -93,7 +99,7 @@ export const SmartImport: React.FC = () => {
                                 {label}
                             </span>
                         </div>
-                        {s < 3 && <ChevronRight className="w-4 h-4 text-slate-300" />}
+                        {s < (step === 4 ? 4 : 3) && <ChevronRight className="w-4 h-4 text-slate-300" />}
                     </React.Fragment>
                 ))}
             </div>
@@ -236,6 +242,39 @@ export const SmartImport: React.FC = () => {
                             <h4 className="text-sm font-bold text-slate-700">{t('datasource.smart_import.import_running')}</h4>
                             <p className="text-xs text-slate-400 mt-1">{t('common.loading')}</p>
                         </div>
+                    </div>
+                )}
+
+                {step === 4 && (
+                    <div className="flex flex-col items-center justify-center p-12 text-center space-y-6 animate-in zoom-in-95 duration-500">
+                        <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center shadow-inner ring-8 ring-emerald-50/50">
+                            <CheckIcon className="w-10 h-10" />
+                        </div>
+                        <div className="space-y-2">
+                            <h4 className="text-xl font-black text-slate-800 tracking-tight">{t('datasource.smart_import.import_success_title')}</h4>
+                            <p className="text-sm text-slate-500 max-w-[280px] leading-relaxed">
+                                {t('datasource.smart_import.import_success_hint', { count: importedStats.tables })}
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-8 py-4 px-8 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('datasource.smart_import.found_tables')}</p>
+                                <p className="text-lg font-black text-slate-700">{importedStats.tables}</p>
+                            </div>
+                            <div className="w-px h-8 bg-slate-200" />
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('datasource.smart_import.rows_count', { count: 0 }).replace('0', '').trim()}</p>
+                                <p className="text-lg font-black text-slate-700">{importedStats.records}</p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setStep(1)}
+                            className="px-8 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-sm font-bold transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-slate-900/10"
+                        >
+                            {t('datasource.smart_import.finish_btn')}
+                        </button>
                     </div>
                 )}
             </div>

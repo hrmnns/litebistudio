@@ -213,8 +213,8 @@ export async function exportDatabase(): Promise<Uint8Array> {
     return send<Uint8Array>('EXPORT');
 }
 
-export async function importDatabase(buffer: ArrayBuffer) {
-    await send('IMPORT', buffer);
+export async function importDatabase(buffer: ArrayBuffer): Promise<any> {
+    return await send('IMPORT', buffer);
 }
 
 export async function loadDemoData(data?: any) {
