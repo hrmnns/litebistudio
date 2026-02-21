@@ -25,7 +25,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         date: now.toLocaleDateString(i18n.language === 'de' ? 'de-DE' : 'en-US'),
         time: now.toLocaleTimeString(i18n.language === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' })
     });
-    const { isReadOnly } = useDashboard();
+    const { isReadOnly, isAdminMode } = useDashboard();
 
     // Tab State
     const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system'>('import');
@@ -327,20 +327,22 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                         </div>
 
                         {/* System Tables Read-Only */}
-                        <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-6">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{t('datasource.system_tables')}</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {systemTables.map((t_name: string) => (
-                                    <button
-                                        key={t_name}
-                                        onClick={() => { setSelectedTable(t_name); setIsSchemaOpen(true); }}
-                                        className="px-3 py-2 bg-white/50 border border-slate-200/50 rounded text-xs font-mono text-slate-500 hover:bg-white hover:text-blue-600 text-left transition-colors"
-                                    >
-                                        {t_name}
-                                    </button>
-                                ))}
+                        {isAdminMode && (
+                            <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-6">
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{t('datasource.system_tables')}</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {systemTables.map((t_name: string) => (
+                                        <button
+                                            key={t_name}
+                                            onClick={() => { setSelectedTable(t_name); setIsSchemaOpen(true); }}
+                                            className="px-3 py-2 bg-white/50 border border-slate-200/50 rounded text-xs font-mono text-slate-500 hover:bg-white hover:text-blue-600 text-left transition-colors"
+                                        >
+                                            {t_name}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
 
@@ -495,7 +497,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 defaultValue=""
                                             >
                                                 <option value="" disabled>{t('datasource.select_target_table')}</option>
-                                                {tables?.map((table_n: string) => <option key={table_n} value={table_n}>{table_n}</option>)}
+                                                {(isAdminMode ? tables : userTables)?.map((table_n: string) => <option key={table_n} value={table_n}>{table_n}</option>)}
                                             </select>
                                             <button
                                                 onClick={() => {

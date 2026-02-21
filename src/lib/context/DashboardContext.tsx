@@ -21,6 +21,8 @@ interface DashboardContextType {
     togglePresentationMode: () => void;
     isReadOnly: boolean;
     setIsReadOnly: (readOnly: boolean) => void;
+    isAdminMode: boolean;
+    setIsAdminMode: (adminMode: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -108,6 +110,9 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     // Read-Only Mode
     const [isReadOnly, setIsReadOnly] = React.useState(false);
 
+    // Admin Mode
+    const [isAdminMode, setIsAdminMode] = useLocalStorage<boolean>('litebistudio_admin_mode', false);
+
     return (
         <DashboardContext.Provider value={{
             visibleComponentIds,
@@ -127,7 +132,9 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             isPresentationMode,
             togglePresentationMode,
             isReadOnly,
-            setIsReadOnly
+            setIsReadOnly,
+            isAdminMode,
+            setIsAdminMode
         }}>
             {children}
         </DashboardContext.Provider>

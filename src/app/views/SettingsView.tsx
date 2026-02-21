@@ -10,7 +10,7 @@ import { useDashboard } from '../../lib/context/DashboardContext';
 export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { theme, setTheme } = useThemeContext();
-    const { isReadOnly } = useDashboard();
+    const { isReadOnly, isAdminMode, setIsAdminMode } = useDashboard();
 
     const themeOptions: { value: ThemeMode; emoji: string; label: string }[] = [
         { value: 'light', emoji: '🌞', label: t('settings.theme_light') },
@@ -173,6 +173,29 @@ export const SettingsView: React.FC = () => {
                                 </button>
                             </div>
                         )}
+
+                        <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                        <Shield className="w-4 h-4 text-amber-500" />
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold text-slate-900 dark:text-white">{t('settings.admin_mode')}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">{t('settings.admin_mode_hint')}</div>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={isAdminMode}
+                                        onChange={() => setIsAdminMode(!isAdminMode)}
+                                    />
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

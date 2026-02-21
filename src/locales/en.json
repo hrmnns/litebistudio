@@ -204,6 +204,9 @@
         "pin_confirm_remove": "Do you really want to remove PIN protection?",
         "pin_active": "PIN protection active",
         "pin_active_hint": "Dashboard is locked on restart",
+        "admin_mode": "Admin Mode",
+        "admin_mode_hint": "Show system tables (sys_) in selections.",
+        "admin_mode_active": "Admin Mode active",
         "last_update": "Last update: {{date}}, {{time}}"
     },
     "datasource": {

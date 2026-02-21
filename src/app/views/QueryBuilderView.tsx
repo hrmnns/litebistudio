@@ -59,7 +59,7 @@ export const QueryBuilderView: React.FC = () => {
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [activeSchema, setActiveSchema] = useState<any>(null);
     const { isExporting, exportToPdf } = useReportExport();
-    const { togglePresentationMode, isReadOnly } = useDashboard();
+    const { togglePresentationMode, isReadOnly, isAdminMode } = useDashboard();
 
     // Fetch saved widgets
     const { data: savedWidgets, refresh: refreshWidgets } = useAsync<any[]>(
@@ -307,7 +307,11 @@ export const QueryBuilderView: React.FC = () => {
                                                 <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full h-64 font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" placeholder="SELECT * FROM..." />
                                             </>
                                         ) : (
-                                            <VisualQueryBuilder initialConfig={queryConfig} onChange={(newSql, newConfig) => { setSql(newSql); setQueryConfig(newConfig); }} />
+                                            <VisualQueryBuilder
+                                                initialConfig={queryConfig}
+                                                isAdminMode={isAdminMode}
+                                                onChange={(newSql, newConfig) => { setSql(newSql); setQueryConfig(newConfig); }}
+                                            />
                                         )}
                                         <div className="flex justify-between items-center pt-2 border-t border-slate-50 dark:border-slate-800">
                                             <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">

@@ -7,6 +7,7 @@ import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
 import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -14,6 +15,7 @@ interface DataInspectorProps {
 
 export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const { t } = useTranslation();
+    const { isAdminMode } = useDashboard();
     const [mode, setMode] = useState<'table' | 'sql'>('table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
 
@@ -26,13 +28,15 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     // Fetch available tables
     const { data: tables } = useAsync<string[]>(
         async () => {
-            const availableTables = await SystemRepository.getTables();
-            if (availableTables.length > 0 && !selectedTable) {
-                setSelectedTable(availableTables[0]);
+            const allTables = await SystemRepository.getTables();
+            const filteredTables = isAdminMode ? allTables : allTables.filter(t => !t.startsWith('sys_'));
+
+            if (filteredTables.length > 0 && (!selectedTable || (selectedTable.startsWith('sys_') && !isAdminMode))) {
+                setSelectedTable(filteredTables[0]);
             }
-            return availableTables;
+            return filteredTables;
         },
-        []
+        [isAdminMode]
     );
 
     // Main Data Fetching

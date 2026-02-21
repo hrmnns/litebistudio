@@ -24,9 +24,10 @@ export interface QueryConfig {
 interface VisualQueryBuilderProps {
     onChange: (sql: string, config: QueryConfig) => void;
     initialConfig?: QueryConfig;
+    isAdminMode?: boolean;
 }
 
-export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange, initialConfig }) => {
+export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange, initialConfig, isAdminMode = false }) => {
     const [tables, setTables] = useState<string[]>([]);
     const [columns, setColumns] = useState<{ name: string; type: string }[]>([]);
     const [config, setConfig] = useState<QueryConfig>(initialConfig || {
@@ -55,12 +56,13 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
     // Load tables
     useEffect(() => {
         SystemRepository.getTables().then(allTables => {
-            setTables(allTables);
-            if (!config.table && allTables.length > 0) {
-                setConfig(prev => ({ ...prev, table: allTables[0] }));
+            const filteredTables = isAdminMode ? allTables : allTables.filter(t => !t.startsWith('sys_'));
+            setTables(filteredTables);
+            if (!config.table && filteredTables.length > 0) {
+                setConfig(prev => ({ ...prev, table: filteredTables[0] }));
             }
         });
-    }, []);
+    }, [isAdminMode]);
 
     // Load columns when table changes
     useEffect(() => {

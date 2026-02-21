@@ -204,6 +204,9 @@
         "pin_confirm_remove": "Möchten Sie den PIN-Schutz wirklich entfernen?",
         "pin_active": "PIN-Schutz aktiv",
         "pin_active_hint": "Dashboard ist gesperrt beim Neustart",
+        "admin_mode": "Admin-Modus",
+        "admin_mode_hint": "System-Tabellen (sys_) in der Auswahl anzeigen.",
+        "admin_mode_active": "Admin-Modus aktiv",
         "last_update": "Letzte Aktualisierung: {{date}}, {{time}}"
     },
     "datasource": {
