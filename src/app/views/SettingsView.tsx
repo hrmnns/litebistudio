@@ -35,6 +35,7 @@ export const SettingsView: React.FC = () => {
         setHasPin(true);
         setIsEditingPin(false);
         setPinInput('');
+        window.dispatchEvent(new Event('pin-changed'));
         alert(t('settings.pin_success'));
     };
 
@@ -43,6 +44,7 @@ export const SettingsView: React.FC = () => {
             localStorage.removeItem('litebistudio_app_pin');
             localStorage.removeItem('litebistudio_app_pin_salt');
             setHasPin(false);
+            window.dispatchEvent(new Event('pin-changed'));
         }
     };
 

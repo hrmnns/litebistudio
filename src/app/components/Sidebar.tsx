@@ -1,6 +1,7 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe, Info, FileText } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
@@ -29,7 +30,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onCloseMobile,
 }) => {
     const { t, i18n } = useTranslation();
-    const { visibleSidebarComponentIds } = useDashboard();
+    const { visibleSidebarComponentIds, lockApp } = useDashboard();
+    const [isPinActive, setIsPinActive] = React.useState(!!localStorage.getItem('litebistudio_app_pin'));
+
+    React.useEffect(() => {
+        const handlePinChange = () => {
+            setIsPinActive(!!localStorage.getItem('litebistudio_app_pin'));
+        };
+        window.addEventListener('pin-changed', handlePinChange);
+        return () => window.removeEventListener('pin-changed', handlePinChange);
+    }, []);
 
     const toggleLanguage = () => {
         const nextLng = i18n.language.startsWith('de') ? 'en' : 'de';
@@ -126,6 +136,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {i18n.language.startsWith('de') ? 'English' : 'Deutsch'}
                         </span>
                     </button>
+
+                    {isPinActive && (
+                        <button
+                            onClick={lockApp}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
+                            title={i18n.language.startsWith('de') ? 'Lock screen' : 'Sperrbildschirm aktivieren'}
+                        >
+                            <Lock className="w-5 h-5 flex-shrink-0" />
+                            <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>
+                                {i18n.language.startsWith('de') ? 'Lock' : 'Sperren'}
+                            </span>
+                        </button>
+                    )}
 
                     <SystemStatus isCollapsed={isCollapsed} />
                 </div>
