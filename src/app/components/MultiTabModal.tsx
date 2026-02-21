@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertTriangle, XCircle, ExternalLink } from 'lucide-react';
+import { AlertTriangle, XCircle, ExternalLink, Eye } from 'lucide-react';
+import { setReadOnlyMode } from '../../lib/db';
 
 interface MultiTabModalProps {
     // No props needed for informational only
@@ -28,6 +29,14 @@ export const MultiTabModal: React.FC<MultiTabModalProps> = () => {
                             Bitte schließen Sie diesen Tab manuell und nutzen Sie die bereits geöffnete Instanz.
                         </p>
                     </div>
+
+                    <button
+                        onClick={() => setReadOnlyMode()}
+                        className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-medium rounded-xl transition-colors mb-2"
+                    >
+                        <Eye className="w-5 h-5 flex-shrink-0" />
+                        Weiter im Lese-Modus
+                    </button>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-t border-slate-100 dark:border-slate-800 flex justify-center">

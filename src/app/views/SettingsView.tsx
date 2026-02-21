@@ -5,10 +5,12 @@ import { PageLayout } from '../components/ui/PageLayout';
 import { Lock, Shield, Trash2, Check, X, Info, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { hashPin, generateSalt } from '../../lib/utils/crypto';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
 export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { theme, setTheme } = useThemeContext();
+    const { isReadOnly } = useDashboard();
 
     const themeOptions: { value: ThemeMode; emoji: string; label: string }[] = [
         { value: 'light', emoji: '🌞', label: t('settings.theme_light') },
@@ -68,9 +70,8 @@ export const SettingsView: React.FC = () => {
             ]}
         >
             <div className="max-w-2xl space-y-6">
-
                 {/* Appearance Section */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                         <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
@@ -101,7 +102,7 @@ export const SettingsView: React.FC = () => {
                 </div>
 
                 {/* Security Section */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                         <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             <Shield className="w-4 h-4 text-emerald-500" />

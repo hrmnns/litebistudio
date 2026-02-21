@@ -49,7 +49,7 @@ export const CustomDashboardView: React.FC = () => {
 
     const [showFilters, setShowFilters] = useState(false);
     const [suggestedColumns, setSuggestedColumns] = useState<string[]>([]);
-    const { visibleSidebarComponentIds, setVisibleSidebarComponentIds, togglePresentationMode } = useDashboard();
+    const { visibleSidebarComponentIds, setVisibleSidebarComponentIds, togglePresentationMode, isReadOnly } = useDashboard();
     const { isExporting, exportToPdf } = useReportExport();
 
     // Fetch custom widgets
@@ -218,13 +218,15 @@ export const CustomDashboardView: React.FC = () => {
                         >
                             <Filter className="w-5 h-5" />
                         </button>
-                        <button
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm"
-                        >
-                            <Plus className="w-4 h-4" />
-                            {t('dashboard.add_title')}
-                        </button>
+                        {!isReadOnly && (
+                            <button
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm"
+                            >
+                                <Plus className="w-4 h-4" />
+                                {t('dashboard.add_title')}
+                            </button>
+                        )}
                     </div>
                 )
             }}
@@ -337,22 +339,26 @@ export const CustomDashboardView: React.FC = () => {
                             {d.name}
                         </button>
                     ))}
-                    <button
-                        onClick={() => { setIsCreating(true); setEditName(''); }}
-                        className="px-4 py-2.5 text-slate-400 hover:text-blue-600 transition-all border-b-2 border-transparent"
-                        title={t('dashboard.new_dashboard_title')}
-                    >
-                        <Plus className="w-4 h-4" />
-                    </button>
+                    {!isReadOnly && (
+                        <button
+                            onClick={() => { setIsCreating(true); setEditName(''); }}
+                            className="px-4 py-2.5 text-slate-400 hover:text-blue-600 transition-all border-b-2 border-transparent"
+                            title={t('dashboard.new_dashboard_title')}
+                        >
+                            <Plus className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
 
-                <button
-                    onClick={() => setIsManageModalOpen(true)}
-                    className="p-2 text-slate-400 hover:text-slate-600"
-                    title={t('dashboard.manage_title')}
-                >
-                    <Settings className="w-4 h-4" />
-                </button>
+                {!isReadOnly && (
+                    <button
+                        onClick={() => setIsManageModalOpen(true)}
+                        className="p-2 text-slate-400 hover:text-slate-600"
+                        title={t('dashboard.manage_title')}
+                    >
+                        <Settings className="w-4 h-4" />
+                    </button>
+                )}
             </div>
 
             {/* Dashboard Name Editor (Inline Create) */}
@@ -383,12 +389,14 @@ export const CustomDashboardView: React.FC = () => {
                         <Layout className="w-12 h-12 mb-4 opacity-50" />
                         <h3 className="font-bold text-lg text-slate-600">{t('dashboard.empty_msg', { name: activeDashboard.name })}</h3>
                         <p className="mb-4 text-sm text-center">{t('dashboard.empty_hint')}</p>
-                        <button
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-blue-600 font-bold hover:shadow-sm transition-all text-sm"
-                        >
-                            {t('dashboard.add_title')}
-                        </button>
+                        {!isReadOnly && (
+                            <button
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-blue-600 font-bold hover:shadow-sm transition-all text-sm"
+                            >
+                                {t('dashboard.add_title')}
+                            </button>
+                        )}
                     </div>
                 ) : activeDashboard ? (
                     <div id="dashboard-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 auto-rows-[300px]">
@@ -402,15 +410,17 @@ export const CustomDashboardView: React.FC = () => {
 
                                 return (
                                     <div key={widgetRef.id + idx} className={`relative group h-full ${meta.defaultColSpan === 2 ? 'md:col-span-2' : ''}`}>
-                                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); removeFromDashboard(widgetRef.id); }}
-                                                className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
-                                                title={t('common.remove')}
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
-                                        </div>
+                                        {!isReadOnly && (
+                                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); removeFromDashboard(widgetRef.id); }}
+                                                    className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
+                                                    title={t('common.remove')}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        )}
                                         <div className="h-full">
                                             <Component
                                                 onRemove={() => removeFromDashboard(widgetRef.id)}
@@ -434,15 +444,17 @@ export const CustomDashboardView: React.FC = () => {
 
                             return (
                                 <div key={widgetRef.id + idx} className="relative group md:col-span-1 xl:col-span-2 h-full">
-                                    <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => removeFromDashboard(widgetRef.id)}
-                                            className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
-                                            title="Entfernen"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
-                                    </div>
+                                    {!isReadOnly && (
+                                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => removeFromDashboard(widgetRef.id)}
+                                                className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
+                                                title="Entfernen"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    )}
                                     <WidgetRenderer
                                         title={dbWidget.name}
                                         sql={dbWidget.sql_query}

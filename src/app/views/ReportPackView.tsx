@@ -12,6 +12,7 @@ import { useReportExport } from '../../hooks/useReportExport';
 import { WidgetRenderer } from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
 import { type ReportPack, type ReportPackItem } from '../../types';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
 export const ReportPackView: React.FC = () => {
     const { t } = useTranslation();
@@ -19,6 +20,7 @@ export const ReportPackView: React.FC = () => {
     const [activePackId, setActivePackId] = useState<string | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
+    const { isReadOnly } = useDashboard();
 
     // Export State
     const { isExporting, exportProgress, exportPackageToPdf } = useReportExport();
@@ -40,6 +42,7 @@ export const ReportPackView: React.FC = () => {
     const activePack = packs.find(p => p.id === activePackId);
 
     const handleSave = async (pack: ReportPack) => {
+        if (isReadOnly) return;
         await SystemRepository.saveReportPack(pack);
         loadPacks();
     };
@@ -62,6 +65,7 @@ export const ReportPackView: React.FC = () => {
     };
 
     const deletePack = async (id: string) => {
+        if (isReadOnly) return;
         if (confirm(t('common.confirm_delete'))) {
             await SystemRepository.deleteReportPack(id);
             loadPacks();
@@ -135,7 +139,8 @@ export const ReportPackView: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={createPack}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm"
+                            disabled={isReadOnly}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Plus className="w-4 h-4" /> {t('common.add')}
                         </button>
@@ -160,12 +165,14 @@ export const ReportPackView: React.FC = () => {
                                     <FileText className={`w-4 h-4 shrink-0 ${activePackId === p.id ? 'text-blue-500' : 'text-slate-400'}`} />
                                     <span className="font-bold text-sm truncate">{p.name}</span>
                                 </div>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); deletePack(p.id); }}
-                                    className="p-1 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {!isReadOnly && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); deletePack(p.id); }}
+                                        className="p-1 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
                         ))}
                         {packs.length === 0 && (
@@ -193,13 +200,15 @@ export const ReportPackView: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setIsEditModalOpen(true)}
-                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                        title={t('common.settings')}
-                                    >
-                                        <Settings className="w-5 h-5" />
-                                    </button>
+                                    {!isReadOnly && (
+                                        <button
+                                            onClick={() => setIsEditModalOpen(true)}
+                                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            title={t('common.settings')}
+                                        >
+                                            <Settings className="w-5 h-5" />
+                                        </button>
+                                    )}
                                     <button
                                         onClick={handleRunExport}
                                         disabled={isExporting || activePack.config.items.length === 0}
@@ -212,7 +221,7 @@ export const ReportPackView: React.FC = () => {
                             </div>
 
                             {/* Content & Hidden Capture Area */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+                            <div className={`flex-1 overflow-y-auto custom-scrollbar p-1 ${isReadOnly ? 'pointer-events-none opacity-80' : ''}`}>
                                 <div className="space-y-3">
                                     {activePack.config.items.map((item, idx) => {
                                         const meta = item.type === 'dashboard'

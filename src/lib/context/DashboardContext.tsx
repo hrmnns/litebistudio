@@ -19,6 +19,8 @@ interface DashboardContextType {
     unlockApp: () => void;
     isPresentationMode: boolean;
     togglePresentationMode: () => void;
+    isReadOnly: boolean;
+    setIsReadOnly: (readOnly: boolean) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -103,6 +105,9 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [isPresentationMode, setIsPresentationMode] = React.useState(false);
     const togglePresentationMode = React.useCallback(() => setIsPresentationMode(prev => !prev), []);
 
+    // Read-Only Mode
+    const [isReadOnly, setIsReadOnly] = React.useState(false);
+
     return (
         <DashboardContext.Provider value={{
             visibleComponentIds,
@@ -120,7 +125,9 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             lockApp,
             unlockApp,
             isPresentationMode,
-            togglePresentationMode
+            togglePresentationMode,
+            isReadOnly,
+            setIsReadOnly
         }}>
             {children}
         </DashboardContext.Provider>

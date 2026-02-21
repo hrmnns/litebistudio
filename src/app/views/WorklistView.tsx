@@ -4,6 +4,7 @@ import { ClipboardList, Trash2, ExternalLink, AlertCircle, CheckCircle2, Circle,
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { PageLayout } from '../components/ui/PageLayout';
 import { RecordDetailModal } from '../components/RecordDetailModal';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
 export const WorklistView: React.FC = () => {
     const { t } = useTranslation();
@@ -11,6 +12,7 @@ export const WorklistView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
+    const { isReadOnly } = useDashboard();
 
     // Detail Modal State
     const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -42,6 +44,7 @@ export const WorklistView: React.FC = () => {
     }, []);
 
     const handleRemove = async (id: number) => {
+        if (isReadOnly) return;
         await SystemRepository.executeRaw('DELETE FROM sys_worklist WHERE id = ?', [id]);
         loadWorklist();
     };
@@ -196,13 +199,15 @@ export const WorklistView: React.FC = () => {
                                     >
                                         <ExternalLink className="w-4 h-4" />
                                     </button>
-                                    <button
-                                        onClick={() => handleRemove(item.id)}
-                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                        title={t('worklist.remove_btn')}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    {!isReadOnly && (
+                                        <button
+                                            onClick={() => handleRemove(item.id)}
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                            title={t('worklist.remove_btn')}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}

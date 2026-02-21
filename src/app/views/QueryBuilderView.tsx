@@ -59,7 +59,7 @@ export const QueryBuilderView: React.FC = () => {
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [activeSchema, setActiveSchema] = useState<any>(null);
     const { isExporting, exportToPdf } = useReportExport();
-    const { togglePresentationMode } = useDashboard();
+    const { togglePresentationMode, isReadOnly } = useDashboard();
 
     // Fetch saved widgets
     const { data: savedWidgets, refresh: refreshWidgets } = useAsync<any[]>(
@@ -146,7 +146,7 @@ export const QueryBuilderView: React.FC = () => {
     };
 
     const handleSaveWidget = async () => {
-        if (!widgetName) return;
+        if (!widgetName || isReadOnly) return;
         try {
             const widget = {
                 id: activeWidgetId || crypto.randomUUID(),
@@ -170,6 +170,7 @@ export const QueryBuilderView: React.FC = () => {
     };
 
     const deleteWidget = async (id: string) => {
+        if (isReadOnly) return;
         if (confirm(t('dashboard.confirm_delete_report'))) {
             await SystemRepository.deleteUserWidget(id);
             refreshWidgets();
@@ -223,8 +224,8 @@ export const QueryBuilderView: React.FC = () => {
                         )}
                         <button
                             onClick={() => setSaveModalOpen(true)}
-                            disabled={results.length === 0}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
+                            disabled={results.length === 0 || isReadOnly}
+                            className={`flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50 ${isReadOnly ? 'cursor-not-allowed hidden' : ''}`}
                         >
                             <Save className="w-4 h-4" />
                             {activeWidgetId ? t('querybuilder.update_widget') : t('querybuilder.save_as_widget')}
@@ -261,7 +262,9 @@ export const QueryBuilderView: React.FC = () => {
                                             <div key={w.id} className={`group p-3 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
                                                 <div className="flex items-center justify-between">
                                                     <span className="font-bold text-slate-700 dark:text-slate-200 text-sm truncate">{w.name}</span>
-                                                    <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    {!isReadOnly && (
+                                                        <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-2 text-[10px]">
                                                     <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query}</span>

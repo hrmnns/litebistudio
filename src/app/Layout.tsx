@@ -11,16 +11,17 @@ import { LockScreen } from './components/LockScreen';
 export const Layout: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [hasConflict, setHasConflict] = useState(false);
-    const { isSidebarCollapsed, setSidebarCollapsed, isPresentationMode, togglePresentationMode } = useDashboard();
+    const { isSidebarCollapsed, setSidebarCollapsed, isPresentationMode, togglePresentationMode, isReadOnly, setIsReadOnly } = useDashboard();
 
     useEffect(() => {
-        const unsubscribe = onTabConflict((conflict) => {
+        const unsubscribe = onTabConflict((conflict, readOnly) => {
             setHasConflict(conflict);
+            setIsReadOnly(readOnly ?? false);
         });
         return () => {
             unsubscribe();
         };
-    }, []);
+    }, [setIsReadOnly]);
 
     return (
         <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
@@ -32,6 +33,7 @@ export const Layout: React.FC = () => {
                     onNavigate={() => { }}
                     onToggleCollapse={() => setSidebarCollapsed(!isSidebarCollapsed)}
                     onCloseMobile={() => setSidebarOpen(false)}
+                    isReadOnly={isReadOnly}
                 />
             )}
 
@@ -43,7 +45,10 @@ export const Layout: React.FC = () => {
                         <button onClick={() => setSidebarOpen(true)} className="p-1 text-slate-500 hover:text-slate-700">
                             <Menu className="w-6 h-6" />
                         </button>
-                        <h1 className="text-lg font-bold">LiteBI Studio</h1>
+                        <h1 className="text-lg font-bold flex items-center gap-2">
+                            LiteBI Studio
+                            {isReadOnly && <span className="text-[10px] uppercase font-bold tracking-wider bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Lese-Modus</span>}
+                        </h1>
                     </header>
                 )}
 
@@ -60,7 +65,7 @@ export const Layout: React.FC = () => {
                 />
             )}
 
-            {hasConflict && (
+            {hasConflict && !isReadOnly && (
                 <MultiTabModal />
             )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
 import { SmartImport } from '../components/SmartImport';
 import { SchemaTable } from '../components/SchemaDocumentation';
@@ -12,6 +12,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useAsync } from '../../hooks/useAsync';
 import { encryptBuffer, decryptBuffer } from '../../lib/utils/crypto';
 import { Lock, Unlock } from 'lucide-react';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -24,6 +25,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         date: now.toLocaleDateString(i18n.language === 'de' ? 'de-DE' : 'en-US'),
         time: now.toLocaleTimeString(i18n.language === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' })
     });
+    const { isReadOnly } = useDashboard();
 
     // Tab State
     const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system'>('import');
@@ -186,14 +188,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             }}
             footer={footerText}
         >
-            <div className="max-w-4xl space-y-6 mx-auto">
-
+            <div className={`max-w-4xl space-y-6 mx-auto ${isReadOnly ? 'opacity-80' : ''}`}>
                 {/* --- TAB: IMPORT (Smart & Generic) --- */}
                 {activeTab === 'import' && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                         {/* 1. Smart Import (New Tables) */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                        <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm ${isReadOnly ? 'pointer-events-none opacity-60' : ''}`}>
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
                                     <Plus className="w-5 h-5" />
@@ -213,7 +214,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                         </div>
 
                         {/* 2. Generic Import (Append Data) */}
-                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                        <div className={`bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm ${isReadOnly ? 'pointer-events-none opacity-60' : ''}`}>
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-white dark:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 shadow-sm">
@@ -268,12 +269,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                     </h3>
                                     <p className="text-xs text-slate-400 mt-1">{t('datasource.user_tables_hint')}</p>
                                 </div>
-                                <button
-                                    onClick={() => setIsCreateModalOpen(true)}
-                                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
-                                >
-                                    <Plus className="w-4 h-4" /> {t('datasource.new_table')}
-                                </button>
+                                {!isReadOnly && (
+                                    <button
+                                        onClick={() => setIsCreateModalOpen(true)}
+                                        className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                                    >
+                                        <Plus className="w-4 h-4" /> {t('datasource.new_table')}
+                                    </button>
+                                )}
                             </div>
 
                             {userTables.length === 0 ? (
@@ -298,20 +301,24 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 >
                                                     <Info className="w-4 h-4" />
                                                 </button>
-                                                <button
-                                                    onClick={() => { setSelectedTable(t_name); setActiveTab('import'); }}
-                                                    className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                                                    title={t('datasource.append_data_short')}
-                                                >
-                                                    <Upload className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDropTable(t_name)}
-                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                    title={t('common.delete')}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {!isReadOnly && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => { setSelectedTable(t_name); setActiveTab('import'); }}
+                                                            className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                                            title={t('datasource.append_data_short')}
+                                                        >
+                                                            <Upload className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDropTable(t_name)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                            title={t('common.delete')}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -415,7 +422,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         {useEncryption ? t('datasource.save_backup_secure') : t('datasource.save_backup_standard')}
                                     </button>
 
-                                    <div className="relative">
+                                    <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-bold transition-colors">
                                         <input
                                             type="file"
                                             accept=".sqlite3"
@@ -454,27 +461,29 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 }
                                             }}
                                         />
-                                        <button className="w-full flex items-center justify-center gap-2 p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 transition-colors pointer-events-none">
-                                            <Upload className="w-4 h-4 text-amber-500" /> {t('datasource.restore_backup')}
-                                        </button>
+                                        <Upload className="w-4 h-4 text-amber-500" /> {t('datasource.restore_backup')}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Danger Zone */}
-                        <div className="bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-2xl p-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-600">
+                        <div className="bg-red-50/50 dark:bg-red-900/10 rounded-2xl border border-red-200 dark:border-red-900/50 p-6 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-lg">
                                     <AlertTriangle className="w-5 h-5" />
                                 </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-red-900 dark:text-red-100 uppercase tracking-widest">{t('datasource.danger_zone')}</h3>
-                                    <p className="text-xs text-red-700/70 dark:text-red-300/60">{t('datasource.danger_zone_hint')}</p>
+                                <div className="flex flex-col">
+                                    <h3 className="text-sm font-bold text-red-900 dark:text-red-400 uppercase tracking-wider leading-none">
+                                        {t('datasource.danger_zone')}
+                                    </h3>
+                                    <p className="text-xs text-red-700/70 dark:text-red-300/60 mt-1">
+                                        {t('datasource.danger_zone_hint')}
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                                 {/* Clear Data Card */}
                                 <div className="bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/20 rounded-xl p-4 shadow-sm">
                                     <h4 className="text-xs font-black text-slate-400 uppercase mb-3">{t('datasource.clear_reset')}</h4>
@@ -533,59 +542,58 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                         </div>
                     </div>
                 )}
-
-                {/* Modals outside tabs */}
-                <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title={t('datasource.create_table_title')}>
-                    <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                        <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-lg w-fit">
-                            <button onClick={() => setSqlMode(false)} className={`px-3 py-1 text-xs font-bold rounded ${!sqlMode ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t('datasource.assistant')}</button>
-                            <button onClick={() => setSqlMode(true)} className={`px-3 py-1 text-xs font-bold rounded ${sqlMode ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>SQL</button>
-                        </div>
-
-                        {sqlMode ? (
-                            <textarea
-                                value={customSql} onChange={e => setCustomSql(e.target.value)}
-                                className="w-full h-40 font-mono text-sm p-3 bg-slate-900 text-white rounded-lg"
-                            />
-                        ) : (
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.name_label')}</label>
-                                    <input value={newTableName} onChange={e => setNewTableName(e.target.value)} className="w-full p-2 border rounded" placeholder="usr_tabelle" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.columns_label')}</label>
-                                    {createColumns.map((col, idx) => (
-                                        <div key={idx} className="flex gap-2">
-                                            <input value={col.name} onChange={e => {
-                                                const newCols = [...createColumns]; newCols[idx].name = e.target.value; setCreateColumns(newCols);
-                                            }} className="flex-1 p-2 border rounded text-sm" placeholder={t('datasource.name_label')} />
-                                            <select value={col.type} onChange={e => {
-                                                const newCols = [...createColumns]; newCols[idx].type = e.target.value; setCreateColumns(newCols);
-                                            }} className="w-32 p-2 border rounded text-sm">
-                                                <option value="TEXT">TEXT</option>
-                                                <option value="INTEGER">INTEGER</option>
-                                                <option value="REAL">REAL</option>
-                                                <option value="INTEGER PRIMARY KEY">ID (PK)</option>
-                                            </select>
-                                            <button onClick={() => setCreateColumns(createColumns.filter((_, i) => i !== idx))} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
-                                        </div>
-                                    ))}
-                                    <button onClick={() => setCreateColumns([...createColumns, { name: '', type: 'TEXT' }])} className="text-xs text-blue-600 font-bold flex items-center gap-1">{t('datasource.add_column')}</button>
-                                </div>
-                            </div>
-                        )}
-                        <div className="flex justify-end gap-2 pt-4">
-                            <button onClick={handleCreateTable} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">{t('datasource.create_btn')}</button>
-                        </div>
-                    </div>
-                </Modal>
-
-                <Modal isOpen={isSchemaOpen} onClose={() => setIsSchemaOpen(false)} title={tableSchema?.title || selectedTable}>
-                    {tableSchema ? <SchemaTable schema={tableSchema} /> : <div className="p-4 text-center">{t('datasource.schema_not_available')}</div>}
-                </Modal>
-
             </div>
-        </PageLayout >
+
+            {/* Modals outside tabs */}
+            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title={t('datasource.create_table_title')}>
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                    <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-lg w-fit">
+                        <button onClick={() => setSqlMode(false)} className={`px-3 py-1 text-xs font-bold rounded ${!sqlMode ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t('datasource.assistant')}</button>
+                        <button onClick={() => setSqlMode(true)} className={`px-3 py-1 text-xs font-bold rounded ${sqlMode ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>SQL</button>
+                    </div>
+
+                    {sqlMode ? (
+                        <textarea
+                            value={customSql} onChange={e => setCustomSql(e.target.value)}
+                            className="w-full h-40 font-mono text-sm p-3 bg-slate-900 text-white rounded-lg"
+                        />
+                    ) : (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.name_label')}</label>
+                                <input value={newTableName} onChange={e => setNewTableName(e.target.value)} className="w-full p-2 border rounded" placeholder="usr_tabelle" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.columns_label')}</label>
+                                {createColumns.map((col, idx) => (
+                                    <div key={idx} className="flex gap-2">
+                                        <input value={col.name} onChange={e => {
+                                            const newCols = [...createColumns]; newCols[idx].name = e.target.value; setCreateColumns(newCols);
+                                        }} className="flex-1 p-2 border rounded text-sm" placeholder={t('datasource.name_label')} />
+                                        <select value={col.type} onChange={e => {
+                                            const newCols = [...createColumns]; newCols[idx].type = e.target.value; setCreateColumns(newCols);
+                                        }} className="w-32 p-2 border rounded text-sm">
+                                            <option value="TEXT">TEXT</option>
+                                            <option value="INTEGER">INTEGER</option>
+                                            <option value="REAL">REAL</option>
+                                            <option value="INTEGER PRIMARY KEY">ID (PK)</option>
+                                        </select>
+                                        <button onClick={() => setCreateColumns(createColumns.filter((_, i) => i !== idx))} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
+                                ))}
+                                <button onClick={() => setCreateColumns([...createColumns, { name: '', type: 'TEXT' }])} className="text-xs text-blue-600 font-bold flex items-center gap-1">{t('datasource.add_column')}</button>
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex justify-end gap-2 pt-4">
+                        <button onClick={handleCreateTable} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">{t('datasource.create_btn')}</button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal isOpen={isSchemaOpen} onClose={() => setIsSchemaOpen(false)} title={tableSchema?.title || selectedTable}>
+                {tableSchema ? <SchemaTable schema={tableSchema} /> : <div className="p-4 text-center">{t('datasource.schema_not_available')}</div>}
+            </Modal>
+        </PageLayout>
     );
 };

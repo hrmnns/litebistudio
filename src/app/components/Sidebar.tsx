@@ -14,7 +14,9 @@ interface SidebarProps {
     /** @deprecated kept for backwards compat — ignored when using router */
     currentView?: string;
     /** @deprecated kept for backwards compat — ignored when using router */
+    /** @deprecated kept for backwards compat — ignored when using router */
     onNavigate?: (view: string) => void;
+    isReadOnly?: boolean;
 }
 
 interface NavItem {
@@ -28,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     sidebarOpen,
     onToggleCollapse,
     onCloseMobile,
+    isReadOnly,
 }) => {
     const { t, i18n } = useTranslation();
     const { visibleSidebarComponentIds, lockApp } = useDashboard();
@@ -86,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="flex-shrink-0 p-1.5 bg-blue-600 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none">
                         <ShieldCheck className="w-5 h-5 text-white" />
                     </div>
-                    <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
+                    <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100 flex flex-col'}`}>
                         <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
                             LiteBI <span className="text-blue-600">Studio</span>
                         </h1>
@@ -107,23 +110,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className="flex flex-col h-[calc(100%-80px)] justify-between">
-                <nav className="p-4 space-y-1">
-                    {[...staticTopItems, ...dynamicItems, ...staticBottomItems].map(({ to, icon, label }) => (
-                        <NavLink
-                            key={`${label}-${to}`}
-                            to={to}
-                            end={to === '/'}
-                            onClick={onCloseMobile}
-                            className={({ isActive }) =>
-                                `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`
-                            }
-                            title={isCollapsed ? label : ''}
-                        >
-                            {icon}
-                            <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>{label}</span>
-                        </NavLink>
-                    ))}
-                </nav>
+                <div>
+                    {isReadOnly && (
+                        <div className={`bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/50 px-4 py-3 flex items-start gap-3 text-amber-800 dark:text-amber-400 overflow-hidden ${isCollapsed ? 'md:px-0 md:justify-center' : ''}`}>
+                            <Info className="w-5 h-5 flex-shrink-0" />
+                            <div className={`text-xs transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
+                                <span className="font-semibold block text-sm">Lese-Modus</span>
+                                Schreibschutz aktiv (2. Tab)
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="p-4 space-y-1">
+                        {[...staticTopItems, ...dynamicItems, ...staticBottomItems].map(({ to, icon, label }) => (
+                            <NavLink
+                                key={`${label}-${to}`}
+                                to={to}
+                                end={to === '/'}
+                                onClick={onCloseMobile}
+                                className={({ isActive }) =>
+                                    `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`
+                                }
+                                title={isCollapsed ? label : ''}
+                            >
+                                {icon}
+                                <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>{label}</span>
+                            </NavLink>
+                        ))}
+                    </nav>
+                </div>
 
                 <div className={`p-4 py-5 border-t border-slate-300 dark:border-slate-700 transition-all space-y-4 ${isCollapsed ? 'md:p-2 md:py-4' : ''}`}>
                     <button
@@ -153,6 +168,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <SystemStatus isCollapsed={isCollapsed} />
                 </div>
             </div>
-        </aside>
+        </aside >
     );
 };
