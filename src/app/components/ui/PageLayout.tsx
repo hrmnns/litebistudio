@@ -196,8 +196,6 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                 <footer className="flex-shrink-0 px-6 md:px-8 py-3 border-t border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
-                            {footer && <div>{footer}</div>}
-
                             {/* Global Loading & Performance Indicator */}
                             {(activeQueries > 0 || lastQueryMs !== null) && (
                                 <div className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-all" title="Letzte Datenbank-Antwortzeit">
@@ -215,33 +213,42 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                 </div>
                             )}
                         </div>
-                        {breadcrumbs && breadcrumbs.length > 0 && (
-                            <nav className="flex items-center gap-1.5 text-[10px] uppercase font-black tracking-wider">
-                                {breadcrumbs.map((crumb, i) => (
-                                    <React.Fragment key={i}>
-                                        {i > 0 && <span className="text-slate-300 dark:text-slate-600">/</span>}
-                                        {crumb.href || crumb.onClick ? (
-                                            <a
-                                                href={crumb.href || '#'}
-                                                onClick={(e) => {
-                                                    if (crumb.onClick) {
-                                                        e.preventDefault();
-                                                        crumb.onClick();
-                                                    }
-                                                }}
-                                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
-                                            >
-                                                {crumb.label}
-                                            </a>
-                                        ) : (
-                                            <span className="text-slate-600 dark:text-slate-300">
-                                                {crumb.label}
-                                            </span>
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                            </nav>
-                        )}
+
+                        <div className="flex items-center gap-3 text-right">
+                            {footer && <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{footer}</div>}
+
+                            {footer && breadcrumbs && breadcrumbs.length > 0 && (
+                                <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+                            )}
+
+                            {breadcrumbs && breadcrumbs.length > 0 && (
+                                <nav className="flex items-center gap-1.5 text-[10px] uppercase font-black tracking-wider">
+                                    {breadcrumbs.map((crumb, i) => (
+                                        <React.Fragment key={i}>
+                                            {i > 0 && <span className="text-slate-300 dark:text-slate-600">/</span>}
+                                            {crumb.href || crumb.onClick ? (
+                                                <a
+                                                    href={crumb.href || '#'}
+                                                    onClick={(e) => {
+                                                        if (crumb.onClick) {
+                                                            e.preventDefault();
+                                                            crumb.onClick();
+                                                        }
+                                                    }}
+                                                    className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                                                >
+                                                    {crumb.label}
+                                                </a>
+                                            ) : (
+                                                <span className="text-slate-600 dark:text-slate-300">
+                                                    {crumb.label}
+                                                </span>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </nav>
+                            )}
+                        </div>
                     </div>
                 </footer>
             )}

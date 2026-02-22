@@ -28,6 +28,19 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['recharts'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-ui': ['clsx', 'tailwind-merge'],
+          'vendor-db': ['@sqlite.org/sqlite-wasm'],
+        }
+      }
+    }
+  },
   test: {
     globals: true,
     environment: 'jsdom',

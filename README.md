@@ -11,17 +11,17 @@ A high-performance, browser-based business intelligence platform with local SQLi
   - **SQL Copilot**: Integrated snippet assistant and schema-aware templates for rapid query development.
 - **Advanced Visualization**: 
   - **Charts**: Responsive Pie, Bar, Line, Area, Radar, and Scatter charts with multi-series support.
-  - **Pivot Tables**: Multi-dimensional matrix analysis with grouping (rows/cols) and 5+ aggregation types (Sum, Count, Avg, Min, Max).
+  - **Pivot Tables**: Multi-dimensional matrix analysis with drag-and-drop grouping (rows/cols/values) and 5+ aggregation types (Sum, Count, Avg, Min, Max).
   - **KPI Alerts**: Traffic light indicator systems for single-value tiles based on customizable threshold rules.
 - **Reporting & Multi-Page Export**:
-  - **Report Packages**: Build complex management reports by combining multiple dashboards into one sequential document.
+  - **Report Packages**: Build complex management reports by combining multiple dashboards, pivot tables, and charts into one sequential document.
   - **Advanced PDF Core**: Automated multi-page exports including Cover Pages, Tables of Contents (TOC), and consistent branding.
   - **Single-Widget Export**: High-quality image and PDF export of individual results.
 - **Modular Data Import**: 
   - **Smart Import**: Automated schema generation from Excel files.
   - **Generic Import**: Direct mapping of Excel data to existing database structures with pre-import validation.
 - **Interactive Worklist**: 
-  - Centralized management of flagged records with status tracking and existence checks.
+  - Centralized management of flagged records with unified status tracking (Open, In Progress, Done, Closed) and contextual commenting.
 - **Multi-Language Support**: Full internationalization (English & German) with instant UI switching.
 - **Security & Privacy**:
   - **App Lock**: Salted PIN protection for the entire interface.
@@ -85,8 +85,8 @@ This project is optimized for static hosting while maintaining full database fea
 
 - **No External Tracking**: Zero-telemetry, zero-API calls architecture.
 - **Local Sovereignty**: Your data remains on your machine; only you can export or share it.
+- **Hardened CSP**: Content Security Policy actively blocks unauthorized `connect-src` and `img-src` requests to prevent data exfiltration.
 - **Salted Protection**: The application lock uses unique cryptographic salts per device deployment to protect against brute-force/rainbow table attacks.
 - **AES-GCM Encryption**: Modern authenticated encryption used for backups.
-
 ---
 Built with ❤️ for Data Sovereignty and Insights.
