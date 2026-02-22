@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS sys_worklist (
     source_id TEXT NOT NULL,
     display_label TEXT,
     display_context TEXT,
-    status TEXT DEFAULT 'pending',
+    status TEXT DEFAULT 'open',
     comment TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

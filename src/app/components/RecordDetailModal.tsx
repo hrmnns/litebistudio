@@ -104,7 +104,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         const checkStatus = async () => {
             const currentItem = items[currentIndex];
             if (currentItem) {
-                const recordId = getRecordIdValue(currentItem);
+                const recordId = await getRecordIdValueAsync(currentItem);
                 const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId);
                 setIsInWorklist(metadata.isInWorklist);
                 setWorklistItem(metadata.worklistItem);
@@ -120,8 +120,20 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         }
     }, [isOpen, currentIndex, items, activeTable]);
 
-    const getRecordIdValue = (item: any) => {
+    const getRecordIdValueAsync = async (item: any) => {
         if (!item) return null;
+
+        // Find authentic Primary Key
+        try {
+            const columns = await SystemRepository.getTableSchema(activeTable);
+            const pkCol = columns.find((c: any) => c.pk === 1)?.name;
+            if (pkCol && item[pkCol] !== undefined && item[pkCol] !== null) {
+                return item[pkCol];
+            }
+        } catch (e) {
+            // ignore and fallback
+        }
+
         // 0. Hidden RowID from inspectTable (most reliable for tables without PK)
         if (item._rowid !== undefined && item._rowid !== null) return item._rowid;
 
@@ -139,7 +151,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     const handleToggleWorklist = async () => {
         if (isActionLoading) return;
         const currentItem = items[currentIndex];
-        const recordId = getRecordIdValue(currentItem);
+        const recordId = await getRecordIdValueAsync(currentItem);
 
         if (!recordId) {
             console.warn('[RecordDetail] Cannot toggle worklist: No unique ID found for record', currentItem);
@@ -325,7 +337,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 <div className="w-48 shrink-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.status_label')}</label>
                                     <select
-                                        value={worklistItem?.status || 'pending'}
+                                        value={worklistItem?.status || 'open'}
                                         onChange={async (e) => {
                                             if (worklistItem) {
                                                 const newStatus = e.target.value;
@@ -340,11 +352,10 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         }}
                                         className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
                                     >
-                                        <option value="pending">{t('record_detail.status_pending')}</option>
-                                        <option value="in_progress">{t('record_detail.status_in_progress')}</option>
-                                        <option value="error">{t('record_detail.status_error')}</option>
-                                        <option value="obsolete">{t('record_detail.status_obsolete')}</option>
-                                        <option value="done">{t('record_detail.status_done')}</option>
+                                        <option value="open">{t('worklist.status_open', 'Neu / Offen')}</option>
+                                        <option value="in_progress">{t('worklist.status_in_progress', 'In Bearbeitung')}</option>
+                                        <option value="done">{t('worklist.status_done', 'Erledigt')}</option>
+                                        <option value="closed">{t('worklist.status_closed', 'Geschlossen')}</option>
                                     </select>
                                 </div>
                                 <div className="flex-1 min-w-0">

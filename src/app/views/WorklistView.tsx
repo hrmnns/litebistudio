@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ClipboardList, Trash2, ExternalLink, AlertCircle, CheckCircle2, Circle, Clock, Tag, Search, MessageSquare } from 'lucide-react';
+import { ClipboardList, Trash2, ExternalLink, AlertCircle, CheckCircle2, Circle, Clock, Search, MessageSquare } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { PageLayout } from '../components/ui/PageLayout';
 import { RecordDetailModal } from '../components/RecordDetailModal';
@@ -50,10 +50,31 @@ export const WorklistView: React.FC = () => {
     };
 
     const handleOpenDetail = async (item: any) => {
-        const results = await SystemRepository.executeRaw(
-            `SELECT * FROM "${item.source_table}" WHERE id = ?`,
-            [item.source_id]
-        );
+        let results: any[] = [];
+        try {
+            results = await SystemRepository.executeRaw(
+                `SELECT rowid as _rowid, * FROM "${item.source_table}" WHERE id = ?`,
+                [item.source_id]
+            );
+        } catch (e) {
+            try {
+                const columns = await SystemRepository.getTableSchema(item.source_table);
+                const pk = columns.find((c: any) => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
+                if (pk && pk.toLowerCase() !== 'id') {
+                    results = await SystemRepository.executeRaw(
+                        `SELECT rowid as _rowid, * FROM "${item.source_table}" WHERE "${pk}" = ?`,
+                        [item.source_id]
+                    );
+                } else {
+                    results = await SystemRepository.executeRaw(
+                        `SELECT rowid as _rowid, * FROM "${item.source_table}" WHERE rowid = ?`,
+                        [item.source_id]
+                    );
+                }
+            } catch (fallbackErr) {
+                console.error("Failed to load details for", item, fallbackErr);
+            }
+        }
 
         if (results.length > 0) {
             setSourceData(results);
@@ -73,9 +94,9 @@ export const WorklistView: React.FC = () => {
         switch (status) {
             case 'done': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
             case 'in_progress': return <Clock className="w-4 h-4 text-blue-500" />;
-            case 'error': return <AlertCircle className="w-4 h-4 text-rose-500" />;
-            case 'obsolete': return <Circle className="w-4 h-4 text-slate-400 opacity-50" />;
-            default: return <Circle className="w-4 h-4 text-amber-500" />;
+            case 'closed': return <Circle className="w-4 h-4 text-slate-400 opacity-50" />;
+            case 'open':
+            default: return <AlertCircle className="w-4 h-4 text-amber-500" />;
         }
     };
 
@@ -112,9 +133,10 @@ export const WorklistView: React.FC = () => {
                         <div className="flex items-center gap-1 p-1 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
                             {[
                                 { id: 'all', label: t('worklist.filter_all') },
-                                { id: 'pending', label: t('worklist.filter_pending') },
-                                { id: 'in_progress', label: t('worklist.filter_in_prog') },
-                                { id: 'done', label: t('worklist.filter_done') }
+                                { id: 'open', label: t('worklist.filter_open') },
+                                { id: 'in_progress', label: t('worklist.filter_in_progress') },
+                                { id: 'done', label: t('worklist.filter_done') },
+                                { id: 'closed', label: t('worklist.filter_closed') }
                             ].map(f => (
                                 <button
                                     key={f.id}
@@ -149,82 +171,113 @@ export const WorklistView: React.FC = () => {
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-3">
-                        {filteredItems.map(item => (
-                            <div
-                                key={item.id}
-                                className={`
-                                    group flex items-center gap-4 p-4 bg-white dark:bg-slate-800/80 rounded-xl border transition-all hover:border-blue-300 dark:hover:border-blue-900 shadow-sm
-                                    ${!item._exists ? 'border-red-200 dark:border-red-900/40 bg-red-50/10' : 'border-slate-200 dark:border-slate-700'}
-                                `}
-                            >
-                                <div className="shrink-0">
-                                    {getStatusIcon(item.status)}
-                                </div>
-
-                                <div className="flex-1 min-w-0" onClick={() => handleOpenDetail(item)}>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-blue-600 transition-colors">
-                                            {item.display_label || t('worklist.entry_id', { id: item.source_id })}
-                                        </h4>
-                                        {!item._exists && (
-                                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-[9px] font-black text-red-600 dark:text-red-400 rounded uppercase tracking-tighter shadow-sm animate-pulse">
-                                                <AlertCircle className="w-2.5 h-2.5" /> {t('common.deleted')}
-                                            </span>
-                                        )}
-                                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700/50 text-[9px] font-bold text-slate-500 rounded uppercase tracking-wider">
-                                            {item.source_table}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-[11px] text-slate-500">
-                                        <span className="flex items-center gap-1">
-                                            <Tag className="w-3 h-3 opacity-60" /> {item.display_context}
-                                        </span>
-                                        {item.comment && (
-                                            <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 italic">
-                                                <MessageSquare className="w-3 h-3 opacity-60" /> {t('worklist.comment_present')}
-                                            </span>
-                                        )}
-                                        <span className="flex items-center gap-1 ml-auto opacity-40">
-                                            {new Date(item.created_at).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => handleOpenDetail(item)}
-                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all"
-                                        title={t('worklist.details_btn')}
-                                    >
-                                        <ExternalLink className="w-4 h-4" />
-                                    </button>
-                                    {!isReadOnly && (
-                                        <button
-                                            onClick={() => handleRemove(item.id)}
-                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                            title={t('worklist.remove_btn')}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 uppercase text-[11px] font-black tracking-wider">
+                                    <tr>
+                                        <th className="px-4 py-3 w-40">{t('worklist.status_label', 'Status')}</th>
+                                        <th className="px-4 py-3">{t('worklist.element_label', 'Element')}</th>
+                                        <th className="px-4 py-3">{t('worklist.table_label', 'Tabelle')}</th>
+                                        <th className="px-4 py-3">{t('worklist.context_label', 'Kontext')}</th>
+                                        <th className="px-4 py-3 hidden md:table-cell">{t('worklist.created_label', 'Erstellt am')}</th>
+                                        <th className="px-4 py-3 text-right">{t('common.actions', 'Aktionen')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                                    {filteredItems.map(item => (
+                                        <tr key={item.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${!item._exists ? 'bg-red-50/10' : ''}`}>
+                                            <td className="px-4 py-3">
+                                                <select
+                                                    value={item.status}
+                                                    disabled={isReadOnly}
+                                                    onChange={async (e) => {
+                                                        if (isReadOnly) return;
+                                                        await SystemRepository.updateWorklistItem(item.id, { status: e.target.value });
+                                                        loadWorklist();
+                                                    }}
+                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-1.5 text-[11px] font-bold outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-300"
+                                                >
+                                                    <option value="open">{t('worklist.status_open', 'Neu / Offen')}</option>
+                                                    <option value="in_progress">{t('worklist.status_in_progress', 'In Bearbeitung')}</option>
+                                                    <option value="done">{t('worklist.status_done', 'Erledigt')}</option>
+                                                    <option value="closed">{t('worklist.status_closed', 'Geschlossen')}</option>
+                                                </select>
+                                            </td>
+                                            <td className="px-4 py-3" onClick={() => handleOpenDetail(item)}>
+                                                <div className="flex items-center gap-3 cursor-pointer">
+                                                    {getStatusIcon(item.status)}
+                                                    <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                                                        {item.display_label || t('worklist.entry_id', { id: item.source_id })}
+                                                    </span>
+                                                    {!item._exists && (
+                                                        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-[9px] font-black text-red-600 dark:text-red-400 rounded uppercase tracking-tighter shadow-sm">
+                                                            <AlertCircle className="w-2.5 h-2.5" /> {t('common.deleted')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700/50 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 rounded">
+                                                    {item.source_table}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                                                <div className="flex items-center gap-3 text-[11px]">
+                                                    {item.comment ? (
+                                                        <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 w-full max-w-[200px] truncate" title={item.comment}>
+                                                            <MessageSquare className="w-3 h-3 opacity-60 shrink-0" />
+                                                            <span className="truncate">{item.comment}</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400 dark:text-slate-600 italic">-</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-500 hidden md:table-cell text-[11px]">
+                                                {new Date(item.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => handleOpenDetail(item)}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-all"
+                                                        title={t('worklist.details_btn')}
+                                                    >
+                                                        <ExternalLink className="w-4 h-4" />
+                                                    </button>
+                                                    {!isReadOnly && (
+                                                        <button
+                                                            onClick={() => handleRemove(item.id)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
+                                                            title={t('worklist.remove_btn')}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>
 
-            {isDetailOpen && selectedItem && (
-                <RecordDetailModal
-                    isOpen={isDetailOpen}
-                    onClose={() => setIsDetailOpen(false)}
-                    items={sourceData}
-                    initialIndex={0}
-                    tableName={selectedItem.source_table}
-                    title={selectedItem.display_label}
-                />
-            )}
-        </PageLayout>
+            {
+                isDetailOpen && selectedItem && (
+                    <RecordDetailModal
+                        isOpen={isDetailOpen}
+                        onClose={() => setIsDetailOpen(false)}
+                        items={sourceData}
+                        initialIndex={0}
+                        tableName={selectedItem.source_table}
+                        title={selectedItem.display_label}
+                    />
+                )
+            }
+        </PageLayout >
     );
 };

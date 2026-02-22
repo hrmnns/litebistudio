@@ -206,11 +206,25 @@ export const SystemRepository = {
     async checkRecordExists(tableName: string, id: string | number): Promise<boolean> {
         if (!isValidIdentifier(tableName)) return false;
         try {
-            // Using a more efficient check and ensuring table name is quoted
+            // First try standard "id" column
             const result = await runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ? LIMIT 1`, [id]);
             return result.length > 0;
         } catch (e) {
-            return false;
+            // Fallback: try to find the actual primary key name or use rowid
+            try {
+                const columns = await this.getTableSchema(tableName);
+                const pk = columns.find((c: any) => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
+                if (pk && pk.toLowerCase() !== 'id') {
+                    const pkResult = await runQuery(`SELECT 1 FROM "${tableName}" WHERE "${pk}" = ? LIMIT 1`, [id]);
+                    return pkResult.length > 0;
+                }
+
+                // Try rowid if no PK found
+                const rowidResult = await runQuery(`SELECT 1 FROM "${tableName}" WHERE rowid = ? LIMIT 1`, [id]);
+                return rowidResult.length > 0;
+            } catch (fallbackErr) {
+                return false;
+            }
         }
     },
 

@@ -9,7 +9,7 @@ let initPromise: Promise<any> | null = null;
 const log = (...args: any[]) => console.log('[DB Worker]', ...args);
 const error = (...args: any[]) => console.error('[DB Worker]', ...args);
 
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 // Reusable schema and migration logic
 function applyMigrations(databaseInstance: any) {
@@ -118,6 +118,21 @@ function applyMigrations(databaseInstance: any) {
         }
         databaseInstance.exec('PRAGMA user_version = 5');
         userVersion = 5;
+    }
+
+    // Version 6: Migration: Unify sys_worklist statuses
+    if (userVersion < 6) {
+        log('Migration V6: Unifying sys_worklist statuses...');
+        try {
+            databaseInstance.exec("UPDATE sys_worklist SET status = 'open' WHERE status = 'pending'");
+            databaseInstance.exec("UPDATE sys_worklist SET status = 'closed' WHERE status IN ('error', 'obsolete', 'clarification')");
+            databaseInstance.exec("UPDATE sys_worklist SET status = 'done' WHERE status = 'ok'");
+            // 'in_progress' and 'done' (if already set) remain unchanged
+        } catch (e) {
+            error('Migration failed for V6', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 6');
+        userVersion = 6;
     }
 
     log(`Database migrated to version ${userVersion}`);
