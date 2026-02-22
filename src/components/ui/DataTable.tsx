@@ -10,6 +10,11 @@ export interface Column<T> {
     width?: string;
 }
 
+export interface DataTableSortConfig<T> {
+    key: keyof T | string;
+    direction: 'asc' | 'desc';
+}
+
 interface DataTableProps<T> {
     data: T[];
     columns: Column<T>[];
@@ -17,6 +22,12 @@ interface DataTableProps<T> {
     searchFields?: (keyof T)[];
     emptyMessage?: string;
     onRowClick?: (item: T) => void;
+    sortConfig?: DataTableSortConfig<T> | null;
+    onSortConfigChange?: (config: DataTableSortConfig<T> | null) => void;
+    filters?: Record<string, string>;
+    onFiltersChange?: (filters: Record<string, string>) => void;
+    showFilters?: boolean;
+    onShowFiltersChange?: (visible: boolean) => void;
 }
 
 export function DataTable<T>({
@@ -25,14 +36,38 @@ export function DataTable<T>({
     searchTerm = '',
     searchFields = [],
     emptyMessage = 'No items found',
-    onRowClick
+    onRowClick,
+    sortConfig,
+    onSortConfigChange,
+    filters,
+    onFiltersChange,
+    showFilters,
+    onShowFiltersChange
 }: DataTableProps<T>) {
-
     const headerRef = React.useRef<HTMLDivElement>(null);
     const bodyRef = React.useRef<HTMLDivElement>(null);
-    const [sortConfig, setSortConfig] = React.useState<{ key: keyof T | string; direction: 'asc' | 'desc' } | null>(null);
-    const [filters, setFilters] = React.useState<Record<string, string>>({});
-    const [showFilters, setShowFilters] = React.useState(false);
+    const [internalSortConfig, setInternalSortConfig] = React.useState<DataTableSortConfig<T> | null>(null);
+    const [internalFilters, setInternalFilters] = React.useState<Record<string, string>>({});
+    const [internalShowFilters, setInternalShowFilters] = React.useState(false);
+
+    const activeSortConfig = sortConfig !== undefined ? sortConfig : internalSortConfig;
+    const activeFilters = filters !== undefined ? filters : internalFilters;
+    const activeShowFilters = showFilters !== undefined ? showFilters : internalShowFilters;
+
+    const setSortConfig = (next: DataTableSortConfig<T> | null) => {
+        if (sortConfig === undefined) setInternalSortConfig(next);
+        onSortConfigChange?.(next);
+    };
+
+    const setFilters = (next: Record<string, string>) => {
+        if (filters === undefined) setInternalFilters(next);
+        onFiltersChange?.(next);
+    };
+
+    const setShowFilters = (next: boolean) => {
+        if (showFilters === undefined) setInternalShowFilters(next);
+        onShowFiltersChange?.(next);
+    };
 
     const getValueByAccessor = useCallback((item: T, accessor: keyof T | string): unknown => {
         return (item as Record<string, unknown>)[accessor as string];
@@ -41,21 +76,19 @@ export function DataTable<T>({
     const filteredData = useMemo(() => {
         let processed = data;
 
-        // 1. Global Search
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
             processed = processed.filter(item =>
                 searchFields.some(field => {
                     const val = item[field];
-                    return (String(val ?? '').toLowerCase()).includes(lowerSearch);
+                    return String(val ?? '').toLowerCase().includes(lowerSearch);
                 })
             );
         }
 
-        // 2. Column Filters
-        if (Object.keys(filters).length > 0) {
+        if (Object.keys(activeFilters).length > 0) {
             processed = processed.filter(item => {
-                return Object.entries(filters).every(([key, filterValue]) => {
+                return Object.entries(activeFilters).every(([key, filterValue]) => {
                     if (!filterValue) return true;
 
                     const col = columns.find(c => (typeof c.accessor === 'string' ? c.accessor : c.header) === key);
@@ -73,10 +106,9 @@ export function DataTable<T>({
             });
         }
 
-        // 3. Sort
-        if (sortConfig) {
+        if (activeSortConfig) {
             processed = [...processed].sort((a, b) => {
-                const col = columns.find(c => c.accessor === sortConfig.key || (typeof c.accessor === 'string' && c.accessor === sortConfig.key));
+                const col = columns.find(c => c.accessor === activeSortConfig.key || (typeof c.accessor === 'string' && c.accessor === activeSortConfig.key));
 
                 let valA: unknown;
                 let valB: unknown;
@@ -85,8 +117,8 @@ export function DataTable<T>({
                     valA = col.accessor(a);
                     valB = col.accessor(b);
                 } else {
-                    valA = getValueByAccessor(a, sortConfig.key);
-                    valB = getValueByAccessor(b, sortConfig.key);
+                    valA = getValueByAccessor(a, activeSortConfig.key);
+                    valB = getValueByAccessor(b, activeSortConfig.key);
                 }
 
                 if (valA === valB) return 0;
@@ -94,12 +126,12 @@ export function DataTable<T>({
                 if (valB === null || valB === undefined) return -1;
 
                 const compareResult = valA < valB ? -1 : 1;
-                return sortConfig.direction === 'asc' ? compareResult : -compareResult;
+                return activeSortConfig.direction === 'asc' ? compareResult : -compareResult;
             });
         }
 
         return processed;
-    }, [data, searchTerm, searchFields, sortConfig, columns, filters, getValueByAccessor]);
+    }, [data, searchTerm, searchFields, activeSortConfig, columns, activeFilters, getValueByAccessor]);
 
     const handleScroll = () => {
         if (headerRef.current && bodyRef.current) {
@@ -111,17 +143,17 @@ export function DataTable<T>({
         const key = typeof col.accessor === 'string' ? col.accessor : col.header;
 
         let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+        if (activeSortConfig && activeSortConfig.key === key && activeSortConfig.direction === 'asc') {
             direction = 'desc';
         }
         setSortConfig({ key, direction });
     };
 
     const handleFilterChange = (key: string, value: string) => {
-        setFilters(prev => ({
-            ...prev,
+        setFilters({
+            ...activeFilters,
             [key]: value
-        }));
+        });
     };
 
     const renderColGroup = () => (
@@ -134,7 +166,6 @@ export function DataTable<T>({
 
     return (
         <div className="flex flex-col flex-1 overflow-hidden h-full relative border rounded-lg border-slate-300 dark:border-slate-700">
-            {/* Header Table (Static Vertical, Scrolls Horizontal) */}
             <div
                 ref={headerRef}
                 className="overflow-hidden flex-none bg-slate-50 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-700"
@@ -145,7 +176,7 @@ export function DataTable<T>({
                         <tr>
                             {columns.map((col, i) => {
                                 const key = typeof col.accessor === 'string' ? col.accessor : col.header;
-                                const isSorted = sortConfig?.key === key;
+                                const isSorted = activeSortConfig?.key === key;
 
                                 return (
                                     <th
@@ -155,14 +186,13 @@ export function DataTable<T>({
                                         onClick={() => requestSort(col)}
                                     >
                                         <div className={`flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'}`}>
-                                            {/* Filter Toggle in First Column */}
                                             {i === 0 && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setShowFilters(!showFilters);
+                                                        setShowFilters(!activeShowFilters);
                                                     }}
-                                                    className={`p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mr-2 ${showFilters || Object.keys(filters).length > 0 ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/40' : 'text-slate-500 hover:text-slate-700'}`}
+                                                    className={`p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mr-2 ${activeShowFilters || Object.keys(activeFilters).length > 0 ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/40' : 'text-slate-500 hover:text-slate-700'}`}
                                                     title="Toggle Column Filters"
                                                 >
                                                     <Filter className="w-4 h-4" />
@@ -173,16 +203,15 @@ export function DataTable<T>({
 
                                             {isSorted && (
                                                 <span className="text-blue-500 text-[9px]">
-                                                    {sortConfig.direction === 'asc' ? '▲' : '▼'}
+                                                    {activeSortConfig?.direction === 'asc' ? '▲' : '▼'}
                                                 </span>
                                             )}
                                         </div>
                                     </th>
-                                )
+                                );
                             })}
                         </tr>
-                        {/* Filter Row */}
-                        {showFilters && (
+                        {activeShowFilters && (
                             <tr className="bg-slate-100/50 dark:bg-slate-800/50">
                                 {columns.map((col, i) => {
                                     const key = typeof col.accessor === 'string' ? col.accessor : col.header;
@@ -191,13 +220,13 @@ export function DataTable<T>({
                                             <div className="relative flex items-center">
                                                 <input
                                                     type="text"
-                                                    value={filters[key as string] || ''}
+                                                    value={activeFilters[key as string] || ''}
                                                     onChange={(e) => handleFilterChange(key as string, e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
                                                     placeholder={`Filter ${col.header}...`}
                                                     className="w-full px-2 py-1 text-[10px] font-normal border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-300"
                                                 />
-                                                {filters[key as string] && (
+                                                {activeFilters[key as string] && (
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -218,7 +247,6 @@ export function DataTable<T>({
                 </table>
             </div>
 
-            {/* Body Table (Scrolls Vertical & Horizontal) */}
             <div
                 ref={bodyRef}
                 onScroll={handleScroll}
@@ -271,3 +299,4 @@ export function DataTable<T>({
         </div>
     );
 }
+

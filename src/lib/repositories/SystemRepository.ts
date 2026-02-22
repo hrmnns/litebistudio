@@ -71,7 +71,7 @@ export const SystemRepository = {
         return result;
     },
 
-    async inspectTable(tableName: string, limit: number, searchTerm?: string): Promise<DbRow[]> {
+    async inspectTable(tableName: string, limit: number, searchTerm?: string, offset: number = 0): Promise<DbRow[]> {
         if (!isValidIdentifier(tableName)) {
             throw new Error(`Invalid table name: ${tableName}`);
         }
@@ -92,10 +92,35 @@ export const SystemRepository = {
             }
         }
 
-        sql += ` ORDER BY rowid DESC LIMIT ?`;
+        sql += ` ORDER BY rowid DESC LIMIT ? OFFSET ?`;
         params.push(limit);
+        params.push(Math.max(0, offset));
 
         return await runQuery(sql, params);
+    },
+
+    async countTableRows(tableName: string, searchTerm?: string): Promise<number> {
+        if (!isValidIdentifier(tableName)) {
+            throw new Error(`Invalid table name: ${tableName}`);
+        }
+        let sql = `SELECT COUNT(*) as count FROM "${tableName}"`;
+        const params: BindValue[] = [];
+
+        if (searchTerm) {
+            const schema = await this.getTableSchema(tableName);
+            const searchColumns = schema.filter(
+                col => col.type.toUpperCase().includes('TEXT') || col.name.toLowerCase().includes('id') || col.name.toLowerCase().includes('name')
+            );
+            const searchFilter = searchColumns.map(col => `${col.name} LIKE '%' || ? || '%'`).join(' OR ');
+
+            if (searchFilter) {
+                sql += ` WHERE ${searchFilter}`;
+                params.push(...Array(searchColumns.length).fill(searchTerm));
+            }
+        }
+
+        const result = await runQuery(sql, params);
+        return Number(result[0]?.count || 0);
     },
 
     async executeRaw(sql: string, bind?: BindValue[]): Promise<DbRow[]> {

@@ -8,13 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Placeholder for upcoming features.
+- Data Inspector SQL productivity enhancements:
+  - Query templates for top rows, row count, null scan, duplicate scan, and outlier scan.
+  - Explain mode with `EXPLAIN QUERY PLAN` preview.
+  - Query history and favorites (pinned queries), persisted locally.
+  - Custom SQL template management (save, select, rename, delete, clear).
+- Data Inspector table productivity enhancements:
+  - Saved table views (persisted): table, search, sort, column filters, and filter visibility.
+  - Pagination with server-backed `LIMIT/OFFSET`, page size selector, total row count, and direct page jump.
+- Data profiling upgrades in Data Inspector:
+  - Column type detection (`number`, `text`, `date`, `mixed`, `unknown`).
+  - Quality issue badges (high null rate, mixed types, high cardinality, suspicious values).
+  - Pattern detection (`email`, `uuid`, `iban`, `url`, `date`) and suspicious value counts.
+  - Configurable profiling thresholds (null rate / cardinality), persisted locally.
+  - Resizable profiling panel with drag handle and persisted height.
 
 ### Changed
-- Placeholder for upcoming behavior changes.
+- Data Inspector footer and metadata display now align better with active locale and paging context.
+- Data table integration was extended to support controlled sort/filter state for reusable advanced views.
 
 ### Fixed
-- Placeholder for upcoming bug fixes.
+- Stabilized Data Inspector state transitions across table changes, SQL mode, explain mode, and persisted presets.
 
 ## [1.0.0] - 2026-02-22
 
