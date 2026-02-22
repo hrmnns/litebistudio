@@ -389,6 +389,7 @@
         "title": "Über LiteBI Studio",
         "subtitle": "Informationen zum Projekt und System",
         "tagline": "Die leichtgewichtige Business Intelligence Plattform direkt im Browser.",
+        "status_stable": "Stabil (Lokal)",
         "philosophy_title": "Unsere Philosophie",
         "philosophy_description": "LiteBI Studio wurde mit dem Ziel entwickelt, Datenanalyse so einfach und sicher wie möglich zu machen. Im Gegensatz zu herkömmlichen BI-Tools verlassen Ihre Daten bei LiteBI Studio niemals Ihren Browser.",
         "point_privacy_title": "Privacy First",
@@ -398,6 +399,25 @@
         "point_offline_title": "Offline-Ready",
         "point_offline_desc": "Funktioniert auch ohne aktive Internetverbindung.",
         "tech_stack_title": "Technologie-Stack",
+        "tech_ui_framework": "UI-Framework",
+        "tech_language": "Sprache",
+        "tech_build_tool": "Build-Tool",
+        "tech_styling": "Styling",
+        "tech_local_database": "Lokale Datenbank",
+        "tech_visualization": "Visualisierung",
+        "tech_i18n": "Internationalisierung",
+        "tech_pdf_export": "PDF-Export",
+        "tech_icon_system": "Icon-System",
+        "links_title": "Links",
+        "link_github": "GitHub Repository",
+        "link_readme": "README",
+        "link_changelog": "Changelog",
+        "link_docs": "Dokumentation",
+        "link_website": "Webseite",
+        "support_title": "Support",
+        "support_text": "Haben Sie Fragen oder Feedback? Wir freuen uns über Ihre Nachricht.",
+        "contact_cta": "Kontakt aufnehmen",
+        "copyright_prefix": "(c) {{year}} LiteBI Studio Projekt. Freigegeben unter ",
         "settings_hint": "Erfahren Sie mehr über das Projekt, die Version und die Vision hinter LiteBI Studio.",
         "view_info": "Projekt-Informationen"
     },
@@ -492,3 +512,5 @@
         }
     }
 }
+
+
