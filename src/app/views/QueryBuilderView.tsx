@@ -27,7 +27,7 @@ import { SqlAssistant } from '../components/SqlAssistant';
 import { PivotTable } from '../components/PivotTable';
 import type { SchemaDefinition } from '../components/SchemaDocumentation';
 
-type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot';
+type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -151,7 +151,20 @@ export const QueryBuilderView: React.FC = () => {
         }
 
         setSidebarTab('query');
-        setTimeout(() => handleRun(widget.sql_query), 100);
+        const loadedType = (() => {
+            try {
+                const parsed = JSON.parse(widget.visualization_config) as { type?: VisualizationType };
+                return parsed.type || 'table';
+            } catch {
+                return 'table';
+            }
+        })();
+        if (loadedType === 'text') {
+            setResults([]);
+            setError('');
+        } else {
+            setTimeout(() => handleRun(widget.sql_query), 100);
+        }
     };
 
     const handleSaveWidget = async () => {
@@ -200,6 +213,15 @@ export const QueryBuilderView: React.FC = () => {
     }, [results]);
 
     const resultColumns = results.length > 0 ? Object.keys(results[0]) : [];
+    const isTextWidget = visType === 'text';
+    const canPersistWidget = isTextWidget || results.length > 0;
+    const textSizeClass = {
+        sm: 'text-sm',
+        md: 'text-base',
+        lg: 'text-lg',
+        xl: 'text-xl',
+        '2xl': 'text-2xl'
+    } as const;
 
     return (
         <PageLayout
@@ -217,7 +239,7 @@ export const QueryBuilderView: React.FC = () => {
                         </button>
                         <button
                             onClick={() => exportToPdf('query-visualization', `report-${widgetName || 'query'}`)}
-                            disabled={isExporting || results.length === 0}
+                            disabled={isExporting || (!isTextWidget && results.length === 0)}
                             className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
                         >
                             <Download className="w-4 h-4" />
@@ -233,7 +255,7 @@ export const QueryBuilderView: React.FC = () => {
                         )}
                         <button
                             onClick={() => setSaveModalOpen(true)}
-                            disabled={results.length === 0 || isReadOnly}
+                            disabled={!canPersistWidget || isReadOnly}
                             className={`flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50 ${isReadOnly ? 'cursor-not-allowed hidden' : ''}`}
                         >
                             <Save className="w-4 h-4" />
@@ -245,21 +267,24 @@ export const QueryBuilderView: React.FC = () => {
         >
             <div className="flex flex-col gap-6 h-[calc(100vh-140px)]">
                 <div className="flex-1 flex gap-6 min-h-0 overflow-hidden relative">
-                    {/* Sidebar */}
-                    <div className={`${isMaximized ? 'hidden' : 'w-full lg:w-96'} flex flex-col gap-4 h-full overflow-hidden transition-all duration-300`}>
-                        <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl">
-                            <button onClick={() => setSidebarTab('archive')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'archive' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                <Folder className="w-4 h-4" /> {t('querybuilder.archive')}
-                            </button>
-                            <button onClick={() => setSidebarTab('query')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'query' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                <History className="w-4 h-4" /> {t('querybuilder.query')}
-                            </button>
-                            <button onClick={() => setSidebarTab('vis')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'vis' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                <Settings className="w-4 h-4" /> {t('querybuilder.graph')}
-                            </button>
-                        </div>
+                    {/* Builder Rail */}
+                    <div className={`${isMaximized ? 'hidden' : 'w-full lg:w-96'} h-full overflow-hidden transition-all duration-300`}>
+                        <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                            <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40">
+                                <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl">
+                                    <button onClick={() => setSidebarTab('archive')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'archive' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                        <Folder className="w-4 h-4" /> {t('querybuilder.archive')}
+                                    </button>
+                                    <button onClick={() => setSidebarTab('query')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'query' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                        <History className="w-4 h-4" /> {t('querybuilder.query')}
+                                    </button>
+                                    <button onClick={() => setSidebarTab('vis')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'vis' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                        <Settings className="w-4 h-4" /> {t('querybuilder.graph')}
+                                    </button>
+                                </div>
+                            </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
                             {sidebarTab === 'archive' ? (
                                 <div className="space-y-2 animate-in fade-in duration-300">
                                     <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
@@ -303,7 +328,7 @@ export const QueryBuilderView: React.FC = () => {
                                             <button onClick={() => setActiveWidgetId(null)} className="p-1 hover:bg-amber-100 rounded text-amber-500"><X className="w-3.5 h-3.5" /></button>
                                         </div>
                                     )}
-                                    <div className="bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex">
+                                    <div className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex">
                                         <button onClick={() => setBuilderMode('visual')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${builderMode === 'visual' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
                                             <Layout className="w-3.5 h-3.5" /> {t('querybuilder.visual_builder')}
                                         </button>
@@ -311,7 +336,7 @@ export const QueryBuilderView: React.FC = () => {
                                             <span className="font-mono text-[10px]">SQL</span> {t('querybuilder.direct_editor')}
                                         </button>
                                     </div>
-                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
+                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-2">
                                         {builderMode === 'sql' ? (
                                             <>
                                                 <div className="flex items-center justify-between">
@@ -346,21 +371,22 @@ export const QueryBuilderView: React.FC = () => {
                                     {error && <div className="bg-red-50 text-red-600 text-[10px] p-3 rounded-lg border border-red-100 flex items-start gap-2 font-mono break-all"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{error}</div>}
                                 </div>
                             ) : (
-                                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 animate-in slide-in-from-right-4 duration-300">
+                                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-4 animate-in slide-in-from-right-4 duration-300">
                                     <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><Layout className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.graph_type')}</h3>
                                     <div className="grid grid-cols-3 gap-2">
-                                        {[
-                                            { id: 'table', icon: TableIcon, label: t('querybuilder.table') },
-                                            { id: 'bar', icon: BarChart2, label: t('querybuilder.bar') },
-                                            { id: 'line', icon: TrendingUp, label: t('querybuilder.line') },
+                                            {[
+                                                { id: 'table', icon: TableIcon, label: t('querybuilder.table') },
+                                                { id: 'bar', icon: BarChart2, label: t('querybuilder.bar') },
+                                                { id: 'line', icon: TrendingUp, label: t('querybuilder.line') },
                                             { id: 'area', icon: Layout, label: t('querybuilder.area') },
                                             { id: 'pie', icon: Layout, label: t('querybuilder.pie') },
                                             { id: 'kpi', icon: Layout, label: t('querybuilder.kpi') },
-                                            { id: 'composed', icon: Layout, label: t('querybuilder.composed') },
-                                            { id: 'radar', icon: Layout, label: t('querybuilder.radar') },
-                                            { id: 'scatter', icon: Layout, label: t('querybuilder.scatter') },
-                                            { id: 'pivot', icon: Layout, label: t('querybuilder.pivot') },
-                                        ].map(type => (
+                                                { id: 'composed', icon: Layout, label: t('querybuilder.composed') },
+                                                { id: 'radar', icon: Layout, label: t('querybuilder.radar') },
+                                                { id: 'scatter', icon: Layout, label: t('querybuilder.scatter') },
+                                                { id: 'pivot', icon: Layout, label: t('querybuilder.pivot') },
+                                                { id: 'text', icon: Edit3, label: t('querybuilder.text') },
+                                            ].map(type => (
                                             <button key={type.id} onClick={() => setVisType(type.id as VisualizationType)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
                                                 <type.icon className="w-4 h-4" />
                                                 <span className="text-[9px] uppercase font-black">{type.label}</span>
@@ -391,6 +417,71 @@ export const QueryBuilderView: React.FC = () => {
                                                     <option value="">{t('querybuilder.add_y_axis')}</option>
                                                     {resultColumns.filter(c => !(visConfig.yAxes || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
                                                 </select>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {visType === 'text' && (
+                                        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                            <div>
+                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.text_content')}</label>
+                                                <textarea
+                                                    value={visConfig.textContent || ''}
+                                                    onChange={e => setVisConfig({ ...visConfig, textContent: e.target.value })}
+                                                    className="w-full h-32 p-2 border border-slate-200 rounded text-[11px] bg-white outline-none resize-y"
+                                                    placeholder={t('querybuilder.text_placeholder')}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.text_size')}</label>
+                                                    <select
+                                                        value={visConfig.textSize || 'md'}
+                                                        onChange={e => setVisConfig({ ...visConfig, textSize: e.target.value as NonNullable<WidgetConfig['textSize']> })}
+                                                        className="w-full p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
+                                                    >
+                                                        <option value="sm">{t('querybuilder.text_size_sm')}</option>
+                                                        <option value="md">{t('querybuilder.text_size_md')}</option>
+                                                        <option value="lg">{t('querybuilder.text_size_lg')}</option>
+                                                        <option value="xl">{t('querybuilder.text_size_xl')}</option>
+                                                        <option value="2xl">{t('querybuilder.text_size_2xl')}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.text_align')}</label>
+                                                    <select
+                                                        value={visConfig.textAlign || 'left'}
+                                                        onChange={e => setVisConfig({ ...visConfig, textAlign: e.target.value as NonNullable<WidgetConfig['textAlign']> })}
+                                                        className="w-full p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
+                                                    >
+                                                        <option value="left">{t('querybuilder.text_align_left')}</option>
+                                                        <option value="center">{t('querybuilder.text_align_center')}</option>
+                                                        <option value="right">{t('querybuilder.text_align_right')}</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.text_style')}</label>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => setVisConfig({ ...visConfig, textBold: !visConfig.textBold })}
+                                                        className={`px-2 py-1 rounded border text-[11px] font-bold ${visConfig.textBold ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                                                    >
+                                                        {t('querybuilder.text_bold')}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setVisConfig({ ...visConfig, textItalic: !visConfig.textItalic })}
+                                                        className={`px-2 py-1 rounded border text-[11px] italic ${visConfig.textItalic ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                                                    >
+                                                        {t('querybuilder.text_italic')}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setVisConfig({ ...visConfig, textUnderline: !visConfig.textUnderline })}
+                                                        className={`px-2 py-1 rounded border text-[11px] underline ${visConfig.textUnderline ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                                                    >
+                                                        {t('querybuilder.text_underline')}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -521,6 +612,7 @@ export const QueryBuilderView: React.FC = () => {
                             )}
                         </div>
                     </div>
+                    </div>
 
                     {/* Preview Area */}
                     <div id="query-visualization" className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full relative">
@@ -533,14 +625,24 @@ export const QueryBuilderView: React.FC = () => {
                         </div>
 
                         <div className="flex-1 overflow-auto p-4 min-h-0 container-scrollbar">
-                            {results.length === 0 ? (
+                            {!isTextWidget && results.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-300">
                                     <Play className="w-12 h-12 mb-4 opacity-10" />
                                     <p className="text-xs font-black uppercase tracking-widest text-center whitespace-pre-wrap">{t('querybuilder.no_data_prompt')}</p>
                                 </div>
                             ) : (
                                 <div className="h-full w-full flex flex-col">
-                                    {visType === 'table' ? (
+                                    {visType === 'text' ? (
+                                        <div
+                                            className={`flex-1 p-6 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 ${
+                                                textSizeClass[visConfig.textSize || 'md']
+                                            } ${visConfig.textBold ? 'font-bold' : 'font-normal'} ${visConfig.textItalic ? 'italic' : 'not-italic'} ${visConfig.textUnderline ? 'underline' : 'no-underline'} ${
+                                                visConfig.textAlign === 'center' ? 'text-center' : visConfig.textAlign === 'right' ? 'text-right' : 'text-left'
+                                            }`}
+                                        >
+                                            {(visConfig.textContent || '').trim() || t('querybuilder.text_placeholder')}
+                                        </div>
+                                    ) : visType === 'table' ? (
                                         <DataTable columns={columns} data={results} onRowClick={item => { setSelectedItemIndex(results.indexOf(item)); setDetailModalOpen(true); }} />
                                     ) : visType === 'pivot' ? (
                                         <PivotTable data={results} rows={visConfig.pivotRows || []} cols={visConfig.pivotCols || []} measures={visConfig.pivotMeasures || []} />

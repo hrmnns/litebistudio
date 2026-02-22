@@ -35,6 +35,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
     const { t } = useTranslation();
     const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {
+            if (config.type === 'text') return [];
             if (!sql) return [];
             let effectiveSql = sql;
 
@@ -69,7 +70,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
 
             return await SystemRepository.executeRaw(effectiveSql);
         },
-        [sql, globalFilters]
+        [sql, globalFilters, config.type]
     );
 
     const [isDetailOpen, setIsDetailOpen] = React.useState(false);
@@ -106,6 +107,41 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
             render: (item: DbRow) => formatValue(item[key], key)
         }));
     }, [results]);
+
+    const textSizeClass = {
+        sm: 'text-sm',
+        md: 'text-base',
+        lg: 'text-lg',
+        xl: 'text-xl',
+        '2xl': 'text-2xl'
+    } as const;
+
+    if (config.type === 'text') {
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
+                <div className="flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-1.5 rounded-xl shrink-0 shadow-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400">
+                            <BarChart3 className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                            <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
+                        </div>
+                    </div>
+                </div>
+                <div
+                    className={`flex-1 p-4 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 ${
+                        textSizeClass[config.textSize || 'md']
+                    } ${config.textBold ? 'font-bold' : 'font-normal'} ${config.textItalic ? 'italic' : 'not-italic'} ${config.textUnderline ? 'underline' : 'no-underline'} ${
+                        config.textAlign === 'center' ? 'text-center' : config.textAlign === 'right' ? 'text-right' : 'text-left'
+                    }`}
+                >
+                    {(config.textContent || '').trim() || t('querybuilder.text_placeholder')}
+                </div>
+            </div>
+        );
+    }
 
     if (loading) {
         return (

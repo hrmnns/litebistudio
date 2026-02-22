@@ -98,7 +98,7 @@ export interface AlertRule {
 }
 
 export interface WidgetConfig {
-    type: 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot';
+    type: 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text';
     xAxis?: string;
     yAxes?: string[];
     yAxis?: string;
@@ -110,6 +110,12 @@ export interface WidgetConfig {
     pivotRows?: string[];
     pivotCols?: string[];
     pivotMeasures?: { field: string, agg: 'sum' | 'count' | 'avg' | 'min' | 'max' }[];
+    textContent?: string;
+    textSize?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+    textAlign?: 'left' | 'center' | 'right';
+    textBold?: boolean;
+    textItalic?: boolean;
+    textUnderline?: boolean;
 }
 
 // ─── Report Packages ────────────────────────────────────────────────
