@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -31,7 +31,7 @@ interface WidgetRendererProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, globalFilters }) => {
+const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, globalFilters }) => {
     const { t } = useTranslation();
     const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {
@@ -142,7 +142,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
                         <BarChart3 className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                        <h3 className="text-xs font-bold text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                        <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
                         <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
                     </div>
                 </div>
@@ -357,3 +357,8 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
         </div>
     );
 };
+
+
+export { WidgetRenderer };
+export default WidgetRenderer;
+

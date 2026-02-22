@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useAsync } from '../../hooks/useAsync';
 import { Plus, Layout, Trash2, Database, Star, Settings, Check, X, Edit2, Download, Maximize2, Filter } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
-import { WidgetRenderer } from '../components/WidgetRenderer';
+import WidgetRenderer from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
 import { getComponent, SYSTEM_WIDGETS } from '../registry';
 import { COMPONENTS } from '../../config/components';
@@ -495,7 +495,7 @@ export const CustomDashboardView: React.FC = () => {
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     onClick={() => {
-                                        const newName = prompt('Name für Dashboard:', d.name);
+                                        const newName = prompt('Name fÃ¼r Dashboard:', d.name);
                                         if (newName && newName !== d.name) {
                                             syncDashboard({ ...d, name: newName });
                                         }
@@ -640,3 +640,4 @@ export const CustomDashboardView: React.FC = () => {
         </PageLayout >
     );
 };
+

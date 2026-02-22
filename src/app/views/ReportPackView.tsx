@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -10,7 +10,7 @@ import {
     BookOpen, User, MoveUp, MoveDown, Check, X, Edit2, Maximize2, Minimize2, ArrowRightLeft
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
-import { WidgetRenderer } from '../components/WidgetRenderer';
+import WidgetRenderer from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
 import { type ReportPack, type ReportPackItem, type DbRow, type WidgetConfig } from '../../types';
 import { useDashboard } from '../../lib/context/DashboardContext';
@@ -536,7 +536,7 @@ const ReportPackView: React.FC = () => {
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-slate-800 dark:text-white leading-tight truncate">{pack.name}</h3>
                                             <p className="text-xs text-slate-400">
-                                                {(pack.category || defaultCategory)} • {pack.config.items.length} {t('reports.pages', 'Pages')}
+                                                {(pack.category || defaultCategory)} â€¢ {pack.config.items.length} {t('reports.pages', 'Pages')}
                                             </p>
                                         </div>
                                     </div>
@@ -1142,3 +1142,4 @@ const ReportPackView: React.FC = () => {
 
 export { ReportPackView };
 export default ReportPackView;
+

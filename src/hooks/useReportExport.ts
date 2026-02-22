@@ -141,10 +141,25 @@ export const useReportExport = (): UseReportExportResult => {
             (el as HTMLElement).style.height = 'auto';
         });
 
+        // html2canvas can clip descenders on tightly styled/truncated headers.
+        // Relax text constraints in the export clone only.
+        const textCandidates = clone.querySelectorAll('h1, h2, h3, h4, h5, h6, .truncate');
+        textCandidates.forEach(el => {
+            const node = el as HTMLElement;
+            node.style.overflow = 'visible';
+            node.style.textOverflow = 'clip';
+            node.style.lineHeight = '1.35';
+            node.style.paddingBottom = '2px';
+        });
+
         document.body.appendChild(clone);
 
         // Wait for rendering
         await new Promise(resolve => setTimeout(resolve, 800));
+        // Ensure webfonts are loaded before rasterizing text into canvas.
+        if ('fonts' in document) {
+            await (document as Document & { fonts: FontFaceSet }).fonts.ready;
+        }
 
         const canvas = await html2canvas(clone, {
             scale: 2,

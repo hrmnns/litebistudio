@@ -1,4 +1,4 @@
-
+﻿
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
@@ -36,7 +36,7 @@ const colorStyles = {
     slate: 'text-slate-600 bg-slate-50 dark:bg-slate-900/20 dark:text-slate-400',
 };
 
-export const DashboardComponent: React.FC<DashboardComponentProps> = ({
+const DashboardComponent: React.FC<DashboardComponentProps> = ({
     title,
     icon: Icon,
     iconColor = 'blue',
@@ -85,7 +85,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
                         <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                        <h3 className="text-xs font-bold text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                        <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
                         <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5 group-hover:w-8 transition-all duration-500" />
                     </div>
                 </div>
@@ -139,3 +139,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
         </div>
     );
 };
+
+export { DashboardComponent };
+export default DashboardComponent;
+
