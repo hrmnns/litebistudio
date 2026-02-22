@@ -134,7 +134,7 @@ export const WorklistView: React.FC = () => {
                 onBack: () => window.history.back()
             }}
         >
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-5xl space-y-6">
                 {/* Filters & Search */}
                 <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="flex items-center gap-2">

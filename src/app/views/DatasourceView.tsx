@@ -191,33 +191,37 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             header={{
                 title: t('sidebar.datasource'),
                 subtitle: t('datasource.subtitle'),
-                onBack: () => window.history.back(),
-                actions: (
-                    <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                        <button
-                            onClick={() => setActiveTab('import')}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'import' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            <span className="flex items-center gap-2"><Upload className="w-3 h-3" /> {t('datasource.tab_import')}</span>
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('structure')}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'structure' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            <span className="flex items-center gap-2"><TableIcon className="w-3 h-3" /> {t('datasource.tab_structure')}</span>
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('system')}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'system' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            <span className="flex items-center gap-2"><Database className="w-3 h-3" /> {t('datasource.tab_system')}</span>
-                        </button>
-                    </div>
-                )
+                onBack: () => window.history.back()
             }}
             footer={footerText}
         >
-            <div className={`max-w-4xl space-y-6 mx-auto ${isReadOnly ? 'opacity-80' : ''}`}>
+            <div className={`max-w-4xl space-y-6 ${isReadOnly ? 'opacity-80' : ''}`}>
+                <div className="border-b border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-8 px-1">
+                        <button
+                            onClick={() => setActiveTab('import')}
+                            className={`relative py-3 text-sm font-bold transition-colors ${activeTab === 'import' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        >
+                            {t('datasource.tab_import')}
+                            {activeTab === 'import' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('structure')}
+                            className={`relative py-3 text-sm font-bold transition-colors ${activeTab === 'structure' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        >
+                            {t('datasource.tab_structure')}
+                            {activeTab === 'structure' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('system')}
+                            className={`relative py-3 text-sm font-bold transition-colors ${activeTab === 'system' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        >
+                            {t('datasource.tab_system')}
+                            {activeTab === 'system' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
+                        </button>
+                    </div>
+                </div>
+
                 {/* --- TAB: IMPORT (Smart & Generic) --- */}
                 {activeTab === 'import' && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
