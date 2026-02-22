@@ -30,6 +30,7 @@
         "default": "Standard",
         "rename": "Umbenennen",
         "confirm_delete": "Wirklich löschen?",
+        "read_only": "Lese-Modus",
         "open_details": "Detailansicht"
     },
     "sidebar": {
@@ -261,6 +262,7 @@
         "admin_mode": "Admin-Modus",
         "admin_mode_hint": "System-Tabellen (sys_) in der Auswahl anzeigen.",
         "admin_mode_active": "Admin-Modus aktiv",
+        "user_mode": "User-Modus",
         "last_update": "Letzte Aktualisierung: {{date}}, {{time}}"
     },
     "datasource": {

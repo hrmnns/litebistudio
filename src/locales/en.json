@@ -30,6 +30,7 @@
         "default": "Default",
         "rename": "Rename",
         "confirm_delete": "Delete this item?",
+        "read_only": "Read-Only",
         "open_details": "Open details"
     },
     "sidebar": {
@@ -261,6 +262,7 @@
         "admin_mode": "Admin Mode",
         "admin_mode_hint": "Show system tables (sys_) in selections.",
         "admin_mode_active": "Admin Mode active",
+        "user_mode": "User Mode",
         "last_update": "Last update: {{date}}, {{time}}"
     },
     "datasource": {

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Loader2, Activity } from 'lucide-react';
+import { ArrowLeft, Loader2, Activity, ShieldAlert, User, Lock } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { useDashboard } from '../../../lib/context/DashboardContext';
 
 /* ─── Alert Types ─── */
 export type AlertLevel = 'error' | 'warning' | 'info' | 'success';
@@ -85,6 +86,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     fillHeight,
 }) => {
     const { t } = useTranslation();
+    const { isAdminMode, isReadOnly } = useDashboard();
     const [activeQueries, setActiveQueries] = useState(0);
     const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
 
@@ -197,13 +199,42 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                 <footer className="flex-shrink-0 px-6 md:px-8 py-3 border-t border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
+                            {isReadOnly && (
+                                <div
+                                    className="flex items-center gap-2 px-2.5 py-0.5 rounded-lg bg-rose-100 dark:bg-rose-900/40 border border-rose-300 dark:border-rose-700 shadow-sm"
+                                    title={t('common.read_only', 'Read-Only')}
+                                >
+                                    <Lock className="w-3.5 h-3.5 text-rose-700 dark:text-rose-300" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 dark:text-rose-200">
+                                        {t('common.read_only', 'Read-Only')}
+                                    </span>
+                                </div>
+                            )}
+                            {isAdminMode ? (
+                                <div
+                                    className="flex items-center gap-2 px-2.5 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 shadow-sm"
+                                    title={t('settings.admin_mode_active', 'Admin Mode active')}
+                                >
+                                    <ShieldAlert className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-200">
+                                        {t('settings.admin_mode', 'Admin Mode')}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div
+                                    className="flex items-center px-1.5 py-0.5 rounded-full text-slate-400 dark:text-slate-500"
+                                    title={t('settings.user_mode', 'User Mode')}
+                                >
+                                    <User className="w-3.5 h-3.5" />
+                                </div>
+                            )}
                             {/* Global Loading & Performance Indicator */}
                             {(activeQueries > 0 || lastQueryMs !== null) && (
                                 <div className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-all" title="Letzte Datenbank-Antwortzeit">
                                     {activeQueries > 0 ? (
                                         <>
                                             <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('common.loading', 'LÄDT...')}</span>
+                                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('common.loading', 'Loading...')}</span>
                                         </>
                                     ) : (
                                         <>
