@@ -237,6 +237,13 @@ export function DataTable<T>({
                                     const value = typeof col.accessor === 'function'
                                         ? col.accessor(item)
                                         : getValueByAccessor(item, col.accessor);
+                                    const displayValue = col.render
+                                        ? col.render(item)
+                                        : (typeof value === 'string' || typeof value === 'number'
+                                            ? value
+                                            : value === null || value === undefined
+                                                ? ''
+                                                : String(value));
 
                                     return (
                                         <td
@@ -244,7 +251,7 @@ export function DataTable<T>({
                                             className={`px-4 py-3 truncate ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
                                             title={typeof value === 'string' ? value : undefined}
                                         >
-                                            {col.render ? col.render(item) : value}
+                                            {displayValue}
                                         </td>
                                     );
                                 })}

@@ -47,8 +47,8 @@ export const ReportPackView: React.FC = () => {
     const { data: allWidgets } = useAsync<WidgetRow[]>(() => SystemRepository.getUserWidgets() as Promise<WidgetRow[]>, []);
 
     const loadPacks = useCallback(async () => {
-        const data = await SystemRepository.getReportPacks();
-        setPacks(data as ReportPack[]);
+        const data = await SystemRepository.getReportPacks() as unknown as ReportPack[];
+        setPacks(data);
         if (data.length > 0 && !activePackId) setActivePackId(data[0].id);
     }, [activePackId]);
 

@@ -24,7 +24,7 @@ async function getKeyMaterial(password: string): Promise<CryptoKey> {
     );
 }
 
-async function getKey(keyMaterial: CryptoKey, salt: Uint8Array): Promise<CryptoKey> {
+async function getKey(keyMaterial: CryptoKey, salt: ArrayBuffer): Promise<CryptoKey> {
     return crypto.subtle.deriveKey(
         {
             "name": "PBKDF2",
@@ -44,7 +44,7 @@ export async function encryptBuffer(data: BufferSource, password: string): Promi
     const iv = crypto.getRandomValues(new Uint8Array(12));
 
     const keyMaterial = await getKeyMaterial(password);
-    const key = await getKey(keyMaterial, salt);
+    const key = await getKey(keyMaterial, new Uint8Array(salt).buffer);
 
     const encrypted = await crypto.subtle.encrypt(
         {
@@ -71,7 +71,7 @@ export async function decryptBuffer(data: BufferSource, password: string): Promi
     const ciphertext = view.slice(28);
 
     const keyMaterial = await getKeyMaterial(password);
-    const key = await getKey(keyMaterial, salt);
+    const key = await getKey(keyMaterial, new Uint8Array(salt).buffer);
 
     return crypto.subtle.decrypt(
         {

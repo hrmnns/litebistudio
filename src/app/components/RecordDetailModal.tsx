@@ -18,6 +18,12 @@ interface RecordDetailModalProps {
     schema?: SchemaDefinition;
 }
 
+interface WorklistItemState extends DbRow {
+    id: number | string;
+    status?: string;
+    comment?: string;
+}
+
 export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     isOpen,
     onClose,
@@ -33,7 +39,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     const [referenceIndex, setReferenceIndex] = useState<number | null>(null);
     const [helpOpen, setHelpOpen] = useState(false);
     const [isInWorklist, setIsInWorklist] = useState(false);
-    const [worklistItem, setWorklistItem] = useState<DbRow | null>(null);
+    const [worklistItem, setWorklistItem] = useState<WorklistItemState | null>(null);
     const [recordExists, setRecordExists] = useState<boolean | null>(null);
     const [resolvedSchema, setResolvedSchema] = useState<SchemaDefinition | null>(null);
 
@@ -147,7 +153,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 const recordId = await getRecordIdValueAsync(currentItem);
                 const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId ?? '');
                 setIsInWorklist(metadata.isInWorklist);
-                setWorklistItem(metadata.worklistItem);
+                setWorklistItem(metadata.worklistItem as WorklistItemState | null);
                 setRecordExists(metadata.exists);
             } else {
                 setRecordExists(null);
@@ -212,7 +218,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 // Fetch the newly created item once
                 const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId);
                 setIsInWorklist(true);
-                setWorklistItem(metadata.worklistItem);
+                setWorklistItem(metadata.worklistItem as WorklistItemState | null);
             }
 
             // Explicity dispatch db-changed so widgets update since executeRaw bypasses it
@@ -349,11 +355,11 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 <div className="w-48 shrink-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.status_label')}</label>
                                     <select
-                                        value={worklistItem?.status || 'open'}
+                                        value={typeof worklistItem?.status === 'string' ? worklistItem.status : 'open'}
                                         onChange={async (e) => {
                                             if (worklistItem) {
                                                 const newStatus = e.target.value;
-                                                setWorklistItem({ ...worklistItem, status: newStatus });
+                                                setWorklistItem(prev => prev ? ({ ...prev, status: newStatus }) : prev);
                                                 try {
                                                     await SystemRepository.updateWorklistItem(worklistItem.id, { status: newStatus });
                                                     // Global db-changed is automatically fired
@@ -373,8 +379,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 <div className="flex-1 min-w-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.comment_label')}</label>
                                     <textarea
-                                        value={worklistItem?.comment || ''}
-                                        onChange={(e) => setWorklistItem({ ...worklistItem, comment: e.target.value })}
+                                        value={typeof worklistItem?.comment === 'string' ? worklistItem.comment : ''}
+                                        onChange={(e) => setWorklistItem(prev => prev ? ({ ...prev, comment: e.target.value }) : prev)}
                                         onBlur={async (e) => {
                                             if (worklistItem) {
                                                 try {

@@ -72,7 +72,7 @@ export const QueryBuilderView: React.FC = () => {
 
     // Fetch saved widgets
     const { data: savedWidgets, refresh: refreshWidgets } = useAsync<SavedWidget[]>(
-        async () => await SystemRepository.getUserWidgets() as SavedWidget[],
+        async () => await SystemRepository.getUserWidgets() as unknown as SavedWidget[],
         []
     );
 
@@ -277,7 +277,16 @@ export const QueryBuilderView: React.FC = () => {
                                                 </div>
                                                 <div className="flex items-center gap-2 text-[10px]">
                                                     <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query}</span>
-                                                    <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">{JSON.parse(w.visualization_config).type.toUpperCase()}</span>
+                                                    <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
+                                                        {(() => {
+                                                            try {
+                                                                const parsed = JSON.parse(w.visualization_config) as { type?: string };
+                                                                return (parsed.type || 'table').toUpperCase();
+                                                            } catch {
+                                                                return 'TABLE';
+                                                            }
+                                                        })()}
+                                                    </span>
                                                 </div>
                                             </div>
                                         ))}
@@ -700,7 +709,7 @@ export const QueryBuilderView: React.FC = () => {
                 items={results}
                 initialIndex={selectedItemIndex}
                 tableName={queryConfig?.table}
-                schema={activeSchema}
+                schema={activeSchema || undefined}
             />
         </PageLayout>
     );

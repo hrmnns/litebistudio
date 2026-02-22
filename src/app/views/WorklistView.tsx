@@ -35,7 +35,7 @@ export const WorklistView: React.FC = () => {
 
     const loadWorklist = useCallback(async () => {
         setLoading(true);
-        const data = await SystemRepository.getWorklist() as WorklistItem[];
+        const data = await SystemRepository.getWorklist() as unknown as WorklistItem[];
 
         // Add existence check for each item
         const enriched = await Promise.all(data.map(async (item) => {
@@ -102,7 +102,7 @@ export const WorklistView: React.FC = () => {
             // Even if deleted, maybe show the worklist item info? 
             // For now, if source record is gone, we can still show the modal if we have a way to handle missing data.
             // But RecordDetailModal expects source data.
-            setSourceData([{ id: item.source_id, _deleted: true, ...item }]);
+            setSourceData([{ ...item, _deleted: true }]);
             setSelectedItem(item);
             setIsDetailOpen(true);
         }
@@ -149,13 +149,13 @@ export const WorklistView: React.FC = () => {
                             />
                         </div>
                         <div className="flex items-center gap-1 p-1 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
-                            {[
+                            {([
                                 { id: 'all', label: t('worklist.filter_all') },
                                 { id: 'open', label: t('worklist.filter_open') },
                                 { id: 'in_progress', label: t('worklist.filter_in_progress') },
                                 { id: 'done', label: t('worklist.filter_done') },
                                 { id: 'closed', label: t('worklist.filter_closed') }
-                            ].map(f => (
+                            ] as { id: WorklistFilter; label: string }[]).map(f => (
                                 <button
                                     key={f.id}
                                     onClick={() => setFilter(f.id)}
@@ -292,7 +292,7 @@ export const WorklistView: React.FC = () => {
                         items={sourceData}
                         initialIndex={0}
                         tableName={selectedItem.source_table}
-                        title={selectedItem.display_label}
+                        title={selectedItem.display_label ?? undefined}
                     />
                 )
             }

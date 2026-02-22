@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { runQuery, initDB } from '../lib/db';
 import { queryCache } from '../lib/cache';
 import type { DbRow } from '../types';
@@ -6,6 +6,13 @@ import type { DbRow } from '../types';
 export interface UseQueryOptions {
     cacheKey?: string;
     ttl?: number;
+}
+
+function serializeParam(param: string | number | null | undefined): string {
+    if (param === null) return 'null';
+    if (param === undefined) return 'undefined';
+    if (typeof param === 'string') return `str:${param}`;
+    return `num:${param}`;
 }
 
 export function useQuery<T = DbRow>(
@@ -26,6 +33,12 @@ export function useQuery<T = DbRow>(
     const [loading, setLoading] = useState(!cacheKey || !queryCache.get(cacheKey));
     const [error, setError] = useState<Error | null>(null);
     const [version, setVersion] = useState(0);
+    const paramsKey = params.map(serializeParam).join('|');
+    const paramsRef = useRef(params);
+
+    useEffect(() => {
+        paramsRef.current = params;
+    }, [paramsKey, params]);
 
     const refresh = useCallback(() => {
         setVersion(v => v + 1);
@@ -50,7 +63,7 @@ export function useQuery<T = DbRow>(
                 }
 
                 await initDB();
-                const result = await runQuery(query, params);
+                const result = await runQuery(query, paramsRef.current);
 
                 if (mounted) {
                     setData(result as T[]);
@@ -91,7 +104,7 @@ export function useQuery<T = DbRow>(
             window.removeEventListener('db-updated', handleDbUpdate);
             if (unsubscribe) unsubscribe();
         };
-    }, [query, JSON.stringify(params), version, cacheKey]);
+    }, [query, paramsKey, version, cacheKey, ttl]);
 
     return { data, loading, error, refresh };
 }

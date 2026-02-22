@@ -7,6 +7,21 @@ interface UseAsyncOptions {
     keepPreviousData?: boolean;
 }
 
+function serializeDependency(dep: unknown): string {
+    if (dep === null) return 'null';
+    if (dep === undefined) return 'undefined';
+    if (typeof dep === 'string') return `str:${dep}`;
+    if (typeof dep === 'number') return `num:${dep}`;
+    if (typeof dep === 'boolean') return `bool:${dep}`;
+    if (typeof dep === 'bigint') return `bigint:${dep.toString()}`;
+    if (typeof dep === 'function') return `fn:${dep.name || 'anonymous'}`;
+    try {
+        return `json:${JSON.stringify(dep)}`;
+    } catch {
+        return `obj:${String(dep)}`;
+    }
+}
+
 export function useAsync<T>(
     asyncFunction: () => Promise<T>,
     deps: React.DependencyList = [],
@@ -32,6 +47,7 @@ export function useAsync<T>(
     const [error, setError] = useState<Error | null>(null);
     const [version, setVersion] = useState(0);
     const lastFetchId = useRef(0);
+    const depsKey = deps.map(serializeDependency).join('|');
 
     // Always keep the latest asyncFunction to prevent stale closures
     // when triggered by global events (like db-updated)
@@ -52,7 +68,8 @@ export function useAsync<T>(
             try {
                 // If we have cached data, we don't need to set loading to true immediately
                 // This creates the "stale-while-revalidate" effect
-                if (!data || !cacheKey) {
+                const hasCachedData = cacheKey ? queryCache.get<T>(cacheKey) !== null : false;
+                if (!hasCachedData) {
                     setLoading(true);
                 }
 
@@ -95,7 +112,7 @@ export function useAsync<T>(
             mounted = false;
             window.removeEventListener('db-updated', handleDbUpdate);
         };
-    }, [...deps, version, cacheKey, ttl]);
+    }, [depsKey, version, cacheKey, ttl]);
 
     return { data, loading, error, refresh };
 }

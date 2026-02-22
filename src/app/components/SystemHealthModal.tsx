@@ -14,13 +14,21 @@ interface NavigatorWithDeviceMemory extends Navigator {
     deviceMemory?: number;
 }
 
+interface DiagnosticsInfo {
+    schemaVersion?: number | string;
+    dbSize?: number;
+    pageCount?: number;
+    pageSize?: number;
+    tableStats?: Record<string, number>;
+}
+
 export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, onClose }) => {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<'overview' | 'storage' | 'database'>('overview');
     const [storageEst, setStorageEst] = useState<{ quota?: number, usage?: number }>({});
 
     // Fetch Diagnostics on modal open
-    const { data: diagnostics, loading: diagLoading, refresh: refreshDiag } = useAsync(
+    const { data: diagnostics, loading: diagLoading, refresh: refreshDiag } = useAsync<DiagnosticsInfo>(
         () => SystemRepository.getDiagnostics(),
         [isOpen]
     );

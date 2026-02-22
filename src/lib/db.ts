@@ -223,7 +223,7 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
             }, 5000);
 
             pending.set(id, {
-                resolve: (val) => { clearTimeout(timeout); resolve(val); },
+                resolve: (val) => { clearTimeout(timeout); resolve(val as T); },
                 reject: (err) => { clearTimeout(timeout); reject(err); }
             });
             channel.postMessage({ type: 'RPC_REQ', id, actionType: type, payload });
@@ -242,7 +242,7 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
             const w = result as Worker;
             return new Promise<T>((resolve, reject) => {
                 const id = ++msgId;
-                pending.set(id, { resolve, reject });
+                pending.set(id, { resolve: (val) => resolve(val as T), reject });
                 w.postMessage({ id, type, payload });
             });
         });

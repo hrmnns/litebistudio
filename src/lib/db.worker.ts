@@ -69,6 +69,20 @@ function getRowString(row: SqliteRow, key: string): string {
     return typeof val === 'string' ? val : '';
 }
 
+function requireDb(): DatabaseLike {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+    return db;
+}
+
+function requireSqlite(): SqliteApiLike {
+    if (!sqlite3) {
+        throw new Error('SQLite API not initialized');
+    }
+    return sqlite3;
+}
+
 // Reusable schema and migration logic
 function applyMigrations(databaseInstance: DatabaseLike) {
     if (!databaseInstance) return;
@@ -256,13 +270,14 @@ async function loadDemoData(demoContent?: Record<string, unknown>) {
     }
 
     try {
-        db.exec('BEGIN TRANSACTION');
+        const database = requireDb();
+        database.exec('BEGIN TRANSACTION');
 
         let totalRecords = 0;
         for (const [tableName, records] of Object.entries(demoContent)) {
             if (Array.isArray(records) && records.length > 0) {
                 // Determine if table exists
-                const tableExists = db.selectValue("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?", [tableName]);
+                const tableExists = database.selectValue("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?", [tableName]);
                 if (tableExists) {
                     genericBulkInsert(tableName, records as SqliteRow[], false); // false = use existing transaction
                     totalRecords += records.length;
@@ -270,11 +285,11 @@ async function loadDemoData(demoContent?: Record<string, unknown>) {
             }
         }
 
-        db.exec('COMMIT');
+        database.exec('COMMIT');
         log(`Demo data loaded successfully: ${totalRecords} records across multiple tables.`);
         return totalRecords;
     } catch (e) {
-        db.exec('ROLLBACK');
+        requireDb().exec('ROLLBACK');
         error('Failed to load demo data', e);
         throw e;
     }
@@ -291,9 +306,10 @@ function genericBulkInsert(tableName: string, records: SqliteRow[], wrapInTransa
     const columns = keys.map(k => `"${k}"`).join(', ');
     const sql = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`;
 
-    if (wrapInTransaction) db.exec('BEGIN TRANSACTION');
+    const database = requireDb();
+    if (wrapInTransaction) database.exec('BEGIN TRANSACTION');
     try {
-        const stmt = db.prepare(sql);
+        const stmt = database.prepare(sql);
         try {
             for (const record of records) {
                 const values = keys.map(k => {
@@ -307,9 +323,9 @@ function genericBulkInsert(tableName: string, records: SqliteRow[], wrapInTransa
         } finally {
             stmt.finalize();
         }
-        if (wrapInTransaction) db.exec('COMMIT');
+        if (wrapInTransaction) database.exec('COMMIT');
     } catch (e) {
-        if (wrapInTransaction) db.exec('ROLLBACK');
+        if (wrapInTransaction) database.exec('ROLLBACK');
         throw e;
     }
 }
@@ -328,11 +344,12 @@ async function handleMessage(e: MessageEvent) {
 
             case 'EXEC': {
                 if (!db) await initDB();
+                const database = requireDb();
                 const payloadObj = isRecord(payload) ? payload : {};
                 const sql = typeof payloadObj.sql === 'string' ? payloadObj.sql : '';
                 const bind = Array.isArray(payloadObj.bind) ? payloadObj.bind : undefined;
                 const rows: SqliteRow[] = [];
-                db.exec({
+                database.exec({
                     sql,
                     bind,
                     rowMode: 'object',
@@ -349,7 +366,7 @@ async function handleMessage(e: MessageEvent) {
 
             case 'EXPORT':
                 if (!db) await initDB();
-                result = sqlite3.capi.sqlite3_js_db_export(db.pointer);
+                result = requireSqlite().capi.sqlite3_js_db_export(requireDb().pointer);
                 break;
 
             case 'IMPORT': {
@@ -362,22 +379,23 @@ async function handleMessage(e: MessageEvent) {
 
             case 'CLEAR': {
                 if (!db) await initDB();
+                const database = requireDb();
                 try {
-                    db.exec('BEGIN TRANSACTION');
+                    database.exec('BEGIN TRANSACTION');
                     // Get all user tables
                     const tables: string[] = [];
-                    db.exec({
+                    database.exec({
                         sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sys_%'",
                         rowMode: 'object',
                         callback: (row: SqliteRow) => tables.push(getRowString(row, 'name'))
                     });
                     for (const t of tables) {
-                        db.exec(`DELETE FROM ${t};`);
+                        database.exec(`DELETE FROM ${t};`);
                     }
-                    db.exec('COMMIT');
+                    database.exec('COMMIT');
                     log('Database cleared (all user tables)');
                 } catch (err) {
-                    db.exec('ROLLBACK');
+                    database.exec('ROLLBACK');
                     throw err;
                 }
                 result = true;
@@ -406,12 +424,13 @@ async function handleMessage(e: MessageEvent) {
 
             case 'CLEAR_TABLE': {
                 if (!db) await initDB();
+                const database = requireDb();
                 const payloadObj = isRecord(payload) ? payload : {};
                 const cleanTableName = typeof payloadObj.tableName === 'string' ? payloadObj.tableName : '';
                 if (!/^[a-z0-9_]+$/i.test(cleanTableName)) {
                     throw new Error(`Invalid table name: ${cleanTableName}`);
                 }
-                db.exec(`DELETE FROM ${cleanTableName};`);
+                database.exec(`DELETE FROM ${cleanTableName};`);
                 result = true;
                 break;
             }
@@ -428,16 +447,17 @@ async function handleMessage(e: MessageEvent) {
 
             case 'EXPORT_DEMO_DATA': {
                 if (!db) await initDB();
+                const database = requireDb();
                 const exportData: Record<string, SqliteRow[]> = {};
                 const tables: string[] = [];
-                db.exec({
+                database.exec({
                     sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
                     rowMode: 'object',
                     callback: (row: SqliteRow) => tables.push(getRowString(row, 'name'))
                 });
                 for (const t of tables) {
                     const rows: SqliteRow[] = [];
-                    db.exec({
+                    database.exec({
                         sql: `SELECT * FROM ${t}`,
                         rowMode: 'object',
                         callback: (row: SqliteRow) => rows.push(row)
@@ -472,20 +492,21 @@ async function handleMessage(e: MessageEvent) {
 }
 
 function getDiagnostics() {
-    const pageCount = db.selectValue('PRAGMA page_count') as number;
-    const pageSize = db.selectValue('PRAGMA page_size') as number;
+    const database = requireDb();
+    const pageCount = database.selectValue('PRAGMA page_count') as number;
+    const pageSize = database.selectValue('PRAGMA page_size') as number;
     const dbSize = pageCount * pageSize;
 
     const tableStats: Record<string, number> = {};
     const tables: string[] = [];
-    db.exec({
+    database.exec({
         sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
         rowMode: 'object',
         callback: (row: SqliteRow) => tables.push(getRowString(row, 'name'))
     });
 
     for (const table of tables) {
-        tableStats[table] = db.selectValue(`SELECT count(*) FROM "${table}"`);
+        tableStats[table] = Number(database.selectValue(`SELECT count(*) FROM "${table}"`) || 0);
     }
 
     return {
@@ -493,7 +514,7 @@ function getDiagnostics() {
         pageCount,
         pageSize,
         tableStats,
-        schemaVersion: db.selectValue('PRAGMA user_version') as number
+        schemaVersion: database.selectValue('PRAGMA user_version') as number
     };
 }
 
@@ -511,6 +532,7 @@ async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
         if (!sqlite3) {
             await initDB();
         }
+        const sqliteApi = requireSqlite();
         // 1. Basic SQLite Validation
         const header = new Uint8Array(buffer.slice(0, 16));
         const headerString = new TextDecoder().decode(header);
@@ -524,7 +546,7 @@ async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
         // We use a fresh module initialization if needed, but since we already have sqlite3, 
         // we can just open the buffer as a DB.
         try {
-            tempDb = new sqlite3.oo1.DB(buffer);
+            tempDb = new sqliteApi.oo1.DB(buffer);
         } catch (e: unknown) {
             error('Temporary DB open failed', e);
             report.error = "Memory DB allocation failed or buffer malformed: " + getErrorMessage(e);
@@ -563,8 +585,9 @@ async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
             });
 
             if (db) {
+                const database = requireDb();
                 const targetCols: string[] = [];
-                db.exec({
+                database.exec({
                     sql: `PRAGMA table_info("${tableName}")`,
                     rowMode: 'object',
                     callback: (row: SqliteRow) => targetCols.push(getRowString(row, 'name'))
@@ -589,7 +612,7 @@ async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
         }
 
         // 3. Finalize Import (write to OPFS)
-        if (sqlite3.oo1.OpfsDb) {
+        if (sqliteApi.oo1.OpfsDb) {
             if (db) {
                 db.close();
                 db = null;
@@ -605,7 +628,7 @@ async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
             await writable.close();
 
             // Re-open the main database instance for subsequent queries
-            db = new sqlite3.oo1.OpfsDb('/litebistudio.sqlite3');
+            db = new sqliteApi.oo1.OpfsDb('/litebistudio.sqlite3');
 
             // Critical: Apply migrations to the newly restored database
             // This ensures older backups get new tables like sys_dashboards

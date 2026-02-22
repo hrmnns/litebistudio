@@ -444,13 +444,15 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             }
 
                                             const { exportDatabase } = await import('../../lib/db');
-                                            let bytes = await exportDatabase();
+                                            const bytes = await exportDatabase();
+                                            const plainBuffer = new Uint8Array(bytes).buffer;
+                                            let outputBuffer: ArrayBuffer = plainBuffer;
 
                                             if (useEncryption) {
-                                                bytes = new Uint8Array(await encryptBuffer(bytes, backupPassword));
+                                                outputBuffer = await encryptBuffer(plainBuffer, backupPassword);
                                             }
 
-                                            const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
+                                            const blob = new Blob([outputBuffer], { type: 'application/x-sqlite3' });
                                             const url = URL.createObjectURL(blob);
                                             const a = document.createElement('a');
                                             a.href = url;

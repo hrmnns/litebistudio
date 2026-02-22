@@ -10,7 +10,7 @@ import { Modal } from '../components/Modal';
 import { getComponent, SYSTEM_WIDGETS } from '../registry';
 import { COMPONENTS } from '../../config/components';
 import { useDashboard } from '../../lib/context/DashboardContext';
-import type { DbRow } from '../../types';
+import type { DbRow, WidgetConfig } from '../../types';
 
 interface FilterDef {
     column: string;
@@ -34,6 +34,7 @@ interface DashboardDef {
 
 interface CustomWidgetRecord extends DbRow {
     id: string;
+    name: string;
     sql_query: string;
     visualization_config: string;
 }
@@ -75,7 +76,8 @@ export const CustomDashboardView: React.FC = () => {
             if (initRef.current) return;
             initRef.current = true;
 
-            let dbDashboards = await SystemRepository.getDashboards();
+            const rawDashboards = await SystemRepository.getDashboards();
+            let dbDashboards = rawDashboards as unknown as DashboardDef[];
 
             // Migration from localStorage
             const legacyLayout = localStorage.getItem('custom_dashboard_layout');
@@ -91,14 +93,14 @@ export const CustomDashboardView: React.FC = () => {
                 dbDashboards = [defaultDash];
             } else if (dbDashboards.length > 0) {
                 // Parse layouts from strings
-                dbDashboards = dbDashboards.map(d => ({
+                dbDashboards = dbDashboards.map((d: DashboardDef) => ({
                     ...d,
                     layout: typeof d.layout === 'string' ? JSON.parse(d.layout) : d.layout
                 }));
             }
 
             setDashboards(dbDashboards);
-            setActiveDashboardId(dbDashboards[0].id);
+            setActiveDashboardId(dbDashboards[0]?.id ?? null);
             setIsLoaded(true);
         };
         init();
@@ -447,9 +449,9 @@ export const CustomDashboardView: React.FC = () => {
                             const dbWidget = customWidgets?.find(w => w.id === widgetRef.id);
                             if (!dbWidget) return null;
 
-                            let config;
+                            let config: WidgetConfig;
                             try {
-                                config = JSON.parse(dbWidget.visualization_config);
+                                config = JSON.parse(dbWidget.visualization_config) as WidgetConfig;
                             } catch {
                                 config = { type: 'table' };
                             }

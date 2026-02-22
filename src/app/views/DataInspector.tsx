@@ -62,7 +62,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [searchTerm, mode]); // Re-run when searchTerm changes
+    }, [searchTerm, mode, execute]); // Re-run when searchTerm changes
 
     const handleRunSql = () => {
         if (!inputSql) return;
@@ -87,7 +87,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 className: isId ? 'font-mono text-[10px] text-slate-400' :
                     (key === 'Period' || key === 'PostingDate' ? 'font-mono' : ''),
                 render: isAmount ? (item: DbRow) => (
-                    <span className={item[key] < 0 ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}>
+                    <span className={Number(item[key] ?? 0) < 0 ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}>
                         {new Intl.NumberFormat('de-DE', {
                             style: 'currency',
                             currency: (item.Currency as string) || 'EUR'

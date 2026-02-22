@@ -350,7 +350,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
                     items={results}
                     initialIndex={selectedItemIndex}
                     title={title}
-                    schema={dynamicSchema}
+                    schema={dynamicSchema || undefined}
                     tableName={sql.match(/FROM\s+([a-zA-Z0-9_]+)/i)?.[1]}
                 />
             )}
