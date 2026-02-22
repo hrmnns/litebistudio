@@ -247,7 +247,7 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
             </div>
 
             {/* Filters */}
-            <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
+            <div className="border-t border-slate-300 dark:border-slate-600 pt-5 mt-1">
                 <button
                     onClick={() => toggleSection('filters')}
                     className="w-full flex items-center justify-between mb-3 group"
@@ -323,7 +323,7 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
             </div>
 
             {/* Aggregations */}
-            <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
+            <div className="border-t border-slate-300 dark:border-slate-600 pt-5 mt-1">
                 <button
                     onClick={() => toggleSection('aggregations')}
                     className="w-full flex items-center justify-between mb-3 group"
@@ -407,7 +407,7 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
             </div>
 
             {/* Sort & Limit */}
-            <div className="border-t border-slate-100 dark:border-slate-800 pt-4 pb-2">
+            <div className="border-t border-slate-300 dark:border-slate-600 pt-5 pb-2 mt-1">
                 <button
                     onClick={() => toggleSection('sorting')}
                     className="w-full flex items-center justify-between mb-3 group"

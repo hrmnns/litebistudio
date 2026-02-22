@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
-    Play, Save, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
-    Layout, Maximize2, Minimize2, Settings, History, Folder, Trash2,
-    Edit3, X, Check, Download
+    Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
+    Layout, Maximize2, Minimize2, Folder, Trash2,
+    Edit3, X, Download, Check
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { DataTable } from '../../components/ui/DataTable';
@@ -28,6 +28,8 @@ import { PivotTable } from '../components/PivotTable';
 import type { SchemaDefinition } from '../components/SchemaDocumentation';
 
 type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text';
+type GuidedStep = 1 | 2 | 3 | 4;
+const DEFAULT_SQL = 'SELECT * FROM sqlite_master LIMIT 10';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -41,15 +43,20 @@ interface SavedWidget {
 
 export const QueryBuilderView: React.FC = () => {
     const { t } = useTranslation();
-    const [sql, setSql] = useState('SELECT * FROM sqlite_master LIMIT 10');
+    const [sql, setSql] = useState(DEFAULT_SQL);
     const [results, setResults] = useState<DbRow[]>([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [lastRunSql, setLastRunSql] = useState('');
+    const [previewRenderVersion, setPreviewRenderVersion] = useState(0);
+    const [savedSnapshot, setSavedSnapshot] = useState('');
 
     // Mode State
     const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('visual');
-    const [sidebarTab, setSidebarTab] = useState<'query' | 'vis' | 'archive'>('query');
+    const [sidebarTab, setSidebarTab] = useState<'query' | 'vis'>('query');
+    const [entryMode, setEntryMode] = useState<'new' | 'existing'>('new');
     const [isMaximized, setIsMaximized] = useState(false);
+    const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
     const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
 
     // Visualization State
@@ -87,7 +94,7 @@ export const QueryBuilderView: React.FC = () => {
             if (cols && cols.length > 0) {
                 const dynamicSchema = {
                     title: `Tabelle: ${tableName}`,
-                    description: `Automatisch generiertes Schema für die Tabelle "${tableName}".`,
+                    description: `Automatisch generiertes Schema fÃ¼r die Tabelle "${tableName}".`,
                     type: 'object',
                     properties: cols.reduce((acc: Record<string, { type: string; description: string }>, col: TableColumn) => {
                         acc[col.name] = {
@@ -102,13 +109,14 @@ export const QueryBuilderView: React.FC = () => {
         });
     }, [queryConfig?.table]);
 
-    const handleRun = async (overrideSql?: string) => {
+    const handleRun = useCallback(async (overrideSql?: string): Promise<boolean> => {
         setLoading(true);
         setError('');
         try {
             const sqlToExecute = overrideSql || sql;
             const data = await SystemRepository.executeRaw(sqlToExecute);
             setResults(data);
+            setLastRunSql(sqlToExecute);
             if (data.length > 0) {
                 const numericCols = Object.keys(data[0]).filter(k => typeof data[0][k] === 'number');
                 const textCols = Object.keys(data[0]).filter(k => typeof data[0][k] === 'string');
@@ -121,50 +129,79 @@ export const QueryBuilderView: React.FC = () => {
                     }));
                 }
             }
+            return true;
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
-            setResults([]);
+            return false;
         } finally {
             setLoading(false);
         }
-    };
+    }, [sql, visConfig.xAxis]);
 
     const loadWidget = (widget: SavedWidget) => {
+        let parsedVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
+        let parsedVisType: VisualizationType = 'table';
+        let parsedBuilderMode: 'sql' | 'visual' = 'sql';
+        let parsedQueryConfig: QueryConfig | undefined;
+        const widgetSql = (widget.sql_query || '').trim() || DEFAULT_SQL;
+
         setActiveWidgetId(widget.id);
         setWidgetName(widget.name);
-        setSql(widget.sql_query);
+        setSql(widgetSql);
+        setLastRunSql('');
+        setResults([]);
+        setError('');
+        setQueryConfig(undefined);
+        setBuilderMode('sql');
+        setVisType('table');
+        setVisConfig({ type: 'table', color: '#3b82f6' });
 
         try {
-            const visualConfig = JSON.parse(widget.visualization_config);
-            setVisType(visualConfig.type || 'table');
-            setVisConfig(visualConfig);
+            const visualConfig = JSON.parse(widget.visualization_config) as WidgetConfig;
+            parsedVisConfig = visualConfig;
+            parsedVisType = (visualConfig.type || 'table') as VisualizationType;
+            setVisType(parsedVisType);
+            setVisConfig(parsedVisConfig);
 
             if (widget.visual_builder_config) {
-                const qConfig = JSON.parse(widget.visual_builder_config);
+                const qConfig = JSON.parse(widget.visual_builder_config) as QueryConfig;
+                parsedQueryConfig = qConfig;
+                parsedBuilderMode = 'visual';
                 setQueryConfig(qConfig);
-                setBuilderMode('visual');
+                setBuilderMode(parsedBuilderMode);
             } else {
-                setBuilderMode('sql');
+                parsedBuilderMode = 'sql';
+                parsedQueryConfig = undefined;
+                setBuilderMode(parsedBuilderMode);
+                setQueryConfig(undefined);
             }
         } catch (e) {
             console.error('Error parsing widget config', e);
         }
 
         setSidebarTab('query');
-        const loadedType = (() => {
-            try {
-                const parsed = JSON.parse(widget.visualization_config) as { type?: VisualizationType };
-                return parsed.type || 'table';
-            } catch {
-                return 'table';
-            }
-        })();
-        if (loadedType === 'text') {
-            setResults([]);
-            setError('');
+        setEntryMode('existing');
+        if (parsedVisType === 'text') {
+            setSql('');
+            setLastRunSql('');
+            setBuilderMode('visual');
+            setQueryConfig(undefined);
+            setGuidedStep(3);
         } else {
-            setTimeout(() => handleRun(widget.sql_query), 100);
+            setSql(widgetSql);
+            setGuidedStep(2);
+            setTimeout(() => handleRun(widgetSql), 100);
         }
+        setSidebarTab('query');
+        setSavedSnapshot(buildSnapshot({
+            currentSql: parsedVisType === 'text' ? '' : widgetSql,
+            currentBuilderMode: parsedBuilderMode,
+            currentQueryConfig: parsedVisType === 'text' ? undefined : parsedQueryConfig,
+            currentVisType: parsedVisType,
+            currentVisConfig: parsedVisConfig,
+            currentWidgetName: widget.name,
+            currentActiveWidgetId: widget.id
+        }));
     };
 
     const handleSaveWidget = async () => {
@@ -186,6 +223,15 @@ export const QueryBuilderView: React.FC = () => {
             refreshWidgets();
             alert(activeWidgetId ? t('querybuilder.success_update') : t('querybuilder.success_save'));
             setActiveWidgetId(widget.id);
+            setSavedSnapshot(buildSnapshot({
+                currentSql: widget.sql_query,
+                currentBuilderMode: builderMode,
+                currentQueryConfig: builderMode === 'visual' ? queryConfig : undefined,
+                currentVisType: visType,
+                currentVisConfig: { ...visConfig, type: visType },
+                currentWidgetName: widget.name,
+                currentActiveWidgetId: widget.id
+            }));
         } catch (err: unknown) {
             alert(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
         }
@@ -213,8 +259,32 @@ export const QueryBuilderView: React.FC = () => {
     }, [results]);
 
     const resultColumns = results.length > 0 ? Object.keys(results[0]) : [];
+    const numericColumns = useMemo(() => {
+        if (results.length === 0) return [] as string[];
+        return resultColumns.filter((col) =>
+            results.some((row) => row[col] !== null && row[col] !== undefined && typeof row[col] === 'number')
+        );
+    }, [results, resultColumns]);
     const isTextWidget = visType === 'text';
+    const scatterXKey = visConfig.xAxis || '';
+    const scatterYKey = (visConfig.yAxes || [])[0] || '';
+    const scatterData = useMemo(() => {
+        if (visType !== 'scatter' || !scatterXKey || !scatterYKey) return [] as DbRow[];
+        return results
+            .map((row) => {
+                const x = Number(row[scatterXKey]);
+                const y = Number(row[scatterYKey]);
+                return { ...row, [scatterXKey]: x, [scatterYKey]: y };
+            })
+            .filter((row) => Number.isFinite(row[scatterXKey] as number) && Number.isFinite(row[scatterYKey] as number));
+    }, [results, scatterXKey, scatterYKey, visType]);
+    const previewVisType: VisualizationType = (guidedStep === 2 && !isTextWidget) ? 'table' : visType;
     const canPersistWidget = isTextWidget || results.length > 0;
+    const exportDisabled = isExporting || (!isTextWidget && results.length === 0);
+    const saveDisabled = !canPersistWidget || isReadOnly;
+    const exportDisabledReason = isExporting
+        ? t('common.exporting')
+        : (!isTextWidget && results.length === 0 ? t('querybuilder.hint_run_query_before_export') : '');
     const textSizeClass = {
         sm: 'text-sm',
         md: 'text-base',
@@ -222,6 +292,249 @@ export const QueryBuilderView: React.FC = () => {
         xl: 'text-xl',
         '2xl': 'text-2xl'
     } as const;
+
+    const hasEntrySelection = entryMode === 'new' || (entryMode === 'existing' && Boolean(activeWidgetId));
+    const hasSourceConfig = builderMode === 'visual'
+        ? Boolean(queryConfig?.table)
+        : sql.trim().length > 0;
+    const hasRunOutput = isTextWidget || (results.length > 0 && !error && lastRunSql.trim() === sql.trim());
+    const hasVisualizationConfig = useMemo(() => {
+        if (visType === 'text') {
+            return Boolean((visConfig.textContent || '').trim());
+        }
+        if (visType === 'table' || visType === 'pivot') {
+            return true;
+        }
+        const hasXAxis = Boolean(visConfig.xAxis);
+        const hasYAxis = Boolean(visConfig.yAxes && visConfig.yAxes.length > 0);
+        if (!hasXAxis || !hasYAxis) {
+            return false;
+        }
+        if (visType === 'scatter') {
+            const xIsNumeric = numericColumns.includes(scatterXKey);
+            const yIsNumeric = numericColumns.includes(scatterYKey);
+            return xIsNumeric && yIsNumeric && scatterData.length > 0;
+        }
+        if (visType === 'kpi') {
+            return results.length > 0;
+        }
+        const hasRenderableData = results.some((row) => {
+            const xVal = row[visConfig.xAxis as string];
+            if (xVal === null || xVal === undefined || xVal === '') return false;
+            return (visConfig.yAxes || []).some((yAxis) => {
+                const yVal = row[yAxis];
+                return yVal !== null && yVal !== undefined && yVal !== '';
+            });
+        });
+        return hasRenderableData;
+    }, [visType, visConfig, numericColumns, scatterData.length, scatterXKey, scatterYKey, results]);
+    const previewVisualizationInvalid = !isTextWidget
+        && results.length > 0
+        && previewVisType !== 'table'
+        && previewVisType !== 'pivot'
+        && !hasVisualizationConfig;
+    const suggestedGuidedStep: GuidedStep = !hasEntrySelection
+        ? 1
+        : isTextWidget
+            ? (!hasVisualizationConfig ? 3 : 4)
+            : (!hasSourceConfig || !hasRunOutput
+                ? 2
+                : !hasVisualizationConfig
+                    ? 3
+                    : 4);
+    const canGoToStep = (step: GuidedStep) => {
+        if (isTextWidget && step === 2) return false;
+        return step <= suggestedGuidedStep;
+    };
+    const guidedNextDisabled = loading || (
+        guidedStep === 1
+            ? !hasEntrySelection
+            : guidedStep === 2
+                ? (isTextWidget ? false : (!hasSourceConfig || !hasRunOutput))
+                : guidedStep === 3
+                    ? !hasVisualizationConfig
+                    : saveDisabled
+    );
+    const guidedPrimaryLabel = guidedStep >= 4
+        ? t('querybuilder.finish')
+        : t('querybuilder.next');
+    const guidedApplyVisible = guidedStep === 2 || guidedStep === 3;
+    const guidedApplyDisabled = loading || (
+        guidedStep === 2
+            ? (isTextWidget || !hasSourceConfig)
+            : guidedStep === 3
+                ? false
+                : true
+    );
+    const guidedApplyLabel = loading
+        ? t('common.loading')
+        : t('querybuilder.apply');
+    const effectiveSidebarTab: 'query' | 'vis' = sidebarTab;
+    const showGuidedFooter = true;
+    const showFinalizePanel = guidedStep === 4 && effectiveSidebarTab === 'query';
+    const buildSnapshot = useCallback((overrides?: {
+        currentSql?: string;
+        currentBuilderMode?: 'sql' | 'visual';
+        currentQueryConfig?: QueryConfig | undefined;
+        currentVisType?: VisualizationType;
+        currentVisConfig?: WidgetConfig;
+        currentWidgetName?: string;
+        currentActiveWidgetId?: string | null;
+    }) => JSON.stringify({
+        sql: (overrides?.currentSql ?? sql).trim(),
+        builderMode: overrides?.currentBuilderMode ?? builderMode,
+        queryConfig: overrides?.currentQueryConfig ?? queryConfig ?? null,
+        visType: overrides?.currentVisType ?? visType,
+        visConfig: overrides?.currentVisConfig ?? visConfig,
+        widgetName: (overrides?.currentWidgetName ?? widgetName).trim(),
+        activeWidgetId: overrides?.currentActiveWidgetId ?? activeWidgetId
+    }), [sql, builderMode, queryConfig, visType, visConfig, widgetName, activeWidgetId]);
+    const currentSnapshot = useMemo(
+        () => buildSnapshot(),
+        [buildSnapshot]
+    );
+    const hasUnsavedChanges = savedSnapshot.length > 0 && currentSnapshot !== savedSnapshot;
+    const stepLabels: Record<GuidedStep, string> = {
+        1: t('querybuilder.step_start'),
+        2: t('querybuilder.step_source_run'),
+        3: t('querybuilder.step_visualize'),
+        4: t('querybuilder.step_finalize')
+    };
+    const stepHelpText: Record<GuidedStep, string> = {
+        1: t('querybuilder.step_help_start'),
+        2: t('querybuilder.step_help_source_run'),
+        3: t('querybuilder.step_help_visualize'),
+        4: t('querybuilder.step_help_finalize')
+    };
+    const guidedSteps: GuidedStep[] = [1, 2, 3, 4];
+    const modeInfoText =
+        entryMode === 'new' && !activeWidgetId
+            ? (isTextWidget ? t('querybuilder.mode_new_text_active') : t('querybuilder.mode_new_active'))
+            : t('querybuilder.mode_editing_active', { name: widgetName });
+    const previewTypeMeta = useMemo(() => {
+        const iconClass = 'w-5 h-5';
+        switch (previewVisType) {
+            case 'table':
+                return { icon: <TableIcon className={iconClass} />, label: t('querybuilder.table') };
+            case 'bar':
+                return { icon: <BarChart2 className={iconClass} />, label: t('querybuilder.bar') };
+            case 'line':
+                return { icon: <TrendingUp className={iconClass} />, label: t('querybuilder.line') };
+            case 'text':
+                return { icon: <Edit3 className={iconClass} />, label: t('querybuilder.text') };
+            default:
+                return { icon: <Layout className={iconClass} />, label: previewVisType.toUpperCase() };
+        }
+    }, [previewVisType, t]);
+
+    const gotoStep = (step: GuidedStep) => {
+        if (!canGoToStep(step)) return;
+        setGuidedStep(step);
+        if (step <= 2) setSidebarTab('query');
+        if (step === 3) setSidebarTab('vis');
+        if (step === 4) setSidebarTab('query');
+    };
+
+    const handleGuidedNext = async () => {
+        if (guidedStep === 1) {
+            if (!hasEntrySelection) return;
+            gotoStep(isTextWidget ? 3 : 2);
+            return;
+        }
+        if (guidedStep === 2) {
+            if (isTextWidget) {
+                gotoStep(3);
+                return;
+            }
+            if (!hasSourceConfig || !hasRunOutput) return;
+            gotoStep(3);
+            return;
+        }
+        if (guidedStep === 3) {
+            if (!hasVisualizationConfig) return;
+            gotoStep(4);
+            return;
+        }
+        if (guidedStep === 4 && !saveDisabled) {
+            setSaveModalOpen(true);
+        }
+    };
+
+    const handleGuidedApply = async () => {
+        if (guidedStep === 2) {
+            if (isTextWidget || !hasSourceConfig || loading) return;
+            await handleRun();
+            return;
+        }
+        if (guidedStep === 3) {
+            setPreviewRenderVersion((prev) => prev + 1);
+            if (!hasVisualizationConfig) return;
+        }
+    };
+
+    useEffect(() => {
+        if (!savedSnapshot) {
+            setSavedSnapshot(currentSnapshot);
+        }
+    }, [savedSnapshot, currentSnapshot]);
+
+    useEffect(() => {
+        const onBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (!hasUnsavedChanges) return;
+            event.preventDefault();
+            event.returnValue = '';
+        };
+
+        window.addEventListener('beforeunload', onBeforeUnload);
+        return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }, [hasUnsavedChanges]);
+
+    useEffect(() => {
+        setGuidedStep(prev => (prev > suggestedGuidedStep ? suggestedGuidedStep : prev));
+    }, [suggestedGuidedStep]);
+
+    useEffect(() => {
+        if (visType !== 'scatter' || numericColumns.length === 0) return;
+        const currentX = visConfig.xAxis || '';
+        const currentY = (visConfig.yAxes || [])[0] || '';
+        const xValid = numericColumns.includes(currentX);
+        const yValid = numericColumns.includes(currentY);
+        if (xValid && yValid) return;
+
+        const nextX = xValid ? currentX : numericColumns[0];
+        const fallbackY = numericColumns[1] || numericColumns[0];
+        const nextY = yValid ? currentY : fallbackY;
+        setVisConfig(prev => ({
+            ...prev,
+            xAxis: nextX,
+            yAxes: nextY ? [nextY] : []
+        }));
+    }, [visType, numericColumns, visConfig.xAxis, visConfig.yAxes]);
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            const isModifier = event.ctrlKey || event.metaKey;
+            if (!isModifier) return;
+
+            const key = event.key.toLowerCase();
+            if (key === 'enter') {
+                event.preventDefault();
+                if (!loading) {
+                    void handleRun();
+                }
+            }
+
+            if (key === 's') {
+                event.preventDefault();
+                if (!saveDisabled) {
+                    setSaveModalOpen(true);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [loading, saveDisabled, handleRun]);
 
     return (
         <PageLayout
@@ -239,160 +552,291 @@ export const QueryBuilderView: React.FC = () => {
                         </button>
                         <button
                             onClick={() => exportToPdf('query-visualization', `report-${widgetName || 'query'}`)}
-                            disabled={isExporting || (!isTextWidget && results.length === 0)}
+                            disabled={exportDisabled}
+                            title={exportDisabled ? exportDisabledReason : t('querybuilder.hint_export_shortcut')}
                             className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
                         >
                             <Download className="w-4 h-4" />
                             {isExporting ? t('common.exporting') : t('common.export_pdf')}
                         </button>
-                        {activeWidgetId && (
-                            <button
-                                onClick={() => setActiveWidgetId(null)}
-                                className="px-4 py-2 text-slate-400 hover:text-slate-600 font-medium text-sm transition-colors"
-                            >
-                                {t('querybuilder.new_report')}
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setSaveModalOpen(true)}
-                            disabled={!canPersistWidget || isReadOnly}
-                            className={`flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50 ${isReadOnly ? 'cursor-not-allowed hidden' : ''}`}
-                        >
-                            <Save className="w-4 h-4" />
-                            {activeWidgetId ? t('querybuilder.update_widget') : t('querybuilder.save_as_widget')}
-                        </button>
                     </div>
                 )
             }}
         >
-            <div className="flex flex-col gap-6 h-[calc(100vh-140px)]">
+            <div className="flex flex-col gap-6 h-full min-h-0">
                 <div className="flex-1 flex gap-6 min-h-0 overflow-hidden relative">
                     {/* Builder Rail */}
                     <div className={`${isMaximized ? 'hidden' : 'w-full lg:w-96'} h-full overflow-hidden transition-all duration-300`}>
                         <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                            <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40">
-                                <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl">
-                                    <button onClick={() => setSidebarTab('archive')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'archive' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                        <Folder className="w-4 h-4" /> {t('querybuilder.archive')}
-                                    </button>
-                                    <button onClick={() => setSidebarTab('query')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'query' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                        <History className="w-4 h-4" /> {t('querybuilder.query')}
-                                    </button>
-                                    <button onClick={() => setSidebarTab('vis')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-black uppercase transition-all ${sidebarTab === 'vis' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                        <Settings className="w-4 h-4" /> {t('querybuilder.graph')}
-                                    </button>
+                            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                <div className="p-3">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-1">
+                                        {t('querybuilder.guided_panel')}
+                                    </h3>
                                 </div>
+                                <div className="border-t border-slate-100 dark:border-slate-800 px-3 pt-2 pb-2">
+                                <div className="grid grid-cols-4 gap-1">
+                                    {guidedSteps.map((step) => (
+                                        <button
+                                            key={step}
+                                            onClick={() => gotoStep(step)}
+                                            disabled={!canGoToStep(step)}
+                                            className={`px-1 py-1.5 rounded border text-[9px] font-black uppercase tracking-wide transition-all ${
+                                                isTextWidget && step === 2
+                                                    ? 'bg-slate-100 text-slate-300 border-slate-200'
+                                                    : guidedStep === step
+                                                    ? 'bg-blue-50 text-blue-700 border-blue-200 ring-1 ring-blue-100'
+                                                    : step <= suggestedGuidedStep
+                                                        ? 'bg-white text-slate-600 border-slate-200'
+                                                        : 'bg-slate-100 text-slate-400 border-slate-200'
+                                            } disabled:opacity-50`}
+                                        >
+                                            {stepLabels[step]}
+                                        </button>
+                                    ))}
+                                </div>
+                                </div>
+                                <div className="mt-1 mb-2 px-4 space-y-1">
+                                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                                        {stepHelpText[guidedStep]}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="px-4 py-2 border-b border-amber-200 bg-amber-50">
+                                <p className="text-[10px] text-amber-800">
+                                    {modeInfoText}
+                                </p>
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
-                            {sidebarTab === 'archive' ? (
-                                <div className="space-y-2 animate-in fade-in duration-300">
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
-                                        {t('querybuilder.saved_reports')}
-                                        <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">{savedWidgets?.length || 0}</span>
-                                    </h3>
-                                    <div className="space-y-1">
-                                        {savedWidgets?.map(w => (
-                                            <div key={w.id} className={`group p-3 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-bold text-slate-700 dark:text-slate-200 text-sm truncate">{w.name}</span>
-                                                    {!isReadOnly && (
-                                                        <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-2 text-[10px]">
-                                                    <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query}</span>
-                                                    <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
-                                                        {(() => {
-                                                            try {
-                                                                const parsed = JSON.parse(w.visualization_config) as { type?: string };
-                                                                return (parsed.type || 'table').toUpperCase();
-                                                            } catch {
-                                                                return 'TABLE';
-                                                            }
-                                                        })()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : sidebarTab === 'query' ? (
+                            {effectiveSidebarTab === 'query' ? (
                                 <div className="space-y-4">
-                                    {activeWidgetId && (
-                                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 flex items-center justify-between">
-                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                <Edit3 className="w-4 h-4" />
-                                                <span className="text-xs font-bold truncate">{t('querybuilder.editing', { name: widgetName })}</span>
-                                            </div>
-                                            <button onClick={() => setActiveWidgetId(null)} className="p-1 hover:bg-amber-100 rounded text-amber-500"><X className="w-3.5 h-3.5" /></button>
-                                        </div>
-                                    )}
-                                    <div className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex">
-                                        <button onClick={() => setBuilderMode('visual')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${builderMode === 'visual' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                                            <Layout className="w-3.5 h-3.5" /> {t('querybuilder.visual_builder')}
-                                        </button>
-                                        <button onClick={() => setBuilderMode('sql')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${builderMode === 'sql' ? 'bg-slate-900 dark:bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
-                                            <span className="font-mono text-[10px]">SQL</span> {t('querybuilder.direct_editor')}
-                                        </button>
-                                    </div>
-                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-2">
-                                        {builderMode === 'sql' ? (
-                                            <>
-                                                <div className="flex items-center justify-between">
-                                                    <label className="text-[10px] font-black uppercase text-slate-400">{t('querybuilder.sql_query')}</label>
-                                                    <SqlAssistant
-                                                        tableName={queryConfig?.table}
-                                                        columns={results.length > 0 ? Object.keys(results[0]).map(c => ({ name: c, type: typeof results[0][c] })) : []}
-                                                        onSelectSnippet={snippet => setSql(prev => prev + '\n' + snippet)}
-                                                    />
-                                                </div>
-                                                <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full h-64 font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" placeholder="SELECT * FROM..." />
-                                            </>
-                                        ) : (
-                                            <VisualQueryBuilder
-                                                initialConfig={queryConfig}
-                                                isAdminMode={isAdminMode}
-                                                onChange={(newSql, newConfig) => { setSql(newSql); setQueryConfig(newConfig); }}
-                                            />
-                                        )}
-                                        <div className="flex justify-between items-center pt-2 border-t border-slate-50 dark:border-slate-800">
-                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('querybuilder.labels')}:</span>
-                                                <button onClick={() => setVisConfig({ ...visConfig, showLabels: !visConfig.showLabels })} className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.showLabels ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"}`}>
-                                                    {visConfig.showLabels ? t('querybuilder.label_on') : t('querybuilder.label_off')}
+                                    {guidedStep === 1 && (
+                                        <div className="space-y-4">
+                                            <div className="space-y-2 animate-in fade-in duration-300">
+                                                <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
+                                                    {t('querybuilder.new_report')}
+                                                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">1</span>
+                                                </h3>
+                                                <button
+                                                    onClick={() => {
+                                                        setEntryMode('new');
+                                                        setActiveWidgetId(null);
+                                                        setWidgetName('');
+                                                        setResults([]);
+                                                        setError('');
+                                                        setVisType('table');
+                                                        gotoStep(2);
+                                                    }}
+                                                    className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
+                                                        !isTextWidget && entryMode === 'new' && !activeWidgetId
+                                                            ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
+                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
+                                                    }`}
+                                                >
+                                                    <Edit3 className="w-4 h-4 flex-shrink-0" />
+                                                    <div className="flex-1 min-w-0 text-left">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-sm font-bold truncate">{t('querybuilder.new_query_card_title')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-[10px]">
+                                                            <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_query_card_subtitle')}</span>
+                                                            <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
+                                                                {t('querybuilder.new_query_card_type')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setEntryMode('new');
+                                                        setActiveWidgetId(null);
+                                                        setWidgetName('');
+                                                        setResults([]);
+                                                        setError('');
+                                                        setVisType('text');
+                                                        setVisConfig(prev => ({ ...prev, type: 'text', textContent: prev.textContent || '' }));
+                                                        gotoStep(3);
+                                                    }}
+                                                    className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
+                                                        isTextWidget && entryMode === 'new' && !activeWidgetId
+                                                            ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
+                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
+                                                    }`}
+                                                >
+                                                    <Edit3 className="w-4 h-4 flex-shrink-0" />
+                                                    <div className="flex-1 min-w-0 text-left">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-sm font-bold truncate">{t('querybuilder.new_text_card_title')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-[10px]">
+                                                            <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_text_card_subtitle')}</span>
+                                                            <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
+                                                                {t('querybuilder.new_text_card_type')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </button>
                                             </div>
-                                            <button onClick={() => handleRun()} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs shadow-md disabled:opacity-50">
-                                                <Play className="w-3.5 h-3.5" /> {loading ? t('common.loading') : t('querybuilder.apply')}
-                                            </button>
+                                            <div className="space-y-2 animate-in fade-in duration-300">
+                                                <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
+                                                    {t('querybuilder.saved_reports')}
+                                                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">{savedWidgets?.length || 0}</span>
+                                                </h3>
+                                                <div className="space-y-1">
+                                                    {savedWidgets?.map(w => (
+                                                        <div key={w.id} className={`group p-3 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="font-bold text-slate-700 dark:text-slate-200 text-sm truncate">{w.name}</span>
+                                                                {!isReadOnly && (
+                                                                    <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-[10px]">
+                                                                <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query}</span>
+                                                                <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
+                                                                    {(() => {
+                                                                        try {
+                                                                            const parsed = JSON.parse(w.visualization_config) as { type?: string };
+                                                                            return (parsed.type || 'table').toUpperCase();
+                                                                        } catch {
+                                                                            return 'TABLE';
+                                                                        }
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
+                                    {guidedStep === 1 ? null : showFinalizePanel ? (
+                                        <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/60 space-y-3">
+                                            <p className="text-[10px] font-black uppercase tracking-wide text-blue-500">
+                                                {t('querybuilder.step_finalize')}
+                                            </p>
+                                            <p className="text-xs text-slate-700 font-semibold">
+                                                {widgetName || t('querybuilder.new_report')}
+                                            </p>
+                                            <div className="space-y-2 text-[11px]">
+                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
+                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_mode')}</div>
+                                                    <div className="mt-1 text-slate-700">{modeInfoText}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
+                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_source')}</div>
+                                                    <div className="mt-1 text-slate-700">
+                                                        {isTextWidget
+                                                            ? t('querybuilder.new_text_card_type')
+                                                            : builderMode === 'visual'
+                                                                ? (queryConfig?.table || t('querybuilder.please_select'))
+                                                                : t('querybuilder.direct_editor')}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
+                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_chart')}</div>
+                                                    <div className="mt-1 text-slate-700 font-semibold">{previewTypeMeta.label}</div>
+                                                    {!isTextWidget && (
+                                                        <div className="mt-1 text-[10px] text-slate-500">
+                                                            {t('querybuilder.finalize_axes', {
+                                                                x: visConfig.xAxis || '-',
+                                                                count: (visConfig.yAxes || []).length
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    {isTextWidget && (
+                                                        <div className="mt-1 text-[10px] text-slate-500">
+                                                            {t('querybuilder.finalize_text_length', { count: (visConfig.textContent || '').trim().length })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
+                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.preview', { count: results.length })}</div>
+                                                    <div className={`mt-1 text-[11px] font-semibold ${previewVisualizationInvalid ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                        {previewVisualizationInvalid ? t('querybuilder.preview_not_renderable_title') : t('querybuilder.finalize_ready')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {!isReadOnly && (
+                                                <button
+                                                    onClick={() => setSaveModalOpen(true)}
+                                                    disabled={saveDisabled}
+                                                    className="w-full px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-sm disabled:opacity-50"
+                                                >
+                                                    {activeWidgetId ? t('querybuilder.update_widget') : t('querybuilder.save_as_widget')}
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-0">
+                                            <div className="overflow-hidden rounded-t-xl border border-b-0 border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex">
+                                                <button onClick={() => setBuilderMode('visual')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase transition-all border-r border-slate-200 dark:border-slate-800 ${builderMode === 'visual' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-400 hover:text-slate-600 bg-transparent'}`}>
+                                                    <Layout className="w-3.5 h-3.5" /> {t('querybuilder.visual_builder')}
+                                                </button>
+                                                <button onClick={() => setBuilderMode('sql')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase transition-all ${builderMode === 'sql' ? 'bg-slate-900 dark:bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-600 bg-transparent'}`}>
+                                                    <span className="font-mono text-[10px]">SQL</span> {t('querybuilder.direct_editor')}
+                                                </button>
+                                            </div>
+                                            <div className="p-4 rounded-b-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-2 -mt-px">
+                                                {builderMode === 'sql' ? (
+                                                    <>
+                                                        <div className="flex items-center justify-between">
+                                                            <label className="text-[10px] font-black uppercase text-slate-400">{t('querybuilder.sql_query')}</label>
+                                                            <SqlAssistant
+                                                                tableName={queryConfig?.table}
+                                                                columns={results.length > 0 ? Object.keys(results[0]).map(c => ({ name: c, type: typeof results[0][c] })) : []}
+                                                                onSelectSnippet={snippet => setSql(prev => prev + '\n' + snippet)}
+                                                            />
+                                                        </div>
+                                                        <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full h-64 font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" placeholder="SELECT * FROM..." />
+                                                    </>
+                                                ) : (
+                                                    <VisualQueryBuilder
+                                                        initialConfig={queryConfig}
+                                                        isAdminMode={isAdminMode}
+                                                        onChange={(newSql, newConfig) => { setSql(newSql); setQueryConfig(newConfig); }}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                     {error && <div className="bg-red-50 text-red-600 text-[10px] p-3 rounded-lg border border-red-100 flex items-start gap-2 font-mono break-all"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{error}</div>}
                                 </div>
                             ) : (
                                 <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-4 animate-in slide-in-from-right-4 duration-300">
                                     <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><Layout className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.graph_type')}</h3>
                                     <div className="grid grid-cols-3 gap-2">
-                                            {[
-                                                { id: 'table', icon: TableIcon, label: t('querybuilder.table') },
-                                                { id: 'bar', icon: BarChart2, label: t('querybuilder.bar') },
-                                                { id: 'line', icon: TrendingUp, label: t('querybuilder.line') },
-                                            { id: 'area', icon: Layout, label: t('querybuilder.area') },
-                                            { id: 'pie', icon: Layout, label: t('querybuilder.pie') },
-                                            { id: 'kpi', icon: Layout, label: t('querybuilder.kpi') },
-                                                { id: 'composed', icon: Layout, label: t('querybuilder.composed') },
-                                                { id: 'radar', icon: Layout, label: t('querybuilder.radar') },
-                                                { id: 'scatter', icon: Layout, label: t('querybuilder.scatter') },
-                                                { id: 'pivot', icon: Layout, label: t('querybuilder.pivot') },
-                                                { id: 'text', icon: Edit3, label: t('querybuilder.text') },
-                                            ].map(type => (
+                                            {(isTextWidget
+                                                ? [
+                                                    { id: 'text', icon: Edit3, label: t('querybuilder.text') }
+                                                ]
+                                                : [
+                                                    { id: 'table', icon: TableIcon, label: t('querybuilder.table') },
+                                                    { id: 'bar', icon: BarChart2, label: t('querybuilder.bar') },
+                                                    { id: 'line', icon: TrendingUp, label: t('querybuilder.line') },
+                                                    { id: 'area', icon: Layout, label: t('querybuilder.area') },
+                                                    { id: 'pie', icon: Layout, label: t('querybuilder.pie') },
+                                                    { id: 'kpi', icon: Layout, label: t('querybuilder.kpi') },
+                                                    { id: 'composed', icon: Layout, label: t('querybuilder.composed') },
+                                                    { id: 'radar', icon: Layout, label: t('querybuilder.radar') },
+                                                    { id: 'scatter', icon: Layout, label: t('querybuilder.scatter') },
+                                                    { id: 'pivot', icon: Layout, label: t('querybuilder.pivot') }
+                                                ]).map(type => (
                                             <button key={type.id} onClick={() => setVisType(type.id as VisualizationType)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
                                                 <type.icon className="w-4 h-4" />
                                                 <span className="text-[9px] uppercase font-black">{type.label}</span>
                                             </button>
                                         ))}
                                     </div>
+                                    {(visType !== 'table' && visType !== 'pivot' && visType !== 'text') && (
+                                        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('querybuilder.labels')}:</span>
+                                            <button onClick={() => setVisConfig({ ...visConfig, showLabels: !visConfig.showLabels })} className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.showLabels ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"}`}>
+                                                {visConfig.showLabels ? t('querybuilder.label_on') : t('querybuilder.label_off')}
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {(visType !== 'table' && visType !== 'pivot' && results.length > 0) && (
                                         <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
@@ -400,7 +844,7 @@ export const QueryBuilderView: React.FC = () => {
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.x_axis')}</label>
                                                 <select value={visConfig.xAxis || ''} onChange={e => setVisConfig({ ...visConfig, xAxis: e.target.value })} className="w-full p-2 border border-slate-200 rounded text-[11px] bg-white outline-none">
                                                     <option value="">{t('querybuilder.select_column')}</option>
-                                                    {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
+                                                    {(visType === 'scatter' ? numericColumns : resultColumns).map(col => <option key={col} value={col}>{col}</option>)}
                                                 </select>
                                             </div>
                                             <div>
@@ -415,7 +859,7 @@ export const QueryBuilderView: React.FC = () => {
                                                 </div>
                                                 <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, yAxes: [...(visConfig.yAxes || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 rounded text-[11px] bg-white outline-none">
                                                     <option value="">{t('querybuilder.add_y_axis')}</option>
-                                                    {resultColumns.filter(c => !(visConfig.yAxes || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
+                                                    {(visType === 'scatter' ? numericColumns : resultColumns).filter(c => !(visConfig.yAxes || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
                                                 </select>
                                             </div>
                                         </div>
@@ -611,11 +1055,47 @@ export const QueryBuilderView: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                        {showGuidedFooter && (
+                            <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-[0_-6px_18px_-14px_rgba(15,23,42,0.5)]">
+                                <div className="flex items-center justify-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => {
+                                                const previousStep = (isTextWidget && guidedStep === 3)
+                                                    ? 1
+                                                    : Math.max(1, guidedStep - 1);
+                                                gotoStep(previousStep as GuidedStep);
+                                            }}
+                                            disabled={guidedStep <= 1}
+                                            className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-bold text-slate-500 disabled:opacity-40"
+                                        >
+                                            {t('querybuilder.back')}
+                                        </button>
+                                        {guidedApplyVisible && (
+                                            <button
+                                                onClick={() => { void handleGuidedApply(); }}
+                                                disabled={guidedApplyDisabled}
+                                                className="px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-bold disabled:opacity-40"
+                                            >
+                                                {guidedApplyLabel}
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => { void handleGuidedNext(); }}
+                                            disabled={guidedNextDisabled}
+                                            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-sm disabled:opacity-40"
+                                        >
+                                            {guidedPrimaryLabel}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     </div>
 
                     {/* Preview Area */}
-                    <div id="query-visualization" className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full relative">
+                    <div id="query-visualization" className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full min-h-[380px] lg:min-h-[460px] relative">
                         <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('querybuilder.preview', { count: results.length })}</h3>
                             <button onClick={() => setIsMaximized(!isMaximized)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md text-slate-400 transition-all flex items-center gap-1.5 shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
@@ -631,8 +1111,8 @@ export const QueryBuilderView: React.FC = () => {
                                     <p className="text-xs font-black uppercase tracking-widest text-center whitespace-pre-wrap">{t('querybuilder.no_data_prompt')}</p>
                                 </div>
                             ) : (
-                                <div className="h-full w-full flex flex-col">
-                                    {visType === 'text' ? (
+                                <div key={`${previewVisType}-${previewRenderVersion}`} className="h-full min-h-[260px] w-full flex flex-col">
+                                    {previewVisType === 'text' ? (
                                         <div
                                             className={`flex-1 p-6 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 ${
                                                 textSizeClass[visConfig.textSize || 'md']
@@ -642,11 +1122,26 @@ export const QueryBuilderView: React.FC = () => {
                                         >
                                             {(visConfig.textContent || '').trim() || t('querybuilder.text_placeholder')}
                                         </div>
-                                    ) : visType === 'table' ? (
+                                    ) : previewVisType === 'table' ? (
                                         <DataTable columns={columns} data={results} onRowClick={item => { setSelectedItemIndex(results.indexOf(item)); setDetailModalOpen(true); }} />
-                                    ) : visType === 'pivot' ? (
+                                    ) : previewVisType === 'pivot' ? (
                                         <PivotTable data={results} rows={visConfig.pivotRows || []} cols={visConfig.pivotCols || []} measures={visConfig.pivotMeasures || []} />
-                                    ) : visType === 'kpi' ? (() => {
+                                    ) : previewVisualizationInvalid ? (
+                                        <div className="flex-1 flex items-center justify-center p-6">
+                                            <div className="max-w-md w-full rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-4">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="mt-0.5 text-amber-600">{previewTypeMeta.icon}</div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs font-black uppercase tracking-wide text-amber-700">
+                                                            {previewTypeMeta.label}
+                                                        </div>
+                                                        <p className="text-sm font-bold mt-1">{t('querybuilder.preview_not_renderable_title')}</p>
+                                                        <p className="text-xs text-amber-800/90 mt-1">{t('querybuilder.preview_not_renderable_hint')}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : previewVisType === 'kpi' ? (() => {
                                         const val = results[0][Object.keys(results[0])[0]];
                                         const numVal = Number(val);
                                         let displayColor = 'text-slate-900 dark:text-white';
@@ -676,8 +1171,9 @@ export const QueryBuilderView: React.FC = () => {
                                             </div>
                                         );
                                     })() : (
-                                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                                            {visType === 'bar' ? (
+                                        <div className="flex-1 min-h-[280px] min-w-0">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={320} minHeight={280}>
+                                            {previewVisType === 'bar' ? (
                                                 <BarChart data={results}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
@@ -690,7 +1186,7 @@ export const QueryBuilderView: React.FC = () => {
                                                         </Bar>
                                                     ))}
                                                 </BarChart>
-                                            ) : visType === 'line' ? (
+                                            ) : previewVisType === 'line' ? (
                                                 <LineChart data={results}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
@@ -703,7 +1199,7 @@ export const QueryBuilderView: React.FC = () => {
                                                         </Line>
                                                     ))}
                                                 </LineChart>
-                                            ) : visType === 'area' ? (
+                                            ) : previewVisType === 'area' ? (
                                                 <AreaChart data={results}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
@@ -716,7 +1212,7 @@ export const QueryBuilderView: React.FC = () => {
                                                         </Area>
                                                     ))}
                                                 </AreaChart>
-                                            ) : visType === 'pie' ? (
+                                            ) : previewVisType === 'pie' ? (
                                                 <PieChart>
                                                     <Pie
                                                         data={results}
@@ -734,7 +1230,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
                                                     <Legend layout="vertical" align="right" verticalAlign="middle" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                 </PieChart>
-                                            ) : visType === 'composed' ? (
+                                            ) : previewVisType === 'composed' ? (
                                                 <ComposedChart data={results}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
@@ -753,7 +1249,7 @@ export const QueryBuilderView: React.FC = () => {
                                                         )
                                                     ))}
                                                 </ComposedChart>
-                                            ) : visType === 'radar' ? (
+                                            ) : previewVisType === 'radar' ? (
                                                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={results}>
                                                     <PolarGrid stroke="#e2e8f0" />
                                                     <PolarAngleAxis dataKey={visConfig.xAxis} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
@@ -764,17 +1260,18 @@ export const QueryBuilderView: React.FC = () => {
                                                     <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
                                                 </RadarChart>
-                                            ) : visType === 'scatter' ? (
+                                            ) : previewVisType === 'scatter' ? (
                                                 <ScatterChart>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis type="number" dataKey={visConfig.xAxis} name={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <YAxis type="number" dataKey={(visConfig.yAxes || [])[0]} name={(visConfig.yAxes || [])[0]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
-                                                    <Scatter name={widgetName || 'Scatter'} data={results} fill={visConfig.color || COLORS[0]} />
+                                                    <Scatter name={widgetName || 'Scatter'} data={scatterData} fill={visConfig.color || COLORS[0]} />
                                                 </ScatterChart>
                                             ) : null}
                                         </ResponsiveContainer>
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -816,3 +1313,5 @@ export const QueryBuilderView: React.FC = () => {
         </PageLayout>
     );
 };
+
+

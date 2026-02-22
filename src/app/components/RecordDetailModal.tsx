@@ -257,6 +257,47 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 
     if (!currentItem) return null;
 
+    const detectPattern = (value: unknown): 'email' | 'uuid' | 'iban' | 'url' | 'date' | null => {
+        if (value === null || value === undefined) return null;
+        const str = String(value).trim();
+        if (!str) return null;
+
+        const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const IBAN_RE = /^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/i;
+        const URL_RE = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+        const isDate = (() => {
+            const looksDate = /^\d{4}-\d{2}-\d{2}/.test(str) || /^\d{2}[./-]\d{2}[./-]\d{2,4}$/.test(str);
+            if (!looksDate) return false;
+            const parsed = Date.parse(str.replace(/\./g, '-'));
+            return !Number.isNaN(parsed);
+        })();
+
+        if (EMAIL_RE.test(str)) return 'email';
+        if (UUID_RE.test(str)) return 'uuid';
+        if (IBAN_RE.test(str)) return 'iban';
+        if (URL_RE.test(str)) return 'url';
+        if (isDate) return 'date';
+        return null;
+    };
+
+    const isSuspiciousValue = (value: unknown): boolean => {
+        if (value === null || value === undefined) return false;
+        const str = String(value);
+        if (!str.trim()) return false;
+        let hasControlChars = false;
+        for (let i = 0; i < str.length; i++) {
+            const code = str.charCodeAt(i);
+            if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
+                hasControlChars = true;
+                break;
+            }
+        }
+        const veryLongToken = str.length > 256 && !/\s/.test(str);
+        const htmlScriptLike = /<script|javascript:/i.test(str);
+        return hasControlChars || veryLongToken || htmlScriptLike;
+    };
+
     return (
         <>
             <Modal
@@ -438,7 +479,23 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                             {value === null || value === undefined || value === '' ? (
                                                 <span className="text-slate-300 italic">{t('record_detail.empty_value')}</span>
                                             ) : (
-                                                String(value)
+                                                <div className="flex flex-wrap items-start gap-2">
+                                                    <span>{String(value)}</span>
+                                                    {(() => {
+                                                        const pattern = detectPattern(value);
+                                                        if (!pattern) return null;
+                                                        return (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wide">
+                                                                {t(`record_detail.pattern_${pattern}`)}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                    {isSuspiciousValue(value) && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-wide">
+                                                            {t('record_detail.suspicious')}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             )}
                                         </dd>
                                     </div>

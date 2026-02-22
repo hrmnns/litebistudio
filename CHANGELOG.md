@@ -22,13 +22,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Pattern detection (`email`, `uuid`, `iban`, `url`, `date`) and suspicious value counts.
   - Configurable profiling thresholds (null rate / cardinality), persisted locally.
   - Resizable profiling panel with drag handle and persisted height.
+- Query Builder guided workflow and safety enhancements:
+  - Guided vs. Advanced workflow mode with persistent selection.
+  - Step flow (`Source`, `Run`, `Visualize`, `Finalize`) with step gating and contextual primary actions.
+  - Inline guided checklist for current step readiness.
+  - Persistent unsaved-changes detection with visible header badge.
+  - Reload/tab-close guard (`beforeunload`) when unsaved changes exist.
+  - Save/export hints and keyboard shortcuts (`Ctrl/Cmd+Enter`, `Ctrl/Cmd+S`).
+- Query Builder test coverage:
+  - Guided graph-tab gate behavior.
+  - Unsaved-changes confirmation on report switch.
+  - `beforeunload` unsaved-changes protection.
 
 ### Changed
 - Data Inspector footer and metadata display now align better with active locale and paging context.
 - Data table integration was extended to support controlled sort/filter state for reusable advanced views.
+- Query Builder navigation was streamlined to a single guided flow (`Start`, `Source & Run`, `Visualize`, `Finalize`) without redundant top-level tabs/actions.
+- Finalize panel now acts as a real summary step (mode, source, visualization, axis/text meta, preview readiness) and includes direct save/update action.
+- Query Builder left header panel was visually aligned with the preview header style (title row, divider, spacing adjustments).
 
 ### Fixed
 - Stabilized Data Inspector state transitions across table changes, SQL mode, explain mode, and persisted presets.
+- Fixed locale resource loading issues caused by malformed newline literals and BOM encoding in `src/locales/en.json` and `src/locales/de.json`.
+- Query Builder preview stability for chart rendering:
+  - Added robust minimum sizing for preview/chart containers to avoid `ResponsiveContainer` width/height `-1` issues.
+  - Scatter preview now uses stricter numeric-axis handling and filtered numeric data.
+  - Visualize apply flow now consistently triggers preview refresh and shows a clear fallback message (with visualization icon) when rendering is not possible.
+- Guided step behavior in `Visualize` no longer blocks `Next` behind `Apply`; `Next` now depends on valid visualization config only.
 
 ## [1.0.0] - 2026-02-22
 

@@ -74,9 +74,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.datasource') },
         { to: '/query', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.query_builder') },
         { to: '/reports', icon: <FileText className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.reports') },
-        { to: '/settings', icon: <Settings className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.settings') },
         { to: '/about', icon: <Info className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.about') },
     ];
+    const navOrder: Record<string, number> = {
+        '/': 0,
+        '/datasource': 1,
+        '/inspector': 2,
+        '/query': 3,
+        '/reports': 4,
+        '/worklist': 5,
+        '/settings': 6,
+        '/about': 7
+    };
+    const orderedNavItems = [...staticTopItems, ...dynamicItems, ...staticBottomItems]
+        .sort((a, b) => {
+            const aOrder = navOrder[a.to] ?? 100;
+            const bOrder = navOrder[b.to] ?? 100;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            return a.label.localeCompare(b.label);
+        });
 
     return (
         <aside className={`
@@ -122,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     )}
 
                     <nav className="p-4 space-y-1">
-                        {[...staticTopItems, ...dynamicItems, ...staticBottomItems].map(({ to, icon, label }) => (
+                        {orderedNavItems.map(({ to, icon, label }) => (
                             <NavLink
                                 key={`${label}-${to}`}
                                 to={to}
@@ -151,6 +167,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {i18n.language.startsWith('de') ? 'English' : 'Deutsch'}
                         </span>
                     </button>
+                    <NavLink
+                        to="/settings"
+                        onClick={onCloseMobile}
+                        className={({ isActive }) =>
+                            `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                        }
+                        title={isCollapsed ? t('sidebar.settings') : ''}
+                    >
+                        <Settings className="w-5 h-5 flex-shrink-0" />
+                        <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>
+                            {t('sidebar.settings')}
+                        </span>
+                    </NavLink>
 
                     {isPinActive && (
                         <button
