@@ -117,13 +117,24 @@ export interface WidgetConfig {
 export interface ReportPackItem {
     type: 'dashboard' | 'widget';
     id: string;
+    titleOverride?: string;
+    orientation?: 'portrait' | 'landscape';
 }
 
 export interface ReportPackConfig {
     coverTitle: string;
     coverSubtitle?: string;
     author?: string;
+    coverLogoUrl?: string;
+    themeColor?: string;
     showTOC: boolean;
+    exportOptions?: {
+        showHeader?: boolean;
+        showFooter?: boolean;
+        headerText?: string;
+        footerText?: string;
+        footerMode?: 'all' | 'content_only';
+    };
     items: ReportPackItem[];
 }
 
@@ -131,6 +142,7 @@ export interface ReportPack {
     id: string;
     name: string;
     description: string;
+    category?: string;
     config: ReportPackConfig;
     created_at?: string;
     updated_at?: string;

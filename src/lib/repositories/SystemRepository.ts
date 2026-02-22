@@ -24,6 +24,7 @@ interface DashboardInput {
 interface ReportPackInput {
     id: string;
     name: string;
+    category?: string | null;
     description?: string | null;
     config: unknown;
 }
@@ -182,6 +183,7 @@ export const SystemRepository = {
         const result = await runQuery('SELECT * FROM sys_report_packs ORDER BY created_at DESC');
         return result.map(r => ({
             ...r,
+            category: typeof r.category === 'string' && r.category.trim().length > 0 ? r.category : 'General',
             config: typeof r.config === 'string' ? JSON.parse(r.config) : r.config
         }));
     },
@@ -190,13 +192,13 @@ export const SystemRepository = {
         const existing = await runQuery('SELECT id FROM sys_report_packs WHERE id = ?', [pack.id]);
         if (existing.length > 0) {
             await runQuery(
-                'UPDATE sys_report_packs SET name = ?, description = ?, config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [pack.name, pack.description, JSON.stringify(pack.config), pack.id]
+                'UPDATE sys_report_packs SET name = ?, category = ?, description = ?, config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config), pack.id]
             );
         } else {
             await runQuery(
-                'INSERT INTO sys_report_packs (id, name, description, config) VALUES (?, ?, ?, ?)',
-                [pack.id, pack.name, pack.description, JSON.stringify(pack.config)]
+                'INSERT INTO sys_report_packs (id, name, category, description, config) VALUES (?, ?, ?, ?, ?)',
+                [pack.id, pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config)]
             );
         }
         notifyDbChange();
