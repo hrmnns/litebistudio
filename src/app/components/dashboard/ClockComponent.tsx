@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Clock, Calendar } from 'lucide-react';
-import { DashboardComponent } from '../ui/DashboardComponent';
+import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 
-export const ClockComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
+export const ClockComponent: React.FC<DashboardTileProps> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { t, i18n } = useTranslation();
     const [time, setTime] = useState(new Date());
 

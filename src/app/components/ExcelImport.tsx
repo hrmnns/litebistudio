@@ -2,14 +2,15 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileSpreadsheet, CheckCircle2 as Check, AlertCircle, RefreshCw, Layers, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import type { DbRow } from '../../types';
 
 export interface ImportConfig {
     key: string;
     entityLabel: string;
-    schema: any;
-    validate: (data: any[]) => boolean;
-    getValidationErrors: (data: any[]) => string[];
-    importFn: (data: any[]) => Promise<void>;
+    schema: unknown;
+    validate: (data: DbRow[]) => boolean;
+    getValidationErrors: (data: DbRow[]) => string[];
+    importFn: (data: DbRow[]) => Promise<void>;
     clearFn?: () => Promise<void>;
 }
 
@@ -39,7 +40,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
             const workbook = XLSX.read(data);
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            const jsonData = XLSX.utils.sheet_to_json(worksheet) as DbRow[];
 
             if (jsonData.length === 0) {
                 setError(t('datasource.excel_import.no_data'));
@@ -61,8 +62,9 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
             // Trigger global sync for counters
             window.dispatchEvent(new Event('db-updated'));
 
-        } catch (err: any) {
-            setError(t('datasource.excel_import.error_reading', { error: err.message }));
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(t('datasource.excel_import.error_reading', { error: message }));
         } finally {
             setIsProcessing(false);
         }

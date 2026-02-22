@@ -1,27 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClipboardList, Trash2, ExternalLink, AlertCircle, CheckCircle2, Circle, Clock, Search, MessageSquare } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { PageLayout } from '../components/ui/PageLayout';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import type { TableColumn, WorklistStatus } from '../../types';
+
+type WorklistFilter = 'all' | WorklistStatus;
+
+interface WorklistItem {
+    id: number;
+    source_table: string;
+    source_id: string | number;
+    display_label: string | null;
+    comment: string | null;
+    status: WorklistStatus;
+    created_at: string;
+    _exists?: boolean;
+}
 
 export const WorklistView: React.FC = () => {
     const { t } = useTranslation();
-    const [items, setItems] = useState<any[]>([]);
+    const [items, setItems] = useState<WorklistItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all');
+    const [filter, setFilter] = useState<WorklistFilter>('all');
     const [search, setSearch] = useState('');
     const { isReadOnly } = useDashboard();
 
     // Detail Modal State
-    const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [sourceData, setSourceData] = useState<any[]>([]);
+    const [selectedItem, setSelectedItem] = useState<WorklistItem | null>(null);
+    const [sourceData, setSourceData] = useState<Record<string, unknown>[]>([]);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-    const loadWorklist = async () => {
+    const loadWorklist = useCallback(async () => {
         setLoading(true);
-        const data = await SystemRepository.getWorklist();
+        const data = await SystemRepository.getWorklist() as WorklistItem[];
 
         // Add existence check for each item
         const enriched = await Promise.all(data.map(async (item) => {
@@ -31,45 +45,49 @@ export const WorklistView: React.FC = () => {
 
         setItems(enriched);
         setLoading(false);
-    };
+    }, []);
 
     useEffect(() => {
-        loadWorklist();
+        const initialLoadHandle = window.setTimeout(() => {
+            void loadWorklist();
+        }, 0);
+
         window.addEventListener('db-updated', loadWorklist);
         window.addEventListener('db-changed', loadWorklist);
         return () => {
+            window.clearTimeout(initialLoadHandle);
             window.removeEventListener('db-updated', loadWorklist);
             window.removeEventListener('db-changed', loadWorklist);
         };
-    }, []);
+    }, [loadWorklist]);
 
     const handleRemove = async (id: number) => {
         if (isReadOnly) return;
         await SystemRepository.executeRaw('DELETE FROM sys_worklist WHERE id = ?', [id]);
-        loadWorklist();
+        await loadWorklist();
     };
 
-    const handleOpenDetail = async (item: any) => {
-        let results: any[] = [];
+    const handleOpenDetail = async (item: WorklistItem) => {
+        let results: Record<string, unknown>[] = [];
         try {
             results = await SystemRepository.executeRaw(
                 `SELECT rowid as _rowid, * FROM "${item.source_table}" WHERE id = ?`,
                 [item.source_id]
-            );
-        } catch (e) {
+            ) as Record<string, unknown>[];
+        } catch {
             try {
                 const columns = await SystemRepository.getTableSchema(item.source_table);
-                const pk = columns.find((c: any) => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
+                const pk = columns.find((c: TableColumn) => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
                 if (pk && pk.toLowerCase() !== 'id') {
                     results = await SystemRepository.executeRaw(
                         `SELECT rowid as _rowid, * FROM "${item.source_table}" WHERE "${pk}" = ?`,
                         [item.source_id]
-                    );
+                    ) as Record<string, unknown>[];
                 } else {
                     results = await SystemRepository.executeRaw(
                         `SELECT rowid as _rowid, * FROM "${item.source_table}" WHERE rowid = ?`,
                         [item.source_id]
-                    );
+                    ) as Record<string, unknown>[];
                 }
             } catch (fallbackErr) {
                 console.error("Failed to load details for", item, fallbackErr);
@@ -194,7 +212,7 @@ export const WorklistView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         if (isReadOnly) return;
                                                         await SystemRepository.updateWorklistItem(item.id, { status: e.target.value });
-                                                        loadWorklist();
+                                                        await loadWorklist();
                                                     }}
                                                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-1.5 text-[11px] font-bold outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-300"
                                                 >

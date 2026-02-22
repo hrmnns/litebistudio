@@ -1,19 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from './Modal';
 import { Bookmark, Info, Target, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
+import type { DbRow, TableColumn } from '../../types';
 
 import { SchemaTable } from './SchemaDocumentation';
+import type { SchemaDefinition } from './SchemaDocumentation';
 
 interface RecordDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
-    items: any[];
+    items: DbRow[];
     initialIndex?: number;
     title?: string;
     tableName?: string;
-    schema?: any;
+    schema?: SchemaDefinition;
 }
 
 export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
@@ -31,9 +33,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     const [referenceIndex, setReferenceIndex] = useState<number | null>(null);
     const [helpOpen, setHelpOpen] = useState(false);
     const [isInWorklist, setIsInWorklist] = useState(false);
-    const [worklistItem, setWorklistItem] = useState<any>(null);
+    const [worklistItem, setWorklistItem] = useState<DbRow | null>(null);
     const [recordExists, setRecordExists] = useState<boolean | null>(null);
-    const [resolvedSchema, setResolvedSchema] = useState<any>(null);
+    const [resolvedSchema, setResolvedSchema] = useState<SchemaDefinition | null>(null);
 
     // Prevent double clicks during worklist toggle
     const [isActionLoading, setIsActionLoading] = useState(false);
@@ -86,7 +88,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 description: `${col.name} (${col.type})`
                             };
                             return acc;
-                        }, {} as any)
+                        }, {} as Record<string, { type: string; description: string }>)
                     };
                     setResolvedSchema(dynamicSchema);
                 } else {
@@ -100,12 +102,50 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     }, [isOpen, tableName, schema, t]);
 
     // Check if current item is in worklist and if it exists
+    const getRecordIdValueAsync = useCallback(async (item: DbRow): Promise<string | number | null> => {
+        if (!item) return null;
+
+        // Find authentic Primary Key
+        try {
+            const columns = await SystemRepository.getTableSchema(activeTable);
+            const pkCol = columns.find((c: TableColumn) => c.pk === 1)?.name;
+            if (pkCol && item[pkCol] !== undefined && item[pkCol] !== null) {
+                const value = item[pkCol];
+                if (typeof value === 'string' || typeof value === 'number') return value;
+            }
+        } catch {
+            // ignore and fallback
+        }
+
+        // 0. Hidden RowID from inspectTable (most reliable for tables without PK)
+        if (item._rowid !== undefined && item._rowid !== null) {
+            const rowid = item._rowid;
+            if (typeof rowid === 'string' || typeof rowid === 'number') return rowid;
+        }
+
+        // 1. Explicit ID column (case-insensitive)
+        const idKey = Object.keys(item).find(k => k.toLowerCase() === 'id' || k.toLowerCase() === 'entryid' || k.toLowerCase() === 'rowid');
+        if (idKey && (item[idKey] !== undefined && item[idKey] !== null)) {
+            const idValue = item[idKey];
+            if (typeof idValue === 'string' || typeof idValue === 'number') return idValue;
+        }
+
+        // 2. Fallback: Any column that looks like an ID
+        const fallbackIdKey = Object.keys(item).find(k => k.toLowerCase().endsWith('_id') || k.toLowerCase().endsWith('id'));
+        if (fallbackIdKey && (item[fallbackIdKey] !== undefined && item[fallbackIdKey] !== null)) {
+            const fallbackValue = item[fallbackIdKey];
+            if (typeof fallbackValue === 'string' || typeof fallbackValue === 'number') return fallbackValue;
+        }
+
+        return null;
+    }, [activeTable]);
+
     useEffect(() => {
         const checkStatus = async () => {
             const currentItem = items[currentIndex];
             if (currentItem) {
                 const recordId = await getRecordIdValueAsync(currentItem);
-                const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId);
+                const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId ?? '');
                 setIsInWorklist(metadata.isInWorklist);
                 setWorklistItem(metadata.worklistItem);
                 setRecordExists(metadata.exists);
@@ -116,37 +156,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
             }
         };
         if (isOpen) {
-            checkStatus();
+            void checkStatus();
         }
-    }, [isOpen, currentIndex, items, activeTable]);
-
-    const getRecordIdValueAsync = async (item: any) => {
-        if (!item) return null;
-
-        // Find authentic Primary Key
-        try {
-            const columns = await SystemRepository.getTableSchema(activeTable);
-            const pkCol = columns.find((c: any) => c.pk === 1)?.name;
-            if (pkCol && item[pkCol] !== undefined && item[pkCol] !== null) {
-                return item[pkCol];
-            }
-        } catch (e) {
-            // ignore and fallback
-        }
-
-        // 0. Hidden RowID from inspectTable (most reliable for tables without PK)
-        if (item._rowid !== undefined && item._rowid !== null) return item._rowid;
-
-        // 1. Explicit ID column (case-insensitive)
-        const idKey = Object.keys(item).find(k => k.toLowerCase() === 'id' || k.toLowerCase() === 'entryid' || k.toLowerCase() === 'rowid');
-        if (idKey && (item[idKey] !== undefined && item[idKey] !== null)) return item[idKey];
-
-        // 2. Fallback: Any column that looks like an ID
-        const fallbackIdKey = Object.keys(item).find(k => k.toLowerCase().endsWith('_id') || k.toLowerCase().endsWith('id'));
-        if (fallbackIdKey && (item[fallbackIdKey] !== undefined && item[fallbackIdKey] !== null)) return item[fallbackIdKey];
-
-        return null;
-    };
+    }, [isOpen, currentIndex, items, activeTable, getRecordIdValueAsync]);
 
     const handleToggleWorklist = async () => {
         if (isActionLoading) return;

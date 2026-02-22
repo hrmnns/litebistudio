@@ -85,7 +85,7 @@ export interface TableColumn {
     name: string;
     type: string;
     notnull: number;
-    dflt_value: any;
+    dflt_value: unknown;
     pk: number;
 }
 

@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Upload, FileSpreadsheet, ChevronRight, AlertCircle, Trash2, Database, Table as TableIcon, CheckCircle2 as CheckIcon } from 'lucide-react';
 import { analyzeExcelFile } from '../../lib/utils/excelParser';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
+import type { DbRow } from '../../types';
 
 interface TablePreview {
     sheetName: string;
     tableName: string;
     columns: { name: string; type: string }[];
-    rows: any[];
+    rows: DbRow[];
     isValid: boolean;
     error?: string;
 }
@@ -74,8 +75,9 @@ export const SmartImport: React.FC = () => {
             setStep(4);
             setPreviews([]);
             window.dispatchEvent(new Event('db-updated'));
-        } catch (error: any) {
-            alert(t('common.error') + ': ' + error.message);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            alert(t('common.error') + ': ' + message);
         } finally {
             setIsImporting(false);
         }

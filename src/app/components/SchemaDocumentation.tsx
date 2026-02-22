@@ -2,12 +2,33 @@ import React, { useState } from 'react';
 import { ExternalLink, ShieldCheck } from 'lucide-react';
 import { Modal } from './Modal';
 
+interface SchemaProperty {
+    type?: string;
+    description?: string;
+    enum?: string[];
+    pattern?: string;
+    format?: string;
+    minimum?: number;
+    maximum?: number;
+}
+
+export interface SchemaDefinition {
+    title?: string;
+    description?: string;
+    properties?: Record<string, SchemaProperty>;
+    required?: string[];
+    items?: {
+        properties?: Record<string, SchemaProperty>;
+        required?: string[];
+    };
+}
+
 interface SchemaDocumentationProps {
-    schema: any;
+    schema: SchemaDefinition;
     title?: string;
 }
 
-export const SchemaTable: React.FC<{ schema: any }> = ({ schema }) => {
+export const SchemaTable: React.FC<{ schema: SchemaDefinition }> = ({ schema }) => {
     if (!schema) return null;
 
     // Handle both array/list schemas (with .items) and direct object schemas
@@ -31,7 +52,7 @@ export const SchemaTable: React.FC<{ schema: any }> = ({ schema }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {propertyEntries.map(([key, value]: [string, any]) => (
+                    {propertyEntries.map(([key, value]: [string, SchemaProperty]) => (
                         <tr key={key} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0">
                             <td className="px-4 py-4 align-top">
                                 <div className="font-mono font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -117,7 +138,7 @@ export const SchemaDocumentation: React.FC<SchemaDocumentationProps> = ({ schema
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {propertyEntries.filter(([key]) => required.includes(key)).slice(0, 4).map(([key, value]: [string, any]) => (
+                {propertyEntries.filter(([key]) => required.includes(key)).slice(0, 4).map(([key, value]: [string, SchemaProperty]) => (
                     <div key={key} className="text-xs p-2.5 rounded-lg bg-white/50 dark:bg-slate-900/50 border border-blue-200/50 dark:border-blue-800/30">
                         <div className="flex items-center justify-between mb-0.5">
                             <span className="font-bold text-blue-800 dark:text-blue-200">{key}</span>

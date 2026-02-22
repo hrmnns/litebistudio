@@ -8,7 +8,9 @@ import { WorklistComponent } from './components/dashboard/WorklistComponent';
 import { Clock, Activity, HardDrive, Search, ClipboardList } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export const COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
+type DashboardComponentProps = Record<string, unknown>;
+
+export const COMPONENT_REGISTRY: Record<string, React.FC<DashboardComponentProps>> = {
     'ClockComponent': ClockComponent,
     'DataInspectorComponent': DataInspectorComponent,
     'SystemStatusComponent': SystemStatusComponent,

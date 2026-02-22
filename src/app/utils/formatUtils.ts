@@ -3,7 +3,7 @@ export const isCurrencyColumn = (col: string) => {
     return lower.includes('price') || lower.includes('amount') || lower.includes('preis') || lower.includes('betrag') || lower.includes('summe') || lower.includes('kosten') || lower.includes('total');
 };
 
-export const formatValue = (val: any, col?: string) => {
+export const formatValue = (val: unknown, col?: string): string | unknown => {
     if (typeof val !== 'number') return val;
     if (col && isCurrencyColumn(col)) {
         return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val);

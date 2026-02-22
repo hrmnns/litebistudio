@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
-import { DataTable } from '../../components/ui/DataTable';
+import { DataTable, type Column } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
 import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import type { DbRow } from '../../types';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -22,7 +23,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTable, setSelectedTable] = useState('');
-    const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [selectedItem, setSelectedItem] = useState<DbRow | null>(null);
     const limit = 500;
 
     // Fetch available tables
@@ -40,7 +41,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     );
 
     // Main Data Fetching
-    const { data: items, loading, error, refresh: execute } = useAsync<any[]>(
+    const { data: items, loading, error, refresh: execute } = useAsync<DbRow[]>(
         async () => {
             if (mode === 'table') {
                 if (!selectedTable) return [];
@@ -69,7 +70,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     };
 
     // Generate Columns dynamically
-    const columns: any[] = React.useMemo(() => {
+    const columns: Column<DbRow>[] = React.useMemo(() => {
         if (!items || items.length === 0) return [];
 
         const keys = Object.keys(items[0]).filter(k => k !== '_rowid');
@@ -85,7 +86,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 align: isNumeric ? 'right' : 'left',
                 className: isId ? 'font-mono text-[10px] text-slate-400' :
                     (key === 'Period' || key === 'PostingDate' ? 'font-mono' : ''),
-                render: isAmount ? (item: any) => (
+                render: isAmount ? (item: DbRow) => (
                     <span className={item[key] < 0 ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}>
                         {new Intl.NumberFormat('de-DE', {
                             style: 'currency',

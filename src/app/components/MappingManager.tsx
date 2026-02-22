@@ -24,9 +24,10 @@ export const MappingManager: React.FC = () => {
             URL.revokeObjectURL(url);
             setStatus('success');
             setMessage(t('common.success'));
-        } catch (e: any) {
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : String(e);
             setStatus('error');
-            setMessage(t('common.error') + ': ' + e.message);
+            setMessage(t('common.error') + ': ' + message);
         }
     };
 
@@ -46,9 +47,10 @@ export const MappingManager: React.FC = () => {
 
                 setStatus('success');
                 setMessage(t('common.success'));
-            } catch (err: any) {
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
                 setStatus('error');
-                setMessage(t('common.error') + ': ' + err.message);
+                setMessage(t('common.error') + ': ' + message);
             }
         };
         reader.readAsText(file);

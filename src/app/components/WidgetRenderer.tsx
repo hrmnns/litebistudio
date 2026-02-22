@@ -12,8 +12,9 @@ import {
 import { Loader2, AlertCircle, BarChart3 } from 'lucide-react';
 import { RecordDetailModal } from './RecordDetailModal';
 import { formatValue } from '../utils/formatUtils';
-import { type WidgetConfig } from '../../types';
+import { type WidgetConfig, type DbRow } from '../../types';
 import { PivotTable } from './PivotTable';
+import type { SchemaDefinition } from './SchemaDocumentation';
 
 interface FilterDef {
     column: string;
@@ -32,7 +33,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, globalFilters }) => {
     const { t } = useTranslation();
-    const { data: results, loading, error } = useAsync<any[]>(
+    const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {
             if (!sql) return [];
             let effectiveSql = sql;
@@ -73,7 +74,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
 
     const [isDetailOpen, setIsDetailOpen] = React.useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = React.useState(0);
-    const [dynamicSchema, setDynamicSchema] = React.useState<any>(null);
+    const [dynamicSchema, setDynamicSchema] = React.useState<SchemaDefinition | null>(null);
 
     React.useEffect(() => {
         if (results && results.length > 0) {
@@ -91,18 +92,18 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
                     const type = typeof val === 'number' ? 'number' : 'string';
                     acc[key] = { type, description: key };
                     return acc;
-                }, {} as any)
+                }, {} as Record<string, { type: string; description: string }>)
             };
             setDynamicSchema(schema);
         }
-    }, [results, sql, title]);
+    }, [results, sql, title, t]);
 
     const columns = useMemo(() => {
         if (!results || results.length === 0) return [];
         return Object.keys(results[0]).map(key => ({
             header: key,
             accessor: key,
-            render: (item: any) => formatValue(item[key], key)
+            render: (item: DbRow) => formatValue(item[key], key)
         }));
     }, [results]);
 
@@ -223,7 +224,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Bar key={y} dataKey={y} fill={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
-                                        {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: any) => formatValue(val, y)} />}
+                                        {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
                                     </Bar>
                                 ))}
                             </BarChart>
@@ -239,7 +240,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Line key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                                        {config.showLabels && <LabelList dataKey={y} position="top" offset={10} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: any) => formatValue(val, y)} />}
+                                        {config.showLabels && <LabelList dataKey={y} position="top" offset={10} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
                                     </Line>
                                 ))}
                             </LineChart>
@@ -263,7 +264,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Area key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]} strokeWidth={3} fillOpacity={1} fill={`url(#color-${y}-${title.replace(/\s+/g, '')})`}>
-                                        {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: any) => formatValue(val, y)} />}
+                                        {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
                                     </Area>
                                 ))}
                             </AreaChart>
@@ -301,11 +302,11 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, conf
                                 {(config.yAxes || []).map((y, idx) => (
                                     config.lineSeries?.includes(y) ? (
                                         <Line key={y} type="monotone" dataKey={y} stroke={COLORS[idx % COLORS.length]} strokeWidth={3}>
-                                            {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: any) => formatValue(val, y)} />}
+                                            {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
                                         </Line>
                                     ) : (
                                         <Bar key={y} dataKey={y} fill={COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
-                                            {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: any) => formatValue(val, y)} />}
+                                            {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
                                         </Bar>
                                     )
                                 ))}

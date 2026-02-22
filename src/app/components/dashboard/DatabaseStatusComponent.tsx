@@ -1,14 +1,10 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Database, Save, AlertCircle, Settings } from 'lucide-react';
-import { DashboardComponent } from '../ui/DashboardComponent';
+import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 import { useBackupStatus } from '../../../hooks/useBackupStatus';
 
-interface DatabaseStatusComponentProps {
-    onRemove?: () => void;
-    dragHandleProps?: any;
-    onClick?: () => void;
-    targetView?: string;
+interface DatabaseStatusComponentProps extends DashboardTileProps {
     isOverlay?: boolean;
 }
 

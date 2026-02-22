@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Activity, Zap, Cpu } from 'lucide-react';
-import { DashboardComponent } from '../ui/DashboardComponent';
+import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 import { SystemHealthModal } from '../SystemHealthModal';
 
-export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
+interface BrowserMemoryInfo {
+    usedJSHeapSize: number;
+    jsHeapSizeLimit: number;
+}
+
+interface PerformanceWithMemory extends Performance {
+    memory?: BrowserMemoryInfo;
+}
+
+export const SystemStatusComponent: React.FC<DashboardTileProps> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { t } = useTranslation();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -16,8 +25,9 @@ export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandle
         if (nav) setLoadTime(Math.round(nav.duration));
 
         const updateMetrics = () => {
-            if ((performance as any).memory) {
-                const mem = (performance as any).memory;
+            const perf = performance as PerformanceWithMemory;
+            if (perf.memory) {
+                const mem = perf.memory;
                 setMemory({
                     used: Math.round(mem.usedJSHeapSize / 1024 / 1024),
                     total: Math.round(mem.jsHeapSizeLimit / 1024 / 1024)

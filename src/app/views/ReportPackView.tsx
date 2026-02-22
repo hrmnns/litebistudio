@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -11,8 +11,25 @@ import {
 import { useReportExport } from '../../hooks/useReportExport';
 import { WidgetRenderer } from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
-import { type ReportPack, type ReportPackItem } from '../../types';
+import { type ReportPack, type ReportPackItem, type DbRow, type WidgetConfig } from '../../types';
 import { useDashboard } from '../../lib/context/DashboardContext';
+
+interface DashboardRow extends DbRow {
+    id: string;
+    name: string;
+    layout?: unknown;
+}
+
+interface WidgetRow extends DbRow {
+    id: string;
+    name: string;
+    sql_query: string;
+    visualization_config?: unknown;
+}
+
+interface DashboardLayoutWidgetRef {
+    id: string;
+}
 
 export const ReportPackView: React.FC = () => {
     const { t } = useTranslation();
@@ -26,17 +43,34 @@ export const ReportPackView: React.FC = () => {
     const { isExporting, exportProgress, exportPackageToPdf } = useReportExport();
 
     // Data 
-    const { data: allDashboards } = useAsync(() => SystemRepository.getDashboards(), []);
-    const { data: allWidgets } = useAsync(() => SystemRepository.getUserWidgets(), []);
+    const { data: allDashboards } = useAsync<DashboardRow[]>(() => SystemRepository.getDashboards() as Promise<DashboardRow[]>, []);
+    const { data: allWidgets } = useAsync<WidgetRow[]>(() => SystemRepository.getUserWidgets() as Promise<WidgetRow[]>, []);
+
+    const loadPacks = useCallback(async () => {
+        const data = await SystemRepository.getReportPacks();
+        setPacks(data as ReportPack[]);
+        if (data.length > 0 && !activePackId) setActivePackId(data[0].id);
+    }, [activePackId]);
 
     useEffect(() => {
-        loadPacks();
-    }, []);
+        const initialLoadHandle = window.setTimeout(() => {
+            void loadPacks();
+        }, 0);
+        return () => window.clearTimeout(initialLoadHandle);
+    }, [loadPacks]);
 
-    const loadPacks = async () => {
-        const data = await SystemRepository.getReportPacks();
-        setPacks(data);
-        if (data.length > 0 && !activePackId) setActivePackId(data[0].id);
+    const parseWidgetConfig = (rawConfig: unknown): WidgetConfig => {
+        if (typeof rawConfig === 'string') {
+            try {
+                return JSON.parse(rawConfig) as WidgetConfig;
+            } catch {
+                return { type: 'table' };
+            }
+        }
+        if (rawConfig && typeof rawConfig === 'object') {
+            return rawConfig as WidgetConfig;
+        }
+        return { type: 'table' };
     };
 
     const activePack = packs.find(p => p.id === activePackId);
@@ -44,7 +78,7 @@ export const ReportPackView: React.FC = () => {
     const handleSave = async (pack: ReportPack) => {
         if (isReadOnly) return;
         await SystemRepository.saveReportPack(pack);
-        loadPacks();
+        await loadPacks();
     };
 
     const createPack = () => {
@@ -68,7 +102,7 @@ export const ReportPackView: React.FC = () => {
         if (isReadOnly) return;
         if (confirm(t('common.confirm_delete'))) {
             await SystemRepository.deleteReportPack(id);
-            loadPacks();
+            await loadPacks();
             if (activePackId === id) setActivePackId(null);
         }
     };
@@ -275,22 +309,17 @@ export const ReportPackView: React.FC = () => {
                                                         <span className="text-sm text-slate-400 font-mono">{t('reports.page')} {idx + 1}</span>
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-10">
-                                                        {Array.isArray(dash.layout) && dash.layout.map((w: any) => {
+                                                        {Array.isArray(dash.layout) && dash.layout.map((w: DashboardLayoutWidgetRef) => {
                                                             const wMeta = allWidgets?.find(rw => rw.id === w.id);
                                                             if (!wMeta) return null;
-                                                            let vConfig = {};
-                                                            try {
-                                                                vConfig = typeof wMeta.visualization_config === 'string'
-                                                                    ? JSON.parse(wMeta.visualization_config)
-                                                                    : wMeta.visualization_config;
-                                                            } catch (e) { console.error('Error parsing widget config in pack export', e); }
+                                                            const vConfig = parseWidgetConfig(wMeta.visualization_config);
 
                                                             return (
                                                                 <div key={w.id} className="h-[400px]">
                                                                     <WidgetRenderer
                                                                         title={wMeta.name}
                                                                         sql={wMeta.sql_query}
-                                                                        config={vConfig as any}
+                                                                        config={vConfig}
                                                                     />
                                                                 </div>
                                                             );
@@ -301,12 +330,7 @@ export const ReportPackView: React.FC = () => {
                                         } else {
                                             const widget = allWidgets?.find(w => w.id === item.id);
                                             if (!widget) return null;
-                                            let vConfig = {};
-                                            try {
-                                                vConfig = typeof widget.visualization_config === 'string'
-                                                    ? JSON.parse(widget.visualization_config)
-                                                    : widget.visualization_config;
-                                            } catch (e) { console.error('Error parsing widget config in pack export', e); }
+                                            const vConfig = parseWidgetConfig(widget.visualization_config);
 
                                             return (
                                                 <div key={`ghost-widget-${idx}`} id={`export-widget-${item.id}`} className="bg-white p-10 min-h-[1000px] flex flex-col items-center justify-center">
@@ -314,7 +338,7 @@ export const ReportPackView: React.FC = () => {
                                                         <WidgetRenderer
                                                             title={widget.name}
                                                             sql={widget.sql_query}
-                                                            config={vConfig as any}
+                                                            config={vConfig}
                                                         />
                                                     </div>
                                                 </div>

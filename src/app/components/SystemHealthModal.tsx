@@ -10,6 +10,10 @@ interface SystemHealthModalProps {
     onClose: () => void;
 }
 
+interface NavigatorWithDeviceMemory extends Navigator {
+    deviceMemory?: number;
+}
+
 export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, onClose }) => {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<'overview' | 'storage' | 'database'>('overview');
@@ -23,6 +27,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
 
     const version = __APP_VERSION__;
     const buildDate = __BUILD_DATE__;
+    const navigatorWithDeviceMemory = navigator as NavigatorWithDeviceMemory;
 
     // Check storage quota
     useEffect(() => {
@@ -118,8 +123,8 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
                                 <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30">
                                     <div className="text-xs text-purple-600 dark:text-purple-400 font-bold uppercase mb-1">{t('widgets.system_health.device_memory')}</div>
                                     <div className="text-2xl font-black text-purple-700 dark:text-purple-300" title={t('widgets.system_health.memory_limit_hint')}>
-                                        {(navigator as any).deviceMemory ?
-                                            `${(navigator as any).deviceMemory >= 8 ? '≥ ' : '~'}${(navigator as any).deviceMemory} GB`
+                                        {navigatorWithDeviceMemory.deviceMemory ?
+                                            `${navigatorWithDeviceMemory.deviceMemory >= 8 ? '≥ ' : '~'}${navigatorWithDeviceMemory.deviceMemory} GB`
                                             : '?'}
                                     </div>
                                     <div className="text-[9px] text-purple-400 dark:text-purple-500 mt-1 leading-tight">

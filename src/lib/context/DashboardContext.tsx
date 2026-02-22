@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, type ReactNode } from 'react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { COMPONENTS } from '../../config/components';
@@ -50,8 +51,8 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     }, [setLastBackup, setChangeCount]);
 
     React.useEffect(() => {
-        const handleDbChange = (e: any) => {
-            const detail = e.detail || {};
+        const handleDbChange = (e: Event) => {
+            const detail = (e as CustomEvent<{ type?: string; count?: number }>).detail || {};
             if (detail.type === 'restore') {
                 console.log('[DashboardContext] DB Restore detected. Resetting count to 0.');
                 setChangeCount(0);

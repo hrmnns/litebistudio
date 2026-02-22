@@ -4,6 +4,7 @@ import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, Al
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
 import { SmartImport } from '../components/SmartImport';
 import { SchemaTable } from '../components/SchemaDocumentation';
+import type { SchemaDefinition } from '../components/SchemaDocumentation';
 import { InlineAlert } from '../components/ui/InlineAlert';
 import type { AlertType } from '../components/ui/InlineAlert';
 import { Modal } from '../components/Modal';
@@ -20,6 +21,19 @@ interface DatasourceViewProps {
     onImportComplete: () => void;
 }
 
+interface RestoreReport {
+    headerMatch: boolean;
+    isValid: boolean;
+    error?: string;
+    isDowngrade?: boolean;
+    missingTables: string[];
+    missingColumns: Record<string, string[]>;
+    versionInfo?: {
+        backup: string | number;
+        current: string | number;
+    };
+}
+
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
     const { t, i18n } = useTranslation();
     const now = new Date();
@@ -28,10 +42,15 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         time: now.toLocaleTimeString(i18n.language === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' })
     });
     const { isReadOnly, isAdminMode } = useDashboard();
+    const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
     // Tab State
     const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system'>(() => {
-        return (sessionStorage.getItem('litebistudio_datasource_tab') as any) || 'import';
+        const stored = sessionStorage.getItem('litebistudio_datasource_tab');
+        if (stored === 'import' || stored === 'structure' || stored === 'system') {
+            return stored;
+        }
+        return 'import';
     });
 
     useEffect(() => {
@@ -40,7 +59,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
     // Import State
     const [selectedTable, setSelectedTable] = useState<string>('');
-    const [tableSchema, setTableSchema] = useState<any>(null);
+    const [tableSchema, setTableSchema] = useState<SchemaDefinition | null>(null);
     const [isSchemaOpen, setIsSchemaOpen] = useState(false);
 
     // Schema Manager State
@@ -80,7 +99,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             // Dynamic Schema
             try {
                 const columns = await SystemRepository.getTableSchema(selectedTable);
-                const properties: Record<string, any> = {};
+                const properties: NonNullable<SchemaDefinition['properties']> = {};
                 columns.forEach(col => {
                     properties[col.name] = {
                         type: col.type.toUpperCase().includes('INT') || col.type.toUpperCase().includes('REAL') ? 'number' : 'string',
@@ -140,8 +159,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             setNewTableName('');
             setCreateColumns([{ name: 'id', type: 'INTEGER PRIMARY KEY' }]);
             alert(t('datasource.table_created'));
-        } catch (error: any) {
-            alert(t('common.error') + ': ' + error.message);
+        } catch (error: unknown) {
+            alert(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
@@ -151,8 +170,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             await SystemRepository.executeRaw(`DROP TABLE ${tableName}`);
             refreshTables();
             if (selectedTable === tableName) setSelectedTable('');
-        } catch (error: any) {
-            alert(t('common.error') + ': ' + error.message);
+        } catch (error: unknown) {
+            alert(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
@@ -162,8 +181,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             await SystemRepository.executeRaw(`DELETE FROM ${tableName}`);
             refreshTables();
             alert(t('datasource.cleared_success'));
-        } catch (error: any) {
-            alert(t('common.error') + ': ' + error.message);
+        } catch (error: unknown) {
+            alert(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
@@ -428,10 +447,10 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             let bytes = await exportDatabase();
 
                                             if (useEncryption) {
-                                                bytes = new Uint8Array(await encryptBuffer(bytes as any, backupPassword));
+                                                bytes = new Uint8Array(await encryptBuffer(bytes, backupPassword));
                                             }
 
-                                            const blob = new Blob([bytes as any], { type: 'application/x-sqlite3' });
+                                            const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
                                             const url = URL.createObjectURL(blob);
                                             const a = document.createElement('a');
                                             a.href = url;
@@ -482,7 +501,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                         try {
                                                             const decrypted = await decryptBuffer(buffer, pwd);
                                                             finalBuffer = decrypted;
-                                                        } catch (err) {
+                                                        } catch {
                                                             setRestoreAlert({
                                                                 type: 'error',
                                                                 title: t('common.error'),
@@ -504,7 +523,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                             console.log(`[Restore][${logTime()}] Importing db module...`);
                                                             const { importDatabase } = await import('../../lib/db');
                                                             console.log(`[Restore][${logTime()}] Calling worker importDatabase...`);
-                                                            const report = await importDatabase(finalBuffer) as any;
+                                                            const report = await importDatabase(finalBuffer) as unknown as RestoreReport;
                                                             console.log(`[Restore][${logTime()}] Worker report received:`, report);
                                                             const { versionInfo } = report;
 
@@ -560,21 +579,21 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                 markBackupComplete();
                                                                 setTimeout(() => window.location.reload(), 2000);
                                                             }
-                                                        } catch (err: any) {
+                                                        } catch (err: unknown) {
                                                             console.error(`[Restore][${logTime()}] Inner Error:`, err);
                                                             setRestoreAlert({
                                                                 type: 'error',
                                                                 title: t('common.error'),
-                                                                message: err.message
+                                                                message: getErrorMessage(err)
                                                             });
                                                         }
                                                     }
-                                                } catch (err: any) {
+                                                } catch (err: unknown) {
                                                     console.error(`[Restore][${logTime()}] Outer Error:`, err);
                                                     setRestoreAlert({
                                                         type: 'error',
                                                         title: t('common.error'),
-                                                        message: err.message
+                                                        message: getErrorMessage(err)
                                                     });
                                                 }
                                             }}
@@ -678,9 +697,9 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                 sessionStorage.removeItem('litebistudio_datasource_tab');
                                                                 window.location.hash = '#/';
                                                                 window.location.reload();
-                                                            } catch (err: any) {
+                                                            } catch (err: unknown) {
                                                                 setIsResetting(false);
-                                                                alert(err.message);
+                                                                alert(getErrorMessage(err));
                                                             }
                                                         } else if (promptText !== null) {
                                                             alert(t('datasource.factory_reset_aborted', 'Abgebrochen: Falsche Eingabe.'));

@@ -3,8 +3,17 @@ import type { DbRow } from '../types';
 
 let worker: Worker | null = null;
 let msgId = 0;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pending = new Map<number, { resolve: (val: any) => void, reject: (err: any) => void }>();
+
+type PendingRequest = {
+    resolve: (val: unknown) => void;
+    reject: (err: unknown) => void;
+};
+
+type ImportReport = {
+    isValid?: boolean;
+} & Record<string, unknown>;
+
+const pending = new Map<number, PendingRequest>();
 
 const channel = new BroadcastChannel('litebistudio_db_v1');
 const conflictListeners = new Set<(hasConflict: boolean, isReadOnly: boolean) => void>();
@@ -15,6 +24,18 @@ let isReadOnlyMode = false;
 
 const instanceId = sessionStorage.getItem('litebistudio_instance_id') || crypto.randomUUID();
 sessionStorage.setItem('litebistudio_instance_id', instanceId);
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
+}
+
+function isExecPayload(payload: unknown): payload is { sql: string } {
+    return typeof payload === 'object'
+        && payload !== null
+        && 'sql' in payload
+        && typeof (payload as { sql?: unknown }).sql === 'string';
+}
 
 channel.onmessage = async (event) => {
     if (event.data && event.data.type === 'PING') {
@@ -31,8 +52,8 @@ channel.onmessage = async (event) => {
         try {
             const result = await send(actionType, payload);
             channel.postMessage({ type: 'RPC_RES', id, result: result });
-        } catch (e: any) {
-            channel.postMessage({ type: 'RPC_RES', id, error: e.message });
+        } catch (e: unknown) {
+            channel.postMessage({ type: 'RPC_RES', id, error: getErrorMessage(e) });
         }
     } else if (event.data && event.data.type === 'RPC_RES' && !isMaster) {
         const { id, result, error } = event.data;
@@ -45,7 +66,7 @@ channel.onmessage = async (event) => {
     }
 };
 
-let readOnlyResolve: (() => void) | null = null;
+const readOnlyResolve: (() => void) | null = null;
 
 const lockAbortController = new AbortController();
 
@@ -106,8 +127,10 @@ function getWorker(): Promise<Worker | 'SLAVE'> {
                             console.log('[DB] Previous master tab closed. Reloading to take over...');
                             window.location.reload();
                         });
-                    } catch (e: any) {
-                        if (e.name !== 'AbortError') console.error('[DB] Background lock request failed:', e);
+                    } catch (e: unknown) {
+                        if (!(e instanceof DOMException && e.name === 'AbortError')) {
+                            console.error('[DB] Background lock request failed:', e);
+                        }
                     }
                     return;
                 }
@@ -178,8 +201,8 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
         // If we are in explicit Read-Only mode (user accepted the conflict),
         // we restrict destructive actions.
         if (isReadOnlyMode) {
-            if (type === 'EXEC' && payload && 'sql' in (payload as any)) {
-                const sql = (payload as any).sql.toUpperCase().trimStart();
+            if (type === 'EXEC' && isExecPayload(payload)) {
+                const sql = payload.sql.toUpperCase().trimStart();
                 if (!sql.startsWith('SELECT') && !sql.startsWith('PRAGMA')) {
                     return Promise.reject(new Error(`Action ${type} (WRITE) not permitted in Read-Only mode.`));
                 }
@@ -264,22 +287,22 @@ export async function exportDatabase(): Promise<Uint8Array> {
     return send<Uint8Array>('EXPORT');
 }
 
-export async function importDatabase(buffer: ArrayBuffer): Promise<any> {
-    const result = await send<any>('IMPORT', buffer);
+export async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
+    const result = await send<ImportReport>('IMPORT', buffer);
     if (result && result.isValid) {
         notifyDbChange(0, 'restore');
     }
     return result;
 }
 
-export async function loadDemoData(data?: any) {
+export async function loadDemoData(data?: Record<string, unknown>) {
     await initDB();
     return send<number>('LOAD_DEMO', data);
 }
 
-export async function exportDemoData(): Promise<any> {
+export async function exportDemoData(): Promise<Record<string, unknown>> {
     await initDB();
-    return send('EXPORT_DEMO_DATA');
+    return send<Record<string, unknown>>('EXPORT_DEMO_DATA');
 }
 
 export async function initSchema() {
@@ -287,11 +310,11 @@ export async function initSchema() {
     return send('INIT_SCHEMA');
 }
 
-export async function getDiagnostics() {
+export async function getDiagnostics(): Promise<Record<string, unknown>> {
     await initDB();
-    return send('GET_DIAGNOSTICS');
+    return send<Record<string, unknown>>('GET_DIAGNOSTICS');
 }
 
-export function genericBulkInsert(tableName: string, records: any[]): Promise<number> {
+export function genericBulkInsert(tableName: string, records: DbRow[]): Promise<number> {
     return send<number>('GENERIC_BULK_INSERT', { tableName, records });
 }

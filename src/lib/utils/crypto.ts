@@ -28,7 +28,7 @@ async function getKey(keyMaterial: CryptoKey, salt: Uint8Array): Promise<CryptoK
     return crypto.subtle.deriveKey(
         {
             "name": "PBKDF2",
-            salt: salt as any,
+            salt,
             "iterations": 100000,
             "hash": "SHA-256"
         },

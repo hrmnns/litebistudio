@@ -63,7 +63,7 @@ export const SortableComponent: React.FC<SortableComponentProps> = ({
             // Only inject props into custom components, not plain DOM elements like 'div'
             if (typeof child.type === 'string') return child;
 
-            return React.cloneElement(child as React.ReactElement<any>, {
+            return React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
                 onRemove: onRemove ? () => onRemove(id) : undefined,
                 dragHandleProps: listeners,
                 onClick: targetView ? () => navigate(targetView) : undefined,

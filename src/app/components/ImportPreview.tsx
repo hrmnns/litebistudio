@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Check, AlertCircle } from 'lucide-react';
+import type { DbRow } from '../../types';
 
 export interface ValidationResult {
     isValid: boolean;
@@ -7,7 +8,7 @@ export interface ValidationResult {
 }
 
 interface ImportPreviewProps {
-    data: any[];
+    data: DbRow[];
     schema: {
         properties: Record<string, { description?: string; type?: string }>;
         required?: string[];

@@ -23,7 +23,7 @@ export const RecordComparison: React.FC<RecordComparisonProps> = ({
         ...Object.keys(rightItem || {})
     ])).filter(key => !excludeKeys.includes(key));
 
-    const formatValue = (val: any) => {
+    const formatValue = (val: unknown): string => {
         if (val === null || val === undefined || val === '') return '-';
         if (typeof val === 'number') return val.toLocaleString();
         return String(val);

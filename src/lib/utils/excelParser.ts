@@ -10,7 +10,7 @@ export interface SheetAnalysis {
     suggestedTableName: string;
     columns: ColumnDefinition[];
     rowCount: number;
-    data: any[];
+    data: Record<string, unknown>[];
     isValid: boolean;
     validationError?: string;
 }
@@ -33,8 +33,8 @@ export async function analyzeExcelFile(file: File): Promise<SheetAnalysis[]> {
                     }
 
                     // Extract Headers
-                    const headers = (jsonData[0] as any[]).map(h => String(h).trim());
-                    const rows = jsonData.slice(1) as any[][];
+                    const headers = (jsonData[0] as unknown[]).map(h => String(h).trim());
+                    const rows = jsonData.slice(1) as unknown[][];
 
                     // Sanitize Table Name
                     let suggestedTableName = sheetName.toLowerCase()
@@ -101,9 +101,9 @@ export async function analyzeExcelFile(file: File): Promise<SheetAnalysis[]> {
 
                     // Prepare Data (Full Dataset with Sanitized Keys)
                     const data = rows.map(row => {
-                        const obj: any = {};
+                        const obj: Record<string, unknown> = {};
                         columns.forEach((col, i) => {
-                            let val = row[i];
+                            let val: unknown = row[i];
                             if (val instanceof Date) {
                                 val = val.toISOString();
                             } else if (typeof val === 'object' && val !== null) {

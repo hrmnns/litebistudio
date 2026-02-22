@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Filter, Layers, Database, Hash, Type, Calendar, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
+import type { TableColumn } from '../../types';
 
 export interface QueryConfig {
     table: string;
@@ -28,8 +29,12 @@ interface VisualQueryBuilderProps {
 }
 
 export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange, initialConfig, isAdminMode = false }) => {
+    type ColumnInfo = { name: string; type: string };
+    type FilterOperator = QueryConfig['filters'][number]['operator'];
+    type AggregationType = QueryConfig['aggregations'][number]['type'];
+
     const [tables, setTables] = useState<string[]>([]);
-    const [columns, setColumns] = useState<{ name: string; type: string }[]>([]);
+    const [columns, setColumns] = useState<ColumnInfo[]>([]);
     const [config, setConfig] = useState<QueryConfig>(initialConfig || {
         table: '',
         columns: [],
@@ -58,9 +63,12 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
         SystemRepository.getTables().then(allTables => {
             const filteredTables = isAdminMode ? allTables : allTables.filter(t => !t.startsWith('sys_'));
             setTables(filteredTables);
-            if (!config.table && filteredTables.length > 0) {
-                setConfig(prev => ({ ...prev, table: filteredTables[0] }));
-            }
+            setConfig(prev => {
+                if (!prev.table && filteredTables.length > 0) {
+                    return { ...prev, table: filteredTables[0] };
+                }
+                return prev;
+            });
         });
     }, [isAdminMode]);
 
@@ -68,19 +76,12 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
     useEffect(() => {
         if (config.table) {
             SystemRepository.getTableSchema(config.table).then(schema => {
-                // @ts-ignore - PRAGMA info mapping
-                setColumns(schema.map(c => ({ name: c.name, type: c.type.toLowerCase() })));
+                setColumns(schema.map((c: TableColumn) => ({ name: c.name, type: c.type.toLowerCase() })));
             });
         }
     }, [config.table]);
 
-    // SQL Generation
-    useEffect(() => {
-        const sql = generateSQL(config);
-        onChange(sql, config);
-    }, [config, columns]);
-
-    const generateSQL = (cfg: QueryConfig): string => {
+    const generateSQL = useCallback((cfg: QueryConfig): string => {
         if (!cfg.table) return '';
 
         let select = cfg.columns.length > 0 ? cfg.columns.join(', ') : '*';
@@ -128,7 +129,13 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
         }
 
         return sql;
-    };
+    }, [columns]);
+
+    // SQL Generation
+    useEffect(() => {
+        const sql = generateSQL(config);
+        onChange(sql, config);
+    }, [config, generateSQL, onChange]);
 
     const toggleColumn = (col: string) => {
         setConfig(prev => ({
@@ -147,10 +154,20 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
         }));
     };
 
-    const updateFilter = (index: number, field: string, value: any) => {
+    const updateFilter = (
+        index: number,
+        field: 'column' | 'operator' | 'value',
+        value: string | FilterOperator
+    ) => {
         setConfig(prev => {
             const newFilters = [...prev.filters];
-            newFilters[index] = { ...newFilters[index], [field]: value };
+            if (field === 'operator') {
+                newFilters[index] = { ...newFilters[index], operator: value as FilterOperator };
+            } else if (field === 'column') {
+                newFilters[index] = { ...newFilters[index], column: value as string };
+            } else {
+                newFilters[index] = { ...newFilters[index], value: value as string };
+            }
             return { ...prev, filters: newFilters };
         });
     };
@@ -331,7 +348,7 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
                                         value={a.type}
                                         onChange={e => {
                                             const newAggs = [...config.aggregations];
-                                            newAggs[i].type = e.target.value as any;
+                                            newAggs[i].type = e.target.value as AggregationType;
                                             setConfig({ ...config, aggregations: newAggs });
                                         }}
                                         className="w-20 p-1.5 text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded outline-none focus:ring-1 focus:ring-blue-500"

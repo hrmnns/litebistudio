@@ -7,7 +7,7 @@ type CacheEntry<T> = {
 type Listener = () => void;
 
 class QueryCache {
-    private cache = new Map<string, CacheEntry<any>>();
+    private cache = new Map<string, CacheEntry<unknown>>();
     private listeners = new Map<string, Set<Listener>>();
 
     set<T>(key: string, data: T, ttl: number = 60 * 1000) { // Default 1 minute TTL

@@ -2,11 +2,7 @@ import React from 'react';
 import { AlertTriangle, XCircle, ExternalLink, Eye } from 'lucide-react';
 import { setReadOnlyMode } from '../../lib/db';
 
-interface MultiTabModalProps {
-    // No props needed for informational only
-}
-
-export const MultiTabModal: React.FC<MultiTabModalProps> = () => {
+export const MultiTabModal: React.FC = () => {
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-300">

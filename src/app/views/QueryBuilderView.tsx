@@ -17,7 +17,7 @@ import {
     ScatterChart, Scatter, LabelList
 } from 'recharts';
 import { formatValue } from '../utils/formatUtils';
-import { type WidgetConfig } from '../../types';
+import type { DbRow, TableColumn, WidgetConfig } from '../../types';
 import { VisualQueryBuilder, type QueryConfig } from '../components/VisualQueryBuilder';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useDashboard } from '../../lib/context/DashboardContext';
@@ -25,15 +25,24 @@ import { RecordDetailModal } from '../components/RecordDetailModal';
 import { useAsync } from '../../hooks/useAsync';
 import { SqlAssistant } from '../components/SqlAssistant';
 import { PivotTable } from '../components/PivotTable';
+import type { SchemaDefinition } from '../components/SchemaDocumentation';
 
 type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
+interface SavedWidget {
+    id: string;
+    name: string;
+    sql_query: string;
+    visualization_config: string;
+    visual_builder_config?: string | null;
+}
+
 export const QueryBuilderView: React.FC = () => {
     const { t } = useTranslation();
     const [sql, setSql] = useState('SELECT * FROM sqlite_master LIMIT 10');
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<DbRow[]>([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -57,13 +66,13 @@ export const QueryBuilderView: React.FC = () => {
     // Detail View State
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
-    const [activeSchema, setActiveSchema] = useState<any>(null);
+    const [activeSchema, setActiveSchema] = useState<SchemaDefinition | null>(null);
     const { isExporting, exportToPdf } = useReportExport();
     const { togglePresentationMode, isReadOnly, isAdminMode } = useDashboard();
 
     // Fetch saved widgets
-    const { data: savedWidgets, refresh: refreshWidgets } = useAsync<any[]>(
-        async () => await SystemRepository.getUserWidgets(),
+    const { data: savedWidgets, refresh: refreshWidgets } = useAsync<SavedWidget[]>(
+        async () => await SystemRepository.getUserWidgets() as SavedWidget[],
         []
     );
 
@@ -80,13 +89,13 @@ export const QueryBuilderView: React.FC = () => {
                     title: `Tabelle: ${tableName}`,
                     description: `Automatisch generiertes Schema für die Tabelle "${tableName}".`,
                     type: 'object',
-                    properties: cols.reduce((acc, col) => {
+                    properties: cols.reduce((acc: Record<string, { type: string; description: string }>, col: TableColumn) => {
                         acc[col.name] = {
                             type: col.type.toLowerCase().includes('int') || col.type.toLowerCase().includes('real') ? 'number' : 'string',
                             description: `Feld: ${col.name} (Typ: ${col.type})`
                         };
                         return acc;
-                    }, {} as any)
+                    }, {})
                 };
                 setActiveSchema(dynamicSchema);
             }
@@ -112,15 +121,15 @@ export const QueryBuilderView: React.FC = () => {
                     }));
                 }
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
             setResults([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const loadWidget = (widget: any) => {
+    const loadWidget = (widget: SavedWidget) => {
         setActiveWidgetId(widget.id);
         setWidgetName(widget.name);
         setSql(widget.sql_query);
@@ -164,8 +173,8 @@ export const QueryBuilderView: React.FC = () => {
             refreshWidgets();
             alert(activeWidgetId ? t('querybuilder.success_update') : t('querybuilder.success_save'));
             setActiveWidgetId(widget.id);
-        } catch (err: any) {
-            alert(t('querybuilder.error_save') + err.message);
+        } catch (err: unknown) {
+            alert(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
         }
     };
 
@@ -186,7 +195,7 @@ export const QueryBuilderView: React.FC = () => {
         return Object.keys(results[0]).map(key => ({
             header: key,
             accessor: key,
-            render: (item: any) => formatValue(item[key], key)
+            render: (item: DbRow) => formatValue(item[key], key)
         }));
     }, [results]);
 
@@ -415,7 +424,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     {(visConfig.pivotMeasures || []).map((m, idx) => (
                                                         <div key={idx} className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100">
                                                             <span className="text-[10px] font-bold text-slate-600 truncate flex-1">{m.field}</span>
-                                                            <select value={m.agg} onChange={e => { const next = [...(visConfig.pivotMeasures || [])]; next[idx] = { ...m, agg: e.target.value as any }; setVisConfig({ ...visConfig, pivotMeasures: next }); }} className="bg-transparent text-[10px] font-bold text-blue-600 outline-none">
+                                                            <select value={m.agg} onChange={e => { const next = [...(visConfig.pivotMeasures || [])]; const agg = e.target.value as NonNullable<WidgetConfig['pivotMeasures']>[number]['agg']; next[idx] = { ...m, agg }; setVisConfig({ ...visConfig, pivotMeasures: next }); }} className="bg-transparent text-[10px] font-bold text-blue-600 outline-none">
                                                                 <option value="sum">{t('querybuilder.pivot_agg_sum')}</option>
                                                                 <option value="count">{t('querybuilder.pivot_agg_count')}</option>
                                                                 <option value="avg">{t('querybuilder.pivot_agg_avg')}</option>
@@ -452,7 +461,8 @@ export const QueryBuilderView: React.FC = () => {
                                                             value={rule.operator}
                                                             onChange={e => {
                                                                 const next = [...(visConfig.rules || [])];
-                                                                next[idx] = { ...rule, operator: e.target.value as any };
+                                                                const operator = e.target.value as NonNullable<WidgetConfig['rules']>[number]['operator'];
+                                                                next[idx] = { ...rule, operator };
                                                                 setVisConfig({ ...visConfig, rules: next });
                                                             }}
                                                             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-1 text-[10px] outline-none"
@@ -474,12 +484,12 @@ export const QueryBuilderView: React.FC = () => {
                                                             className="w-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-1 text-[10px] outline-none"
                                                         />
                                                         <div className="flex gap-1">
-                                                            {['green', 'yellow', 'red', 'blue'].map(c => (
+                                                            {(['green', 'yellow', 'red', 'blue'] as const).map(c => (
                                                                 <button
                                                                     key={c}
                                                                     onClick={() => {
                                                                         const next = [...(visConfig.rules || [])];
-                                                                        next[idx] = { ...rule, color: c as any };
+                                                                        next[idx] = { ...rule, color: c };
                                                                         setVisConfig({ ...visConfig, rules: next });
                                                                     }}
                                                                     className={`w-4 h-4 rounded-full border-2 ${rule.color === c ? 'border-slate-400 scale-110' : 'border-transparent opacity-40 hover:opacity-100'}`}

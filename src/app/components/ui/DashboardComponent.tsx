@@ -5,6 +5,13 @@ import { cn } from '../../../lib/utils';
 import { X, GripVertical, type LucideIcon, Maximize2, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+export interface DashboardTileProps {
+    onRemove?: () => void;
+    onClick?: () => void;
+    targetView?: string;
+    dragHandleProps?: Record<string, unknown>;
+}
+
 interface DashboardComponentProps {
     title: string;
     icon: LucideIcon;
@@ -13,7 +20,7 @@ interface DashboardComponentProps {
     onRemove?: () => void;
     onClick?: () => void;
     targetView?: string;
-    dragHandleProps?: any;
+    dragHandleProps?: Record<string, unknown>;
     footerLeft?: React.ReactNode;
     footerRight?: React.ReactNode;
     className?: string;

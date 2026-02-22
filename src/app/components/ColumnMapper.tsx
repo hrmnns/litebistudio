@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowRight, Save, Wand2, AlertCircle, Settings2, Plus, ArrowDownUp } from 'lucide-react';
 import { transformers } from '../../lib/transformers';
 
@@ -22,6 +22,11 @@ interface ColumnMapperProps {
     initialMapping?: Record<string, MappingConfig>;
 }
 
+interface SchemaProperty {
+    description?: string;
+    type?: string;
+}
+
 export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targetSchema, onConfirm, onCancel, initialMapping }) => {
     const [mapping, setMapping] = useState<Record<string, MappingConfig>>(initialMapping || {});
 
@@ -31,12 +36,11 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
 
     const targetFields = Object.keys(schemaProperties).map(key => ({
         key,
-        // @ts-ignore
-        description: schemaProperties[key].description,
+        description: (schemaProperties[key] as SchemaProperty).description,
         required: requiredFields.includes(key)
     }));
 
-    const handleAutoMap = () => {
+    const handleAutoMap = useCallback(() => {
         const newMapping: Record<string, MappingConfig> = {};
         targetFields.forEach(field => {
             const match = sourceColumns.find(col =>
@@ -48,13 +52,17 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
             }
         });
         setMapping(prev => ({ ...prev, ...newMapping }));
-    };
+    }, [sourceColumns, targetFields]);
 
     useEffect(() => {
-        if (!initialMapping || Object.keys(initialMapping).length === 0) {
-            handleAutoMap();
+        if (initialMapping && Object.keys(initialMapping).length > 0) {
+            return;
         }
-    }, [initialMapping]);
+        const autoMapHandle = window.setTimeout(() => {
+            handleAutoMap();
+        }, 0);
+        return () => window.clearTimeout(autoMapHandle);
+    }, [handleAutoMap, initialMapping]);
 
     const isValid = targetFields
         .filter(f => f.required)

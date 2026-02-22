@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Search, Filter, X } from 'lucide-react';
 
 export interface Column<T> {
     header: string;
-    accessor: keyof T | ((item: T) => any);
+    accessor: keyof T | ((item: T) => unknown);
     render?: (item: T) => React.ReactNode;
     align?: 'left' | 'center' | 'right';
     className?: string;
@@ -34,6 +34,10 @@ export function DataTable<T>({
     const [filters, setFilters] = React.useState<Record<string, string>>({});
     const [showFilters, setShowFilters] = React.useState(false);
 
+    const getValueByAccessor = useCallback((item: T, accessor: keyof T | string): unknown => {
+        return (item as Record<string, unknown>)[accessor as string];
+    }, []);
+
     const filteredData = useMemo(() => {
         let processed = data;
 
@@ -57,11 +61,11 @@ export function DataTable<T>({
                     const col = columns.find(c => (typeof c.accessor === 'string' ? c.accessor : c.header) === key);
                     if (!col) return true;
 
-                    let itemValue: any;
+                    let itemValue: unknown;
                     if (typeof col.accessor === 'function') {
                         itemValue = col.accessor(item);
                     } else {
-                        itemValue = (item as any)[col.accessor];
+                        itemValue = getValueByAccessor(item, col.accessor);
                     }
 
                     return String(itemValue ?? '').toLowerCase().includes(filterValue.toLowerCase());
@@ -74,15 +78,15 @@ export function DataTable<T>({
             processed = [...processed].sort((a, b) => {
                 const col = columns.find(c => c.accessor === sortConfig.key || (typeof c.accessor === 'string' && c.accessor === sortConfig.key));
 
-                let valA: any;
-                let valB: any;
+                let valA: unknown;
+                let valB: unknown;
 
                 if (col && typeof col.accessor === 'function') {
                     valA = col.accessor(a);
                     valB = col.accessor(b);
                 } else {
-                    valA = (a as any)[sortConfig.key];
-                    valB = (b as any)[sortConfig.key];
+                    valA = getValueByAccessor(a, sortConfig.key);
+                    valB = getValueByAccessor(b, sortConfig.key);
                 }
 
                 if (valA === valB) return 0;
@@ -95,7 +99,7 @@ export function DataTable<T>({
         }
 
         return processed;
-    }, [data, searchTerm, searchFields, sortConfig, columns, filters]);
+    }, [data, searchTerm, searchFields, sortConfig, columns, filters, getValueByAccessor]);
 
     const handleScroll = () => {
         if (headerRef.current && bodyRef.current) {
@@ -232,7 +236,7 @@ export function DataTable<T>({
                                 {columns.map((col, colIndex) => {
                                     const value = typeof col.accessor === 'function'
                                         ? col.accessor(item)
-                                        : (item as any)[col.accessor];
+                                        : getValueByAccessor(item, col.accessor);
 
                                     return (
                                         <td

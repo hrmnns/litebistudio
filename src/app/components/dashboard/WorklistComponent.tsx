@@ -2,13 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClipboardList, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
-import { DashboardComponent } from '../ui/DashboardComponent';
+import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
+import type { DbRow } from '../../../types';
 
-interface WorklistStatusComponentProps {
-    onRemove?: () => void;
-    dragHandleProps?: any;
-    onClick?: () => void;
-    targetView?: string;
+interface WorklistStatusComponentProps extends DashboardTileProps {
     isOverlay?: boolean;
 }
 
@@ -27,7 +24,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
         try {
             const list = await SystemRepository.getWorklist();
             const total = list.length;
-            const pending = list.filter(item => item.status === 'pending' || !item.status).length;
+            const pending = list.filter((item: DbRow) => item.status === 'pending' || !item.status).length;
             setStats({ total, pending });
         } catch (e) {
             console.error('Failed to load worklist stats', e);

@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Key, AlertCircle, Check, Info } from 'lucide-react';
 import { Modal } from './Modal';
+import type { DbRow } from '../../types';
 
 interface KeySelectionModalProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirm: (keyFields: string[]) => void;
-    mappedData: any[];
+    mappedData: DbRow[];
     initialKeyFields: string[];
     availableFields: string[];
 }

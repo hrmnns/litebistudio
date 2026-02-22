@@ -10,6 +10,7 @@ import { Modal } from '../components/Modal';
 import { getComponent, SYSTEM_WIDGETS } from '../registry';
 import { COMPONENTS } from '../../config/components';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import type { DbRow } from '../../types';
 
 interface FilterDef {
     column: string;
@@ -29,6 +30,12 @@ interface DashboardDef {
     layout: SavedWidget[];
     is_default: boolean;
     filters?: FilterDef[];
+}
+
+interface CustomWidgetRecord extends DbRow {
+    id: string;
+    sql_query: string;
+    visualization_config: string;
 }
 
 export const CustomDashboardView: React.FC = () => {
@@ -53,9 +60,9 @@ export const CustomDashboardView: React.FC = () => {
     const { isExporting, exportToPdf } = useReportExport();
 
     // Fetch custom widgets
-    const { data: customWidgets, refresh: refreshCustomWidgets } = useAsync<any[]>(
+    const { data: customWidgets, refresh: refreshCustomWidgets } = useAsync<CustomWidgetRecord[]>(
         async () => {
-            return await SystemRepository.executeRaw('SELECT * FROM sys_user_widgets ORDER BY created_at DESC');
+            return await SystemRepository.executeRaw('SELECT * FROM sys_user_widgets ORDER BY created_at DESC') as CustomWidgetRecord[];
         },
         []
     );
@@ -95,7 +102,7 @@ export const CustomDashboardView: React.FC = () => {
             setIsLoaded(true);
         };
         init();
-    }, []);
+    }, [t]);
 
     const activeDashboard = dashboards.find(d => d.id === activeDashboardId);
 
@@ -128,7 +135,7 @@ export const CustomDashboardView: React.FC = () => {
         };
 
         scanColumns();
-    }, [activeDashboardId, customWidgets, activeDashboard?.layout]);
+    }, [activeDashboard, customWidgets]);
 
     // Sync active dashboard to DB
     const syncDashboard = async (updatedDash: DashboardDef) => {
@@ -443,7 +450,7 @@ export const CustomDashboardView: React.FC = () => {
                             let config;
                             try {
                                 config = JSON.parse(dbWidget.visualization_config);
-                            } catch (e) {
+                            } catch {
                                 config = { type: 'table' };
                             }
 

@@ -2,11 +2,11 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Database, Table as TableIcon } from 'lucide-react';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
-import { DashboardComponent } from '../ui/DashboardComponent';
+import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 import { Skeleton } from '../ui/Skeleton';
 import { useAsync } from '../../../hooks/useAsync';
 
-export const DataInspectorComponent: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void; targetView?: string }> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
+export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { t } = useTranslation();
     const { data: stats, loading, error } = useAsync<{ tables: number; records: number }>(
         () => SystemRepository.getDatabaseStats(),

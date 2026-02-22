@@ -2,17 +2,75 @@ import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import schemaSql from '../datasets/schema.sql?raw';
 import viewsSql from '../datasets/views.sql?raw';
 
-let db: any = null;
-let sqlite3: any = null;
-let initPromise: Promise<any> | null = null;
+type SqliteRow = Record<string, unknown>;
 
-const log = (...args: any[]) => console.log('[DB Worker]', ...args);
-const error = (...args: any[]) => console.error('[DB Worker]', ...args);
+interface ExecOptions {
+    sql: string;
+    bind?: unknown[];
+    rowMode?: 'object';
+    callback?: (row: SqliteRow) => void;
+}
+
+interface PreparedStmt {
+    bind(values: unknown[]): void;
+    step(): void;
+    reset(): void;
+    finalize(): void;
+}
+
+interface DatabaseLike {
+    exec(sqlOrOpts: string | ExecOptions): void;
+    selectValue(sql: string, bind?: unknown[]): unknown;
+    prepare(sql: string): PreparedStmt;
+    close(): void;
+    pointer: number;
+}
+
+interface SqliteApiLike {
+    oo1: {
+        OpfsDb?: new (path: string) => DatabaseLike;
+        DB: new (arg: string | ArrayBuffer) => DatabaseLike;
+    };
+    capi: {
+        sqlite3_js_db_export(pointer: number): Uint8Array;
+    };
+}
+
+interface ImportReport {
+    isValid: boolean;
+    headerMatch: boolean;
+    missingTables: string[];
+    missingColumns: Record<string, string[]>;
+    versionInfo: { current: number; backup: number };
+    error?: string;
+    isDowngrade?: boolean;
+}
+
+let db: DatabaseLike | null = null;
+let sqlite3: SqliteApiLike | null = null;
+let initPromise: Promise<boolean> | null = null;
+
+const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
+const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
 
 const CURRENT_SCHEMA_VERSION = 6;
 
+function getErrorMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    return String(err);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function getRowString(row: SqliteRow, key: string): string {
+    const val = row[key];
+    return typeof val === 'string' ? val : '';
+}
+
 // Reusable schema and migration logic
-function applyMigrations(databaseInstance: any) {
+function applyMigrations(databaseInstance: DatabaseLike) {
     if (!databaseInstance) return;
 
     let userVersion = databaseInstance.selectValue('PRAGMA user_version') as number;
@@ -35,11 +93,11 @@ function applyMigrations(databaseInstance: any) {
     if (userVersion < 2) {
         log('Migration V2: Adding visual_builder_config to sys_user_widgets...');
         try {
-            const columns: any[] = [];
+            const columns: string[] = [];
             databaseInstance.exec({
                 sql: "PRAGMA table_info(sys_user_widgets)",
                 rowMode: 'object',
-                callback: (row: any) => columns.push(row.name)
+                callback: (row: SqliteRow) => columns.push(getRowString(row, 'name'))
             });
             if (columns.length > 0 && !columns.includes('visual_builder_config')) {
                 databaseInstance.exec("ALTER TABLE sys_user_widgets ADD COLUMN visual_builder_config TEXT");
@@ -55,11 +113,11 @@ function applyMigrations(databaseInstance: any) {
     if (userVersion < 3) {
         log('Migration V3: Enhancing sys_worklist...');
         try {
-            const columns: any[] = [];
+            const columns: string[] = [];
             databaseInstance.exec({
                 sql: "PRAGMA table_info(sys_worklist)",
                 rowMode: 'object',
-                callback: (row: any) => columns.push(row.name)
+                callback: (row: SqliteRow) => columns.push(getRowString(row, 'name'))
             });
             if (columns.length > 0) {
                 if (!columns.includes('comment')) {
@@ -113,7 +171,7 @@ function applyMigrations(databaseInstance: any) {
         try {
             // Apply views as they might depend on new tables
             databaseInstance.exec(viewsSql);
-        } catch (e) {
+        } catch {
             log('Warning: views.sql execution partially or fully failed');
         }
         databaseInstance.exec('PRAGMA user_version = 5');
@@ -146,10 +204,10 @@ async function initDB() {
         try {
             log('Initializing SQLite...');
 
-            let isRetrying = false;
+            const isRetrying = false;
             const config = {
                 print: log,
-                printErr: (...args: any[]) => {
+                printErr: (...args: unknown[]) => {
                     const msg = args.join(' ');
                     if (isRetrying && (msg.includes('OPFS asyncer') || msg.includes('GetSyncHandleError'))) {
                         return;
@@ -158,16 +216,16 @@ async function initDB() {
                 },
             };
 
-            sqlite3 = await (sqlite3InitModule as any)(config);
+            sqlite3 = await (sqlite3InitModule as unknown as (cfg: unknown) => Promise<SqliteApiLike>)(config);
 
             if (sqlite3.oo1.OpfsDb) {
                 try {
                     db = new sqlite3.oo1.OpfsDb('/litebistudio.sqlite3');
                     log('Opened OPFS database');
-                } catch (e: any) {
+                } catch (e: unknown) {
                     error('OPFS unavailable OR corrupted, falling back to memory', e);
                     // Explicitly ignore "is not a database" errors to allow fallback
-                    if (e.message?.includes('is not a database')) {
+                    if (getErrorMessage(e).includes('is not a database')) {
                         log('Database file corrupted on disk. User should restore backup.');
                     }
                     db = new sqlite3.oo1.DB(':memory:');
@@ -191,7 +249,7 @@ async function initDB() {
     return initPromise;
 }
 
-async function loadDemoData(demoContent?: any) {
+async function loadDemoData(demoContent?: Record<string, unknown>) {
     if (!demoContent) {
         log('No demo data provided for generic loader.');
         return 0;
@@ -206,7 +264,7 @@ async function loadDemoData(demoContent?: any) {
                 // Determine if table exists
                 const tableExists = db.selectValue("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?", [tableName]);
                 if (tableExists) {
-                    genericBulkInsert(tableName, records, false); // false = use existing transaction
+                    genericBulkInsert(tableName, records as SqliteRow[], false); // false = use existing transaction
                     totalRecords += records.length;
                 }
             }
@@ -222,7 +280,7 @@ async function loadDemoData(demoContent?: any) {
     }
 }
 
-function genericBulkInsert(tableName: string, records: any[], wrapInTransaction: boolean = true) {
+function genericBulkInsert(tableName: string, records: SqliteRow[], wrapInTransaction: boolean = true) {
     if (records.length === 0) return;
     if (!/^[a-z0-9_]+$/i.test(tableName)) {
         throw new Error(`Invalid table name: ${tableName}`);
@@ -268,17 +326,21 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
-            case 'EXEC':
+            case 'EXEC': {
                 if (!db) await initDB();
-                const rows: any[] = [];
+                const payloadObj = isRecord(payload) ? payload : {};
+                const sql = typeof payloadObj.sql === 'string' ? payloadObj.sql : '';
+                const bind = Array.isArray(payloadObj.bind) ? payloadObj.bind : undefined;
+                const rows: SqliteRow[] = [];
                 db.exec({
-                    sql: payload.sql,
-                    bind: payload.bind,
+                    sql,
+                    bind,
                     rowMode: 'object',
-                    callback: (row: any) => rows.push(row)
+                    callback: (row: SqliteRow) => rows.push(row)
                 });
                 result = rows;
                 break;
+            }
 
             case 'GET_DIAGNOSTICS':
                 if (!db) await initDB();
@@ -290,20 +352,24 @@ async function handleMessage(e: MessageEvent) {
                 result = sqlite3.capi.sqlite3_js_db_export(db.pointer);
                 break;
 
-            case 'IMPORT':
+            case 'IMPORT': {
+                if (!(payload instanceof ArrayBuffer)) {
+                    throw new Error('IMPORT payload must be ArrayBuffer');
+                }
                 result = await importDatabase(payload);
                 break;
+            }
 
-            case 'CLEAR':
+            case 'CLEAR': {
                 if (!db) await initDB();
                 try {
                     db.exec('BEGIN TRANSACTION');
                     // Get all user tables
-                    const tables: any[] = [];
+                    const tables: string[] = [];
                     db.exec({
                         sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sys_%'",
                         rowMode: 'object',
-                        callback: (row: any) => tables.push(row.name)
+                        callback: (row: SqliteRow) => tables.push(getRowString(row, 'name'))
                     });
                     for (const t of tables) {
                         db.exec(`DELETE FROM ${t};`);
@@ -316,6 +382,7 @@ async function handleMessage(e: MessageEvent) {
                 }
                 result = true;
                 break;
+            }
 
             case 'FACTORY_RESET':
                 if (db) {
@@ -337,47 +404,55 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
-            case 'CLEAR_TABLE':
+            case 'CLEAR_TABLE': {
                 if (!db) await initDB();
-                const cleanTableName = payload.tableName;
+                const payloadObj = isRecord(payload) ? payload : {};
+                const cleanTableName = typeof payloadObj.tableName === 'string' ? payloadObj.tableName : '';
                 if (!/^[a-z0-9_]+$/i.test(cleanTableName)) {
                     throw new Error(`Invalid table name: ${cleanTableName}`);
                 }
                 db.exec(`DELETE FROM ${cleanTableName};`);
                 result = true;
                 break;
+            }
 
-            case 'GENERIC_BULK_INSERT':
+            case 'GENERIC_BULK_INSERT': {
                 if (!db) await initDB();
-                genericBulkInsert(payload.tableName, payload.records);
-                result = payload.records.length;
+                const payloadObj = isRecord(payload) ? payload : {};
+                const tableName = typeof payloadObj.tableName === 'string' ? payloadObj.tableName : '';
+                const records = Array.isArray(payloadObj.records) ? payloadObj.records as SqliteRow[] : [];
+                genericBulkInsert(tableName, records);
+                result = records.length;
                 break;
+            }
 
-            case 'EXPORT_DEMO_DATA':
+            case 'EXPORT_DEMO_DATA': {
                 if (!db) await initDB();
-                const exportData: any = {};
-                const tables: any[] = [];
+                const exportData: Record<string, SqliteRow[]> = {};
+                const tables: string[] = [];
                 db.exec({
                     sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
                     rowMode: 'object',
-                    callback: (row: any) => tables.push(row.name)
+                    callback: (row: SqliteRow) => tables.push(getRowString(row, 'name'))
                 });
                 for (const t of tables) {
-                    const rows: any[] = [];
+                    const rows: SqliteRow[] = [];
                     db.exec({
                         sql: `SELECT * FROM ${t}`,
                         rowMode: 'object',
-                        callback: (row: any) => rows.push(row)
+                        callback: (row: SqliteRow) => rows.push(row)
                     });
                     exportData[t] = rows;
                 }
                 result = exportData;
                 break;
+            }
 
-            case 'LOAD_DEMO':
+            case 'LOAD_DEMO': {
                 if (!db) await initDB();
-                result = await loadDemoData(payload);
+                result = await loadDemoData(isRecord(payload) ? payload : undefined);
                 break;
+            }
 
             case 'CLOSE':
                 if (db) {
@@ -391,8 +466,8 @@ async function handleMessage(e: MessageEvent) {
         }
 
         self.postMessage({ id, result });
-    } catch (error: any) {
-        self.postMessage({ id, error: error.message });
+    } catch (error: unknown) {
+        self.postMessage({ id, error: getErrorMessage(error) });
     }
 }
 
@@ -402,11 +477,11 @@ function getDiagnostics() {
     const dbSize = pageCount * pageSize;
 
     const tableStats: Record<string, number> = {};
-    const tables: any[] = [];
+    const tables: string[] = [];
     db.exec({
         sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
         rowMode: 'object',
-        callback: (row: any) => tables.push(row.name)
+        callback: (row: SqliteRow) => tables.push(getRowString(row, 'name'))
     });
 
     for (const table of tables) {
@@ -422,9 +497,9 @@ function getDiagnostics() {
     };
 }
 
-async function importDatabase(buffer: ArrayBuffer) {
-    let tempDb: any = null;
-    const report: any = {
+async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
+    let tempDb: DatabaseLike | null = null;
+    const report: ImportReport = {
         isValid: false,
         headerMatch: false,
         missingTables: [],
@@ -450,9 +525,9 @@ async function importDatabase(buffer: ArrayBuffer) {
         // we can just open the buffer as a DB.
         try {
             tempDb = new sqlite3.oo1.DB(buffer);
-        } catch (e: any) {
+        } catch (e: unknown) {
             error('Temporary DB open failed', e);
-            report.error = "Memory DB allocation failed or buffer malformed: " + e.message;
+            report.error = "Memory DB allocation failed or buffer malformed: " + getErrorMessage(e);
             return report;
         }
 
@@ -484,7 +559,7 @@ async function importDatabase(buffer: ArrayBuffer) {
             tempDb.exec({
                 sql: `PRAGMA table_info("${tableName}")`,
                 rowMode: 'object',
-                callback: (row: any) => actualCols.push(row.name)
+                callback: (row: SqliteRow) => actualCols.push(getRowString(row, 'name'))
             });
 
             if (db) {
@@ -492,7 +567,7 @@ async function importDatabase(buffer: ArrayBuffer) {
                 db.exec({
                     sql: `PRAGMA table_info("${tableName}")`,
                     rowMode: 'object',
-                    callback: (row: any) => targetCols.push(row.name)
+                    callback: (row: SqliteRow) => targetCols.push(getRowString(row, 'name'))
                 });
 
                 const missing = targetCols.filter(c => !actualCols.includes(c));
@@ -522,7 +597,7 @@ async function importDatabase(buffer: ArrayBuffer) {
             const root = await navigator.storage.getDirectory();
             try {
                 await root.removeEntry('litebistudio.sqlite3');
-            } catch (e) { /* ignore */ }
+            } catch { /* ignore */ }
 
             const fileHandle = await root.getFileHandle('litebistudio.sqlite3', { create: true });
             const writable = await fileHandle.createWritable();
@@ -540,9 +615,9 @@ async function importDatabase(buffer: ArrayBuffer) {
         }
 
         return report;
-    } catch (e: any) {
+    } catch (e: unknown) {
         error('Import failed', e);
-        report.error = e.message;
+        report.error = getErrorMessage(e);
         return report;
     } finally {
         if (tempDb) tempDb.close();

@@ -90,10 +90,11 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
 
     useEffect(() => {
         const onStart = () => setActiveQueries(q => q + 1);
-        const onEnd = (e: any) => {
+        const onEnd = (e: Event) => {
             setActiveQueries(q => Math.max(0, q - 1));
-            if (e.detail?.duration !== undefined) {
-                setLastQueryMs(e.detail.duration);
+            const detail = (e as CustomEvent<{ duration?: number }>).detail;
+            if (detail?.duration !== undefined) {
+                setLastQueryMs(detail.duration);
             }
         };
 

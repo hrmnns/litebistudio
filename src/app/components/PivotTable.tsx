@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatValue } from '../utils/formatUtils';
+import type { DbRow } from '../../types';
 
 interface PivotMeasure {
     field: string;
@@ -8,7 +9,7 @@ interface PivotMeasure {
 }
 
 interface PivotTableProps {
-    data: any[];
+    data: DbRow[];
     rows: string[];
     cols: string[];
     measures: PivotMeasure[];

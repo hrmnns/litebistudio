@@ -9,6 +9,7 @@ import {
     useSensor,
     useSensors,
     DragOverlay,
+    type DragStartEvent,
     type DragEndEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -41,7 +42,7 @@ export const ComponentGrid: React.FC<ComponentGridProps> = ({
 
     const [activeId, setActiveId] = React.useState<string | null>(null);
 
-    const handleDragStart = (event: { active: { id: any } }) => {
+    const handleDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id as string);
     };
 
