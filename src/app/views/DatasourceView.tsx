@@ -82,11 +82,16 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         () => SystemRepository.getTables(),
         []
     );
+    const { data: dataSources, refresh: refreshDataSources } = useAsync<Array<{ name: string; type: 'table' | 'view' }>>(
+        () => SystemRepository.getDataSources(),
+        []
+    );
 
     // Filter Tables
     const isSystemTable = (name: string) => name.startsWith('sys_') || name === 'sqlite_sequence';
     const userTables = tables?.filter((t: string) => !isSystemTable(t)) || [];
     const systemTables = tables?.filter((t: string) => isSystemTable(t)) || [];
+    const userViews = (dataSources || []).filter((s) => s.type === 'view' && !isSystemTable(s.name));
 
     // Load Schema for selected table (Generic Import)
     useEffect(() => {
@@ -169,7 +174,20 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         try {
             await SystemRepository.executeRaw(`DROP TABLE ${tableName}`);
             refreshTables();
+            refreshDataSources();
             if (selectedTable === tableName) setSelectedTable('');
+        } catch (error: unknown) {
+            alert(t('common.error') + ': ' + getErrorMessage(error));
+        }
+    };
+
+    const handleDropView = async (viewName: string) => {
+        if (!confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName }))) return;
+        try {
+            await SystemRepository.executeRaw(`DROP VIEW ${viewName}`);
+            refreshTables();
+            refreshDataSources();
+            if (selectedTable === viewName) setSelectedTable('');
         } catch (error: unknown) {
             alert(t('common.error') + ': ' + getErrorMessage(error));
         }
@@ -351,6 +369,62 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
                                                     </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Views Manager */}
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                        <TableIcon className="w-4 h-4" /> {t('datasource.user_views', 'Views')}
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        {t('datasource.user_views_hint', 'SQL views available in the local database.')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {userViews.length === 0 ? (
+                                <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                                    <p className="text-slate-400 text-sm">{t('datasource.no_user_views', 'No views available.')}</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {userViews.map((view) => (
+                                        <div key={view.name} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between group">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
+                                                    <TableIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <span className="font-bold text-slate-700 block truncate">{view.name}</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                        {t('datasource.view_type', 'VIEW')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => { setSelectedTable(view.name); setIsSchemaOpen(true); }}
+                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                    title={t('datasource.show_schema')}
+                                                >
+                                                    <Info className="w-4 h-4" />
+                                                </button>
+                                                {!isReadOnly && (
+                                                    <button
+                                                        onClick={() => handleDropView(view.name)}
+                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                        title={t('datasource.drop_view_title', 'Delete view')}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
@@ -665,14 +739,19 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 defaultValue=""
                                             >
                                                 <option value="" disabled>{t('datasource.select_target_table')}</option>
-                                                {userTables.map((table_n: string) => <option key={table_n} value={table_n}>{table_n}</option>)}
+                                                {userTables.map((table_n: string) => <option key={`tbl-${table_n}`} value={`table:${table_n}`}>{table_n}</option>)}
+                                                {userViews.map((view_n) => <option key={`view-${view_n.name}`} value={`view:${view_n.name}`}>{view_n.name} (view)</option>)}
                                             </select>
                                             <button
                                                 onClick={() => {
                                                     const select = document.getElementById('drop-table-select') as HTMLSelectElement;
-                                                    if (select.value) handleDropTable(select.value);
+                                                    if (!select.value) return;
+                                                    const [objType, objName] = select.value.split(':');
+                                                    if (!objName) return;
+                                                    if (objType === 'view') handleDropView(objName);
+                                                    else handleDropTable(objName);
                                                 }}
-                                                disabled={userTables.length === 0}
+                                                disabled={userTables.length === 0 && userViews.length === 0}
                                                 className="px-3 py-2 bg-red-900 hover:bg-black text-white rounded font-bold text-xs transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                             >
                                                 {t('datasource.drop_btn')}

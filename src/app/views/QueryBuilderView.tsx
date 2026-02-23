@@ -5,7 +5,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
     Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
     Layout, Maximize2, Minimize2, Folder, Trash2,
-    Edit3, X, Download, Check
+    Edit3, X, Download, Check, Search
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { DataTable } from '../../components/ui/DataTable';
@@ -69,6 +69,7 @@ export const QueryBuilderView: React.FC = () => {
     // Save Widget State
     const [saveModalOpen, setSaveModalOpen] = useState(false);
     const [widgetName, setWidgetName] = useState('');
+    const [widgetSearchTerm, setWidgetSearchTerm] = useState('');
 
     // Detail View State
     const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -257,6 +258,15 @@ export const QueryBuilderView: React.FC = () => {
             render: (item: DbRow) => formatValue(item[key], key)
         }));
     }, [results]);
+    const filteredSavedWidgets = useMemo(() => {
+        const all = savedWidgets || [];
+        const term = widgetSearchTerm.trim().toLowerCase();
+        if (!term) return all;
+        return all.filter((widget) =>
+            widget.name.toLowerCase().includes(term) ||
+            (widget.sql_query || '').toLowerCase().includes(term)
+        );
+    }, [savedWidgets, widgetSearchTerm]);
 
     const resultColumns = results.length > 0 ? Object.keys(results[0]) : [];
     const numericColumns = useMemo(() => {
@@ -681,19 +691,30 @@ export const QueryBuilderView: React.FC = () => {
                                             <div className="space-y-2 animate-in fade-in duration-300">
                                                 <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
                                                     {t('querybuilder.saved_reports')}
-                                                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">{savedWidgets?.length || 0}</span>
+                                                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">
+                                                        {filteredSavedWidgets.length}/{savedWidgets?.length || 0}
+                                                    </span>
                                                 </h3>
-                                                <div className="space-y-1">
-                                                    {savedWidgets?.map(w => (
-                                                        <div key={w.id} className={`group p-3 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
+                                                <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                    <input
+                                                        value={widgetSearchTerm}
+                                                        onChange={(e) => setWidgetSearchTerm(e.target.value)}
+                                                        placeholder={t('querybuilder.search_saved_reports', 'Search saved widgets...')}
+                                                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                                                    {filteredSavedWidgets.map(w => (
+                                                        <div key={w.id} className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
                                                             <div className="flex items-center justify-between">
-                                                                <span className="font-bold text-slate-700 dark:text-slate-200 text-sm truncate">{w.name}</span>
+                                                                <span className="font-bold text-slate-700 dark:text-slate-200 text-xs truncate">{w.name}</span>
                                                                 {!isReadOnly && (
                                                                     <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                                                                 )}
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-[10px]">
-                                                                <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query}</span>
+                                                            <div className="flex items-center gap-2 text-[9px]">
+                                                                <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query || '-'}</span>
                                                                 <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
                                                                     {(() => {
                                                                         try {
@@ -707,6 +728,11 @@ export const QueryBuilderView: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     ))}
+                                                    {filteredSavedWidgets.length === 0 && (
+                                                        <div className="p-3 rounded-lg border border-dashed border-slate-200 text-[11px] text-slate-400 text-center">
+                                                            {t('querybuilder.no_saved_reports_filtered', 'No matching widgets found.')}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -789,7 +815,7 @@ export const QueryBuilderView: React.FC = () => {
                                                                 onSelectSnippet={snippet => setSql(prev => prev + '\n' + snippet)}
                                                             />
                                                         </div>
-                                                        <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full h-64 font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" placeholder="SELECT * FROM..." />
+                                                        <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full h-96 font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" placeholder="SELECT * FROM..." />
                                                     </>
                                                 ) : (
                                                     <VisualQueryBuilder

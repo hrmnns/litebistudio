@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
@@ -6,10 +6,13 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable, type Column, type DataTableSortConfig } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
-import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, ChevronDown, Save } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow } from '../../types';
+import type { TableColumn } from '../../types';
+import { Modal } from '../components/Modal';
+import type { DataSourceEntry } from '../../lib/repositories/SystemRepository';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -36,6 +39,13 @@ interface ProfilingThresholds {
     cardinalityRate: number;
 }
 
+const SQL_KEYWORDS = [
+    'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET',
+    'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'ON',
+    'AND', 'OR', 'NOT', 'IN', 'LIKE', 'IS NULL', 'IS NOT NULL',
+    'COUNT(*)', 'SUM()', 'AVG()', 'MIN()', 'MAX()', 'DISTINCT'
+];
+
 export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const { t, i18n } = useTranslation();
     const { isAdminMode } = useDashboard();
@@ -46,9 +56,29 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [customSqlTemplates, setCustomSqlTemplates] = useLocalStorage<CustomSqlTemplate[]>('data_inspector_custom_sql_templates', []);
     const [selectedCustomTemplateId, setSelectedCustomTemplateId] = useLocalStorage<string>('data_inspector_selected_custom_template', '');
     const [explainMode, setExplainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
+    const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
+    const [autocompleteEnabled, setAutocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
     const [explainRows, setExplainRows] = useState<DbRow[]>([]);
     const [explainError, setExplainError] = useState('');
     const [explainLoading, setExplainLoading] = useState(false);
+    const [saveToBuilderOpen, setSaveToBuilderOpen] = useState(false);
+    const [saveWidgetName, setSaveWidgetName] = useState('');
+    const [saveWidgetDescription, setSaveWidgetDescription] = useState('');
+    const [saveToBuilderError, setSaveToBuilderError] = useState('');
+    const [isSavingToBuilder, setIsSavingToBuilder] = useState(false);
+    const [sqlEditorHeight, setSqlEditorHeight] = useLocalStorage<number>('data_inspector_sql_editor_height', 160);
+    const sqlInputRef = useRef<HTMLTextAreaElement | null>(null);
+    const [sqlCursor, setSqlCursor] = useState(0);
+    const [autocompleteOpen, setAutocompleteOpen] = useState(false);
+    const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+    const [autocompletePosition, setAutocompletePosition] = useState({ top: 12, left: 12, width: 320 });
+
+    type SuggestionType = 'keyword' | 'table' | 'column';
+    interface SqlSuggestion {
+        label: string;
+        insert: string;
+        type: SuggestionType;
+    }
 
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
@@ -61,6 +91,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [tableSortConfig, setTableSortConfig] = useState<DataTableSortConfig<DbRow> | null>(null);
     const [tableFilters, setTableFilters] = useState<Record<string, string>>({});
     const [showTableFilters, setShowTableFilters] = useState(false);
+    const [columnWidthsBySource, setColumnWidthsBySource] = useLocalStorage<Record<string, Record<string, number>>>(
+        'data_inspector_column_widths_v1',
+        {}
+    );
     const [savedViews, setSavedViews] = useLocalStorage<InspectorViewPreset[]>('data_inspector_saved_views', []);
     const [activeViewId, setActiveViewId] = useLocalStorage<string>('data_inspector_active_view', '');
     const [showProfiling, setShowProfiling] = useLocalStorage<boolean>('data_inspector_show_profiling', true);
@@ -72,32 +106,49 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [isResizingProfile, setIsResizingProfile] = useState(false);
     const resizeStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
-    // Fetch available tables
-    const { data: tables } = useAsync<string[]>(
+    // Fetch available data sources (tables + views)
+    const { data: dataSources } = useAsync<DataSourceEntry[]>(
         async () => {
-            const allTables = await SystemRepository.getTables();
-            const filteredTables = isAdminMode ? allTables : allTables.filter(t => !t.startsWith('sys_'));
+            const allSources = await SystemRepository.getDataSources();
+            const filteredSources = isAdminMode ? allSources : allSources.filter(s => !s.name.startsWith('sys_'));
 
-            if (filteredTables.length > 0 && (!selectedTable || (selectedTable.startsWith('sys_') && !isAdminMode))) {
-                setSelectedTable(filteredTables[0]);
+            if (filteredSources.length > 0 && (!selectedTable || (selectedTable.startsWith('sys_') && !isAdminMode))) {
+                setSelectedTable(filteredSources[0].name);
             }
-            return filteredTables;
+            return filteredSources;
         },
         [isAdminMode]
     );
+
+    const tables = React.useMemo(() => (dataSources || []).map(s => s.name), [dataSources]);
+    const selectedSourceType = React.useMemo<'table' | 'view'>(
+        () => (dataSources?.find(s => s.name === selectedTable)?.type ?? 'table'),
+        [dataSources, selectedTable]
+    );
+    const activeColumnWidths = React.useMemo<Record<string, number>>(
+        () => (selectedTable ? (columnWidthsBySource[selectedTable] || {}) : {}),
+        [columnWidthsBySource, selectedTable]
+    );
+    const handleColumnWidthsChange = useCallback((nextWidths: Record<string, number>) => {
+        if (!selectedTable) return;
+        setColumnWidthsBySource(prev => ({
+            ...prev,
+            [selectedTable]: nextWidths
+        }));
+    }, [selectedTable, setColumnWidthsBySource]);
 
     // Main Data Fetching
     const { data: items, loading, error, refresh: execute } = useAsync<DbRow[]>(
         async () => {
             if (mode === 'table') {
                 if (!selectedTable) return [];
-                return await SystemRepository.inspectTable(selectedTable, pageSize, searchTerm, offset);
+                return await SystemRepository.inspectTable(selectedTable, pageSize, searchTerm, offset, selectedSourceType);
             } else {
                 if (!inputSql) return []; // Don't run empty SQL
                 return await SystemRepository.executeRaw(inputSql);
             }
         },
-        [mode, selectedTable, pageSize, currentPage] // Auto-run when mode/table/page changes
+        [mode, selectedTable, selectedSourceType, pageSize, currentPage] // Auto-run when mode/source/page changes
     );
 
     const { data: tableTotalRows } = useAsync<number>(
@@ -108,6 +159,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         [mode, selectedTable, searchTerm]
     );
     const totalPages = Math.max(1, Math.ceil((tableTotalRows || 0) / pageSize));
+
+    const { data: selectedTableSchema } = useAsync<TableColumn[]>(
+        async () => {
+            if (!selectedTable) return [];
+            return await SystemRepository.getTableSchema(selectedTable);
+        },
+        [selectedTable]
+    );
 
     // Debounced search for table mode
     useEffect(() => {
@@ -211,6 +270,87 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         });
     };
 
+    const validateSqlForWidgetSave = useCallback(async (sql: string) => {
+        const stripComments = (value: string) => value
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/--.*$/gm, '')
+            .trim();
+
+        const cleaned = stripComments(sql);
+        if (!cleaned) return { valid: false, reason: t('datainspector.empty_sql') };
+
+        const statements = cleaned
+            .split(';')
+            .map(s => s.trim())
+            .filter(Boolean);
+
+        if (statements.length !== 1) {
+            return { valid: false, reason: t('datainspector.single_statement_only', 'Only a single SELECT statement can be saved.') };
+        }
+
+        const stmt = statements[0];
+        const upper = stmt.toUpperCase();
+        if (!(upper.startsWith('SELECT') || upper.startsWith('WITH'))) {
+            return { valid: false, reason: t('datainspector.only_select_save', 'Only SELECT queries can be saved.') };
+        }
+
+        const forbidden = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|TRUNCATE|ATTACH|DETACH|VACUUM|PRAGMA)\b/i;
+        if (forbidden.test(stmt)) {
+            return { valid: false, reason: t('datainspector.only_select_save', 'Only SELECT queries can be saved.') };
+        }
+
+        try {
+            await SystemRepository.executeRaw(`EXPLAIN QUERY PLAN ${stmt}`);
+            return { valid: true, reason: '' };
+        } catch (err) {
+            return { valid: false, reason: err instanceof Error ? err.message : String(err) };
+        }
+    }, [t]);
+
+    const handleOpenSaveToBuilder = useCallback(() => {
+        const trimmedSql = inputSql.trim();
+        if (!trimmedSql) return;
+        setSaveWidgetName(`${selectedTable || 'Query'} ${new Date().toISOString().slice(0, 10)}`);
+        setSaveWidgetDescription('');
+        setSaveToBuilderError('');
+        setSaveToBuilderOpen(true);
+    }, [inputSql, selectedTable]);
+
+    const handleSaveToQueryBuilder = useCallback(async () => {
+        const sql = inputSql.trim();
+        const name = saveWidgetName.trim();
+        if (!name) {
+            setSaveToBuilderError(t('querybuilder.enter_name', 'Please provide a name.'));
+            return;
+        }
+
+        setIsSavingToBuilder(true);
+        setSaveToBuilderError('');
+        try {
+            const validation = await validateSqlForWidgetSave(sql);
+            if (!validation.valid) {
+                setSaveToBuilderError(validation.reason);
+                return;
+            }
+
+            await SystemRepository.saveUserWidget({
+                id: crypto.randomUUID(),
+                name,
+                description: saveWidgetDescription.trim(),
+                sql_query: sql,
+                visualization_config: { type: 'table' },
+                visual_builder_config: null
+            });
+
+            setSaveToBuilderOpen(false);
+            alert(t('datainspector.saved_to_query_builder', 'Saved to Query Builder.'));
+        } catch (err) {
+            setSaveToBuilderError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setIsSavingToBuilder(false);
+        }
+    }, [inputSql, saveWidgetDescription, saveWidgetName, t, validateSqlForWidgetSave]);
+
     const applyViewPreset = (preset: InspectorViewPreset) => {
         setSelectedTable(preset.table);
         setSearchTerm(preset.searchTerm);
@@ -297,6 +437,184 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         { key: 'duplicates', sql: `SELECT key_column, COUNT(*) AS cnt FROM ${selectedTable || 'table_name'} GROUP BY key_column HAVING COUNT(*) > 1 ORDER BY cnt DESC LIMIT 50` },
         { key: 'outliers', sql: `SELECT * FROM ${selectedTable || 'table_name'} WHERE value_column IS NOT NULL ORDER BY value_column DESC LIMIT 25` },
     ];
+
+    const getTokenAtCursor = useCallback((sql: string, cursor: number) => {
+        let start = cursor;
+        let end = cursor;
+        const isTokenChar = (ch: string) => /[A-Za-z0-9_."]/i.test(ch);
+
+        while (start > 0 && isTokenChar(sql[start - 1])) start -= 1;
+        while (end < sql.length && isTokenChar(sql[end])) end += 1;
+
+        const token = sql.slice(start, cursor);
+        return { start, end, token };
+    }, []);
+
+    const suggestions = React.useMemo<SqlSuggestion[]>(() => {
+        if (mode !== 'sql' || !autocompleteEnabled) return [];
+
+        const schemaColumns = (selectedTableSchema || []).map(col => col.name);
+        const { token } = getTokenAtCursor(inputSql, sqlCursor);
+        const prefix = token.trim().toLowerCase();
+        const beforeCursor = inputSql.slice(0, sqlCursor).toUpperCase();
+
+        const tableContext = /\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+["A-Z0-9_]*$/i.test(beforeCursor);
+        const columnContext = /\b(SELECT|WHERE|AND|OR|ON|HAVING|BY|ORDER BY|GROUP BY)\s+["A-Z0-9_.,]*$/i.test(beforeCursor);
+
+        const keywordSuggestions: SqlSuggestion[] = SQL_KEYWORDS
+            .filter(k => prefix.length === 0 || k.toLowerCase().startsWith(prefix))
+            .map(k => ({ label: k, insert: k, type: 'keyword' }));
+
+        const tableSuggestions: SqlSuggestion[] = (tables || [])
+            .filter(t => prefix.length === 0 || t.toLowerCase().startsWith(prefix))
+            .map(t => ({ label: t, insert: t, type: 'table' }));
+
+        const columnSuggestions: SqlSuggestion[] = schemaColumns
+            .filter(c => prefix.length === 0 || c.toLowerCase().startsWith(prefix))
+            .map(c => ({ label: c, insert: c, type: 'column' }));
+
+        let merged: SqlSuggestion[] = [];
+        if (tableContext) {
+            merged = [...tableSuggestions, ...keywordSuggestions];
+        } else if (columnContext || token.includes('.')) {
+            merged = [...columnSuggestions, ...keywordSuggestions, ...tableSuggestions];
+        } else {
+            merged = [...keywordSuggestions, ...tableSuggestions, ...columnSuggestions];
+        }
+
+        const deduped = merged.filter((item, idx, arr) => arr.findIndex(i => i.label === item.label && i.type === item.type) === idx);
+        return deduped.slice(0, 16);
+    }, [mode, autocompleteEnabled, selectedTableSchema, getTokenAtCursor, inputSql, sqlCursor, tables]);
+
+    useEffect(() => {
+        setAutocompleteIndex(0);
+        setAutocompleteOpen(mode === 'sql' && autocompleteEnabled && suggestions.length > 0);
+    }, [mode, autocompleteEnabled, suggestions]);
+
+    useEffect(() => {
+        if (!autocompleteEnabled) {
+            setAutocompleteOpen(false);
+        }
+    }, [autocompleteEnabled]);
+
+    const insertSuggestion = useCallback((suggestion: SqlSuggestion) => {
+        const { start, end } = getTokenAtCursor(inputSql, sqlCursor);
+        const nextSql = `${inputSql.slice(0, start)}${suggestion.insert}${inputSql.slice(end)}`;
+        const nextCursor = start + suggestion.insert.length;
+        setInputSql(nextSql);
+        setSqlCursor(nextCursor);
+        setAutocompleteOpen(false);
+        setAutocompleteIndex(0);
+        window.setTimeout(() => {
+            sqlInputRef.current?.focus();
+            sqlInputRef.current?.setSelectionRange(nextCursor, nextCursor);
+        }, 0);
+    }, [getTokenAtCursor, inputSql, sqlCursor]);
+
+    const handleSqlEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (!autocompleteEnabled) return;
+        if (!autocompleteOpen || suggestions.length === 0) {
+            if (e.key === ' ' && e.ctrlKey) {
+                e.preventDefault();
+                setAutocompleteOpen(true);
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setAutocompleteIndex(prev => (prev + 1) % suggestions.length);
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setAutocompleteIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+            return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            insertSuggestion(suggestions[autocompleteIndex]);
+            return;
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            setAutocompleteOpen(false);
+        }
+    }, [autocompleteEnabled, autocompleteOpen, autocompleteIndex, insertSuggestion, suggestions]);
+
+    const updateAutocompletePosition = useCallback(() => {
+        const textarea = sqlInputRef.current;
+        if (!textarea) return;
+
+        const caret = textarea.selectionStart ?? sqlCursor;
+        const style = window.getComputedStyle(textarea);
+        const mirror = document.createElement('div');
+        const copiedStyles = [
+            'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
+            'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize', 'fontFamily',
+            'lineHeight', 'textAlign', 'textTransform', 'textIndent', 'letterSpacing', 'wordSpacing'
+        ] as const;
+
+        mirror.style.position = 'absolute';
+        mirror.style.visibility = 'hidden';
+        mirror.style.whiteSpace = 'pre-wrap';
+        mirror.style.wordWrap = 'break-word';
+        mirror.style.top = '0';
+        mirror.style.left = '-9999px';
+
+        for (const key of copiedStyles) {
+            mirror.style[key] = style[key];
+        }
+
+        mirror.style.width = `${textarea.clientWidth}px`;
+        mirror.textContent = textarea.value.slice(0, caret);
+
+        const marker = document.createElement('span');
+        marker.textContent = textarea.value.slice(caret) || '.';
+        mirror.appendChild(marker);
+        document.body.appendChild(mirror);
+
+        const lineHeightRaw = Number.parseFloat(style.lineHeight);
+        const lineHeight = Number.isFinite(lineHeightRaw) ? lineHeightRaw : 18;
+        const desiredTop = marker.offsetTop - textarea.scrollTop + lineHeight + 6;
+        const desiredLeft = marker.offsetLeft - textarea.scrollLeft + 8;
+
+        document.body.removeChild(mirror);
+
+        const clampedTop = Math.max(8, Math.min(desiredTop, textarea.clientHeight - 44));
+        const clampedLeft = Math.max(8, Math.min(desiredLeft, textarea.clientWidth - 180));
+        const availableWidth = Math.max(180, textarea.clientWidth - clampedLeft - 10);
+        setAutocompletePosition({
+            top: clampedTop,
+            left: clampedLeft,
+            width: Math.min(420, availableWidth)
+        });
+    }, [sqlCursor]);
+
+    useEffect(() => {
+        if (!autocompleteOpen || suggestions.length === 0) return;
+        updateAutocompletePosition();
+    }, [autocompleteOpen, suggestions.length, sqlCursor, inputSql, updateAutocompletePosition]);
+
+    useEffect(() => {
+        const textarea = sqlInputRef.current;
+        if (!textarea) return;
+
+        const observer = new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (!entry) return;
+            const next = Math.round(entry.contentRect.height);
+            const clamped = Math.max(120, Math.min(520, next));
+            if (clamped !== sqlEditorHeight) {
+                setSqlEditorHeight(clamped);
+            }
+        });
+
+        observer.observe(textarea);
+        return () => observer.disconnect();
+    }, [setSqlEditorHeight, sqlEditorHeight, mode]);
 
     const profiling = React.useMemo(() => {
         if (mode !== 'table' || !items || items.length === 0) return [];
@@ -501,9 +819,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
             {/* Controls Row: Selection or SQL Editor */}
             {mode === 'table' ? (
-                <div className="flex flex-col xl:flex-row xl:items-center gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full xl:flex-1">
-                        <div className="relative w-full sm:w-auto">
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
+                    <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_auto] gap-3 2xl:items-center">
+                        <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,320px)_minmax(280px,1fr)_auto] gap-3">
+                            <div className="relative min-w-0">
                             <select
                                 value={selectedTable}
                                 onChange={(e) => {
@@ -517,15 +836,17 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 }}
                                 className="appearance-none pl-10 pr-10 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium"
                             >
-                                {tables?.map(t => (
-                                    <option key={t} value={t}>{t}</option>
+                                {dataSources?.map(source => (
+                                    <option key={source.name} value={source.name}>
+                                        {source.type === 'view' ? `${source.name} (view)` : source.name}
+                                    </option>
                                 ))}
                             </select>
                             <Database className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
                             <div className="absolute right-3 top-3.5 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
                         </div>
 
-                        <div className="relative w-full sm:max-w-md sm:ml-0">
+                            <div className="relative min-w-0">
                             <input
                                 type="text"
                                 placeholder={t('datainspector.search_placeholder')}
@@ -538,70 +859,119 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             />
                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                         </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto xl:ml-3">
-                        <select
-                            value={activeViewId}
-                            onChange={(e) => {
-                                const nextId = e.target.value;
-                                setActiveViewId(nextId);
-                                if (!nextId) return;
-                                const preset = savedViews.find(v => v.id === nextId);
-                                if (preset) applyViewPreset(preset);
-                            }}
-                            className="p-2 border border-slate-200 rounded text-[11px] bg-white outline-none w-full sm:w-auto sm:min-w-[180px]"
-                        >
-                            <option value="">{t('datainspector.select_view')}</option>
-                            {savedViews.map(view => (
-                                <option key={view.id} value={view.id}>{view.name}</option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={handleSaveCurrentView}
-                            className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
-                        >
-                            {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
-                        </button>
-                        <button
-                            onClick={handleDeleteCurrentView}
-                            disabled={!activeViewId}
-                            className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
-                        >
-                            {t('datainspector.delete_view')}
-                        </button>
-                        <div className="text-xs text-slate-400 font-medium sm:ml-2">
-                            {t('datainspector.auto_limit', { limit: pageSize })}
+
+                            <button
+                                onClick={() => execute()}
+                                className="h-10 px-3 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium"
+                                title={t('datainspector.refresh_title')}
+                            >
+                                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                <span>{t('common.refresh', 'Refresh')}</span>
+                            </button>
                         </div>
-                        <select
-                            value={String(pageSize)}
-                            onChange={(e) => {
-                                setPageSize(Number(e.target.value));
-                                setCurrentPage(1);
-                            }}
-                            className="p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
-                            title={t('datainspector.page_size')}
-                        >
-                            {[50, 100, 250, 500].map(size => (
-                                <option key={size} value={size}>{t('datainspector.page_size_value', { size })}</option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={() => setShowProfiling(!showProfiling)}
-                            className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 ml-1"
-                        >
-                            {showProfiling ? t('datainspector.hide_profile') : t('datainspector.show_profile')}
-                        </button>
+
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                            <select
+                                value={activeViewId}
+                                onChange={(e) => {
+                                    const nextId = e.target.value;
+                                    setActiveViewId(nextId);
+                                if (!nextId) return;
+                                    const preset = savedViews.find(v => v.id === nextId);
+                                    if (preset) applyViewPreset(preset);
+                                }}
+                                className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white outline-none min-w-[180px]"
+                            >
+                                <option value="">{t('datainspector.select_view')}</option>
+                                {savedViews.map(view => (
+                                    <option key={view.id} value={view.id}>{view.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleSaveCurrentView}
+                                className="h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                            >
+                                {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
+                            </button>
+                            <button
+                                onClick={handleDeleteCurrentView}
+                                disabled={!activeViewId}
+                                className="h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
+                            >
+                                {t('datainspector.delete_view')}
+                            </button>
+                            <div className="h-10 px-3 inline-flex items-center rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-500 font-semibold">
+                                {t('datainspector.auto_limit', { limit: pageSize })}
+                            </div>
+                            <select
+                                value={String(pageSize)}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white outline-none"
+                                title={t('datainspector.page_size')}
+                            >
+                                {[50, 100, 250, 500].map(size => (
+                                    <option key={size} value={size}>{t('datainspector.page_size_value', { size })}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => setShowProfiling(!showProfiling)}
+                                className="h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                            >
+                                {showProfiling ? t('datainspector.hide_profile') : t('datainspector.show_profile')}
+                            </button>
+                        </div>
                     </div>
                 </div>
             ) : (
                 <div className="flex flex-col gap-2 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm ring-1 ring-slate-900/5 flex-shrink-0">
                     <div className="relative">
                         <textarea
+                            ref={sqlInputRef}
                             value={inputSql}
-                            onChange={(e) => setInputSql(e.target.value)}
+                            onChange={(e) => {
+                                setInputSql(e.target.value);
+                                setSqlCursor(e.target.selectionStart ?? e.target.value.length);
+                            }}
+                            onClick={(e) => setSqlCursor(e.currentTarget.selectionStart ?? 0)}
+                            onKeyUp={(e) => setSqlCursor(e.currentTarget.selectionStart ?? 0)}
+                            onSelect={(e) => setSqlCursor(e.currentTarget.selectionStart ?? 0)}
+                            onScroll={() => {
+                                if (autocompleteEnabled && autocompleteOpen) updateAutocompletePosition();
+                            }}
+                            onKeyDown={handleSqlEditorKeyDown}
                             placeholder={t('datainspector.sql_placeholder')}
-                            className="w-full h-24 p-4 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-slate-800 dark:text-slate-200"
+                            className="w-full p-4 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y text-slate-800 dark:text-slate-200 min-h-[120px] max-h-[520px]"
+                            style={{ height: `${sqlEditorHeight}px` }}
                         />
+                        {autocompleteEnabled && autocompleteOpen && suggestions.length > 0 && (
+                            <div
+                                className="absolute z-20 border border-slate-200 dark:border-slate-700 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-lg max-h-40 overflow-auto"
+                                style={{
+                                    top: autocompletePosition.top,
+                                    left: autocompletePosition.left,
+                                    width: autocompletePosition.width
+                                }}
+                            >
+                                {suggestions.slice(0, 10).map((s, idx) => (
+                                    <button
+                                        key={`${s.type}-${s.label}`}
+                                        type="button"
+                                        onClick={() => insertSuggestion(s)}
+                                        className={`w-full text-left px-3 py-1.5 text-xs font-mono border-b last:border-b-0 border-slate-100 dark:border-slate-800 transition-colors ${
+                                            idx === autocompleteIndex
+                                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                        }`}
+                                    >
+                                        <span className="font-bold">{s.label}</span>
+                                        <span className="ml-2 hidden sm:inline text-[10px] uppercase tracking-wide text-slate-400">{s.type}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <div className="absolute bottom-4 right-4 flex gap-2">
                             <button
                                 onClick={() => setInputSql('')}
@@ -634,11 +1004,33 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 {t('datainspector.explain')}
                             </button>
                             <button
+                                onClick={() => setAutocompleteEnabled(!autocompleteEnabled)}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                                    autocompleteEnabled
+                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                }`}
+                                title={t('datainspector.autocomplete_toggle_title', 'Toggle SQL autocomplete')}
+                            >
+                                {autocompleteEnabled
+                                    ? t('datainspector.autocomplete_on', 'Autocomplete on')
+                                    : t('datainspector.autocomplete_off', 'Autocomplete off')}
+                            </button>
+                            <button
                                 onClick={handleSaveCustomTemplate}
                                 className="px-3 py-1.5 rounded-md text-sm font-medium border bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                                 title={t('datainspector.save_template')}
                             >
                                 {t('datainspector.save_template')}
+                            </button>
+                            <button
+                                onClick={handleOpenSaveToBuilder}
+                                disabled={!inputSql.trim()}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border bg-white border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                                title={t('datainspector.save_to_query_builder', 'Save to Query Builder')}
+                            >
+                                <Save className="w-3.5 h-3.5" />
+                                {t('datainspector.save_to_query_builder_short', 'Save Report')}
                             </button>
                             <button
                                 onClick={() => toggleFavoriteQuery(inputSql)}
@@ -654,116 +1046,145 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </button>
                         </div>
                     </div>
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.templates')}</span>
-                            {sqlTemplates.map(template => (
-                                <button
-                                    key={template.key}
-                                    onClick={() => setInputSql(template.sql)}
-                                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
-                                >
-                                    {t(`datainspector.template_${template.key}`)}
-                                </button>
-                            ))}
-                        </div>
-
-                        {customSqlTemplates.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.custom_templates')}</span>
-                                <select
-                                    value={selectedCustomTemplateId}
-                                    onChange={(e) => {
-                                        const templateId = e.target.value;
-                                        setSelectedCustomTemplateId(templateId);
-                                        if (!templateId) return;
-                                        const template = customSqlTemplates.find(tpl => tpl.id === templateId);
-                                        if (template) setInputSql(template.sql);
-                                    }}
-                                    className="flex-1 max-w-xl p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
-                                >
-                                    <option value="">{t('datainspector.pick_custom_template')}</option>
-                                    {customSqlTemplates.map((tpl) => (
-                                        <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={handleRenameCustomTemplate}
-                                    disabled={!selectedCustomTemplateId}
-                                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
-                                >
-                                    {t('datainspector.rename_template')}
-                                </button>
-                                <button
-                                    onClick={handleDeleteCustomTemplate}
-                                    disabled={!selectedCustomTemplateId}
-                                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
-                                >
-                                    {t('datainspector.delete_template')}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (!confirm(t('datainspector.clear_templates_confirm'))) return;
-                                        setCustomSqlTemplates([]);
-                                        setSelectedCustomTemplateId('');
-                                    }}
-                                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500"
-                                >
-                                    {t('datainspector.clear_templates')}
-                                </button>
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/70 dark:bg-slate-900/40">
+                        <button
+                            type="button"
+                            onClick={() => setShowSqlAssist(!showSqlAssist)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-left"
+                        >
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-300">
+                                    {t('datainspector.sql_assist', 'SQL Assist')}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                    {t('datainspector.templates')}:{sqlTemplates.length}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                    {t('datainspector.favorite_queries')}: {favoriteQueries.length}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                    {t('datainspector.recent_queries')}: {sqlHistory.length}
+                                </span>
                             </div>
-                        )}
-
-                        {favoriteQueries.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.favorite_queries')}</span>
-                                <select
-                                    onChange={(e) => {
-                                        if (!e.target.value) return;
-                                        setInputSql(e.target.value);
-                                    }}
-                                    className="flex-1 max-w-xl p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
-                                    defaultValue=""
-                                >
-                                    <option value="">{t('datainspector.pick_favorite')}</option>
-                                    {favoriteQueries.map((q, idx) => (
-                                        <option key={`${idx}-${q.slice(0, 20)}`} value={q}>{q}</option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={() => setFavoriteQueries([])}
-                                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500"
-                                >
-                                    {t('datainspector.clear_favorites')}
-                                </button>
+                            <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
+                                <span>{showSqlAssist ? t('common.hide', 'Hide') : t('common.show', 'Show')}</span>
+                                <ChevronDown className={`w-4 h-4 transition-transform ${showSqlAssist ? 'rotate-180' : ''}`} />
                             </div>
-                        )}
-
-                        {sqlHistory.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.recent_queries')}</span>
-                                <select
-                                    onChange={(e) => {
-                                        if (!e.target.value) return;
-                                        setInputSql(e.target.value);
-                                    }}
-                                    className="flex-1 max-w-xl p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
-                                    defaultValue=""
-                                >
-                                    <option value="">{t('datainspector.pick_recent')}</option>
-                                    {sqlHistory.map((q, idx) => (
-                                        <option key={`${idx}-${q.slice(0, 20)}`} value={q}>{q}</option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={() => setSqlHistory([])}
-                                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500"
-                                >
-                                    {t('datainspector.clear_history')}
-                                </button>
-                            </div>
-                        )}
+                        </button>
                     </div>
+
+                    {showSqlAssist && (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.templates')}</span>
+                                {sqlTemplates.map(template => (
+                                    <button
+                                        key={template.key}
+                                        onClick={() => setInputSql(template.sql)}
+                                        className="px-2 py-1 text-xs rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
+                                    >
+                                        {t(`datainspector.template_${template.key}`)}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {customSqlTemplates.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.custom_templates')}</span>
+                                    <select
+                                        value={selectedCustomTemplateId}
+                                        onChange={(e) => {
+                                            const templateId = e.target.value;
+                                            setSelectedCustomTemplateId(templateId);
+                                            if (!templateId) return;
+                                            const template = customSqlTemplates.find(tpl => tpl.id === templateId);
+                                            if (template) setInputSql(template.sql);
+                                        }}
+                                        className="flex-1 max-w-xl p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
+                                    >
+                                        <option value="">{t('datainspector.pick_custom_template')}</option>
+                                        {customSqlTemplates.map((tpl) => (
+                                            <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={handleRenameCustomTemplate}
+                                        disabled={!selectedCustomTemplateId}
+                                        className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
+                                    >
+                                        {t('datainspector.rename_template')}
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteCustomTemplate}
+                                        disabled={!selectedCustomTemplateId}
+                                        className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
+                                    >
+                                        {t('datainspector.delete_template')}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (!confirm(t('datainspector.clear_templates_confirm'))) return;
+                                            setCustomSqlTemplates([]);
+                                            setSelectedCustomTemplateId('');
+                                        }}
+                                        className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500"
+                                    >
+                                        {t('datainspector.clear_templates')}
+                                    </button>
+                                </div>
+                            )}
+
+                            {favoriteQueries.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.favorite_queries')}</span>
+                                    <select
+                                        onChange={(e) => {
+                                            if (!e.target.value) return;
+                                            setInputSql(e.target.value);
+                                        }}
+                                        className="flex-1 max-w-xl p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
+                                        defaultValue=""
+                                    >
+                                        <option value="">{t('datainspector.pick_favorite')}</option>
+                                        {favoriteQueries.map((q, idx) => (
+                                            <option key={`${idx}-${q.slice(0, 20)}`} value={q}>{q}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => setFavoriteQueries([])}
+                                        className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500"
+                                    >
+                                        {t('datainspector.clear_favorites')}
+                                    </button>
+                                </div>
+                            )}
+
+                            {sqlHistory.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">{t('datainspector.recent_queries')}</span>
+                                    <select
+                                        onChange={(e) => {
+                                            if (!e.target.value) return;
+                                            setInputSql(e.target.value);
+                                        }}
+                                        className="flex-1 max-w-xl p-2 border border-slate-200 rounded text-[11px] bg-white outline-none"
+                                        defaultValue=""
+                                    >
+                                        <option value="">{t('datainspector.pick_recent')}</option>
+                                        {sqlHistory.map((q, idx) => (
+                                            <option key={`${idx}-${q.slice(0, 20)}`} value={q}>{q}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => setSqlHistory([])}
+                                        className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500"
+                                    >
+                                        {t('datainspector.clear_history')}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -971,6 +1392,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             onFiltersChange={mode === 'table' ? setTableFilters : undefined}
                             showFilters={mode === 'table' ? showTableFilters : undefined}
                             onShowFiltersChange={mode === 'table' ? setShowTableFilters : undefined}
+                            columnWidths={mode === 'table' ? activeColumnWidths : undefined}
+                            onColumnWidthsChange={mode === 'table' ? handleColumnWidthsChange : undefined}
                         />
                     )}
                 </div>
@@ -1043,6 +1466,65 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 tableName={selectedTable}
                 schema={undefined}
             />
+
+            <Modal
+                isOpen={saveToBuilderOpen}
+                onClose={() => {
+                    if (isSavingToBuilder) return;
+                    setSaveToBuilderOpen(false);
+                }}
+                title={t('datainspector.save_to_query_builder', 'Save to Query Builder')}
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                            {t('common.name', 'Name')}
+                        </label>
+                        <input
+                            type="text"
+                            value={saveWidgetName}
+                            onChange={(e) => setSaveWidgetName(e.target.value)}
+                            className="w-full p-2 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder={t('querybuilder.report_name_placeholder', 'Report name')}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                            {t('common.description', 'Description')}
+                        </label>
+                        <textarea
+                            value={saveWidgetDescription}
+                            onChange={(e) => setSaveWidgetDescription(e.target.value)}
+                            className="w-full p-2 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 min-h-20"
+                            placeholder={t('querybuilder.description_placeholder', 'Optional description')}
+                        />
+                    </div>
+                    <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                        {t('datainspector.save_select_only_hint', 'Only valid SELECT queries can be saved. SQL is checked before saving.')}
+                    </div>
+                    {saveToBuilderError && (
+                        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                            {saveToBuilderError}
+                        </div>
+                    )}
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                        <button
+                            onClick={() => setSaveToBuilderOpen(false)}
+                            disabled={isSavingToBuilder}
+                            className="px-3 py-1.5 rounded border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 disabled:opacity-40"
+                        >
+                            {t('common.cancel', 'Cancel')}
+                        </button>
+                        <button
+                            onClick={() => { void handleSaveToQueryBuilder(); }}
+                            disabled={isSavingToBuilder || !saveWidgetName.trim()}
+                            className="px-4 py-1.5 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40"
+                        >
+                            {isSavingToBuilder ? t('common.saving', 'Saving...') : t('common.save', 'Save')}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Error Toast / Floating Alert */}
             {

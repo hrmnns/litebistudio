@@ -10,6 +10,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - No changes yet.
 
+## [1.1.0] - 2026-02-23
+
+### Added
+- Data Inspector autocomplete enhancements:
+  - Context-aware SQL suggestions for keywords, tables, and columns.
+  - Keyboard navigation (`ArrowUp/Down`, `Enter/Tab`, `Ctrl+Space`).
+  - Optional autocomplete toggle (persisted).
+- Data Inspector usability improvements:
+  - Resizable SQL editor area with persisted height.
+  - Resizable table columns (drag on header separators) with persisted widths per data source.
+  - Save SELECT queries directly to Query Builder with pre-save validation.
+  - Views are now listed as selectable data sources in table mode.
+- Data source management improvements:
+  - User-created views are visible in structure management.
+  - User-created views can be deleted in the danger zone.
+- Query Builder saved widget management enhancements:
+  - Search field for saved widgets.
+  - Scrollable, compact widget list for large collections.
+  - Filtered/total count display and empty-state feedback.
+
+### Changed
+- Data Inspector SQL suggestion UI was moved to a floating overlay and positioned near the current cursor line to reduce editor obstruction.
+- Data Inspector SQL assist section was optimized for space usage (collapsible behavior and denser layout).
+- Data Inspector toolbar/layout in table mode was refined for clearer responsive behavior.
+- Query Builder SQL direct editor height was increased by ~50% for better readability.
+- Locale coverage was extended for newly added Inspector/Datasource/Query-Builder controls in both German and English.
+
+### Fixed
+- Excel append import now ignores non-schema helper fields (e.g., `_rowid`) to prevent SQLite insert errors.
+- Excel export/import roundtrip stability improved by removing `_rowid` from exported table data.
+- Re-enabled import mapping flow before append import, including persisted column mappings and transformer application.
+- Fixed table/view inspection behavior by handling view sources without `rowid` assumptions.
+
 ## [1.0.0] - 2026-02-23
 
 ### Added

@@ -15,6 +15,8 @@ export interface DataTableSortConfig<T> {
     direction: 'asc' | 'desc';
 }
 
+type ColumnWidthMap = Record<string, number>;
+
 interface DataTableProps<T> {
     data: T[];
     columns: Column<T>[];
@@ -28,6 +30,8 @@ interface DataTableProps<T> {
     onFiltersChange?: (filters: Record<string, string>) => void;
     showFilters?: boolean;
     onShowFiltersChange?: (visible: boolean) => void;
+    columnWidths?: ColumnWidthMap;
+    onColumnWidthsChange?: (widths: ColumnWidthMap) => void;
 }
 
 export function DataTable<T>({
@@ -42,17 +46,22 @@ export function DataTable<T>({
     filters,
     onFiltersChange,
     showFilters,
-    onShowFiltersChange
+    onShowFiltersChange,
+    columnWidths,
+    onColumnWidthsChange
 }: DataTableProps<T>) {
     const headerRef = React.useRef<HTMLDivElement>(null);
     const bodyRef = React.useRef<HTMLDivElement>(null);
+    const resizeStateRef = React.useRef<{ key: string; startX: number; startWidth: number } | null>(null);
     const [internalSortConfig, setInternalSortConfig] = React.useState<DataTableSortConfig<T> | null>(null);
     const [internalFilters, setInternalFilters] = React.useState<Record<string, string>>({});
     const [internalShowFilters, setInternalShowFilters] = React.useState(false);
+    const [internalColumnWidths, setInternalColumnWidths] = React.useState<ColumnWidthMap>({});
 
     const activeSortConfig = sortConfig !== undefined ? sortConfig : internalSortConfig;
     const activeFilters = filters !== undefined ? filters : internalFilters;
     const activeShowFilters = showFilters !== undefined ? showFilters : internalShowFilters;
+    const activeColumnWidths = columnWidths !== undefined ? columnWidths : internalColumnWidths;
 
     const setSortConfig = (next: DataTableSortConfig<T> | null) => {
         if (sortConfig === undefined) setInternalSortConfig(next);
@@ -67,6 +76,26 @@ export function DataTable<T>({
     const setShowFilters = (next: boolean) => {
         if (showFilters === undefined) setInternalShowFilters(next);
         onShowFiltersChange?.(next);
+    };
+
+    const setColumnWidths = React.useCallback((next: ColumnWidthMap) => {
+        if (columnWidths === undefined) setInternalColumnWidths(next);
+        onColumnWidthsChange?.(next);
+    }, [columnWidths, onColumnWidthsChange]);
+
+    const getColumnKey = (col: Column<T>) => (typeof col.accessor === 'string' ? col.accessor : col.header);
+
+    const parseWidth = (value?: string): number | null => {
+        if (!value) return null;
+        const match = /^(\d+)px$/i.exec(value.trim());
+        return match ? Number(match[1]) : null;
+    };
+
+    const getWidthForColumn = (col: Column<T>): number => {
+        const key = getColumnKey(col);
+        if (activeColumnWidths[key]) return Math.max(90, activeColumnWidths[key]);
+        const parsed = parseWidth(col.width);
+        return parsed ? Math.max(90, parsed) : 150;
     };
 
     const getValueByAccessor = useCallback((item: T, accessor: keyof T | string): unknown => {
@@ -139,8 +168,42 @@ export function DataTable<T>({
         }
     };
 
+    const startColumnResize = (event: React.MouseEvent<HTMLDivElement>, col: Column<T>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        resizeStateRef.current = {
+            key: getColumnKey(col),
+            startX: event.clientX,
+            startWidth: getWidthForColumn(col)
+        };
+    };
+
+    React.useEffect(() => {
+        const handleMouseMove = (event: MouseEvent) => {
+            const state = resizeStateRef.current;
+            if (!state) return;
+            const nextWidth = Math.max(90, Math.min(900, state.startWidth + (event.clientX - state.startX)));
+            if (activeColumnWidths[state.key] === nextWidth) return;
+            setColumnWidths({
+                ...activeColumnWidths,
+                [state.key]: nextWidth
+            });
+        };
+
+        const handleMouseUp = () => {
+            resizeStateRef.current = null;
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [activeColumnWidths, setColumnWidths]);
+
     const requestSort = (col: Column<T>) => {
-        const key = typeof col.accessor === 'string' ? col.accessor : col.header;
+        const key = getColumnKey(col);
 
         let direction: 'asc' | 'desc' = 'asc';
         if (activeSortConfig && activeSortConfig.key === key && activeSortConfig.direction === 'asc') {
@@ -159,7 +222,7 @@ export function DataTable<T>({
     const renderColGroup = () => (
         <colgroup>
             {columns.map((col, i) => (
-                <col key={i} style={{ width: col.width || '150px', minWidth: col.width || '150px' }} />
+                <col key={i} style={{ width: `${getWidthForColumn(col)}px`, minWidth: `${getWidthForColumn(col)}px` }} />
             ))}
         </colgroup>
     );
@@ -175,13 +238,13 @@ export function DataTable<T>({
                     <thead className="text-[10px] text-slate-400 uppercase font-bold text-left">
                         <tr>
                             {columns.map((col, i) => {
-                                const key = typeof col.accessor === 'string' ? col.accessor : col.header;
+                                const key = getColumnKey(col);
                                 const isSorted = activeSortConfig?.key === key;
 
                                 return (
                                     <th
                                         key={i}
-                                        className={`px-4 py-3 truncate cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
+                                        className={`relative px-4 py-3 truncate cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
                                         title={col.header}
                                         onClick={() => requestSort(col)}
                                     >
@@ -206,6 +269,15 @@ export function DataTable<T>({
                                                     {activeSortConfig?.direction === 'asc' ? '▲' : '▼'}
                                                 </span>
                                             )}
+                                        </div>
+                                        <div
+                                            className="absolute top-0 right-0 h-full w-2 cursor-col-resize group"
+                                            onMouseDown={(event) => startColumnResize(event, col)}
+                                            role="separator"
+                                            aria-orientation="vertical"
+                                            aria-label={`Resize ${col.header}`}
+                                        >
+                                            <div className="mx-auto h-full w-px bg-slate-300 dark:bg-slate-700 opacity-0 group-hover:opacity-100" />
                                         </div>
                                     </th>
                                 );
@@ -299,4 +371,3 @@ export function DataTable<T>({
         </div>
     );
 }
-

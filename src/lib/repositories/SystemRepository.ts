@@ -29,6 +29,11 @@ interface ReportPackInput {
     config: unknown;
 }
 
+export interface DataSourceEntry {
+    name: string;
+    type: 'table' | 'view';
+}
+
 interface RecordMetadata {
     exists: boolean;
     isInWorklist: boolean;
@@ -62,6 +67,34 @@ export const SystemRepository = {
             .filter((name: string) => name.length > 0);
     },
 
+    async getDataSources(): Promise<DataSourceEntry[]> {
+        const result = await runQuery(`
+            SELECT name, type
+            FROM sqlite_master
+            WHERE type IN ('table', 'view')
+              AND name NOT LIKE 'sqlite_%'
+            ORDER BY name ASC
+        `);
+        return result
+            .map((r: DbRow) => {
+                const name = typeof r.name === 'string' ? r.name : '';
+                const type = r.type === 'view' ? 'view' : 'table';
+                return { name, type } as DataSourceEntry;
+            })
+            .filter((entry: DataSourceEntry) => entry.name.length > 0);
+    },
+
+    async getDataSourceType(name: string): Promise<'table' | 'view' | 'unknown'> {
+        if (!isValidIdentifier(name)) return 'unknown';
+        const result = await runQuery(
+            "SELECT type FROM sqlite_master WHERE name = ? AND type IN ('table', 'view') LIMIT 1",
+            [name]
+        );
+        const type = result[0]?.type;
+        if (type === 'table' || type === 'view') return type;
+        return 'unknown';
+    },
+
     async getTableSchema(tableName: string): Promise<TableColumn[]> {
         if (!isValidIdentifier(tableName)) return [];
         if (schemaCache.has(tableName)) return schemaCache.get(tableName)!;
@@ -71,12 +104,17 @@ export const SystemRepository = {
         return result;
     },
 
-    async inspectTable(tableName: string, limit: number, searchTerm?: string, offset: number = 0): Promise<DbRow[]> {
+    async inspectTable(tableName: string, limit: number, searchTerm?: string, offset: number = 0, sourceType?: 'table' | 'view'): Promise<DbRow[]> {
         if (!isValidIdentifier(tableName)) {
             throw new Error(`Invalid table name: ${tableName}`);
         }
-        // Fetch rowid aliased as _rowid to ensure every record has a unique identifier
-        let sql = `SELECT rowid as _rowid, * FROM "${tableName}"`;
+        const effectiveType = sourceType || await this.getDataSourceType(tableName);
+        const includeRowId = effectiveType === 'table';
+
+        // For tables include rowid; for views rowid is typically unavailable.
+        let sql = includeRowId
+            ? `SELECT rowid as _rowid, * FROM "${tableName}"`
+            : `SELECT * FROM "${tableName}"`;
         const params: BindValue[] = [];
 
         if (searchTerm) {
@@ -92,7 +130,10 @@ export const SystemRepository = {
             }
         }
 
-        sql += ` ORDER BY rowid DESC LIMIT ? OFFSET ?`;
+        if (includeRowId) {
+            sql += ` ORDER BY rowid DESC`;
+        }
+        sql += ` LIMIT ? OFFSET ?`;
         params.push(limit);
         params.push(Math.max(0, offset));
 
