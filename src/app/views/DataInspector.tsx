@@ -496,9 +496,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
             {/* Controls Row: Selection or SQL Editor */}
             {mode === 'table' ? (
-                <div className="flex bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 items-center justify-between shadow-sm flex-shrink-0">
-                    <div className="flex items-center gap-4 flex-1">
-                        <div className="relative">
+                <div className="flex flex-col xl:flex-row xl:items-center gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full xl:flex-1">
+                        <div className="relative w-full sm:w-auto">
                             <select
                                 value={selectedTable}
                                 onChange={(e) => {
@@ -520,7 +520,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             <div className="absolute right-3 top-3.5 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
                         </div>
 
-                        <div className="relative max-w-md w-full ml-4">
+                        <div className="relative w-full sm:max-w-md sm:ml-0">
                             <input
                                 type="text"
                                 placeholder={t('datainspector.search_placeholder')}
@@ -534,7 +534,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 ml-3">
+                    <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto xl:ml-3">
                         <select
                             value={activeViewId}
                             onChange={(e) => {
@@ -544,7 +544,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 const preset = savedViews.find(v => v.id === nextId);
                                 if (preset) applyViewPreset(preset);
                             }}
-                            className="p-2 border border-slate-200 rounded text-[11px] bg-white outline-none min-w-[180px]"
+                            className="p-2 border border-slate-200 rounded text-[11px] bg-white outline-none w-full sm:w-auto sm:min-w-[180px]"
                         >
                             <option value="">{t('datainspector.select_view')}</option>
                             {savedViews.map(view => (
@@ -564,7 +564,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         >
                             {t('datainspector.delete_view')}
                         </button>
-                        <div className="text-xs text-slate-400 font-medium ml-2">
+                        <div className="text-xs text-slate-400 font-medium sm:ml-2">
                             {t('datainspector.auto_limit', { limit: pageSize })}
                         </div>
                         <select

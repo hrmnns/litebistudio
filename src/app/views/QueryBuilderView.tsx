@@ -564,10 +564,10 @@ export const QueryBuilderView: React.FC = () => {
             }}
         >
             <div className="flex flex-col gap-6 h-full min-h-0">
-                <div className="flex-1 flex gap-6 min-h-0 overflow-hidden relative">
+                <div className="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6 min-h-0 overflow-hidden relative">
                     {/* Builder Rail */}
-                    <div className={`${isMaximized ? 'hidden' : 'w-full lg:w-96'} h-full overflow-hidden transition-all duration-300`}>
-                        <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className={`${isMaximized ? 'hidden' : 'w-full lg:w-96'} min-h-0 overflow-hidden transition-all duration-300`}>
+                        <div className="flex flex-col h-full max-h-[46vh] lg:max-h-none bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                             <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
                                 <div className="p-3">
                                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-1">
@@ -1095,7 +1095,7 @@ export const QueryBuilderView: React.FC = () => {
                     </div>
 
                     {/* Preview Area */}
-                    <div id="query-visualization" className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full min-h-[380px] lg:min-h-[460px] relative">
+                    <div id="query-visualization" className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full min-h-[320px] sm:min-h-[380px] lg:min-h-[460px] relative">
                         <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('querybuilder.preview', { count: results.length })}</h3>
                             <button onClick={() => setIsMaximized(!isMaximized)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md text-slate-400 transition-all flex items-center gap-1.5 shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">

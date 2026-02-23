@@ -92,7 +92,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Map Columns & Transforms</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -101,15 +101,15 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                     </div>
                     <button
                         onClick={handleAutoMap}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
                     >
                         <Wand2 className="w-4 h-4" />
                         Auto-Map
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6">
-                    <div className="grid grid-cols-[1fr,auto,2fr,1fr] gap-4 items-start mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <div className="flex-1 overflow-auto p-4 sm:p-6">
+                    <div className="hidden lg:grid grid-cols-[1fr,auto,2fr,1fr] gap-4 items-start mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
                         <div>Required Field</div>
                         <div className="w-8"></div>
                         <div>Source Configuration</div>
@@ -124,7 +124,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
 
                             return (
                                 <div key={field.key} className={`
-                                    grid grid-cols-[1fr,auto,2fr,1fr] gap-4 items-start p-4 rounded-xl border transition-colors
+                                    grid grid-cols-1 lg:grid-cols-[1fr,auto,2fr,1fr] gap-3 lg:gap-4 items-start p-4 rounded-xl border transition-colors
                                     ${currentMapping?.sourceColumn
                                         ? 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-700'
                                         : field.required
@@ -146,11 +146,12 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                                         </div>
                                     </div>
 
-                                    <ArrowRight className={`w-4 h-4 mt-3 ${currentMapping?.sourceColumn ? 'text-blue-500' : 'text-slate-300'}`} />
+                                    <ArrowRight className={`hidden lg:block w-4 h-4 mt-3 ${currentMapping?.sourceColumn ? 'text-blue-500' : 'text-slate-300'}`} />
 
                                     <div className="space-y-2">
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider lg:hidden">Source Configuration</div>
                                         {/* Primary Input / Operation Selector */}
-                                        <div className="flex gap-2 items-center h-10">
+                                        <div className="flex flex-col sm:flex-row gap-2 sm:items-center min-h-10">
                                             <select
                                                 value={currentMapping?.sourceColumn || ''}
                                                 onChange={(e) => {
@@ -174,7 +175,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                                                     });
                                                 }}
                                                 className={`
-                                                    flex-1 h-full px-3 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all
+                                                    w-full sm:flex-1 h-10 px-3 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all
                                                     ${currentMapping?.sourceColumn
                                                         ? 'border-blue-200 bg-white dark:bg-slate-900 dark:border-blue-900/50'
                                                         : 'border-slate-200 bg-slate-50 dark:bg-slate-800 dark:border-slate-600'
@@ -191,7 +192,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                                             </select>
 
                                             {currentMapping?.sourceColumn && currentMapping.sourceColumn !== '__CONSTANT__' && (
-                                                <div className="flex h-full bg-slate-100 dark:bg-slate-700 rounded-lg p-1 border border-slate-200 dark:border-slate-600 shrink-0 items-center">
+                                                <div className="flex h-10 sm:h-full w-full sm:w-auto bg-slate-100 dark:bg-slate-700 rounded-lg p-1 border border-slate-200 dark:border-slate-600 items-center flex-wrap sm:flex-nowrap">
                                                     <button
                                                         onClick={() => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, operation: 'direct' } }))}
                                                         className={`h-full px-3 rounded-md text-xs font-bold transition-all flex items-center ${op === 'direct' ? 'bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
@@ -221,13 +222,13 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
 
                                         {/* Configuration for Operations */}
                                         {op === 'coalesce' && (
-                                            <div className="flex items-center gap-2 animate-in slide-in-from-top-2 h-10">
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 animate-in slide-in-from-top-2 min-h-10">
                                                 <ArrowDownUp className="w-4 h-4 text-slate-400 rotate-45" />
                                                 <span className="text-xs font-bold text-slate-400 shrink-0">ELSE USE</span>
                                                 <select
                                                     value={currentMapping?.secondaryColumn || ''}
                                                     onChange={(e) => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, secondaryColumn: e.target.value } }))}
-                                                    className="flex-1 h-full px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full sm:flex-1 h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
                                                 >
                                                     <option value="">-- Select Fallback Column --</option>
                                                     {sourceColumns.map(col => (
@@ -238,21 +239,21 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                                         )}
 
                                         {op === 'concat' && (
-                                            <div className="flex items-center gap-2 animate-in slide-in-from-top-2 h-10">
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 animate-in slide-in-from-top-2 min-h-10">
                                                 <Plus className="w-4 h-4 text-slate-400" />
                                                 <input
                                                     type="text"
                                                     placeholder="Separator (space)"
                                                     value={currentMapping?.separator ?? ' '}
                                                     onChange={(e) => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, separator: e.target.value } }))}
-                                                    className="w-16 h-full px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center text-sm"
+                                                    className="w-full sm:w-16 h-10 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center text-sm"
                                                     title="Separator"
                                                 />
                                                 <Plus className="w-4 h-4 text-slate-400" />
                                                 <select
                                                     value={currentMapping?.secondaryColumn || ''}
                                                     onChange={(e) => setMapping(prev => ({ ...prev, [field.key]: { ...prev[field.key]!, secondaryColumn: e.target.value } }))}
-                                                    className="flex-1 h-full px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full sm:flex-1 h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
                                                 >
                                                     <option value="">-- Select 2nd Column --</option>
                                                     {sourceColumns.map(col => (
@@ -290,6 +291,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
 
                                     {/* Transformation */}
                                     <div>
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider lg:hidden mb-2">Transformation</div>
                                         {(availableTransforms.length > 0) && (currentMapping?.sourceColumn || field.key === 'Currency') && (
                                             <div className="relative h-10">
                                                 <Settings2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -323,7 +325,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl">
+                <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl">
                     <button
                         onClick={onCancel}
                         className="px-4 py-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-medium transition-colors"
@@ -331,7 +333,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                         Cancel Import
                     </button>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
                         {!isValid && (
                             <div className="flex items-center gap-2 text-red-600 text-sm font-medium">
                                 <AlertCircle className="w-4 h-4" />
@@ -342,7 +344,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, targe
                             onClick={() => onConfirm(mapping)}
                             disabled={!isValid}
                             className={`
-                                flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold shadow-lg transition-all transform
+                                w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold shadow-lg transition-all transform
                                 ${isValid
                                     ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 dark:shadow-none hover:-translate-y-0.5'
                                     : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
