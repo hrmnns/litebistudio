@@ -52,12 +52,16 @@ export const QueryBuilderView: React.FC = () => {
     const [savedSnapshot, setSavedSnapshot] = useState('');
 
     // Mode State
-    const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('visual');
+    const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>(() => {
+        const preferred = localStorage.getItem('query_builder_default_mode');
+        return preferred === 'sql' ? 'sql' : 'visual';
+    });
     const [sidebarTab, setSidebarTab] = useState<'query' | 'vis'>('query');
     const [entryMode, setEntryMode] = useState<'new' | 'existing'>('new');
     const [isMaximized, setIsMaximized] = useState(false);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
     const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
+    const [sqlEditorHeight] = useLocalStorage<number>('query_builder_sql_editor_height', 384);
 
     // Visualization State
     const [visType, setVisType] = useState<VisualizationType>('table');
@@ -240,7 +244,8 @@ export const QueryBuilderView: React.FC = () => {
 
     const deleteWidget = async (id: string) => {
         if (isReadOnly) return;
-        if (confirm(t('dashboard.confirm_delete_report'))) {
+        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        if (!shouldConfirm || confirm(t('dashboard.confirm_delete_report'))) {
             await SystemRepository.deleteUserWidget(id);
             refreshWidgets();
             if (activeWidgetId === id) {
@@ -815,7 +820,7 @@ export const QueryBuilderView: React.FC = () => {
                                                                 onSelectSnippet={snippet => setSql(prev => prev + '\n' + snippet)}
                                                             />
                                                         </div>
-                                                        <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full h-96 font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" placeholder="SELECT * FROM..." />
+                                                        <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" style={{ height: `${Math.max(220, Math.min(700, sqlEditorHeight))}px` }} placeholder="SELECT * FROM..." />
                                                     </>
                                                 ) : (
                                                     <VisualQueryBuilder

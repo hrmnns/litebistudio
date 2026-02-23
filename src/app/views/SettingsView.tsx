@@ -2,25 +2,51 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
 import { PageLayout } from '../components/ui/PageLayout';
-import { Lock, Shield, Trash2, Check, X, Info, ChevronRight } from 'lucide-react';
+import { Lock, Shield, Trash2, Check, X, Info, ChevronRight, Palette, SlidersHorizontal, Bell, Table2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { hashPin, generateSalt } from '../../lib/utils/crypto';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
+
+type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
+type AppsSubTab = 'inspector' | 'querybuilder' | 'datamanagement';
+type ControlsSubTab = 'datatable' | 'notifications';
 
 export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { theme, setTheme } = useThemeContext();
     const { isReadOnly, isAdminMode, setIsAdminMode } = useDashboard();
+    const [activeTab, setActiveTab] = React.useState<SettingsTab>('appearance');
+    const [appsSubTab, setAppsSubTab] = React.useState<AppsSubTab>('inspector');
+    const [controlsSubTab, setControlsSubTab] = React.useState<ControlsSubTab>('datatable');
 
-    const themeOptions: { value: ThemeMode; emoji: string; label: string }[] = [
-        { value: 'light', emoji: '🌞', label: t('settings.theme_light') },
-        { value: 'dark', emoji: '🌚', label: t('settings.theme_dark') },
-        { value: 'system', emoji: '💻', label: t('settings.theme_system') },
+    const themeOptions: { value: ThemeMode; label: string }[] = [
+        { value: 'light', label: t('settings.theme_light') },
+        { value: 'dark', label: t('settings.theme_dark') },
+        { value: 'system', label: t('settings.theme_system') }
     ];
 
     const [hasPin, setHasPin] = React.useState(!!localStorage.getItem('litebistudio_app_pin'));
     const [isEditingPin, setIsEditingPin] = React.useState(false);
     const [pinInput, setPinInput] = React.useState('');
+
+    const [inspectorPageSize, setInspectorPageSize] = useLocalStorage<number>('data_inspector_page_size', 100);
+    const [inspectorShowProfiling, setInspectorShowProfiling] = useLocalStorage<boolean>('data_inspector_show_profiling', true);
+    const [inspectorExplainMode, setInspectorExplainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
+    const [inspectorSqlAssistOpen, setInspectorSqlAssistOpen] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
+    const [inspectorAutocomplete, setInspectorAutocomplete] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [inspectorThresholds, setInspectorThresholds] = useLocalStorage<{ nullRate: number; cardinalityRate: number }>(
+        'data_inspector_profiling_thresholds',
+        { nullRate: 30, cardinalityRate: 95 }
+    );
+    const [qbDefaultMode, setQbDefaultMode] = useLocalStorage<'sql' | 'visual'>('query_builder_default_mode', 'visual');
+    const [qbSqlEditorHeight, setQbSqlEditorHeight] = useLocalStorage<number>('query_builder_sql_editor_height', 384);
+    const [importDefaultMode, setImportDefaultMode] = useLocalStorage<'append' | 'overwrite'>('import_default_mode', 'append');
+    const [importAutoSaveMappings, setImportAutoSaveMappings] = useLocalStorage<boolean>('import_auto_save_mappings', true);
+    const [tableDensity, setTableDensity] = useLocalStorage<'compact' | 'normal'>('ui_table_density', 'normal');
+    const [tableWrapCells, setTableWrapCells] = useLocalStorage<boolean>('ui_table_wrap_cells', false);
+    const [tableDefaultShowFilters, setTableDefaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
+    const [confirmDestructive, setConfirmDestructive] = useLocalStorage<boolean>('notifications_confirm_destructive', true);
 
     const handleSavePin = async () => {
         if (pinInput.length < 4) {
@@ -62,175 +88,447 @@ export const SettingsView: React.FC = () => {
             header={{
                 title: t('sidebar.settings'),
                 subtitle: t('settings.subtitle'),
-                onBack: () => window.history.back(),
+                onBack: () => window.history.back()
             }}
             footer={footerText}
             breadcrumbs={[
                 { label: t('sidebar.settings') }
             ]}
         >
-            <div className="max-w-2xl space-y-6">
-                {/* Appearance Section */}
-                <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                        <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                            {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
-                        </span>
-                        {t('settings.appearance')}
-                    </h3>
-                    <div className="space-y-4">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                            {t('settings.appearance_hint')}
-                        </p>
+            <div className="max-w-3xl space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center overflow-x-auto">
+                        {[
+                            { id: 'appearance', label: t('settings.tab_appearance') },
+                            { id: 'security', label: t('settings.tab_security') },
+                            { id: 'apps', label: t('settings.tab_apps', 'Apps') },
+                            { id: 'controls', label: t('settings.tab_controls', 'Controls') },
+                            { id: 'about', label: t('settings.tab_about') }
+                        ].map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as SettingsTab)}
+                                className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+                                    activeTab === tab.id
+                                        ? 'text-blue-600 border-blue-600'
+                                        : 'text-slate-400 hover:text-blue-600 border-transparent'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
-                        <div className="grid grid-cols-3 gap-3">
-                            {themeOptions.map(({ value, emoji, label }) => (
+                {activeTab === 'apps' && (
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 -mt-2">
+                        <div className="flex items-center overflow-x-auto">
+                            {[
+                                { id: 'inspector', label: t('sidebar.data_inspector') },
+                                { id: 'querybuilder', label: t('sidebar.query_builder') },
+                                { id: 'datamanagement', label: t('sidebar.datasource') }
+                            ].map((tab) => (
                                 <button
-                                    key={value}
-                                    onClick={() => setTheme(value)}
-                                    className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === value
-                                        ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
-                                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
-                                        }`}
+                                    key={tab.id}
+                                    onClick={() => setAppsSubTab(tab.id as AppsSubTab)}
+                                    className={`px-4 py-2 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
+                                        appsSubTab === tab.id
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-slate-400 hover:text-blue-600 border-transparent'
+                                    }`}
                                 >
-                                    <span className="text-xl">{emoji}</span>
-                                    <span className="text-sm font-medium">{label}</span>
+                                    {tab.label}
                                 </button>
                             ))}
                         </div>
                     </div>
-                </div>
+                )}
 
-                {/* Security Section */}
-                <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                        <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                            <Shield className="w-4 h-4 text-emerald-500" />
-                        </span>
-                        {t('settings.security')}
-                    </h3>
-                    <div className="space-y-4">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                            {t('settings.security_hint')}
-                        </p>
-
-                        {!hasPin && !isEditingPin && (
-                            <button
-                                onClick={() => setIsEditingPin(true)}
-                                className="w-full h-12 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-medium"
-                            >
-                                <Lock className="w-4 h-4" />
-                                {t('settings.enable_pin')}
-                            </button>
-                        )}
-
-                        {isEditingPin && (
-                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-                                <input
-                                    type="password"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    placeholder={t('settings.pin_placeholder')}
-                                    className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    value={pinInput}
-                                    onChange={(e) => setPinInput(e.target.value)}
-                                    autoFocus
-                                />
+                {activeTab === 'controls' && (
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 -mt-2">
+                        <div className="flex items-center overflow-x-auto">
+                            {[
+                                { id: 'datatable', label: t('settings.tab_datatable') },
+                                { id: 'notifications', label: t('settings.tab_notifications') }
+                            ].map((tab) => (
                                 <button
-                                    onClick={handleSavePin}
-                                    className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
-                                    title={t('common.save')}
+                                    key={tab.id}
+                                    onClick={() => setControlsSubTab(tab.id as ControlsSubTab)}
+                                    className={`px-4 py-2 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
+                                        controlsSubTab === tab.id
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-slate-400 hover:text-blue-600 border-transparent'
+                                    }`}
                                 >
-                                    <Check className="w-5 h-5" />
+                                    {tab.label}
                                 </button>
-                                <button
-                                    onClick={() => { setIsEditingPin(false); setPinInput(''); }}
-                                    className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
-                                    title={t('common.cancel')}
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                        )}
+                            ))}
+                        </div>
+                    </div>
+                )}
 
-                        {hasPin && (
-                            <div className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
-                                        <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                    </div>
-                                    <div>
-                                        <div className="font-semibold text-emerald-900 dark:text-emerald-100">{t('settings.pin_active')}</div>
-                                        <div className="text-xs text-emerald-700 dark:text-emerald-400">{t('settings.pin_active_hint')}</div>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={handleRemovePin}
-                                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                    title={t('common.remove')}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                        <Shield className="w-4 h-4 text-amber-500" />
-                                    </div>
-                                    <div>
-                                        <div className="font-semibold text-slate-900 dark:text-white">{t('settings.admin_mode')}</div>
-                                        <div className="text-xs text-slate-500 dark:text-slate-400">{t('settings.admin_mode_hint')}</div>
-                                    </div>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="sr-only peer"
-                                        checked={isAdminMode}
-                                        onChange={() => setIsAdminMode(!isAdminMode)}
-                                    />
-                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
-                                </label>
+                {activeTab === 'appearance' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <Palette className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.appearance')}
+                        </h3>
+                        <div className="space-y-4">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.appearance_hint')}</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                {themeOptions.map(({ value, label }) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => setTheme(value)}
+                                        className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === value
+                                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
+                                            : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
+                                            }`}
+                                    >
+                                        <span className="text-sm font-medium">{label}</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>
-                </div>
+                )}
 
-                {/* About Section */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                        <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                            <Info className="w-4 h-4 text-blue-500" />
-                        </span>
-                        {t('about.title', 'Über LiteBI Studio')}
-                    </h3>
-                    <div className="space-y-4">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                            {t('about.settings_hint', 'Erfahren Sie mehr über das Projekt, die Version und die Vision hinter LiteBI Studio.')}
-                        </p>
+                {activeTab === 'security' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <Shield className="w-4 h-4 text-emerald-500" />
+                            </span>
+                            {t('settings.security')}
+                        </h3>
+                        <div className="space-y-4">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.security_hint')}</p>
 
-                        <Link
-                            to="/about"
-                            className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all group"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                    <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            {!hasPin && !isEditingPin && (
+                                <button
+                                    onClick={() => setIsEditingPin(true)}
+                                    className="w-full h-12 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-medium"
+                                >
+                                    <Lock className="w-4 h-4" />
+                                    {t('settings.enable_pin')}
+                                </button>
+                            )}
+
+                            {isEditingPin && (
+                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                                    <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        placeholder={t('settings.pin_placeholder')}
+                                        className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        value={pinInput}
+                                        onChange={(e) => setPinInput(e.target.value)}
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={handleSavePin}
+                                        className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                                        title={t('common.save')}
+                                    >
+                                        <Check className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => { setIsEditingPin(false); setPinInput(''); }}
+                                        className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                                        title={t('common.cancel')}
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
                                 </div>
-                                <div>
-                                    <div className="font-semibold text-slate-900 dark:text-white">{t('about.view_info', 'Projekt-Informationen')}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400">Version 1.0.0</div>
+                            )}
+
+                            {hasPin && (
+                                <div className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
+                                            <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                        </div>
+                                        <div>
+                                            <div className="font-semibold text-emerald-900 dark:text-emerald-100">{t('settings.pin_active')}</div>
+                                            <div className="text-xs text-emerald-700 dark:text-emerald-400">{t('settings.pin_active_hint')}</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleRemovePin}
+                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                        title={t('common.remove')}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                            <Shield className="w-4 h-4 text-amber-500" />
+                                        </div>
+                                        <div>
+                                            <div className="font-semibold text-slate-900 dark:text-white">{t('settings.admin_mode')}</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">{t('settings.admin_mode_hint')}</div>
+                                        </div>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={isAdminMode}
+                                            onChange={() => setIsAdminMode(!isAdminMode)}
+                                        />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
+                                    </label>
                                 </div>
                             </div>
-                            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                        </Link>
+                        </div>
                     </div>
-                </div>
+                )}
 
+                {activeTab === 'apps' && appsSubTab === 'inspector' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.inspector_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.inspector_hint')}</p>
 
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_autocomplete')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={inspectorAutocomplete} onChange={() => setInspectorAutocomplete(!inspectorAutocomplete)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_explain')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={inspectorExplainMode} onChange={() => setInspectorExplainMode(!inspectorExplainMode)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_sql_assist')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={inspectorSqlAssistOpen} onChange={() => setInspectorSqlAssistOpen(!inspectorSqlAssistOpen)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_profiling')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={inspectorShowProfiling} onChange={() => setInspectorShowProfiling(!inspectorShowProfiling)} />
+                                </label>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.inspector_page_size')}</label>
+                                <select
+                                    value={String(inspectorPageSize)}
+                                    onChange={(e) => setInspectorPageSize(Number(e.target.value))}
+                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                >
+                                    {[50, 100, 250, 500].map((size) => (
+                                        <option key={size} value={size}>{size}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.inspector_thresholds')}</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <label className="space-y-1">
+                                        <span className="text-xs text-slate-500">{t('settings.inspector_null_threshold')}</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={inspectorThresholds.nullRate}
+                                            onChange={(e) => {
+                                                const next = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                                                setInspectorThresholds({ ...inspectorThresholds, nullRate: next });
+                                            }}
+                                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                        />
+                                    </label>
+                                    <label className="space-y-1">
+                                        <span className="text-xs text-slate-500">{t('settings.inspector_cardinality_threshold')}</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={inspectorThresholds.cardinalityRate}
+                                            onChange={(e) => {
+                                                const next = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                                                setInspectorThresholds({ ...inspectorThresholds, cardinalityRate: next });
+                                            }}
+                                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'apps' && appsSubTab === 'querybuilder' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.querybuilder_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.querybuilder_hint')}</p>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.querybuilder_default_mode')}</label>
+                                <select
+                                    value={qbDefaultMode}
+                                    onChange={(e) => setQbDefaultMode(e.target.value as 'sql' | 'visual')}
+                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                >
+                                    <option value="visual">{t('querybuilder.visual_builder')}</option>
+                                    <option value="sql">{t('querybuilder.direct_editor')}</option>
+                                </select>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.querybuilder_sql_height')}</label>
+                                <input
+                                    type="number"
+                                    min={220}
+                                    max={700}
+                                    value={qbSqlEditorHeight}
+                                    onChange={(e) => {
+                                        const next = Math.max(220, Math.min(700, Number(e.target.value) || 220));
+                                        setQbSqlEditorHeight(next);
+                                    }}
+                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'apps' && appsSubTab === 'datamanagement' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.import_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.import_hint')}</p>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.import_default_mode')}</label>
+                                <select
+                                    value={importDefaultMode}
+                                    onChange={(e) => setImportDefaultMode(e.target.value as 'append' | 'overwrite')}
+                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                >
+                                    <option value="append">{t('datasource.excel_import.append')}</option>
+                                    <option value="overwrite">{t('datasource.excel_import.overwrite')}</option>
+                                </select>
+                            </div>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.import_auto_save_mappings')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={importAutoSaveMappings} onChange={() => setImportAutoSaveMappings(!importAutoSaveMappings)} />
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'controls' && controlsSubTab === 'datatable' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <Table2 className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.datatable_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.datatable_hint')}</p>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.datatable_density')}</label>
+                                <select
+                                    value={tableDensity}
+                                    onChange={(e) => setTableDensity(e.target.value as 'compact' | 'normal')}
+                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                >
+                                    <option value="normal">{t('settings.datatable_density_normal')}</option>
+                                    <option value="compact">{t('settings.datatable_density_compact')}</option>
+                                </select>
+                            </div>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.datatable_wrap_cells')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={tableWrapCells} onChange={() => setTableWrapCells(!tableWrapCells)} />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.datatable_default_filters')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={tableDefaultShowFilters} onChange={() => setTableDefaultShowFilters(!tableDefaultShowFilters)} />
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'controls' && controlsSubTab === 'notifications' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <Bell className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.notifications_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.notifications_hint')}</p>
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.notifications_confirm_destructive')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={confirmDestructive} onChange={() => setConfirmDestructive(!confirmDestructive)} />
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'about' && (
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <Info className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('about.title', 'About LiteBI Studio')}
+                        </h3>
+                        <div className="space-y-4">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                {t('about.settings_hint', 'Learn more about the project, the version and the vision behind LiteBI Studio.')}
+                            </p>
+
+                            <Link
+                                to="/about"
+                                className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                        <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold text-slate-900 dark:text-white">{t('about.view_info', 'Project Information')}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Version 1.1.0</div>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                            </Link>
+                        </div>
+                    </div>
+                )}
             </div>
         </PageLayout>
     );

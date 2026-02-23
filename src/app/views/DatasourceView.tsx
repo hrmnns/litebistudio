@@ -170,7 +170,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     };
 
     const handleDropTable = async (tableName: string) => {
-        if (!confirm(t('datasource.drop_confirm', { name: tableName }))) return;
+        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        if (shouldConfirm && !confirm(t('datasource.drop_confirm', { name: tableName }))) return;
         try {
             await SystemRepository.executeRaw(`DROP TABLE ${tableName}`);
             refreshTables();
@@ -182,7 +183,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     };
 
     const handleDropView = async (viewName: string) => {
-        if (!confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName }))) return;
+        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        if (shouldConfirm && !confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName }))) return;
         try {
             await SystemRepository.executeRaw(`DROP VIEW ${viewName}`);
             refreshTables();
@@ -194,7 +196,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     };
 
     const handleClearTable = async (tableName: string) => {
-        if (!confirm(t('datasource.clear_confirm', { name: tableName }))) return;
+        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        if (shouldConfirm && !confirm(t('datasource.clear_confirm', { name: tableName }))) return;
         try {
             await SystemRepository.executeRaw(`DELETE FROM ${tableName}`);
             refreshTables();

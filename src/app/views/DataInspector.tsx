@@ -90,7 +90,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const offset = (currentPage - 1) * pageSize;
     const [tableSortConfig, setTableSortConfig] = useState<DataTableSortConfig<DbRow> | null>(null);
     const [tableFilters, setTableFilters] = useState<Record<string, string>>({});
-    const [showTableFilters, setShowTableFilters] = useState(false);
+    const [defaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
+    const [showTableFilters, setShowTableFilters] = useState(defaultShowFilters);
     const [columnWidthsBySource, setColumnWidthsBySource] = useLocalStorage<Record<string, Record<string, number>>>(
         'data_inspector_column_widths_v1',
         {}
@@ -105,6 +106,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     });
     const [isResizingProfile, setIsResizingProfile] = useState(false);
     const resizeStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+    useEffect(() => {
+        setShowTableFilters(defaultShowFilters);
+    }, [defaultShowFilters, selectedTable]);
 
     // Fetch available data sources (tables + views)
     const { data: dataSources } = useAsync<DataSourceEntry[]>(

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileSpreadsheet, CheckCircle2 as Check, AlertCircle, RefreshCw, Layers, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -33,12 +33,18 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
-    const [importMode, setImportMode] = useState<'append' | 'overwrite'>('append');
+    const [defaultImportMode] = useLocalStorage<'append' | 'overwrite'>('import_default_mode', 'append');
+    const [autoSaveMappings] = useLocalStorage<boolean>('import_auto_save_mappings', true);
+    const [importMode, setImportMode] = useState<'append' | 'overwrite'>(defaultImportMode);
     const [isMappingOpen, setIsMappingOpen] = useState(false);
     const [pendingData, setPendingData] = useState<DbRow[] | null>(null);
     const [pendingSourceColumns, setPendingSourceColumns] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [savedMappings, setSavedMappings] = useLocalStorage<Record<string, Record<string, MappingConfig>>>('excel_mappings_v2', {});
+
+    useEffect(() => {
+        setImportMode(defaultImportMode);
+    }, [defaultImportMode, config?.key]);
 
     const getTargetSchema = useCallback((): TargetSchema | null => {
         if (!config?.schema || typeof config.schema !== 'object') return null;
@@ -171,7 +177,9 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
 
         try {
             const mappedRows = applyMappingToRows(pendingData, mapping, targetSchema);
-            setSavedMappings((prev) => ({ ...prev, [config.key]: mapping }));
+            if (autoSaveMappings) {
+                setSavedMappings((prev) => ({ ...prev, [config.key]: mapping }));
+            }
             await executeImport(mappedRows);
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
@@ -181,7 +189,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
             setPendingSourceColumns([]);
             setIsProcessing(false);
         }
-    }, [applyMappingToRows, config, executeImport, getTargetSchema, pendingData, setSavedMappings, t]);
+    }, [applyMappingToRows, autoSaveMappings, config, executeImport, getTargetSchema, pendingData, setSavedMappings, t]);
 
     const handleMappingCancel = useCallback(() => {
         setIsMappingOpen(false);

@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { Search, Filter, X } from 'lucide-react';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 export interface Column<T> {
     header: string;
@@ -57,6 +58,8 @@ export function DataTable<T>({
     const [internalFilters, setInternalFilters] = React.useState<Record<string, string>>({});
     const [internalShowFilters, setInternalShowFilters] = React.useState(false);
     const [internalColumnWidths, setInternalColumnWidths] = React.useState<ColumnWidthMap>({});
+    const [tableDensity] = useLocalStorage<'compact' | 'normal'>('ui_table_density', 'normal');
+    const [wrapCells] = useLocalStorage<boolean>('ui_table_wrap_cells', false);
 
     const activeSortConfig = sortConfig !== undefined ? sortConfig : internalSortConfig;
     const activeFilters = filters !== undefined ? filters : internalFilters;
@@ -244,7 +247,7 @@ export function DataTable<T>({
                                 return (
                                     <th
                                         key={i}
-                                        className={`relative px-4 py-3 truncate cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
+                                        className={`relative px-4 ${tableDensity === 'compact' ? 'py-2' : 'py-3'} truncate cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
                                         title={col.header}
                                         onClick={() => requestSort(col)}
                                     >
@@ -288,7 +291,7 @@ export function DataTable<T>({
                                 {columns.map((col, i) => {
                                     const key = typeof col.accessor === 'string' ? col.accessor : col.header;
                                     return (
-                                        <th key={i} className="px-2 py-1">
+                                        <th key={i} className={`px-2 ${tableDensity === 'compact' ? 'py-0.5' : 'py-1'}`}>
                                             <div className="relative flex items-center">
                                                 <input
                                                     type="text"
@@ -348,7 +351,7 @@ export function DataTable<T>({
                                     return (
                                         <td
                                             key={colIndex}
-                                            className={`px-4 py-3 truncate ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
+                                            className={`px-4 ${tableDensity === 'compact' ? 'py-2' : 'py-3'} ${wrapCells ? 'whitespace-normal break-words' : 'truncate'} ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
                                             title={typeof value === 'string' ? value : undefined}
                                         >
                                             {displayValue}
