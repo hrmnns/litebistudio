@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { FileSpreadsheet, CheckCircle2 as Check, AlertCircle, RefreshCw, Layers, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { DbRow } from '../../types';
+import { ColumnMapper, type MappingConfig } from './ColumnMapper';
+import { applyTransform } from '../../lib/transformers';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 export interface ImportConfig {
     key: string;
@@ -19,6 +22,11 @@ interface ExcelImportProps {
     onImportComplete?: () => void;
 }
 
+interface TargetSchema {
+    properties: Record<string, { description?: string; type?: string }>;
+    required?: string[];
+}
+
 export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComplete }) => {
     const { t } = useTranslation();
     const [isDragging, setIsDragging] = useState(false);
@@ -26,7 +34,90 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [importMode, setImportMode] = useState<'append' | 'overwrite'>('append');
+    const [isMappingOpen, setIsMappingOpen] = useState(false);
+    const [pendingData, setPendingData] = useState<DbRow[] | null>(null);
+    const [pendingSourceColumns, setPendingSourceColumns] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [savedMappings, setSavedMappings] = useLocalStorage<Record<string, Record<string, MappingConfig>>>('excel_mappings_v2', {});
+
+    const getTargetSchema = useCallback((): TargetSchema | null => {
+        if (!config?.schema || typeof config.schema !== 'object') return null;
+        const maybeSchema = config.schema as Partial<TargetSchema>;
+        if (!maybeSchema.properties || typeof maybeSchema.properties !== 'object') return null;
+        return {
+            properties: maybeSchema.properties,
+            required: Array.isArray(maybeSchema.required) ? maybeSchema.required : []
+        };
+    }, [config]);
+
+    const applyMappingToRows = useCallback((rows: DbRow[], mapping: Record<string, MappingConfig>, schema: TargetSchema): DbRow[] => {
+        const targetFields = Object.keys(schema.properties);
+        const isEmpty = (value: unknown) => value === null || value === undefined || value === '';
+
+        return rows.map((row) => {
+            const mappedRow: DbRow = {};
+
+            targetFields.forEach((targetField) => {
+                const cfg = mapping[targetField];
+                if (!cfg?.sourceColumn) return;
+
+                let value: unknown;
+
+                if (cfg.sourceColumn === '__CONSTANT__') {
+                    value = cfg.constantValue ?? '';
+                } else {
+                    const primary = row[cfg.sourceColumn];
+                    const secondary = cfg.secondaryColumn ? row[cfg.secondaryColumn] : undefined;
+
+                    switch (cfg.operation) {
+                        case 'coalesce':
+                            value = !isEmpty(primary) ? primary : secondary;
+                            break;
+                        case 'concat': {
+                            const parts = [primary, secondary]
+                                .filter((part) => !isEmpty(part))
+                                .map((part) => String(part));
+                            value = parts.join(cfg.separator ?? ' ');
+                            break;
+                        }
+                        case 'direct':
+                        default:
+                            value = primary;
+                            break;
+                    }
+                }
+
+                if (cfg.transformId) {
+                    value = applyTransform(value, cfg.transformId, targetField);
+                }
+
+                mappedRow[targetField] = value;
+            });
+
+            return mappedRow;
+        });
+    }, []);
+
+    const executeImport = useCallback(async (rowsToImport: DbRow[]) => {
+        if (!config) return;
+
+        if (rowsToImport.length === 0) {
+            setError(t('datasource.excel_import.no_valid_data'));
+            return;
+        }
+
+        if (importMode === 'overwrite' && config.clearFn) {
+            await config.clearFn();
+        }
+
+        await config.importFn(rowsToImport);
+
+        setSuccess(t('datasource.excel_import.success_msg', { count: rowsToImport.length }));
+        if (onImportComplete) onImportComplete();
+
+        // Trigger global sync for counters
+        window.dispatchEvent(new Event('db-updated'));
+    }, [config, importMode, onImportComplete, t]);
 
     const processFile = useCallback(async (file: File) => {
         if (!config) return;
@@ -47,20 +138,17 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
                 return;
             }
 
-            // Transform data (e.g., lowercase keys to match DB if needed, or mapping)
-            // Here we assume keys match column names
+            const sourceColumns = Object.keys(jsonData[0] ?? {});
+            const targetSchema = getTargetSchema();
 
-            if (importMode === 'overwrite' && config.clearFn) {
-                await config.clearFn();
+            if (targetSchema) {
+                setPendingData(jsonData);
+                setPendingSourceColumns(sourceColumns);
+                setIsMappingOpen(true);
+                return;
             }
 
-            await config.importFn(jsonData);
-
-            setSuccess(t('datasource.excel_import.success_msg', { count: jsonData.length }));
-            if (onImportComplete) onImportComplete();
-
-            // Trigger global sync for counters
-            window.dispatchEvent(new Event('db-updated'));
+            await executeImport(jsonData);
 
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
@@ -68,7 +156,38 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
         } finally {
             setIsProcessing(false);
         }
-    }, [config, importMode, onImportComplete, t]);
+    }, [config, executeImport, getTargetSchema, t]);
+
+    const handleMappingConfirm = useCallback(async (mapping: Record<string, MappingConfig>) => {
+        if (!config || !pendingData) return;
+
+        const targetSchema = getTargetSchema();
+        if (!targetSchema) return;
+
+        setIsMappingOpen(false);
+        setIsProcessing(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const mappedRows = applyMappingToRows(pendingData, mapping, targetSchema);
+            setSavedMappings((prev) => ({ ...prev, [config.key]: mapping }));
+            await executeImport(mappedRows);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(t('datasource.excel_import.import_failed', { error: message }));
+        } finally {
+            setPendingData(null);
+            setPendingSourceColumns([]);
+            setIsProcessing(false);
+        }
+    }, [applyMappingToRows, config, executeImport, getTargetSchema, pendingData, setSavedMappings, t]);
+
+    const handleMappingCancel = useCallback(() => {
+        setIsMappingOpen(false);
+        setPendingData(null);
+        setPendingSourceColumns([]);
+    }, []);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -165,6 +284,16 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
                         <X className="w-4 h-4" />
                     </button>
                 </div>
+            )}
+
+            {isMappingOpen && config && getTargetSchema() && (
+                <ColumnMapper
+                    sourceColumns={pendingSourceColumns}
+                    targetSchema={getTargetSchema()!}
+                    initialMapping={savedMappings[config.key]}
+                    onConfirm={(mapping) => { void handleMappingConfirm(mapping); }}
+                    onCancel={handleMappingCancel}
+                />
             )}
         </div>
     );

@@ -471,7 +471,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             onClick={() => {
                                 if (!items || items.length === 0) return;
                                 const timestamp = new Date().toISOString().slice(0, 10);
-                                exportToExcel(items, `export_${timestamp}`, "Export");
+                                const exportRows = items.map((row) => {
+                                    const cleaned = { ...row };
+                                    delete cleaned._rowid;
+                                    return cleaned;
+                                });
+                                exportToExcel(exportRows, `export_${timestamp}`, "Export");
                             }}
                             className="h-10 flex items-center gap-2 px-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                         >

@@ -322,12 +322,28 @@ function genericBulkInsert(tableName: string, records: SqliteRow[], wrapInTransa
         throw new Error(`Invalid table name: ${tableName}`);
     }
 
-    const keys = Object.keys(records[0]);
+    const database = requireDb();
+    const tableColumns: string[] = [];
+    database.exec({
+        sql: `PRAGMA table_info("${tableName}")`,
+        rowMode: 'object',
+        callback: (row: SqliteRow) => {
+            const name = row.name;
+            if (typeof name === 'string' && name.length > 0) {
+                tableColumns.push(name);
+            }
+        }
+    });
+
+    const keys = Object.keys(records[0]).filter((key) => tableColumns.includes(key));
+    if (keys.length === 0) {
+        throw new Error(`No matching columns found for table "${tableName}" in import payload.`);
+    }
+
     const placeholders = keys.map(() => '?').join(', ');
     const columns = keys.map(k => `"${k}"`).join(', ');
     const sql = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`;
 
-    const database = requireDb();
     if (wrapInTransaction) database.exec('BEGIN TRANSACTION');
     try {
         const stmt = database.prepare(sql);
