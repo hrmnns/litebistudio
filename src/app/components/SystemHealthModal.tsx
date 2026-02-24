@@ -66,7 +66,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
     const { data: healthReport, loading: healthLoading, refresh: refreshHealth } = useAsync<DatabaseHealthReport | null>(
         async () => {
             if (!isOpen) return null;
-            return await SystemRepository.getDatabaseHealth() as DatabaseHealthReport;
+            return await SystemRepository.getDatabaseHealth() as unknown as DatabaseHealthReport;
         },
         [isOpen]
     );

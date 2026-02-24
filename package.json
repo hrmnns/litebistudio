@@ -6,8 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "compile:schemas": "node scripts/compile-schemas.js",
-    "build": "npm run compile:schemas && tsc -b && vite build",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -16,8 +15,6 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@sqlite.org/sqlite-wasm": "^3.51.2-build6",
-    "ajv": "8.18.0",
-    "ajv-formats": "^3.0.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "html2canvas": "^1.4.1",
