@@ -14,6 +14,8 @@ const LINKS = {
 
 export const AboutView: React.FC = () => {
     const { t } = useTranslation();
+    const version = __APP_VERSION__;
+    const buildNumber = __BUILD_NUMBER__;
 
     const techStack = [
         { name: 'React', description: t('about.tech_ui_framework') },
@@ -52,7 +54,10 @@ export const AboutView: React.FC = () => {
                             </p>
                             <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-3">
                                 <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider border border-white/30">
-                                    Version 1.0.0
+                                    Version {version}
+                                </span>
+                                <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider border border-white/30">
+                                    Build {buildNumber}
                                 </span>
                             </div>
                         </div>

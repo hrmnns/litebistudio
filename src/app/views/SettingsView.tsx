@@ -14,6 +14,8 @@ type ControlsSubTab = 'datatable' | 'notifications';
 
 export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
+    const version = __APP_VERSION__;
+    const buildNumber = __BUILD_NUMBER__;
     const { theme, setTheme } = useThemeContext();
     const { isReadOnly, isAdminMode, setIsAdminMode } = useDashboard();
     const [activeTab, setActiveTab] = React.useState<SettingsTab>('appearance');
@@ -521,7 +523,11 @@ export const SettingsView: React.FC = () => {
                                     </div>
                                     <div>
                                         <div className="font-semibold text-slate-900 dark:text-white">{t('about.view_info', 'Project Information')}</div>
-                                        <div className="text-xs text-slate-500 dark:text-slate-400">Version 1.1.0</div>
+                                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                            <span>Version {version}</span>
+                                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                                            <span>Build {buildNumber}</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
