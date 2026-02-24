@@ -27,6 +27,7 @@ import { SqlAssistant } from '../components/SqlAssistant';
 import { PivotTable } from '../components/PivotTable';
 import type { SchemaDefinition } from '../components/SchemaDocumentation';
 import { createLogger } from '../../lib/logger';
+import { appDialog } from '../../lib/appDialog';
 
 type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text';
 type GuidedStep = 1 | 2 | 3 | 4;
@@ -228,7 +229,6 @@ export const QueryBuilderView: React.FC = () => {
             setSaveModalOpen(false);
             if (!activeWidgetId) setWidgetName('');
             refreshWidgets();
-            alert(activeWidgetId ? t('querybuilder.success_update') : t('querybuilder.success_save'));
             setActiveWidgetId(widget.id);
             setSavedSnapshot(buildSnapshot({
                 currentSql: widget.sql_query,
@@ -240,14 +240,16 @@ export const QueryBuilderView: React.FC = () => {
                 currentActiveWidgetId: widget.id
             }));
         } catch (err: unknown) {
-            alert(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
+            await appDialog.error(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
+            return;
         }
+        await appDialog.info(activeWidgetId ? t('querybuilder.success_update') : t('querybuilder.success_save'));
     };
 
     const deleteWidget = async (id: string) => {
         if (isReadOnly) return;
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
-        if (!shouldConfirm || confirm(t('dashboard.confirm_delete_report'))) {
+        if (!shouldConfirm || (await appDialog.confirm(t('dashboard.confirm_delete_report')))) {
             await SystemRepository.deleteUserWidget(id);
             refreshWidgets();
             if (activeWidgetId === id) {

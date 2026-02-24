@@ -5,6 +5,7 @@ import { analyzeExcelFile } from '../../lib/utils/excelParser';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import type { DbRow } from '../../types';
 import { createLogger } from '../../lib/logger';
+import { appDialog } from '../../lib/appDialog';
 
 interface TablePreview {
     sheetName: string;
@@ -44,7 +45,7 @@ export const SmartImport: React.FC = () => {
             setStep(2);
         } catch (error) {
             logger.error('Analysis failed', error);
-            alert(t('datasource.smart_import.error_analyzing'));
+            await appDialog.error(t('datasource.smart_import.error_analyzing'));
         } finally {
             setIsAnalyzing(false);
         }
@@ -79,7 +80,7 @@ export const SmartImport: React.FC = () => {
             window.dispatchEvent(new Event('db-updated'));
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
-            alert(t('common.error') + ': ' + message);
+            await appDialog.error(t('common.error') + ': ' + message);
         } finally {
             setIsImporting(false);
         }

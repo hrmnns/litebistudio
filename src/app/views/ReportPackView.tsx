@@ -14,6 +14,7 @@ import WidgetRenderer from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
 import { type ReportPack, type ReportPackItem, type DbRow, type WidgetConfig } from '../../types';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import { appDialog } from '../../lib/appDialog';
 
 interface DashboardRow extends DbRow {
     id: string;
@@ -177,7 +178,7 @@ const ReportPackView: React.FC = () => {
             setFailedLogoUrl(null);
             await handleSave({ ...activePack, config: { ...activePack.config, coverLogoUrl: dataUrl } });
         } catch {
-            window.alert(t('reports.logo_upload_failed', 'Logo upload failed.'));
+            await appDialog.error(t('reports.logo_upload_failed', 'Logo upload failed.'));
         } finally {
             event.target.value = '';
         }
@@ -244,13 +245,13 @@ const ReportPackView: React.FC = () => {
     const renameCategory = async (currentName: string) => {
         if (isReadOnly) return;
         if (currentName === defaultCategory) return;
-        const raw = window.prompt(t('reports.rename_category_prompt', 'New category name:'), currentName);
+        const raw = await appDialog.prompt(t('reports.rename_category_prompt', 'New category name:'), { defaultValue: currentName });
         const nextName = raw?.trim();
         if (!nextName || nextName === currentName) return;
 
         const duplicate = categoryNames.some(category => category.toLowerCase() === nextName.toLowerCase() && category !== currentName);
         if (duplicate) {
-            window.alert(t('reports.category_exists', 'A category with this name already exists.'));
+            await appDialog.warning(t('reports.category_exists', 'A category with this name already exists.'));
             return;
         }
 
@@ -272,8 +273,8 @@ const ReportPackView: React.FC = () => {
         const packCount = affectedPacks.length;
 
         const confirmed = packCount === 0
-            ? window.confirm(t('reports.delete_category_confirm', 'Delete this category?'))
-            : window.confirm(t('reports.delete_category_with_packs_confirm', { count: packCount, category: categoryName, defaultValue: `Delete category "${categoryName}" and all ${packCount} report packages in it?` }));
+            ? await appDialog.confirm(t('reports.delete_category_confirm', 'Delete this category?'))
+            : await appDialog.confirm(t('reports.delete_category_with_packs_confirm', { count: packCount, category: categoryName, defaultValue: `Delete category "${categoryName}" and all ${packCount} report packages in it?` }));
         if (!confirmed) return;
 
         if (packCount > 0) {
@@ -291,7 +292,7 @@ const ReportPackView: React.FC = () => {
 
     const deletePack = async (id: string) => {
         if (isReadOnly) return;
-        if (confirm(t('common.confirm_delete'))) {
+        if (await appDialog.confirm(t('common.confirm_delete'))) {
             await SystemRepository.deleteReportPack(id);
             await loadPacks();
             if (activePackId === id) setActivePackId(null);
@@ -571,11 +572,12 @@ const ReportPackView: React.FC = () => {
                                         {!isReadOnly && (
                                             <button
                                                 onClick={() => openPickerForPack(pack.id)}
-                                                className="flex items-center gap-2 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-300 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors font-bold text-sm"
+                                                className="flex items-center gap-2 px-2 sm:px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-300 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors font-bold text-sm"
                                                 title={t('reports.add_page', 'Add Page')}
+                                                aria-label={t('reports.add_page', 'Add Page')}
                                             >
                                                 <Plus className="w-4 h-4" />
-                                                {t('reports.add_page', 'Add Page')}
+                                                <span className="hidden sm:inline">{t('reports.add_page', 'Add Page')}</span>
                                             </button>
                                         )}
                                         {!isReadOnly && (
@@ -599,10 +601,14 @@ const ReportPackView: React.FC = () => {
                                         <button
                                             onClick={() => handleRunExport(pack)}
                                             disabled={isExporting || pack.config.items.length === 0}
-                                            className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:opacity-90 transition-all font-bold text-sm shadow-lg shadow-slate-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center gap-2 px-2 sm:px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:opacity-90 transition-all font-bold text-sm shadow-lg shadow-slate-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title={isExporting && isActive ? `${exportProgress}%` : t('reports.export_batch')}
+                                            aria-label={isExporting && isActive ? `${exportProgress}%` : t('reports.export_batch')}
                                         >
                                             <Download className="w-4 h-4" />
-                                            {isExporting && isActive ? `${exportProgress}%` : t('reports.export_batch')}
+                                            <span className="hidden sm:inline">
+                                                {isExporting && isActive ? `${exportProgress}%` : t('reports.export_batch')}
+                                            </span>
                                         </button>
                                     </div>
                                 </div>

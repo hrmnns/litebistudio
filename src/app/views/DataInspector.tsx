@@ -14,6 +14,7 @@ import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
 import type { DataSourceEntry } from '../../lib/repositories/SystemRepository';
 import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
+import { appDialog } from '../../lib/appDialog';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -219,12 +220,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
         const upper = trimmed.toUpperCase();
         const isPotentialWriteQuery = /^(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|REPLACE|TRUNCATE|VACUUM|ATTACH|DETACH)\b/.test(upper);
-        if (isPotentialWriteQuery && !confirm(t('datainspector.write_confirm'))) return;
+        if (isPotentialWriteQuery && !(await appDialog.confirm(t('datainspector.write_confirm')))) return;
 
         const isSelect = /^\s*SELECT\b/i.test(trimmed);
         const hasLimitClause = /\bLIMIT\b/i.test(trimmed);
         if (isSelect && !hasLimitClause && sqlRequireLimitConfirm) {
-            if (!confirm(t('datainspector.limit_confirm_prompt', { limit: sqlMaxRows }))) return;
+            if (!(await appDialog.confirm(t('datainspector.limit_confirm_prompt', { limit: sqlMaxRows })))) return;
         }
 
         let executionSql = trimmed.replace(/;\s*$/, '');
@@ -245,7 +246,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const handleCancelSql = async () => {
         const cancelled = await SystemRepository.abortActiveQueries();
         if (!cancelled) {
-            alert(t('datainspector.cancel_not_available', 'No cancellable SQL query is currently running in this tab.'));
+            await appDialog.info(t('datainspector.cancel_not_available', 'No cancellable SQL query is currently running in this tab.'));
         }
     };
 
@@ -280,16 +281,16 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         });
     };
 
-    const handleSaveCustomTemplate = () => {
+    const handleSaveCustomTemplate = async () => {
         const trimmedSql = inputSql.trim();
         if (!trimmedSql) return;
 
         const suggestedName = `${selectedTable || 'Query'} Template`;
-        const name = prompt(t('datainspector.custom_template_prompt'), suggestedName)?.trim();
+        const name = (await appDialog.prompt(t('datainspector.custom_template_prompt'), { defaultValue: suggestedName }))?.trim();
         if (!name) return;
 
         const existing = customSqlTemplates.find(tpl => tpl.name.toLowerCase() === name.toLowerCase());
-        if (existing && !confirm(t('datainspector.custom_template_overwrite_confirm', { name }))) return;
+        if (existing && !(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return;
 
         const nextTemplate: CustomSqlTemplate = {
             id: existing?.id || crypto.randomUUID(),
@@ -304,25 +305,25 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         setSelectedCustomTemplateId(nextTemplate.id);
     };
 
-    const handleDeleteCustomTemplate = () => {
+    const handleDeleteCustomTemplate = async () => {
         if (!selectedCustomTemplateId) return;
-        if (!confirm(t('datainspector.custom_template_delete_confirm'))) return;
+        if (!(await appDialog.confirm(t('datainspector.custom_template_delete_confirm')))) return;
         setCustomSqlTemplates(prev => prev.filter(tpl => tpl.id !== selectedCustomTemplateId));
         setSelectedCustomTemplateId('');
     };
 
-    const handleRenameCustomTemplate = () => {
+    const handleRenameCustomTemplate = async () => {
         if (!selectedCustomTemplateId) return;
         const current = customSqlTemplates.find(tpl => tpl.id === selectedCustomTemplateId);
         if (!current) return;
 
-        const nextName = prompt(t('datainspector.rename_template_prompt'), current.name)?.trim();
+        const nextName = (await appDialog.prompt(t('datainspector.rename_template_prompt'), { defaultValue: current.name }))?.trim();
         if (!nextName || nextName === current.name) return;
 
         const conflicting = customSqlTemplates.find(
             tpl => tpl.id !== selectedCustomTemplateId && tpl.name.toLowerCase() === nextName.toLowerCase()
         );
-        if (conflicting && !confirm(t('datainspector.custom_template_overwrite_confirm', { name: nextName }))) return;
+        if (conflicting && !(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name: nextName })))) return;
 
         setCustomSqlTemplates(prev => {
             const withoutConflicting = prev.filter(tpl => tpl.id !== conflicting?.id);
@@ -405,7 +406,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             });
 
             setSaveToBuilderOpen(false);
-            alert(t('datainspector.saved_to_query_builder', 'Saved to Query Builder.'));
+            await appDialog.info(t('datainspector.saved_to_query_builder', 'Saved to Query Builder.'));
         } catch (err) {
             setSaveToBuilderError(err instanceof Error ? err.message : String(err));
         } finally {
@@ -422,9 +423,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         setMode('table');
     };
 
-    const handleSaveCurrentView = () => {
+    const handleSaveCurrentView = async () => {
         const suggested = savedViews.find(v => v.id === activeViewId)?.name || `${selectedTable} View`;
-        const name = prompt(t('datainspector.new_view_prompt'), suggested)?.trim();
+        const name = (await appDialog.prompt(t('datainspector.new_view_prompt'), { defaultValue: suggested }))?.trim();
         if (!name) return;
 
         const preset: InspectorViewPreset = {
@@ -444,9 +445,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         setActiveViewId(preset.id);
     };
 
-    const handleDeleteCurrentView = () => {
+    const handleDeleteCurrentView = async () => {
         if (!activeViewId) return;
-        if (!confirm(t('datainspector.delete_view_confirm'))) return;
+        if (!(await appDialog.confirm(t('datainspector.delete_view_confirm')))) return;
         setSavedViews(prev => prev.filter(v => v.id !== activeViewId));
         setActiveViewId('');
     };
@@ -486,11 +487,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         const trimmedName = indexName.trim();
         if (!selectedTable || selectedSourceType !== 'table') return;
         if (!trimmedName) {
-            alert(t('datasource.index_create_name_required', 'Please provide an index name.'));
+            await appDialog.warning(t('datasource.index_create_name_required', 'Please provide an index name.'));
             return;
         }
         if (indexColumns.length === 0) {
-            alert(t('datasource.index_create_columns_required', 'Please select at least one column.'));
+            await appDialog.warning(t('datasource.index_create_columns_required', 'Please select at least one column.'));
             return;
         }
         setIsCreatingIndex(true);
@@ -502,9 +503,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             await SystemRepository.executeRaw(sql);
             setIsCreateIndexOpen(false);
             execute();
-            alert(t('datasource.index_create_success', 'Index created.'));
+            await appDialog.info(t('datasource.index_create_success', 'Index created.'));
         } catch (err) {
-            alert(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
+            await appDialog.error(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setIsCreatingIndex(false);
         }
@@ -1231,8 +1232,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         {t('datainspector.delete_template')}
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            if (!confirm(t('datainspector.clear_templates_confirm'))) return;
+                                        onClick={async () => {
+                                            if (!(await appDialog.confirm(t('datainspector.clear_templates_confirm')))) return;
                                             setCustomSqlTemplates([]);
                                             setSelectedCustomTemplateId('');
                                         }}

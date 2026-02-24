@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useTranslation } from 'react-i18next';
 import { createLogger } from '../lib/logger';
+import { appDialog } from '../lib/appDialog';
 
 interface ExportItem {
     elementId: string;
@@ -277,7 +278,7 @@ export const useReportExport = (): UseReportExportResult => {
             pdf.save(`${filename}.pdf`);
         } catch (error) {
             logger.error('Batch Export failed:', error);
-            alert(t('reports.export_failed', 'Export failed.'));
+            await appDialog.error(t('reports.export_failed', 'Export failed.'));
         } finally {
             setIsExporting(false);
             setExportProgress(0);

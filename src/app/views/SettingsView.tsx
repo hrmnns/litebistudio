@@ -2,12 +2,14 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
 import { PageLayout } from '../components/ui/PageLayout';
-import { Lock, Shield, Trash2, Check, X, Info, ChevronRight, Palette, SlidersHorizontal, Bell, Table2 } from 'lucide-react';
+import { Lock, Shield, Trash2, Check, X, Info, ChevronRight, Palette, SlidersHorizontal, Bell, Table2, Globe, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { hashPin, generateSalt } from '../../lib/utils/crypto';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { LOG_LEVEL_STORAGE_KEY, type AppLogLevel } from '../../lib/logging';
+import { appDialog } from '../../lib/appDialog';
+import { SystemHealthModal } from '../components/SystemHealthModal';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
 type AppsSubTab = 'inspector' | 'querybuilder' | 'datamanagement';
@@ -22,6 +24,7 @@ export const SettingsView: React.FC = () => {
     const [activeTab, setActiveTab] = React.useState<SettingsTab>('appearance');
     const [appsSubTab, setAppsSubTab] = React.useState<AppsSubTab>('inspector');
     const [controlsSubTab, setControlsSubTab] = React.useState<ControlsSubTab>('datatable');
+    const [isHealthModalOpen, setIsHealthModalOpen] = React.useState(false);
 
     const themeOptions: { value: ThemeMode; label: string }[] = [
         { value: 'light', label: t('settings.theme_light') },
@@ -53,33 +56,35 @@ export const SettingsView: React.FC = () => {
     const [tableDefaultShowFilters, setTableDefaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
     const [confirmDestructive, setConfirmDestructive] = useLocalStorage<boolean>('notifications_confirm_destructive', true);
     const [appLogLevel, setAppLogLevel] = useLocalStorage<AppLogLevel>(LOG_LEVEL_STORAGE_KEY, 'error');
+    const [showSidebarLanguageSwitch, setShowSidebarLanguageSwitch] = useLocalStorage<boolean>('ui_sidebar_show_language_switch', true);
+    const [showSidebarSystemStatus, setShowSidebarSystemStatus] = useLocalStorage<boolean>('ui_sidebar_show_system_status', true);
 
-    const confirmAction = (message: string): boolean => {
+    const confirmAction = async (message: string): Promise<boolean> => {
         if (!confirmDestructive) return true;
-        return window.confirm(message);
+        return await appDialog.confirm(message);
     };
 
-    const handleResetInspectorLayout = () => {
-        if (!confirmAction(t('settings.inspector_reset_layout_confirm'))) return;
+    const handleResetInspectorLayout = async () => {
+        if (!(await confirmAction(t('settings.inspector_reset_layout_confirm')))) return;
         localStorage.removeItem('data_inspector_column_widths_v1');
         localStorage.removeItem('data_inspector_saved_views');
         localStorage.removeItem('data_inspector_active_view');
         localStorage.removeItem('data_inspector_sql_editor_height');
-        alert(t('settings.inspector_reset_layout_done'));
+        await appDialog.info(t('settings.inspector_reset_layout_done'));
     };
 
-    const handleClearInspectorSqlMemory = () => {
-        if (!confirmAction(t('settings.inspector_reset_sql_confirm'))) return;
+    const handleClearInspectorSqlMemory = async () => {
+        if (!(await confirmAction(t('settings.inspector_reset_sql_confirm')))) return;
         localStorage.removeItem('data_inspector_sql_history');
         localStorage.removeItem('data_inspector_favorite_queries');
         localStorage.removeItem('data_inspector_custom_sql_templates');
         localStorage.removeItem('data_inspector_selected_custom_template');
-        alert(t('settings.inspector_reset_sql_done'));
+        await appDialog.info(t('settings.inspector_reset_sql_done'));
     };
 
     const handleSavePin = async () => {
         if (pinInput.length < 4) {
-            alert(t('settings.pin_error_min'));
+            await appDialog.warning(t('settings.pin_error_min'));
             return;
         }
 
@@ -93,11 +98,11 @@ export const SettingsView: React.FC = () => {
         setIsEditingPin(false);
         setPinInput('');
         window.dispatchEvent(new Event('pin-changed'));
-        alert(t('settings.pin_success'));
+        await appDialog.info(t('settings.pin_success'));
     };
 
-    const handleRemovePin = () => {
-        if (window.confirm(t('settings.pin_confirm_remove'))) {
+    const handleRemovePin = async () => {
+        if (await appDialog.confirm(t('settings.pin_confirm_remove'))) {
             localStorage.removeItem('litebistudio_app_pin');
             localStorage.removeItem('litebistudio_app_pin_salt');
             setHasPin(false);
@@ -196,115 +201,213 @@ export const SettingsView: React.FC = () => {
                 )}
 
                 {activeTab === 'appearance' && (
-                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                <Palette className="w-4 h-4 text-blue-500" />
-                            </span>
-                            {t('settings.appearance')}
-                        </h3>
-                        <div className="space-y-4">
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.appearance_hint')}</p>
-                            <div className="grid grid-cols-3 gap-3">
-                                {themeOptions.map(({ value, label }) => (
+                    <div className={`space-y-4 transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                    <Palette className="w-4 h-4 text-blue-500" />
+                                </span>
+                                {t('settings.appearance')}
+                            </h3>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.appearance_hint')}</p>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {themeOptions.map(({ value, label }) => (
+                                        <button
+                                            key={value}
+                                            onClick={() => setTheme(value)}
+                                            className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === value
+                                                ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
+                                                : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
+                                                }`}
+                                        >
+                                            <span className="text-sm font-medium">{label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                    <Globe className="w-4 h-4 text-blue-500" />
+                                </span>
+                                {t('settings.language_panel_title')}
+                            </h3>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.language_panel_hint')}</p>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                                            {t('settings.language')}
+                                        </label>
+                                        <select
+                                            value={i18n.language.startsWith('de') ? 'de' : 'en'}
+                                            onChange={(e) => void i18n.changeLanguage(e.target.value)}
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                        >
+                                            <option value="de">{t('settings.language_de')}</option>
+                                            <option value="en">{t('settings.language_en')}</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-end">
+                                        <label className="w-full flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <Globe className="w-4 h-4 text-blue-500" />
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                    {t('settings.show_sidebar_language_switch')}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const next = !showSidebarLanguageSwitch;
+                                                    setShowSidebarLanguageSwitch(next);
+                                                    window.dispatchEvent(new CustomEvent('sidebar-language-visibility-changed', { detail: { visible: next } }));
+                                                }}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showSidebarLanguageSwitch ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                                aria-pressed={showSidebarLanguageSwitch}
+                                                aria-label={t('settings.show_sidebar_language_switch')}
+                                            >
+                                                <span
+                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showSidebarLanguageSwitch ? 'translate-x-6' : 'translate-x-1'}`}
+                                                />
+                                            </button>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                    <Activity className="w-4 h-4 text-blue-500" />
+                                </span>
+                                {t('settings.health_link_title')}
+                            </h3>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.health_link_hint')}</p>
+                                <div className="flex flex-wrap items-center gap-3">
                                     <button
-                                        key={value}
-                                        onClick={() => setTheme(value)}
-                                        className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === value
-                                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
-                                            : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400'
-                                            }`}
+                                        onClick={() => setIsHealthModalOpen(true)}
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg border border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                                     >
-                                        <span className="text-sm font-medium">{label}</span>
+                                        <Activity className="w-4 h-4" />
+                                        {t('settings.health_link_open')}
                                     </button>
-                                ))}
+                                    <label className="inline-flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                            {t('settings.show_sidebar_system_status')}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = !showSidebarSystemStatus;
+                                                setShowSidebarSystemStatus(next);
+                                                window.dispatchEvent(new CustomEvent('sidebar-system-status-visibility-changed', { detail: { visible: next } }));
+                                            }}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showSidebarSystemStatus ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                            aria-pressed={showSidebarSystemStatus}
+                                            aria-label={t('settings.show_sidebar_system_status')}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showSidebarSystemStatus ? 'translate-x-6' : 'translate-x-1'}`}
+                                            />
+                                        </button>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
 
                 {activeTab === 'security' && (
-                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                <Shield className="w-4 h-4 text-emerald-500" />
-                            </span>
-                            {t('settings.security')}
-                        </h3>
-                        <div className="space-y-4">
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.security_hint')}</p>
+                    <div className={`space-y-4 transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                    <Lock className="w-4 h-4 text-emerald-500" />
+                                </span>
+                                {t('settings.access_restriction_title')}
+                            </h3>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.access_restriction_hint')}</p>
 
-                            {!hasPin && !isEditingPin && (
-                                <button
-                                    onClick={() => setIsEditingPin(true)}
-                                    className="w-full h-12 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-medium"
-                                >
-                                    <Lock className="w-4 h-4" />
-                                    {t('settings.enable_pin')}
-                                </button>
-                            )}
-
-                            {isEditingPin && (
-                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-                                    <input
-                                        type="password"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        placeholder={t('settings.pin_placeholder')}
-                                        className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        value={pinInput}
-                                        onChange={(e) => setPinInput(e.target.value)}
-                                        autoFocus
-                                    />
+                                {!hasPin && !isEditingPin && (
                                     <button
-                                        onClick={handleSavePin}
-                                        className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
-                                        title={t('common.save')}
+                                        onClick={() => setIsEditingPin(true)}
+                                        className="w-full h-12 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-medium"
                                     >
-                                        <Check className="w-5 h-5" />
+                                        <Lock className="w-4 h-4" />
+                                        {t('settings.enable_pin')}
                                     </button>
-                                    <button
-                                        onClick={() => { setIsEditingPin(false); setPinInput(''); }}
-                                        className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
-                                        title={t('common.cancel')}
-                                    >
-                                        <X className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            )}
+                                )}
 
-                            {hasPin && (
-                                <div className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
-                                            <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                        </div>
-                                        <div>
-                                            <div className="font-semibold text-emerald-900 dark:text-emerald-100">{t('settings.pin_active')}</div>
-                                            <div className="text-xs text-emerald-700 dark:text-emerald-400">{t('settings.pin_active_hint')}</div>
-                                        </div>
+                                {isEditingPin && (
+                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                                        <input
+                                            type="password"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            placeholder={t('settings.pin_placeholder')}
+                                            className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            value={pinInput}
+                                            onChange={(e) => setPinInput(e.target.value)}
+                                            autoFocus
+                                        />
+                                        <button
+                                            onClick={handleSavePin}
+                                            className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                                            title={t('common.save')}
+                                        >
+                                            <Check className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsEditingPin(false); setPinInput(''); }}
+                                            className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                                            title={t('common.cancel')}
+                                        >
+                                            <X className="w-5 h-5" />
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={handleRemovePin}
-                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                        title={t('common.remove')}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            )}
+                                )}
 
-                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                            <Shield className="w-4 h-4 text-amber-500" />
+                                {hasPin && (
+                                    <div className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
+                                                <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold text-emerald-900 dark:text-emerald-100">{t('settings.pin_active')}</div>
+                                                <div className="text-xs text-emerald-700 dark:text-emerald-400">{t('settings.pin_active_hint')}</div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div className="font-semibold text-slate-900 dark:text-white">{t('settings.admin_mode')}</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400">{t('settings.admin_mode_hint')}</div>
-                                        </div>
+                                        <button
+                                            onClick={handleRemovePin}
+                                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                            title={t('common.remove')}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                    <Shield className="w-4 h-4 text-amber-500" />
+                                </span>
+                                {t('settings.admin_mode')}
+                            </h3>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.admin_mode_panel_hint')}</p>
+                                <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">{t('settings.admin_mode_hint')}</div>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -627,6 +730,10 @@ export const SettingsView: React.FC = () => {
                     </div>
                 )}
             </div>
+            <SystemHealthModal
+                isOpen={isHealthModalOpen}
+                onClose={() => setIsHealthModalOpen(false)}
+            />
         </PageLayout>
     );
 };

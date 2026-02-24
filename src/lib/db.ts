@@ -214,7 +214,13 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
                 if (!sql.startsWith('SELECT') && !sql.startsWith('PRAGMA')) {
                     return Promise.reject(new Error(`Action ${type} (WRITE) not permitted in Read-Only mode.`));
                 }
-            } else if (type !== 'INIT' && type !== 'GET_DIAGNOSTICS' && type !== 'EXPORT') {
+            } else if (
+                type !== 'INIT'
+                && type !== 'GET_DIAGNOSTICS'
+                && type !== 'GET_DATABASE_HEALTH'
+                && type !== 'GET_STORAGE_STATUS'
+                && type !== 'EXPORT'
+            ) {
                 return Promise.reject(new Error(`Action ${type} not permitted in Read-Only mode.`));
             }
         }
@@ -355,6 +361,11 @@ export async function initSchema() {
 export async function getDiagnostics(): Promise<Record<string, unknown>> {
     await initDB();
     return send<Record<string, unknown>>('GET_DIAGNOSTICS');
+}
+
+export async function getDatabaseHealth(): Promise<Record<string, unknown>> {
+    await initDB();
+    return send<Record<string, unknown>>('GET_DATABASE_HEALTH');
 }
 
 export async function getStorageStatus(): Promise<{ mode: 'opfs' | 'memory'; reason: string | null }> {

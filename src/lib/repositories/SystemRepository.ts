@@ -68,6 +68,10 @@ export const SystemRepository = {
         return await import('../db').then(m => m.getDiagnostics());
     },
 
+    async getDatabaseHealth(): Promise<Record<string, unknown>> {
+        return await import('../db').then(m => m.getDatabaseHealth());
+    },
+
     async getStorageStatus(): Promise<{ mode: 'opfs' | 'memory'; reason: string | null }> {
         return await import('../db').then(m => m.getStorageStatus());
     },

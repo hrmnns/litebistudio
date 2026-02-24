@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Download, Upload, Trash2, CheckCircle2 as Check, AlertCircle } from 'lucide-react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import type { MappingConfig } from './ColumnMapper';
+import { appDialog } from '../../lib/appDialog';
 
 export const MappingManager: React.FC = () => {
     const { t } = useTranslation();
@@ -58,8 +59,8 @@ export const MappingManager: React.FC = () => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleClear = () => {
-        if (confirm(t('datasource.clear_mappings_confirm'))) {
+    const handleClear = async () => {
+        if (await appDialog.confirm(t('datasource.clear_mappings_confirm'))) {
             setSavedMappings({});
             setStatus('success');
             setMessage(t('common.success'));

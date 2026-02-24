@@ -57,6 +57,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Added global SQL `Stop` action in the shared footer near the loading indicator.
   - Added configurable SQL safety defaults in Settings (confirm `SELECT` without `LIMIT`, max rows per SQL run).
   - SQL mode now applies a configurable safety cap for returned row count to keep UI responsive on very large datasets.
+- System Health diagnostics expansion:
+  - Added comprehensive database health checks (integrity check, FK check, system table presence, invalid view detection, index coverage on large tables).
+  - Added deeper data-quality/performance checks (NOT NULL violations, high NULL ratios, duplicate key candidates, EXPLAIN full-scan risk detection).
+  - Added per-finding severity/status scoring and actionable recommendations.
+  - Added Quick-Fix support for index-related findings directly from diagnostics.
+- Storage and environment diagnostics:
+  - Added `Environment & Settings Health` checks in the storage diagnostics tab (quota, local/session storage footprint, destructive-confirm setting, log level, backup timestamp).
+  - Added per-check detail expansion for storage/environment findings.
+- Settings enhancements:
+  - Added direct language selection in `General` settings.
+  - Added toggle to show/hide language switch in sidebar footer.
+  - Added toggle to show/hide `System Status` entry in sidebar footer.
+  - Added direct `Open Health Check` entry in `General` settings.
+- Factory reset hardening:
+  - Factory reset now also clears local environment settings (relevant local/session storage keys) in addition to recreating the database.
 
 ### Changed
 - Data Inspector SQL suggestion UI was moved to a floating overlay and positioned near the current cursor line to reduce editor obstruction.
@@ -84,6 +99,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Removed obsolete drag-handle and duplicate maximize actions from tile headers.
   - Unified system-tile and custom-tile remove affordance with consistent floating remove button behavior.
 - Fixed dashboard tile hover visuals by aligning hover-overlay border radius with tile radius.
+- System Health modal UX/layout:
+  - Added sub-tabs in database diagnostics (`Database Health Check` / `Table Statistics`) for better space usage.
+  - Stabilized modal height across tab switches and improved internal scroll behavior.
+  - Optimized storage tab layout to better use available space (responsive two-column layout on larger screens, reduced unnecessary outer scrollbar).
+  - Kept check summary values always visible while moving additional context into expandable details.
+- Settings information architecture:
+  - Renamed first settings tab from `Appearance` to `General`.
+  - Split `General` into separate panels (`Appearance`, `Language`, `Diagnostics`) with consistent card styling.
+  - Split `Security` into two separate panels (`Access Restriction`, `Admin Mode`) for cleaner structure.
+- Report Packages responsive actions:
+  - On small screens, package-level action buttons (e.g. `Add Page`, `Export`) now render icon-only and show labels from `sm` breakpoint upward.
 
 ### Fixed
 - Excel append import now ignores non-schema helper fields (e.g., `_rowid`) to prevent SQLite insert errors.
@@ -91,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Re-enabled import mapping flow before append import, including persisted column mappings and transformer application.
 - Fixed table/view inspection behavior by handling view sources without `rowid` assumptions.
 - Fixed index discovery/rendering reliability in schema inspection (including case-insensitive lookup and refresh behavior when opening schema dialogs).
+- Disabled detail-toggle actions in diagnostics when no additional details are available.
 
 ## [1.0.0] - 2026-02-23
 

@@ -12,6 +12,7 @@ import { COMPONENTS } from '../../config/components';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow, WidgetConfig } from '../../types';
 import { createLogger } from '../../lib/logger';
+import { appDialog } from '../../lib/appDialog';
 
 const logger = createLogger('CustomDashboardView');
 
@@ -176,7 +177,7 @@ export const CustomDashboardView: React.FC = () => {
     };
 
     const deleteCustomWidget = async (id: string) => {
-        if (confirm(t('dashboard.confirm_delete_report'))) {
+        if (await appDialog.confirm(t('dashboard.confirm_delete_report'))) {
             await SystemRepository.executeRaw(`DELETE FROM sys_user_widgets WHERE id = '${id}'`);
             refreshCustomWidgets();
             removeFromDashboard(id);
@@ -200,7 +201,7 @@ export const CustomDashboardView: React.FC = () => {
 
     const removeDashboard = async (id: string) => {
         if (dashboards.length <= 1) return;
-        if (!confirm(t('dashboard.delete_confirm'))) return;
+        if (!(await appDialog.confirm(t('dashboard.delete_confirm')))) return;
 
         await SystemRepository.deleteDashboard(id);
         const filtered = dashboards.filter(d => d.id !== id);
@@ -505,8 +506,8 @@ export const CustomDashboardView: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
-                                    onClick={() => {
-                                        const newName = prompt('Name fÃ¼r Dashboard:', d.name);
+                                    onClick={async () => {
+                                        const newName = await appDialog.prompt('Name fuer Dashboard:', { defaultValue: d.name });
                                         if (newName && newName !== d.name) {
                                             syncDashboard({ ...d, name: newName });
                                         }

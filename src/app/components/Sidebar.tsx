@@ -5,6 +5,7 @@ import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, C
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 interface SidebarProps {
     isCollapsed: boolean;
@@ -35,6 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const { t, i18n } = useTranslation();
     const { visibleSidebarComponentIds, lockApp } = useDashboard();
     const [isPinActive, setIsPinActive] = React.useState(!!localStorage.getItem('litebistudio_app_pin'));
+    const [showLanguageSwitch, setShowLanguageSwitch] = useLocalStorage<boolean>('ui_sidebar_show_language_switch', true);
+    const [showSystemStatus, setShowSystemStatus] = useLocalStorage<boolean>('ui_sidebar_show_system_status', true);
 
     React.useEffect(() => {
         const handlePinChange = () => {
@@ -43,6 +46,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         window.addEventListener('pin-changed', handlePinChange);
         return () => window.removeEventListener('pin-changed', handlePinChange);
     }, []);
+
+    React.useEffect(() => {
+        const handleLanguageVisibilityChange = (event: Event) => {
+            const customEvent = event as CustomEvent<{ visible?: boolean }>;
+            if (typeof customEvent.detail?.visible === 'boolean') {
+                setShowLanguageSwitch(customEvent.detail.visible);
+            }
+        };
+        window.addEventListener('sidebar-language-visibility-changed', handleLanguageVisibilityChange as EventListener);
+        return () => window.removeEventListener('sidebar-language-visibility-changed', handleLanguageVisibilityChange as EventListener);
+    }, [setShowLanguageSwitch]);
+
+    React.useEffect(() => {
+        const handleSystemStatusVisibilityChange = (event: Event) => {
+            const customEvent = event as CustomEvent<{ visible?: boolean }>;
+            if (typeof customEvent.detail?.visible === 'boolean') {
+                setShowSystemStatus(customEvent.detail.visible);
+            }
+        };
+        window.addEventListener('sidebar-system-status-visibility-changed', handleSystemStatusVisibilityChange as EventListener);
+        return () => window.removeEventListener('sidebar-system-status-visibility-changed', handleSystemStatusVisibilityChange as EventListener);
+    }, [setShowSystemStatus]);
 
     const toggleLanguage = () => {
         const nextLng = i18n.language.startsWith('de') ? 'en' : 'de';
@@ -157,16 +182,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <div className={`p-4 border-t border-slate-300 dark:border-slate-700 transition-all space-y-1 ${isCollapsed ? 'md:p-2 md:py-4' : ''}`}>
-                    <button
-                        onClick={toggleLanguage}
-                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
-                        title={i18n.language.startsWith('de') ? 'Switch to English' : 'Auf Deutsch umstellen'}
-                    >
-                        <Globe className="w-5 h-5 flex-shrink-0" />
-                        <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>
-                            {i18n.language.startsWith('de') ? 'English' : 'Deutsch'}
-                        </span>
-                    </button>
+                    {showLanguageSwitch && (
+                        <button
+                            onClick={toggleLanguage}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
+                            title={i18n.language.startsWith('de') ? 'Switch to English' : 'Auf Deutsch umstellen'}
+                        >
+                            <Globe className="w-5 h-5 flex-shrink-0" />
+                            <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>
+                                {i18n.language.startsWith('de') ? 'English' : 'Deutsch'}
+                            </span>
+                        </button>
+                    )}
                     <NavLink
                         to="/settings"
                         onClick={onCloseMobile}
@@ -194,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                     )}
 
-                    <SystemStatus isCollapsed={isCollapsed} />
+                    {showSystemStatus && <SystemStatus isCollapsed={isCollapsed} />}
                 </div>
             </div>
         </aside >

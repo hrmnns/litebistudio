@@ -47,6 +47,24 @@ interface ImportReport {
     isDowngrade?: boolean;
 }
 
+type HealthSeverity = 'error' | 'warning' | 'info';
+
+interface HealthFinding {
+    severity: HealthSeverity;
+    code: string;
+    title: string;
+    details: string;
+    recommendation?: string;
+}
+
+interface DatabaseHealthReport {
+    status: 'ok' | 'warning' | 'error';
+    score: number;
+    checkedAt: string;
+    checksRun: number;
+    findings: HealthFinding[];
+}
+
 let db: DatabaseLike | null = null;
 let sqlite3: SqliteApiLike | null = null;
 let initPromise: Promise<boolean> | null = null;
@@ -81,6 +99,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function getRowString(row: SqliteRow, key: string): string {
     const val = row[key];
     return typeof val === 'string' ? val : '';
+}
+
+function escapeIdentifier(identifier: string): string {
+    return identifier.replace(/"/g, '""');
 }
 
 function requireDb(): DatabaseLike {
@@ -430,6 +452,11 @@ async function handleMessage(e: MessageEvent) {
                 result = getDiagnostics();
                 break;
 
+            case 'GET_DATABASE_HEALTH':
+                if (!db) await initDB();
+                result = getDatabaseHealth();
+                break;
+
             case 'GET_STORAGE_STATUS':
                 if (!db) await initDB();
                 result = {
@@ -591,6 +618,427 @@ function getDiagnostics() {
         schemaVersion: database.selectValue('PRAGMA user_version') as number,
         storageMode: dbStorageMode,
         storageReason: dbStorageReason
+    };
+}
+
+function getDatabaseHealth(): DatabaseHealthReport {
+    const database = requireDb();
+    const findings: HealthFinding[] = [];
+    let checksRun = 0;
+
+    const addFinding = (
+        severity: HealthSeverity,
+        code: string,
+        title: string,
+        details: string,
+        recommendation?: string
+    ) => {
+        findings.push({ severity, code, title, details, recommendation });
+    };
+
+    checksRun += 1;
+    try {
+        const integrity = String(database.selectValue('PRAGMA integrity_check') ?? '');
+        if (integrity.toLowerCase() !== 'ok') {
+            addFinding(
+                'error',
+                'integrity_check_failed',
+                'SQLite integrity check failed',
+                integrity || 'Unknown integrity check result.',
+                'Run backup/export, restore into a fresh database, and investigate file-system issues.'
+            );
+        } else {
+            addFinding('info', 'integrity_check_ok', 'SQLite integrity check passed', 'PRAGMA integrity_check returned OK.');
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'error',
+            'integrity_check_error',
+            'SQLite integrity check could not be executed',
+            getErrorMessage(err),
+            'Retry diagnostics and verify SQLite worker availability.'
+        );
+    }
+
+    checksRun += 1;
+    try {
+        let fkViolations = 0;
+        database.exec({
+            sql: 'PRAGMA foreign_key_check',
+            rowMode: 'object',
+            callback: () => {
+                fkViolations += 1;
+            }
+        });
+        if (fkViolations > 0) {
+            addFinding(
+                'warning',
+                'foreign_key_violations',
+                'Foreign key inconsistencies detected',
+                `${fkViolations} violation(s) reported by PRAGMA foreign_key_check.`,
+                'Review orphaned child rows and repair or remove inconsistent records.'
+            );
+        } else {
+            addFinding('info', 'foreign_key_ok', 'No foreign key inconsistencies found', 'PRAGMA foreign_key_check returned no rows.');
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'foreign_key_check_error',
+            'Foreign key check could not be executed',
+            getErrorMessage(err),
+            'Ensure schema and pragma execution are available in the current SQLite mode.'
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const expectedSystemTables = schemaSql
+            .split(';')
+            .map((stmt) => {
+                const match = stmt.match(/CREATE TABLE (?:IF NOT EXISTS )?([a-z0-9_]+)/i);
+                return match ? match[1] : null;
+            })
+            .filter((name): name is string => Boolean(name) && name!.startsWith('sys_'));
+        const missingSystemTables = expectedSystemTables.filter((tableName) => {
+            const exists = Number(
+                database.selectValue(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?",
+                    [tableName]
+                ) || 0
+            );
+            return exists === 0;
+        });
+        if (missingSystemTables.length > 0) {
+            addFinding(
+                'error',
+                'missing_system_tables',
+                'Required system tables are missing',
+                missingSystemTables.join(', '),
+                'Run migration/bootstrap and restore missing infrastructure tables.'
+            );
+        } else {
+            addFinding('info', 'system_tables_ok', 'All required system tables are present', `Checked ${expectedSystemTables.length} table definitions.`);
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'system_table_check_error',
+            'System table consistency could not be fully checked',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const views: string[] = [];
+        database.exec({
+            sql: "SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'",
+            rowMode: 'object',
+            callback: (row: SqliteRow) => views.push(getRowString(row, 'name'))
+        });
+        const invalidViews: string[] = [];
+        for (const viewName of views) {
+            try {
+                database.exec(`SELECT * FROM "${viewName}" LIMIT 1`);
+            } catch {
+                invalidViews.push(viewName);
+            }
+        }
+        if (invalidViews.length > 0) {
+            addFinding(
+                'warning',
+                'invalid_views',
+                'One or more views are invalid',
+                invalidViews.join(', '),
+                'Recreate or drop broken views and ensure referenced tables/columns exist.'
+            );
+        } else {
+            addFinding('info', 'views_ok', 'All views are valid', `Checked ${views.length} view definition(s).`);
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'view_check_error',
+            'View validation could not be completed',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const userTables: string[] = [];
+        database.exec({
+            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sys_%'",
+            rowMode: 'object',
+            callback: (row: SqliteRow) => userTables.push(getRowString(row, 'name'))
+        });
+        const largeUnindexedTables: string[] = [];
+        for (const tableName of userTables) {
+            const rowCount = Number(database.selectValue(`SELECT COUNT(*) FROM "${tableName}"`) || 0);
+            if (rowCount < 50000) continue;
+            const indexCount = Number(
+                database.selectValue(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND LOWER(tbl_name) = LOWER(?) AND name NOT LIKE 'sqlite_%'",
+                    [tableName]
+                ) || 0
+            );
+            if (indexCount === 0) {
+                largeUnindexedTables.push(`${tableName} (${rowCount} rows)`);
+            }
+        }
+        if (largeUnindexedTables.length > 0) {
+            addFinding(
+                'warning',
+                'large_unindexed_tables',
+                'Large tables without custom indexes detected',
+                largeUnindexedTables.join(', '),
+                'Create indexes for frequently filtered/joined columns in these tables.'
+            );
+        } else {
+            addFinding('info', 'index_coverage_ok', 'No large unindexed user tables detected', 'Threshold: 50,000 rows.');
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'index_coverage_check_error',
+            'Index coverage check could not be completed',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const userTables: string[] = [];
+        database.exec({
+            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sys_%'",
+            rowMode: 'object',
+            callback: (row: SqliteRow) => userTables.push(getRowString(row, 'name'))
+        });
+
+        const nonNullViolations: string[] = [];
+        const highNullRatioColumns: string[] = [];
+
+        for (const tableName of userTables) {
+            const safeTable = escapeIdentifier(tableName);
+            const rowCount = Number(database.selectValue(`SELECT COUNT(*) FROM "${safeTable}"`) || 0);
+            if (rowCount === 0) continue;
+
+            const columns: Array<{ name: string; notnull: number; pk: number }> = [];
+            database.exec({
+                sql: `PRAGMA table_info("${safeTable}")`,
+                rowMode: 'object',
+                callback: (row: SqliteRow) => {
+                    const name = getRowString(row, 'name');
+                    if (!name) return;
+                    columns.push({
+                        name,
+                        notnull: Number(row.notnull || 0),
+                        pk: Number(row.pk || 0)
+                    });
+                }
+            });
+
+            for (const column of columns) {
+                const safeColumn = escapeIdentifier(column.name);
+                const nullCount = Number(
+                    database.selectValue(`SELECT COUNT(*) FROM "${safeTable}" WHERE "${safeColumn}" IS NULL`) || 0
+                );
+
+                if (column.notnull === 1 && nullCount > 0) {
+                    nonNullViolations.push(`${tableName}.${column.name}: ${nullCount}`);
+                }
+
+                if (column.pk === 0) {
+                    const nullRatio = nullCount / rowCount;
+                    if (nullRatio >= 0.7 && nullCount >= 100) {
+                        highNullRatioColumns.push(`${tableName}.${column.name}: ${(nullRatio * 100).toFixed(1)}%`);
+                    }
+                }
+            }
+        }
+
+        if (nonNullViolations.length > 0) {
+            addFinding(
+                'error',
+                'not_null_violations',
+                'NOT NULL violations detected',
+                nonNullViolations.slice(0, 10).join(', ') + (nonNullViolations.length > 10 ? ' ...' : ''),
+                'Repair imported rows or adjust mappings to ensure mandatory fields are always populated.'
+            );
+        } else {
+            addFinding('info', 'not_null_ok', 'No NOT NULL violations detected', 'All checked user tables satisfy mandatory field constraints.');
+        }
+
+        if (highNullRatioColumns.length > 0) {
+            addFinding(
+                'warning',
+                'high_null_ratio_columns',
+                'Columns with high NULL ratio detected',
+                highNullRatioColumns.slice(0, 10).join(', ') + (highNullRatioColumns.length > 10 ? ' ...' : ''),
+                'Review data quality and import mappings for these columns.'
+            );
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'null_quality_check_error',
+            'NULL quality checks could not be completed',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const userTables: string[] = [];
+        database.exec({
+            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sys_%'",
+            rowMode: 'object',
+            callback: (row: SqliteRow) => userTables.push(getRowString(row, 'name'))
+        });
+
+        const duplicateCandidates: string[] = [];
+
+        for (const tableName of userTables) {
+            const safeTable = escapeIdentifier(tableName);
+            const columns: Array<{ name: string; pk: number }> = [];
+            database.exec({
+                sql: `PRAGMA table_info("${safeTable}")`,
+                rowMode: 'object',
+                callback: (row: SqliteRow) => {
+                    const name = getRowString(row, 'name');
+                    if (!name) return;
+                    columns.push({
+                        name,
+                        pk: Number(row.pk || 0)
+                    });
+                }
+            });
+
+            const keyCandidates = columns
+                .filter((column) => {
+                    const lower = column.name.toLowerCase();
+                    return column.pk > 0 || lower === 'id' || lower.endsWith('_id') || lower.endsWith('_key');
+                })
+                .slice(0, 3);
+
+            for (const candidate of keyCandidates) {
+                const safeColumn = escapeIdentifier(candidate.name);
+                const duplicateCount = Number(
+                    database.selectValue(
+                        `SELECT COUNT(*) FROM (
+                            SELECT "${safeColumn}" AS v
+                            FROM "${safeTable}"
+                            WHERE "${safeColumn}" IS NOT NULL
+                            GROUP BY "${safeColumn}"
+                            HAVING COUNT(*) > 1
+                        )`
+                    ) || 0
+                );
+                if (duplicateCount > 0) {
+                    duplicateCandidates.push(`${tableName}.${candidate.name}: ${duplicateCount}`);
+                }
+            }
+        }
+
+        if (duplicateCandidates.length > 0) {
+            addFinding(
+                'warning',
+                'duplicate_key_candidates',
+                'Possible duplicate keys detected',
+                duplicateCandidates.slice(0, 10).join(', ') + (duplicateCandidates.length > 10 ? ' ...' : ''),
+                'Verify key semantics and add UNIQUE indexes where duplicates are not allowed.'
+            );
+        } else {
+            addFinding('info', 'duplicate_candidates_ok', 'No duplicate key candidates found', 'Checked common key-like columns in user tables.');
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'duplicate_check_error',
+            'Duplicate candidate checks could not be completed',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const userTables: string[] = [];
+        database.exec({
+            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sys_%'",
+            rowMode: 'object',
+            callback: (row: SqliteRow) => userTables.push(getRowString(row, 'name'))
+        });
+
+        const fullScanRisks: string[] = [];
+        for (const tableName of userTables) {
+            const safeTable = escapeIdentifier(tableName);
+            const rowCount = Number(database.selectValue(`SELECT COUNT(*) FROM "${safeTable}"`) || 0);
+            if (rowCount < 50000) continue;
+
+            const columns: Array<{ name: string; pk: number }> = [];
+            database.exec({
+                sql: `PRAGMA table_info("${safeTable}")`,
+                rowMode: 'object',
+                callback: (row: SqliteRow) => {
+                    const name = getRowString(row, 'name');
+                    if (!name) return;
+                    columns.push({
+                        name,
+                        pk: Number(row.pk || 0)
+                    });
+                }
+            });
+            const candidate = columns.find((column) => column.pk > 0) || columns[0];
+            if (!candidate) continue;
+            const safeColumn = escapeIdentifier(candidate.name);
+
+            const planDetails: string[] = [];
+            database.exec({
+                sql: `EXPLAIN QUERY PLAN SELECT * FROM "${safeTable}" WHERE "${safeColumn}" = ? LIMIT 1`,
+                bind: [0],
+                rowMode: 'object',
+                callback: (row: SqliteRow) => {
+                    planDetails.push(getRowString(row, 'detail').toUpperCase());
+                }
+            });
+
+            if (planDetails.some((detail) => detail.includes('SCAN'))) {
+                fullScanRisks.push(`${tableName} (column: ${candidate.name})`);
+            }
+        }
+
+        if (fullScanRisks.length > 0) {
+            addFinding(
+                'warning',
+                'query_plan_full_scan_risk',
+                'EXPLAIN detected full-scan risks on large tables',
+                fullScanRisks.join(', '),
+                'Add indexes for frequently queried columns and validate plans in the inspector with EXPLAIN.'
+            );
+        } else {
+            addFinding('info', 'query_plan_ok', 'No EXPLAIN full-scan risks detected for sampled key lookups', 'Checked large user tables with representative key filters.');
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'query_plan_check_error',
+            'EXPLAIN-based performance checks could not be completed',
+            getErrorMessage(err)
+        );
+    }
+
+    const errorCount = findings.filter((finding) => finding.severity === 'error').length;
+    const warningCount = findings.filter((finding) => finding.severity === 'warning').length;
+    const infoCount = findings.filter((finding) => finding.severity === 'info').length;
+    const score = Math.max(0, 100 - (errorCount * 25) - (warningCount * 10) - (infoCount * 1));
+
+    return {
+        status: errorCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'ok',
+        score,
+        checkedAt: new Date().toISOString(),
+        checksRun,
+        findings
     };
 }
 

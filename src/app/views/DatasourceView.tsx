@@ -18,6 +18,7 @@ import { Lock, Unlock } from 'lucide-react';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { TableIndexInfo } from '../../lib/repositories/SystemRepository';
 import { createLogger } from '../../lib/logger';
+import { appDialog } from '../../lib/appDialog';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -48,6 +49,52 @@ interface ViewMetaStatus {
 }
 
 const logger = createLogger('DatasourceView');
+
+const FACTORY_RESET_LOCALSTORAGE_PREFIXES = [
+    'litebistudio_',
+    'data_inspector_',
+    'query_builder_',
+    'data_table_',
+    'ui_table_',
+    'notifications_',
+    'import_'
+];
+
+const FACTORY_RESET_LOCALSTORAGE_KEYS = new Set([
+    'app_log_level',
+    'custom_dashboard_layout',
+    'excel_mappings_v2',
+    'i18nextLng',
+    'visibleComponentIds',
+    'visibleSidebarComponentIds',
+    'componentOrder',
+    'isSidebarCollapsed'
+]);
+
+const FACTORY_RESET_SESSIONSTORAGE_PREFIXES = [
+    'litebistudio_',
+    'data_inspector_',
+    'query_builder_'
+];
+
+const resetEnvironmentSettings = (): void => {
+    const localKeys = Object.keys(window.localStorage);
+    for (const key of localKeys) {
+        if (
+            FACTORY_RESET_LOCALSTORAGE_KEYS.has(key) ||
+            FACTORY_RESET_LOCALSTORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))
+        ) {
+            window.localStorage.removeItem(key);
+        }
+    }
+
+    const sessionKeys = Object.keys(window.sessionStorage);
+    for (const key of sessionKeys) {
+        if (FACTORY_RESET_SESSIONSTORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+            window.sessionStorage.removeItem(key);
+        }
+    }
+};
 
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
     const { t, i18n } = useTranslation();
@@ -247,47 +294,47 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             refreshTables();
             setNewTableName('');
             setCreateColumns([{ name: 'id', type: 'INTEGER PRIMARY KEY' }]);
-            alert(t('datasource.table_created'));
+            await appDialog.info(t('datasource.table_created'));
         } catch (error: unknown) {
-            alert(t('common.error') + ': ' + getErrorMessage(error));
+            await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
     const handleDropTable = async (tableName: string) => {
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
-        if (shouldConfirm && !confirm(t('datasource.drop_confirm', { name: tableName }))) return;
+        if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_confirm', { name: tableName })))) return;
         try {
             await SystemRepository.executeRaw(`DROP TABLE ${tableName}`);
             refreshTables();
             refreshDataSources();
             if (selectedTable === tableName) setSelectedTable('');
         } catch (error: unknown) {
-            alert(t('common.error') + ': ' + getErrorMessage(error));
+            await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
     const handleDropView = async (viewName: string) => {
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
-        if (shouldConfirm && !confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName }))) return;
+        if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName })))) return;
         try {
             await SystemRepository.executeRaw(`DROP VIEW ${viewName}`);
             refreshTables();
             refreshDataSources();
             if (selectedTable === viewName) setSelectedTable('');
         } catch (error: unknown) {
-            alert(t('common.error') + ': ' + getErrorMessage(error));
+            await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
     const handleClearTable = async (tableName: string) => {
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
-        if (shouldConfirm && !confirm(t('datasource.clear_confirm', { name: tableName }))) return;
+        if (shouldConfirm && !(await appDialog.confirm(t('datasource.clear_confirm', { name: tableName })))) return;
         try {
             await SystemRepository.executeRaw(`DELETE FROM ${tableName}`);
             refreshTables();
-            alert(t('datasource.cleared_success'));
+            await appDialog.info(t('datasource.cleared_success'));
         } catch (error: unknown) {
-            alert(t('common.error') + ': ' + getErrorMessage(error));
+            await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
@@ -305,7 +352,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             setIndexName(`idx_${tableName}_`);
             setIsCreateIndexOpen(true);
         } catch (error: unknown) {
-            alert(t('common.error') + ': ' + getErrorMessage(error));
+            await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
@@ -332,11 +379,11 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const handleCreateIndex = async () => {
         const trimmedName = indexName.trim();
         if (!trimmedName) {
-            alert(t('datasource.index_create_name_required', 'Bitte einen Indexnamen angeben.'));
+            await appDialog.warning(t('datasource.index_create_name_required', 'Bitte einen Indexnamen angeben.'));
             return;
         }
         if (indexColumns.length === 0) {
-            alert(t('datasource.index_create_columns_required', 'Bitte mindestens eine Spalte auswählen.'));
+            await appDialog.warning(t('datasource.index_create_columns_required', 'Bitte mindestens eine Spalte auswählen.'));
             return;
         }
         try {
@@ -347,9 +394,9 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             await SystemRepository.executeRaw(sql);
             setIsCreateIndexOpen(false);
             await refreshTables();
-            alert(t('datasource.index_create_success', 'Index erstellt.'));
+            await appDialog.info(t('datasource.index_create_success', 'Index erstellt.'));
         } catch (error: unknown) {
-            alert(t('common.error') + ': ' + getErrorMessage(error));
+            await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
         }
     };
 
@@ -696,7 +743,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                     <button
                                         onClick={async () => {
                                             if (useEncryption && backupPassword.length < 4) {
-                                                alert(t('datasource.backup_password_error'));
+                                                await appDialog.warning(t('datasource.backup_password_error'));
                                                 return;
                                             }
 
@@ -754,7 +801,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
                                                     if (!isSqlite) {
                                                         // Assume encrypted
-                                                        const pwd = prompt(t('datasource.restore_encrypted_prompt'));
+                                                        const pwd = await appDialog.prompt(t('datasource.restore_encrypted_prompt'));
                                                         if (!pwd) return;
 
                                                         try {
@@ -770,7 +817,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                         }
                                                     }
 
-                                                    if (confirm(t('datasource.restore_confirm'))) {
+                                                    if (await appDialog.confirm(t('datasource.restore_confirm'))) {
                                                         logger.info(`[Restore][${logTime()}] User confirmed restore. Starting process...`);
                                                         setRestoreAlert({
                                                             type: 'warning',
@@ -948,25 +995,26 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             <button
                                                 disabled={isResetting}
                                                 onClick={async () => {
-                                                    const confirmText = t('datasource.factory_reset_confirm', 'Bist du sicher? Alle Daten, Dashboards und Widgets werden endgültig gelöscht. Dies kann nicht rückgängig gemacht werden!');
-                                                    if (confirm(confirmText)) {
-                                                        const promptText = prompt(t('datasource.factory_reset_prompt', 'Bitte tippe "RESET" ein, um fortzufahren:'));
+                                                    const confirmText = t('datasource.factory_reset_confirm', 'Bist du sicher? Alle Daten (inkl. Tabellen, Views und Indizes), Dashboards, Widgets und lokale Einstellungen werden endgueltig geloescht. Dies kann nicht rueckgaengig gemacht werden!');
+                                                    if (await appDialog.confirm(confirmText)) {
+                                                        const promptText = await appDialog.prompt(t('datasource.factory_reset_prompt', 'Bitte tippe "RESET" ein, um fortzufahren:'));
                                                         if (promptText === 'RESET') {
                                                             try {
                                                                 setIsResetting(true);
                                                                 const { factoryResetDatabase } = await import('../../lib/db');
                                                                 await factoryResetDatabase();
-                                                                alert(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));
+                                                                resetEnvironmentSettings();
+                                                                await appDialog.info(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));
                                                                 markBackupComplete();
                                                                 sessionStorage.removeItem('litebistudio_datasource_tab');
                                                                 window.location.hash = '#/';
                                                                 window.location.reload();
                                                             } catch (err: unknown) {
                                                                 setIsResetting(false);
-                                                                alert(getErrorMessage(err));
+                                                                await appDialog.error(getErrorMessage(err));
                                                             }
                                                         } else if (promptText !== null) {
-                                                            alert(t('datasource.factory_reset_aborted', 'Abgebrochen: Falsche Eingabe.'));
+                                                            await appDialog.warning(t('datasource.factory_reset_aborted', 'Abgebrochen: Falsche Eingabe.'));
                                                         }
                                                     }
                                                 }}
@@ -976,7 +1024,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 {t('datasource.factory_reset_btn', 'Komplett zurücksetzen')}
                                             </button>
                                         </div>
-                                        <p className="text-[10px] text-slate-400 italic">{t('datasource.factory_reset_hint', 'Löscht die gesamte Datenbank und erstellt ein frisches, leeres Schema der neuesten Version.')}</p>
+                                        <p className="text-[10px] text-slate-400 italic">{t('datasource.factory_reset_hint', 'Loescht die gesamte Datenbank inklusive Tabellen, Views und Indizes, setzt lokale Einstellungen zurueck und erstellt ein frisches, leeres Schema der neuesten Version.')}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1143,3 +1191,4 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         </PageLayout >
     );
 };
+
