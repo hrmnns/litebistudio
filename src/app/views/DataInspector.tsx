@@ -6,7 +6,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable, type Column, type DataTableSortConfig } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
-import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, ChevronDown, Save } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, ChevronDown, Save, ListPlus } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow } from '../../types';
@@ -67,7 +67,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [saveWidgetDescription, setSaveWidgetDescription] = useState('');
     const [saveToBuilderError, setSaveToBuilderError] = useState('');
     const [isSavingToBuilder, setIsSavingToBuilder] = useState(false);
-    const [sqlEditorHeight, setSqlEditorHeight] = useLocalStorage<number>('data_inspector_sql_editor_height', 160);
+    const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
+    const [indexName, setIndexName] = useState('');
+    const [indexColumns, setIndexColumns] = useState<string[]>([]);
+    const [indexUnique, setIndexUnique] = useState(false);
+    const [indexWhere, setIndexWhere] = useState('');
+    const [isCreatingIndex, setIsCreatingIndex] = useState(false);
+    const [storedSqlEditorHeight, setStoredSqlEditorHeight] = useLocalStorage<number>('data_inspector_sql_editor_height', 160);
+    const [sqlEditorHeight, setSqlEditorHeight] = useState(storedSqlEditorHeight);
     const sqlInputRef = useRef<HTMLTextAreaElement | null>(null);
     const [sqlCursor, setSqlCursor] = useState(0);
     const [autocompleteOpen, setAutocompleteOpen] = useState(false);
@@ -99,14 +106,15 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     );
     const [savedViews, setSavedViews] = useLocalStorage<InspectorViewPreset[]>('data_inspector_saved_views', []);
     const [activeViewId, setActiveViewId] = useLocalStorage<string>('data_inspector_active_view', '');
-    const [showProfiling, setShowProfiling] = useLocalStorage<boolean>('data_inspector_show_profiling', true);
-    const [profilingHeight, setProfilingHeight] = useLocalStorage<number>('data_inspector_profiling_height', 235);
+    const [defaultShowProfiling] = useLocalStorage<boolean>('data_inspector_show_profiling', true);
+    const [tableResultTab, setTableResultTab] = useState<'data' | 'profiling'>(defaultShowProfiling ? 'profiling' : 'data');
     const [profilingThresholds, setProfilingThresholds] = useLocalStorage<ProfilingThresholds>('data_inspector_profiling_thresholds', {
         nullRate: 30,
         cardinalityRate: 95
     });
-    const [isResizingProfile, setIsResizingProfile] = useState(false);
-    const resizeStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
+    const [isResizingSqlPane, setIsResizingSqlPane] = useState(false);
+    const sqlPaneResizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
+    const sqlPaneLiveHeightRef = useRef<number>(sqlEditorHeight);
 
     useEffect(() => {
         setShowTableFilters(defaultShowFilters);
@@ -399,6 +407,65 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         setActiveViewId('');
     };
 
+    const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
+
+    const openCreateIndexModal = () => {
+        if (!selectedTable || selectedSourceType !== 'table') return;
+        setIndexName(`idx_${selectedTable}_`);
+        setIndexColumns([]);
+        setIndexUnique(false);
+        setIndexWhere('');
+        setIsCreateIndexOpen(true);
+    };
+
+    const toggleIndexColumn = (column: string) => {
+        setIndexColumns(prev => (
+            prev.includes(column)
+                ? prev.filter(col => col !== column)
+                : [...prev, column]
+        ));
+    };
+
+    const moveIndexColumn = (column: string, direction: 'up' | 'down') => {
+        setIndexColumns(prev => {
+            const index = prev.indexOf(column);
+            if (index === -1) return prev;
+            const nextIndex = direction === 'up' ? index - 1 : index + 1;
+            if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+            const next = [...prev];
+            [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+            return next;
+        });
+    };
+
+    const handleCreateIndex = async () => {
+        const trimmedName = indexName.trim();
+        if (!selectedTable || selectedSourceType !== 'table') return;
+        if (!trimmedName) {
+            alert(t('datasource.index_create_name_required', 'Please provide an index name.'));
+            return;
+        }
+        if (indexColumns.length === 0) {
+            alert(t('datasource.index_create_columns_required', 'Please select at least one column.'));
+            return;
+        }
+        setIsCreatingIndex(true);
+        try {
+            const uniqueSql = indexUnique ? 'UNIQUE ' : '';
+            const quotedCols = indexColumns.map(quoteIdentifier).join(', ');
+            const whereSql = indexWhere.trim() ? ` WHERE ${indexWhere.trim()}` : '';
+            const sql = `CREATE ${uniqueSql}INDEX ${quoteIdentifier(trimmedName)} ON ${quoteIdentifier(selectedTable)} (${quotedCols})${whereSql};`;
+            await SystemRepository.executeRaw(sql);
+            setIsCreateIndexOpen(false);
+            execute();
+            alert(t('datasource.index_create_success', 'Index created.'));
+        } catch (err) {
+            alert(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+            setIsCreatingIndex(false);
+        }
+    };
+
     // Generate Columns dynamically
     const columns: Column<DbRow>[] = React.useMemo(() => {
         if (!items || items.length === 0) return [];
@@ -621,6 +688,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         if (!textarea) return;
 
         const observer = new ResizeObserver((entries) => {
+            if (isResizingSqlPane) return;
             const entry = entries[0];
             if (!entry) return;
             const next = Math.round(entry.contentRect.height);
@@ -632,7 +700,19 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
         observer.observe(textarea);
         return () => observer.disconnect();
-    }, [setSqlEditorHeight, sqlEditorHeight, mode]);
+    }, [sqlEditorHeight, mode, isResizingSqlPane]);
+
+    useEffect(() => {
+        setSqlEditorHeight(storedSqlEditorHeight);
+    }, [storedSqlEditorHeight]);
+
+    useEffect(() => {
+        if (sqlEditorHeight === storedSqlEditorHeight) return;
+        const persistTimer = window.setTimeout(() => {
+            setStoredSqlEditorHeight(sqlEditorHeight);
+        }, 180);
+        return () => window.clearTimeout(persistTimer);
+    }, [sqlEditorHeight, storedSqlEditorHeight, setStoredSqlEditorHeight]);
 
     const profiling = React.useMemo(() => {
         if (mode !== 'table' || !items || items.length === 0) return [];
@@ -724,28 +804,34 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         [profiling]
     );
 
-    const startProfileResize = (event: React.MouseEvent<HTMLDivElement>) => {
+    const startSqlPaneResize = (event: React.MouseEvent<HTMLDivElement>) => {
         event.preventDefault();
-        resizeStateRef.current = { startY: event.clientY, startHeight: profilingHeight };
-        setIsResizingProfile(true);
+        sqlPaneResizeRef.current = { startY: event.clientY, startHeight: sqlEditorHeight };
+        sqlPaneLiveHeightRef.current = sqlEditorHeight;
+        setIsResizingSqlPane(true);
     };
 
     useEffect(() => {
-        if (!isResizingProfile) return;
+        if (!isResizingSqlPane) return;
 
         const handleMouseMove = (event: MouseEvent) => {
-            const state = resizeStateRef.current;
+            const state = sqlPaneResizeRef.current;
             if (!state) return;
             const delta = event.clientY - state.startY;
-            const minHeight = 140;
-            const maxHeight = Math.max(220, Math.floor(window.innerHeight * 0.45));
+            const minHeight = 120;
+            const maxHeight = Math.max(260, Math.floor(window.innerHeight * 0.62));
             const nextHeight = Math.max(minHeight, Math.min(maxHeight, state.startHeight + delta));
-            setProfilingHeight(nextHeight);
+            sqlPaneLiveHeightRef.current = nextHeight;
+            if (sqlInputRef.current) {
+                sqlInputRef.current.style.height = `${nextHeight}px`;
+            }
         };
 
         const handleMouseUp = () => {
-            setIsResizingProfile(false);
-            resizeStateRef.current = null;
+            const nextHeight = Math.round(sqlPaneLiveHeightRef.current);
+            setSqlEditorHeight(nextHeight);
+            setIsResizingSqlPane(false);
+            sqlPaneResizeRef.current = null;
         };
 
         document.body.style.cursor = 'row-resize';
@@ -759,14 +845,18 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isResizingProfile, setProfilingHeight]);
+    }, [isResizingSqlPane, setSqlEditorHeight]);
 
     return (
         <PageLayout
             header={{
                 title: t('sidebar.data_inspector'),
                 subtitle: t('datainspector.subtitle', {
-                    count: mode === 'sql' && sqlOutputView === 'explain' ? explainRows.length : (items?.length || 0),
+                    count: mode === 'sql' && sqlOutputView === 'explain'
+                        ? explainRows.length
+                        : mode === 'table' && tableResultTab === 'profiling'
+                            ? profiling.length
+                            : (items?.length || 0),
                     mode: mode === 'table' ? selectedTable : t('datainspector.sql_mode')
                 }),
                 onBack,
@@ -842,7 +932,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             {/* Controls Row: Selection or SQL Editor */}
             {mode === 'table' ? (
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
-                    <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_auto] gap-3 2xl:items-center">
+                    <div className="grid grid-cols-1 gap-3">
                         <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,320px)_minmax(280px,1fr)_auto] gap-3">
                             <div className="relative min-w-0">
                             <select
@@ -856,7 +946,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     setActiveViewId('');
                                     setCurrentPage(1);
                                 }}
-                                className="appearance-none pl-10 pr-10 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium"
+                                className="w-full h-10 appearance-none pl-10 pr-10 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium"
                             >
                                 {dataSources?.map(source => (
                                     <option key={source.name} value={source.name}>
@@ -864,8 +954,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     </option>
                                 ))}
                             </select>
-                            <Database className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
-                            <div className="absolute right-3 top-3.5 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
+                            <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
                         </div>
 
                             <div className="relative min-w-0">
@@ -877,9 +967,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     setSearchTerm(e.target.value);
                                     setCurrentPage(1);
                                 }}
-                                className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full h-10 pl-10 pr-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
-                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         </div>
 
                             <button
@@ -889,60 +979,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             >
                                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                                 <span>{t('common.refresh', 'Refresh')}</span>
-                            </button>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 min-w-0">
-                            <select
-                                value={activeViewId}
-                                onChange={(e) => {
-                                    const nextId = e.target.value;
-                                    setActiveViewId(nextId);
-                                if (!nextId) return;
-                                    const preset = savedViews.find(v => v.id === nextId);
-                                    if (preset) applyViewPreset(preset);
-                                }}
-                                className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white outline-none min-w-[180px]"
-                            >
-                                <option value="">{t('datainspector.select_view')}</option>
-                                {savedViews.map(view => (
-                                    <option key={view.id} value={view.id}>{view.name}</option>
-                                ))}
-                            </select>
-                            <button
-                                onClick={handleSaveCurrentView}
-                                className="h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
-                            >
-                                {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
-                            </button>
-                            <button
-                                onClick={handleDeleteCurrentView}
-                                disabled={!activeViewId}
-                                className="h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
-                            >
-                                {t('datainspector.delete_view')}
-                            </button>
-                            <div className="h-10 px-3 inline-flex items-center rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-500 font-semibold">
-                                {t('datainspector.auto_limit', { limit: pageSize })}
-                            </div>
-                            <select
-                                value={String(pageSize)}
-                                onChange={(e) => {
-                                    setPageSize(Number(e.target.value));
-                                    setCurrentPage(1);
-                                }}
-                                className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white outline-none"
-                                title={t('datainspector.page_size')}
-                            >
-                                {[50, 100, 250, 500].map(size => (
-                                    <option key={size} value={size}>{t('datainspector.page_size_value', { size })}</option>
-                                ))}
-                            </select>
-                            <button
-                                onClick={() => setShowProfiling(!showProfiling)}
-                                className="h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
-                            >
-                                {showProfiling ? t('datainspector.hide_profile') : t('datainspector.show_profile')}
                             </button>
                         </div>
                     </div>
@@ -1194,134 +1230,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 </div>
             )}
 
-            {mode === 'table' && showProfiling && (
-                <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
-                    <div className="flex items-center justify-between mb-2">
-                        <div>
-                            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">{t('datainspector.profiling_title')}</h3>
-                            <p className="text-[11px] text-slate-400">{t('datainspector.profiling_subtitle', { count: items?.length || 0 })}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="text-[11px] text-slate-500 font-semibold">
-                                {t('datainspector.profiling_issues', { count: profilingIssueCount })}
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px]">
-                                <span className="text-slate-400 font-semibold uppercase tracking-wider">{t('datainspector.thresholds')}</span>
-                                <label className="flex items-center gap-1 text-slate-500">
-                                    <span>{t('datainspector.null_threshold')}</span>
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        value={profilingThresholds.nullRate}
-                                        onChange={(e) => {
-                                            const value = Number(e.target.value);
-                                            if (Number.isNaN(value)) return;
-                                            setProfilingThresholds({ ...profilingThresholds, nullRate: Math.max(0, Math.min(100, value)) });
-                                        }}
-                                        className="w-14 px-1.5 py-0.5 border border-slate-200 rounded bg-white text-slate-700"
-                                    />
-                                    <span>%</span>
-                                </label>
-                                <label className="flex items-center gap-1 text-slate-500">
-                                    <span>{t('datainspector.cardinality_threshold')}</span>
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        value={profilingThresholds.cardinalityRate}
-                                        onChange={(e) => {
-                                            const value = Number(e.target.value);
-                                            if (Number.isNaN(value)) return;
-                                            setProfilingThresholds({ ...profilingThresholds, cardinalityRate: Math.max(0, Math.min(100, value)) });
-                                        }}
-                                        className="w-14 px-1.5 py-0.5 border border-slate-200 rounded bg-white text-slate-700"
-                                    />
-                                    <span>%</span>
-                                </label>
-                                <button
-                                    onClick={() => setProfilingThresholds({ nullRate: 30, cardinalityRate: 95 })}
-                                    className="px-2 py-0.5 rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                                >
-                                    {t('datainspector.reset_thresholds')}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    {profiling.length === 0 ? (
-                        <div className="text-xs text-slate-400">{t('datainspector.no_profile')}</div>
-                    ) : (
-                        <div className="overflow-auto overflow-y-auto pr-1 custom-scrollbar" style={{ height: profilingHeight }}>
-                            <table className="w-full text-xs min-w-[760px]">
-                                <thead className="text-slate-400 uppercase text-[10px] sticky top-0 bg-white dark:bg-slate-800 z-[1]">
-                                    <tr>
-                                        <th className="text-left py-1.5 px-2">{t('querybuilder.value')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.type')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.distinct_values')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.null_rate')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.min')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.max')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.top_values')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.patterns')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.suspicious_values')}</th>
-                                        <th className="text-left py-1.5 px-2">{t('datainspector.issues')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {profiling.map(col => (
-                                        <tr key={col.key} className="border-t border-slate-100 dark:border-slate-700">
-                                            <td className="py-1.5 px-2 font-semibold text-slate-700 dark:text-slate-200">{col.key}</td>
-                                            <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">
-                                                {t(`datainspector.type_${col.detectedType}`)}
-                                            </td>
-                                            <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.distinctCount}</td>
-                                            <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.nullRate.toFixed(1)}%</td>
-                                            <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.min ?? '-'}</td>
-                                            <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.max ?? '-'}</td>
-                                            <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300 truncate max-w-[260px]" title={col.topValues.map(v => `${v[0]} (${v[1]})`).join(', ')}>
-                                                {col.topValues.length > 0 ? col.topValues.map(v => `${v[0]} (${v[1]})`).join(', ') : '-'}
-                                            </td>
-                                            <td className="py-1.5 px-2">
-                                                {col.patterns.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {col.patterns.map((pattern) => (
-                                                            <span key={pattern} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold">
-                                                                {t(`datainspector.pattern_${pattern}`)}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
-                                            </td>
-                                            <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.suspiciousCount}</td>
-                                            <td className="py-1.5 px-2">
-                                                {col.issues.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {col.issues.map(issue => (
-                                                            <span key={issue} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold">
-                                                                {t(`datainspector.issue_${issue}`)}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {mode === 'table' && showProfiling && (
+            {mode === 'sql' && (
                 <div
-                    onMouseDown={startProfileResize}
-                    className={`h-3 -mt-2 -mb-1 flex items-center justify-center cursor-row-resize ${isResizingProfile ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
-                    title={t('datainspector.resize_profile')}
+                    onMouseDown={startSqlPaneResize}
+                    className={`h-3 -mt-2 -mb-1 flex items-center justify-center cursor-row-resize ${isResizingSqlPane ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
+                    title={t('datainspector.resize_sql_split', 'Resize SQL and results panes')}
                 >
                     <div className="h-1 w-12 rounded-full bg-slate-300 dark:bg-slate-600" />
                 </div>
@@ -1365,6 +1278,134 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                     </div>
                 )}
 
+                {mode === 'table' && (
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 flex items-center justify-between gap-3">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
+                            <button
+                                onClick={() => setTableResultTab('data')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableResultTab === 'data'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100'
+                                    }`}
+                            >
+                                {t('datainspector.result_tab_data', 'Data')}
+                            </button>
+                            <button
+                                onClick={() => setTableResultTab('profiling')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableResultTab === 'profiling'
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100'
+                                    }`}
+                            >
+                                {t('datainspector.result_tab_profile', 'Profiling')}
+                            </button>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                            {tableResultTab === 'profiling'
+                                ? t('datainspector.profiling_issues', { count: profilingIssueCount })
+                                : t('datainspector.auto_limit', { limit: pageSize })}
+                        </span>
+                    </div>
+                )}
+
+                {mode === 'table' && tableResultTab === 'profiling' && (
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between gap-3 text-[11px]">
+                        <div className="font-semibold uppercase tracking-wider text-slate-500">
+                            {t('datainspector.profiling_settings', 'Profiling Settings')}
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-500">
+                            <label className="flex items-center gap-1">
+                                <span>{t('datainspector.null_threshold')}</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={profilingThresholds.nullRate}
+                                    onChange={(e) => {
+                                        const value = Number(e.target.value);
+                                        if (Number.isNaN(value)) return;
+                                        setProfilingThresholds({ ...profilingThresholds, nullRate: Math.max(0, Math.min(100, value)) });
+                                    }}
+                                    className="w-14 px-1.5 py-0.5 border border-slate-200 rounded bg-white text-slate-700"
+                                />
+                                <span>%</span>
+                            </label>
+                            <label className="flex items-center gap-1">
+                                <span>{t('datainspector.cardinality_threshold')}</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={profilingThresholds.cardinalityRate}
+                                    onChange={(e) => {
+                                        const value = Number(e.target.value);
+                                        if (Number.isNaN(value)) return;
+                                        setProfilingThresholds({ ...profilingThresholds, cardinalityRate: Math.max(0, Math.min(100, value)) });
+                                    }}
+                                    className="w-14 px-1.5 py-0.5 border border-slate-200 rounded bg-white text-slate-700"
+                                />
+                                <span>%</span>
+                            </label>
+                            <button
+                                onClick={() => setProfilingThresholds({ nullRate: 30, cardinalityRate: 95 })}
+                                className="px-2 py-0.5 rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                            >
+                                {t('datainspector.reset_thresholds')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {mode === 'table' && tableResultTab === 'data' && (
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between gap-3 text-[11px]">
+                        <button
+                            onClick={openCreateIndexModal}
+                            disabled={selectedSourceType !== 'table'}
+                            className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 flex items-center gap-1"
+                            title={selectedSourceType !== 'table'
+                                ? t('datasource.view_type', 'VIEW')
+                                : t('datasource.create_index_title', 'Create index')}
+                        >
+                            <ListPlus className="w-3.5 h-3.5" />
+                            {t('datasource.create_index_btn', 'Create index')}
+                        </button>
+                        <div className="flex items-center gap-2 justify-end">
+                            <span className="text-slate-500 font-semibold uppercase tracking-wider">
+                                {t('datainspector.saved_views', 'Saved Views')}
+                            </span>
+                            <select
+                                value={activeViewId}
+                                onChange={(e) => {
+                                    const nextId = e.target.value;
+                                    setActiveViewId(nextId);
+                                    if (!nextId) return;
+                                    const preset = savedViews.find(v => v.id === nextId);
+                                    if (preset) applyViewPreset(preset);
+                                }}
+                                className="h-7 px-2 border border-slate-200 rounded bg-white text-slate-600 text-[11px] outline-none min-w-[180px]"
+                            >
+                                <option value="">{t('datainspector.select_view')}</option>
+                                {savedViews.map(view => (
+                                    <option key={view.id} value={view.id}>{view.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleSaveCurrentView}
+                                className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                            >
+                                {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
+                            </button>
+                            <button
+                                onClick={handleDeleteCurrentView}
+                                disabled={!activeViewId}
+                                className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
+                            >
+                                {t('datainspector.delete_view')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex-1 overflow-hidden flex flex-col relative min-h-0">
                     {mode === 'sql' && sqlOutputView === 'explain' ? (
                         explainLoading ? (
@@ -1398,6 +1439,71 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 </table>
                             </div>
                         )
+                    ) : mode === 'table' && tableResultTab === 'profiling' ? (
+                        profiling.length === 0 ? (
+                            <div className="flex-1 p-4 text-xs text-slate-400">{t('datainspector.no_profile')}</div>
+                        ) : (
+                            <div className="flex-1 overflow-auto custom-scrollbar">
+                                <table className="w-full text-xs min-w-[760px]">
+                                    <thead className="text-slate-400 uppercase text-[10px] sticky top-0 bg-slate-50 dark:bg-slate-900 z-[1]">
+                                        <tr>
+                                            <th className="text-left py-1.5 px-2">{t('querybuilder.value')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.type')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.distinct_values')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.null_rate')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.min')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.max')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.top_values')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.patterns')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.suspicious_values')}</th>
+                                            <th className="text-left py-1.5 px-2">{t('datainspector.issues')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {profiling.map(col => (
+                                            <tr key={col.key} className="border-t border-slate-100 dark:border-slate-700">
+                                                <td className="py-1.5 px-2 font-semibold text-slate-700 dark:text-slate-200">{col.key}</td>
+                                                <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{t(`datainspector.type_${col.detectedType}`)}</td>
+                                                <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.distinctCount}</td>
+                                                <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.nullRate.toFixed(1)}%</td>
+                                                <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.min ?? '-'}</td>
+                                                <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.max ?? '-'}</td>
+                                                <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300 truncate max-w-[260px]" title={col.topValues.map(v => `${v[0]} (${v[1]})`).join(', ')}>
+                                                    {col.topValues.length > 0 ? col.topValues.map(v => `${v[0]} (${v[1]})`).join(', ') : '-'}
+                                                </td>
+                                                <td className="py-1.5 px-2">
+                                                    {col.patterns.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {col.patterns.map((pattern) => (
+                                                                <span key={pattern} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold">
+                                                                    {t(`datainspector.pattern_${pattern}`)}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-1.5 px-2 text-slate-600 dark:text-slate-300">{col.suspiciousCount}</td>
+                                                <td className="py-1.5 px-2">
+                                                    {col.issues.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {col.issues.map(issue => (
+                                                                <span key={issue} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold">
+                                                                    {t(`datainspector.issue_${issue}`)}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400">-</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
                     ) : loading && !items ? (
                         <div className="flex-1 flex items-center justify-center p-12 text-center text-slate-400 animate-pulse">
                             <div className="flex flex-col items-center gap-4">
@@ -1425,14 +1531,30 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 </div>
                 <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-[10px] flex justify-between items-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="font-medium">
-                        {mode === 'table'
-                            ? t('datainspector.auto_limit', { limit: pageSize })
-                            : sqlOutputView === 'explain'
-                                ? t('datainspector.output_explain', 'Explain')
-                                : t('datainspector.sql_mode')}
+                        {mode === 'table' ? (
+                            tableResultTab === 'profiling' ? (
+                                t('datainspector.result_tab_profile', 'Profiling')
+                            ) : (
+                                <select
+                                    value={String(pageSize)}
+                                    onChange={(e) => {
+                                        setPageSize(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="h-7 px-2 border border-slate-200 rounded bg-white text-slate-600 text-[10px] outline-none"
+                                    title={t('datainspector.page_size')}
+                                >
+                                    {[50, 100, 250, 500].map(size => (
+                                        <option key={size} value={size}>{t('datainspector.page_size_value', { size })}</option>
+                                    ))}
+                                </select>
+                            )
+                        ) : sqlOutputView === 'explain'
+                            ? t('datainspector.output_explain', 'Explain')
+                            : t('datainspector.sql_mode')}
                     </div>
                     <div className="flex items-center gap-4">
-                        {mode === 'table' && (
+                        {mode === 'table' && tableResultTab === 'data' && (
                             <div className="flex items-center gap-1.5">
                                 <button
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -1485,7 +1607,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             {t('common.results_count', {
                                 count: mode === 'sql' && sqlOutputView === 'explain'
                                     ? explainRows.length
-                                    : (items?.length || 0)
+                                    : mode === 'table' && tableResultTab === 'profiling'
+                                        ? profiling.length
+                                        : (items?.length || 0)
                             })}
                         </span>
                     </div>
@@ -1502,6 +1626,126 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 tableName={selectedTable}
                 schema={undefined}
             />
+
+            <Modal
+                isOpen={isCreateIndexOpen}
+                onClose={() => {
+                    if (isCreatingIndex) return;
+                    setIsCreateIndexOpen(false);
+                }}
+                title={t('datasource.create_index_title', 'Create index')}
+            >
+                <div className="space-y-4">
+                    <div className="text-xs text-slate-500">
+                        {t('datasource.index_create_for_table', 'Table')}: <span className="font-mono font-semibold text-slate-700">{selectedTable}</span>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                            {t('datasource.index_name', 'Index name')}
+                        </label>
+                        <input
+                            type="text"
+                            value={indexName}
+                            onChange={(e) => setIndexName(e.target.value)}
+                            className="w-full p-2 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder={`idx_${selectedTable}_...`}
+                        />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                        <input
+                            type="checkbox"
+                            checked={indexUnique}
+                            onChange={() => setIndexUnique(!indexUnique)}
+                            className="h-4 w-4"
+                        />
+                        {t('datasource.index_unique', 'Unique index')}
+                    </label>
+
+                    <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-500 uppercase">
+                            {t('datasource.index_columns', 'Columns')}
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-auto border border-slate-200 rounded p-2 bg-slate-50">
+                            {(selectedTableSchema || []).map((col) => (
+                                <label key={col.name} className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={indexColumns.includes(col.name)}
+                                        onChange={() => toggleIndexColumn(col.name)}
+                                        className="h-4 w-4"
+                                    />
+                                    <span className="font-mono">{col.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    {indexColumns.length > 0 && (
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-slate-500 uppercase">
+                                {t('datasource.index_order', 'Column order')}
+                            </label>
+                            <div className="space-y-1 border border-slate-200 rounded p-2 bg-white">
+                                {indexColumns.map((col, idx) => (
+                                    <div key={col} className="flex items-center justify-between text-sm">
+                                        <span className="font-mono text-slate-700">{idx + 1}. {col}</span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => moveIndexColumn(col, 'up')}
+                                                disabled={idx === 0}
+                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
+                                            >
+                                                ↑
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => moveIndexColumn(col, 'down')}
+                                                disabled={idx === indexColumns.length - 1}
+                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
+                                            >
+                                                ↓
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                            {t('datasource.index_where_optional', 'WHERE (optional)')}
+                        </label>
+                        <input
+                            type="text"
+                            value={indexWhere}
+                            onChange={(e) => setIndexWhere(e.target.value)}
+                            className="w-full p-2 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                            placeholder="status = 'open'"
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                        <button
+                            onClick={() => setIsCreateIndexOpen(false)}
+                            disabled={isCreatingIndex}
+                            className="px-3 py-1.5 rounded border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 disabled:opacity-40"
+                        >
+                            {t('common.cancel', 'Cancel')}
+                        </button>
+                        <button
+                            onClick={() => { void handleCreateIndex(); }}
+                            disabled={isCreatingIndex}
+                            className="px-4 py-1.5 rounded bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40"
+                        >
+                            {isCreatingIndex ? t('common.saving', 'Saving...') : t('datasource.create_index_btn', 'Create index')}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal
                 isOpen={saveToBuilderOpen}

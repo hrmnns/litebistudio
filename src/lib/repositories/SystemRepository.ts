@@ -40,6 +40,14 @@ interface RecordMetadata {
     worklistItem: DbRow | null;
 }
 
+export interface TableIndexInfo {
+    name: string;
+    unique: boolean;
+    columns: string[];
+    origin?: string;
+    partial?: boolean;
+}
+
 export const SystemRepository = {
     async getDatabaseStats(): Promise<{ tables: number; records: number }> {
         const tables = await this.getTables();
@@ -106,6 +114,60 @@ export const SystemRepository = {
         const result = await runQuery(`PRAGMA table_info("${tableName}")`) as unknown as TableColumn[];
         schemaCache.set(tableName, result);
         return result;
+    },
+
+    async getTableIndexes(tableName: string): Promise<TableIndexInfo[]> {
+        if (!isValidIdentifier(tableName)) return [];
+        const safeTableName = tableName.replace(/"/g, '""');
+        const pragmaRows = await runQuery(`PRAGMA index_list("${safeTableName}")`);
+        const masterRows = await runQuery(
+            "SELECT name, sql FROM sqlite_master WHERE type='index' AND LOWER(tbl_name) = LOWER(?) AND name NOT LIKE 'sqlite_%' ORDER BY name",
+            [tableName]
+        );
+
+        const sqlByIndexName = new Map<string, string>();
+        for (const row of masterRows) {
+            const name = typeof row.name === 'string' ? row.name : '';
+            if (!name) continue;
+            sqlByIndexName.set(name, typeof row.sql === 'string' ? row.sql : '');
+        }
+
+        const nameSet = new Set<string>();
+        for (const row of pragmaRows) {
+            if (typeof row.name === 'string' && row.name) nameSet.add(row.name);
+        }
+        for (const row of masterRows) {
+            if (typeof row.name === 'string' && row.name) nameSet.add(row.name);
+        }
+
+        const indexNames = Array.from(nameSet);
+        if (!indexNames.length) return [];
+
+        const indexes = await Promise.all(indexNames.map(async (indexName) => {
+            const safeIndexName = indexName.replace(/"/g, '""');
+            const indexCols = await runQuery(`PRAGMA index_info("${safeIndexName}")`);
+            const columns = indexCols
+                .sort((a, b) => Number(a.seqno || 0) - Number(b.seqno || 0))
+                .map((r) => (typeof r.name === 'string' ? r.name : ''))
+                .filter((name) => name.length > 0);
+
+            const pragmaInfo = pragmaRows.find((r) => r.name === indexName);
+            const sql = sqlByIndexName.get(indexName) || '';
+
+            const uniqueFromPragma = pragmaInfo ? Number(pragmaInfo.unique || 0) === 1 : false;
+            const partialFromPragma = pragmaInfo ? Number(pragmaInfo.partial || 0) === 1 : false;
+            const originFromPragma = pragmaInfo && typeof pragmaInfo.origin === 'string' ? pragmaInfo.origin : undefined;
+
+            return {
+                name: indexName,
+                unique: uniqueFromPragma || /\bCREATE\s+UNIQUE\s+INDEX\b/i.test(sql),
+                columns,
+                origin: originFromPragma || 'c',
+                partial: partialFromPragma || /\bWHERE\b/i.test(sql)
+            } as TableIndexInfo;
+        }));
+
+        return indexes.sort((a, b) => a.name.localeCompare(b.name));
     },
 
     async inspectTable(tableName: string, limit: number, searchTerm?: string, offset: number = 0, sourceType?: 'table' | 'view'): Promise<DbRow[]> {

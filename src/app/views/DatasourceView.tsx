@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
+import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle, Loader2, ListPlus } from 'lucide-react';
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
 import { SmartImport } from '../components/SmartImport';
 import { SchemaTable } from '../components/SchemaDocumentation';
@@ -16,6 +16,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { encryptBuffer, decryptBuffer } from '../../lib/utils/crypto';
 import { Lock, Unlock } from 'lucide-react';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import type { TableIndexInfo } from '../../lib/repositories/SystemRepository';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -32,6 +33,17 @@ interface RestoreReport {
         backup: string | number;
         current: string | number;
     };
+}
+
+interface TableMetaStats {
+    rows: number;
+    indexes: number;
+}
+
+interface ViewMetaStatus {
+    valid: boolean;
+    rows?: number;
+    error?: string;
 }
 
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
@@ -61,6 +73,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const [selectedTable, setSelectedTable] = useState<string>('');
     const [tableSchema, setTableSchema] = useState<SchemaDefinition | null>(null);
     const [isSchemaOpen, setIsSchemaOpen] = useState(false);
+    const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
+    const [indexTableName, setIndexTableName] = useState('');
+    const [indexName, setIndexName] = useState('');
+    const [indexColumns, setIndexColumns] = useState<string[]>([]);
+    const [indexUnique, setIndexUnique] = useState(false);
+    const [indexWhere, setIndexWhere] = useState('');
+    const [availableIndexColumns, setAvailableIndexColumns] = useState<string[]>([]);
 
     // Schema Manager State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -92,6 +111,58 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const userTables = tables?.filter((t: string) => !isSystemTable(t)) || [];
     const systemTables = tables?.filter((t: string) => isSystemTable(t)) || [];
     const userViews = (dataSources || []).filter((s) => s.type === 'view' && !isSystemTable(s.name));
+    const { data: tableMetaStats } = useAsync<Record<string, TableMetaStats>>(
+        async () => {
+            if (activeTab !== 'structure' || userTables.length === 0) return {};
+            const entries = await Promise.all(userTables.map(async (tableName) => {
+                const [rowsResult, indexResult] = await Promise.all([
+                    SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM "${tableName}"`),
+                    SystemRepository.executeRaw(
+                        "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='index' AND LOWER(tbl_name) = LOWER(?) AND name NOT LIKE 'sqlite_%'",
+                        [tableName]
+                    )
+                ]);
+                return [
+                    tableName,
+                    {
+                        rows: Number(rowsResult[0]?.count || 0),
+                        indexes: Number(indexResult[0]?.count || 0)
+                    } as TableMetaStats
+                ] as const;
+            }));
+            return Object.fromEntries(entries);
+        },
+        [activeTab, userTables.join('|')],
+        { cacheKey: `datasource-table-meta-${userTables.join('|')}`, ttl: 15000 }
+    );
+    const { data: viewMetaStats } = useAsync<Record<string, ViewMetaStatus>>(
+        async () => {
+            if (activeTab !== 'structure' || userViews.length === 0) return {};
+            const entries = await Promise.all(userViews.map(async (view) => {
+                try {
+                    const rowsResult = await SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM "${view.name}"`);
+                    return [
+                        view.name,
+                        {
+                            valid: true,
+                            rows: Number(rowsResult[0]?.count || 0)
+                        } as ViewMetaStatus
+                    ] as const;
+                } catch (error: unknown) {
+                    return [
+                        view.name,
+                        {
+                            valid: false,
+                            error: getErrorMessage(error)
+                        } as ViewMetaStatus
+                    ] as const;
+                }
+            }));
+            return Object.fromEntries(entries);
+        },
+        [activeTab, userViews.map(v => v.name).join('|')],
+        { cacheKey: `datasource-view-meta-${userViews.map(v => v.name).join('|')}`, ttl: 15000 }
+    );
 
     // Load Schema for selected table (Generic Import)
     useEffect(() => {
@@ -103,7 +174,10 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
             // Dynamic Schema
             try {
-                const columns = await SystemRepository.getTableSchema(selectedTable);
+                const [columns, indexes] = await Promise.all([
+                    SystemRepository.getTableSchema(selectedTable),
+                    SystemRepository.getTableIndexes(selectedTable)
+                ]);
                 const properties: NonNullable<SchemaDefinition['properties']> = {};
                 columns.forEach(col => {
                     properties[col.name] = {
@@ -115,7 +189,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     title: selectedTable,
                     description: t('datasource.records_label', { name: selectedTable }),
                     properties,
-                    required: columns.filter(c => c.notnull).map(c => c.name)
+                    required: columns.filter(c => c.notnull).map(c => c.name),
+                    indexes: indexes.map((idx: TableIndexInfo) => ({
+                        name: idx.name,
+                        unique: idx.unique,
+                        columns: idx.columns,
+                        origin: idx.origin,
+                        partial: idx.partial
+                    }))
                 });
             } catch (e) {
                 console.error("Failed to load schema", e);
@@ -123,7 +204,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             }
         };
         loadSchema();
-    }, [selectedTable, tables, t]); // Reload schema when table selection OR table list changes (e.g. after migration/drop)
+    }, [selectedTable, tables, isSchemaOpen, t]); // Reload schema when selection/table list changes and whenever schema dialog is opened
 
     // Build Import Config
     const getImportConfig = (): ImportConfig | undefined => {
@@ -202,6 +283,68 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             await SystemRepository.executeRaw(`DELETE FROM ${tableName}`);
             refreshTables();
             alert(t('datasource.cleared_success'));
+        } catch (error: unknown) {
+            alert(t('common.error') + ': ' + getErrorMessage(error));
+        }
+    };
+
+    const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
+
+    const openCreateIndexModal = async (tableName: string) => {
+        try {
+            const schema = await SystemRepository.getTableSchema(tableName);
+            const cols = schema.map(col => col.name).filter(Boolean);
+            setIndexTableName(tableName);
+            setAvailableIndexColumns(cols);
+            setIndexColumns([]);
+            setIndexUnique(false);
+            setIndexWhere('');
+            setIndexName(`idx_${tableName}_`);
+            setIsCreateIndexOpen(true);
+        } catch (error: unknown) {
+            alert(t('common.error') + ': ' + getErrorMessage(error));
+        }
+    };
+
+    const toggleIndexColumn = (column: string) => {
+        setIndexColumns(prev => (
+            prev.includes(column)
+                ? prev.filter(col => col !== column)
+                : [...prev, column]
+        ));
+    };
+
+    const moveIndexColumn = (column: string, direction: 'up' | 'down') => {
+        setIndexColumns(prev => {
+            const index = prev.indexOf(column);
+            if (index === -1) return prev;
+            const nextIndex = direction === 'up' ? index - 1 : index + 1;
+            if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+            const next = [...prev];
+            [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+            return next;
+        });
+    };
+
+    const handleCreateIndex = async () => {
+        const trimmedName = indexName.trim();
+        if (!trimmedName) {
+            alert(t('datasource.index_create_name_required', 'Bitte einen Indexnamen angeben.'));
+            return;
+        }
+        if (indexColumns.length === 0) {
+            alert(t('datasource.index_create_columns_required', 'Bitte mindestens eine Spalte auswählen.'));
+            return;
+        }
+        try {
+            const uniqueSql = indexUnique ? 'UNIQUE ' : '';
+            const quotedCols = indexColumns.map(quoteIdentifier).join(', ');
+            const whereSql = indexWhere.trim() ? ` WHERE ${indexWhere.trim()}` : '';
+            const sql = `CREATE ${uniqueSql}INDEX ${quoteIdentifier(trimmedName)} ON ${quoteIdentifier(indexTableName)} (${quotedCols})${whereSql};`;
+            await SystemRepository.executeRaw(sql);
+            setIsCreateIndexOpen(false);
+            await refreshTables();
+            alert(t('datasource.index_create_success', 'Index erstellt.'));
         } catch (error: unknown) {
             alert(t('common.error') + ': ' + getErrorMessage(error));
         }
@@ -345,7 +488,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 <div className="p-2 bg-white rounded-lg shadow-sm text-blue-600">
                                                     <TableIcon className="w-4 h-4" />
                                                 </div>
-                                                <span className="font-bold text-slate-700">{t_name}</span>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-bold text-slate-700 truncate">{t_name}</span>
+                                                    <span className="text-[10px] text-slate-400">
+                                                        {t('datasource.table_meta_rows', { count: tableMetaStats?.[t_name]?.rows ?? 0 })}
+                                                        {' • '}
+                                                        {t('datasource.table_meta_indexes', { count: tableMetaStats?.[t_name]?.indexes ?? 0 })}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
@@ -357,6 +507,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 </button>
                                                 {!isReadOnly && (
                                                     <>
+                                                        <button
+                                                            onClick={() => { void openCreateIndexModal(t_name); }}
+                                                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                                            title={t('datasource.create_index_title', 'Index erstellen')}
+                                                        >
+                                                            <ListPlus className="w-4 h-4" />
+                                                        </button>
                                                         <button
                                                             onClick={() => { setSelectedTable(t_name); setActiveTab('import'); }}
                                                             className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
@@ -407,16 +564,32 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 </div>
                                                 <div className="min-w-0">
                                                     <span className="font-bold text-slate-700 block truncate">{view.name}</span>
-                                                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                                                        {t('datasource.view_type', 'VIEW')}
-                                                    </span>
+                                                    {viewMetaStats?.[view.name]?.valid === false ? (
+                                                        <span
+                                                            className="text-[10px] text-rose-500 block"
+                                                            title={viewMetaStats?.[view.name]?.error}
+                                                        >
+                                                            {t('datasource.view_invalid', 'Defekter View')}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 block">
+                                                            {t('datasource.table_meta_rows', { count: viewMetaStats?.[view.name]?.rows ?? 0 })}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => { setSelectedTable(view.name); setIsSchemaOpen(true); }}
-                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                                    title={t('datasource.show_schema')}
+                                                    disabled={viewMetaStats?.[view.name]?.valid === false}
+                                                    className={`p-1.5 rounded transition-colors ${
+                                                        viewMetaStats?.[view.name]?.valid === false
+                                                            ? 'text-slate-300 cursor-not-allowed'
+                                                            : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                                                    }`}
+                                                    title={viewMetaStats?.[view.name]?.valid === false
+                                                        ? t('datasource.view_invalid', 'Defekter View')
+                                                        : t('datasource.show_schema')}
                                                 >
                                                     <Info className="w-4 h-4" />
                                                 </button>
@@ -858,6 +1031,111 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
             <Modal isOpen={isSchemaOpen} onClose={() => setIsSchemaOpen(false)} title={tableSchema?.title || selectedTable}>
                 {tableSchema ? <SchemaTable schema={tableSchema} /> : <div className="p-4 text-center">{t('datasource.schema_not_available')}</div>}
+            </Modal>
+
+            <Modal
+                isOpen={isCreateIndexOpen}
+                onClose={() => setIsCreateIndexOpen(false)}
+                title={t('datasource.create_index_title', 'Index erstellen')}
+            >
+                <div className="space-y-4">
+                    <div className="text-xs text-slate-500">
+                        {t('datasource.index_create_for_table', 'Tabelle')}: <span className="font-mono font-semibold text-slate-700">{indexTableName}</span>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_name', 'Indexname')}</label>
+                        <input
+                            value={indexName}
+                            onChange={(e) => setIndexName(e.target.value)}
+                            className="w-full p-2 border border-slate-200 rounded text-sm"
+                            placeholder={`idx_${indexTableName}_...`}
+                        />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                        <input
+                            type="checkbox"
+                            checked={indexUnique}
+                            onChange={() => setIndexUnique(!indexUnique)}
+                            className="h-4 w-4"
+                        />
+                        {t('datasource.index_unique', 'Unique Index')}
+                    </label>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_columns', 'Spalten')}</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-auto border border-slate-200 rounded p-2 bg-slate-50">
+                            {availableIndexColumns.map((col) => (
+                                <label key={col} className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={indexColumns.includes(col)}
+                                        onChange={() => toggleIndexColumn(col)}
+                                        className="h-4 w-4"
+                                    />
+                                    <span className="font-mono">{col}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    {indexColumns.length > 0 && (
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_order', 'Spaltenreihenfolge')}</label>
+                            <div className="space-y-1 border border-slate-200 rounded p-2 bg-white">
+                                {indexColumns.map((col, idx) => (
+                                    <div key={col} className="flex items-center justify-between text-sm">
+                                        <span className="font-mono text-slate-700">{idx + 1}. {col}</span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => moveIndexColumn(col, 'up')}
+                                                disabled={idx === 0}
+                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
+                                            >
+                                                ↑
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => moveIndexColumn(col, 'down')}
+                                                disabled={idx === indexColumns.length - 1}
+                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
+                                            >
+                                                ↓
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_where_optional', 'WHERE (optional)')}</label>
+                        <input
+                            value={indexWhere}
+                            onChange={(e) => setIndexWhere(e.target.value)}
+                            className="w-full p-2 border border-slate-200 rounded text-sm font-mono"
+                            placeholder="status = 'open'"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            onClick={() => setIsCreateIndexOpen(false)}
+                            className="px-4 py-2 border border-slate-200 rounded-lg text-sm"
+                        >
+                            {t('common.cancel')}
+                        </button>
+                        <button
+                            onClick={() => { void handleCreateIndex(); }}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700"
+                        >
+                            {t('datasource.create_index_btn', 'Index erstellen')}
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </PageLayout >
     );
