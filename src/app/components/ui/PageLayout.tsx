@@ -1,8 +1,10 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Loader2, Activity, ShieldAlert, User, Lock } from 'lucide-react';
+import { Loader2, Activity, ShieldAlert, User, Lock } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useDashboard } from '../../../lib/context/DashboardContext';
+import { useAsync } from '../../../hooks/useAsync';
+import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 
 /* ─── Alert Types ─── */
 export type AlertLevel = 'error' | 'warning' | 'info' | 'success';
@@ -89,6 +91,11 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     const { isAdminMode, isReadOnly } = useDashboard();
     const [activeQueries, setActiveQueries] = useState(0);
     const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
+    const { data: storageStatus } = useAsync(
+        () => SystemRepository.getStorageStatus(),
+        [],
+        { cacheKey: 'db-storage-status', ttl: 15000 }
+    );
 
     useEffect(() => {
         const onStart = () => setActiveQueries(q => q + 1);
@@ -108,21 +115,23 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         };
     }, []);
 
+    const mergedAlerts: PageAlert[] = [...(alerts ?? [])];
+    if (storageStatus?.mode === 'memory') {
+        const reasonText = storageStatus.reason
+            ? ` ${t('common.storage_memory_reason', 'Reason')}: ${storageStatus.reason}`
+            : '';
+        mergedAlerts.unshift({
+            level: 'warning',
+            message: `${t('common.storage_memory_warning', 'Local persistence is currently unavailable. The database runs in memory and changes may be lost after reload.')}${reasonText}`
+        });
+    }
+
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
             <header className="flex-shrink-0 px-6 md:px-8 py-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                        {header.onBack && (
-                            <button
-                                onClick={header.onBack}
-                                className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-all"
-                                title={t('common.back')}
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                            </button>
-                        )}
                         <div>
                             <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                                 {header.title}
@@ -146,9 +155,9 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
             <div className={cn('flex-1', fillHeight ? 'flex flex-col overflow-hidden' : 'overflow-y-auto')}>
                 <div className={cn('px-6 md:px-8 py-6', fillHeight ? 'flex-1 flex flex-col gap-6 overflow-hidden' : 'space-y-6')}>
                     {/* ── Alerts ── */}
-                    {alerts && alerts.length > 0 && (
+                    {mergedAlerts.length > 0 && (
                         <div className="space-y-3 flex-shrink-0">
-                            {alerts.map((alert, i) => {
+                            {mergedAlerts.map((alert, i) => {
                                 const s = alertStyles[alert.level];
                                 return (
                                     <div

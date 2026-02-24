@@ -60,6 +60,10 @@ export const SystemRepository = {
         return await import('../db').then(m => m.getDiagnostics());
     },
 
+    async getStorageStatus(): Promise<{ mode: 'opfs' | 'memory'; reason: string | null }> {
+        return await import('../db').then(m => m.getStorageStatus());
+    },
+
     async getTables(): Promise<string[]> {
         const result = await runQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
         return result

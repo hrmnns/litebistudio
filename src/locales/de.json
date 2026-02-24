@@ -35,6 +35,8 @@
         "refresh": "Aktualisieren",
         "show": "Anzeigen",
         "hide": "Ausblenden",
+        "storage_memory_warning": "Persistenter lokaler Speicher ist aktuell nicht verfuegbar. Die Datenbank laeuft im Arbeitsspeicher und Aenderungen gehen nach einem Neuladen moeglicherweise verloren.",
+        "storage_memory_reason": "Grund",
         "name": "Name",
         "description": "Beschreibung",
         "saving": "Speichern..."
@@ -114,6 +116,8 @@
         "subtitle": "{{count}} Ergebnisse · {{mode}}",
         "table_mode": "Tabelle",
         "sql_mode": "SQL",
+        "output_results": "Ergebnisse",
+        "output_explain": "Explain",
         "refresh_title": "Daten aktualisieren",
         "export_excel": "Excel Export",
         "search_placeholder": "In sichtbaren Spalten suchen...",

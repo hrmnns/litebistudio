@@ -49,6 +49,8 @@ interface ImportReport {
 let db: DatabaseLike | null = null;
 let sqlite3: SqliteApiLike | null = null;
 let initPromise: Promise<boolean> | null = null;
+let dbStorageMode: 'opfs' | 'memory' = 'memory';
+let dbStorageReason: string | null = null;
 
 const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
@@ -256,6 +258,8 @@ async function initDB() {
             if (sqlite3.oo1.OpfsDb) {
                 try {
                     db = new sqlite3.oo1.OpfsDb('/litebistudio.sqlite3');
+                    dbStorageMode = 'opfs';
+                    dbStorageReason = null;
                     log('Opened OPFS database');
                 } catch (e: unknown) {
                     error('OPFS unavailable OR corrupted, falling back to memory', e);
@@ -264,10 +268,14 @@ async function initDB() {
                         log('Database file corrupted on disk. User should restore backup.');
                     }
                     db = new sqlite3.oo1.DB(':memory:');
+                    dbStorageMode = 'memory';
+                    dbStorageReason = getErrorMessage(e);
                 }
             } else {
                 log('OPFS not supported, using memory');
                 db = new sqlite3.oo1.DB(':memory:');
+                dbStorageMode = 'memory';
+                dbStorageReason = 'OPFS not supported in this environment.';
             }
 
             // Apply schema and migrations
@@ -399,6 +407,14 @@ async function handleMessage(e: MessageEvent) {
             case 'GET_DIAGNOSTICS':
                 if (!db) await initDB();
                 result = getDiagnostics();
+                break;
+
+            case 'GET_STORAGE_STATUS':
+                if (!db) await initDB();
+                result = {
+                    mode: dbStorageMode,
+                    reason: dbStorageReason
+                };
                 break;
 
             case 'EXPORT':
@@ -551,7 +567,9 @@ function getDiagnostics() {
         pageCount,
         pageSize,
         tableStats,
-        schemaVersion: database.selectValue('PRAGMA user_version') as number
+        schemaVersion: database.selectValue('PRAGMA user_version') as number,
+        storageMode: dbStorageMode,
+        storageReason: dbStorageReason
     };
 }
 

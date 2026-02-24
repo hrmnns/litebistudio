@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - No changes yet.
 
-## [1.1.0] - 2026-02-23
+## [1.1.0] - 2026-02-24
 
 ### Added
 - Data Inspector autocomplete enhancements:
@@ -29,13 +29,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Search field for saved widgets.
   - Scrollable, compact widget list for large collections.
   - Filtered/total count display and empty-state feedback.
+- Storage resilience visibility:
+  - Global warning banner when OPFS is unavailable and the app runs on in-memory SQLite fallback.
+  - Optional fallback reason is shown to make root-cause diagnosis easier.
+- Data Inspector SQL output toggle:
+  - Compact switch between `Results` and `Explain` inside the result panel.
+  - Explain plan refreshes while editing (debounced) in design-oriented flow.
 
 ### Changed
 - Data Inspector SQL suggestion UI was moved to a floating overlay and positioned near the current cursor line to reduce editor obstruction.
 - Data Inspector SQL assist section was optimized for space usage (collapsible behavior and denser layout).
 - Data Inspector toolbar/layout in table mode was refined for clearer responsive behavior.
+- Data Inspector SQL workflow defaults were refined:
+  - Editing SQL emphasizes `Explain` view.
+  - Executing SQL (`Run`) switches back to `Results` view.
 - Query Builder SQL direct editor height was increased by ~50% for better readability.
 - Locale coverage was extended for newly added Inspector/Datasource/Query-Builder controls in both German and English.
+- Header navigation was simplified:
+  - Removed page-level back buttons from shared view headers to reduce visual clutter and free horizontal space.
 
 ### Fixed
 - Excel append import now ignores non-schema helper fields (e.g., `_rowid`) to prevent SQLite insert errors.

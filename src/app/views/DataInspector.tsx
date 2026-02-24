@@ -55,12 +55,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [favoriteQueries, setFavoriteQueries] = useLocalStorage<string[]>('data_inspector_favorite_queries', []);
     const [customSqlTemplates, setCustomSqlTemplates] = useLocalStorage<CustomSqlTemplate[]>('data_inspector_custom_sql_templates', []);
     const [selectedCustomTemplateId, setSelectedCustomTemplateId] = useLocalStorage<string>('data_inspector_selected_custom_template', '');
-    const [explainMode, setExplainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
+    const [explainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
     const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
     const [autocompleteEnabled, setAutocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
     const [explainRows, setExplainRows] = useState<DbRow[]>([]);
     const [explainError, setExplainError] = useState('');
     const [explainLoading, setExplainLoading] = useState(false);
+    const [sqlOutputView, setSqlOutputView] = useState<'result' | 'explain'>(explainMode ? 'explain' : 'result');
     const [saveToBuilderOpen, setSaveToBuilderOpen] = useState(false);
     const [saveWidgetName, setSaveWidgetName] = useState('');
     const [saveWidgetDescription, setSaveWidgetDescription] = useState('');
@@ -191,26 +192,30 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         const isPotentialWriteQuery = /^(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|REPLACE|TRUNCATE|VACUUM|ATTACH|DETACH)\b/.test(upper);
         if (isPotentialWriteQuery && !confirm(t('datainspector.write_confirm'))) return;
 
+        setSqlOutputView('result');
         execute();
         setSqlHistory(prev => [trimmed, ...prev.filter(q => q !== trimmed)].slice(0, 12));
+    };
 
-        if (explainMode) {
-            setExplainLoading(true);
-            setExplainError('');
-            try {
-                const explainResult = await SystemRepository.executeRaw(`EXPLAIN QUERY PLAN ${trimmed}`);
-                setExplainRows(explainResult);
-            } catch (err) {
-                setExplainRows([]);
-                setExplainError(err instanceof Error ? err.message : String(err));
-            } finally {
-                setExplainLoading(false);
-            }
-        } else {
+    const runExplainPlan = useCallback(async (sql: string) => {
+        const trimmed = sql.trim();
+        if (!trimmed) {
             setExplainRows([]);
             setExplainError('');
+            return;
         }
-    };
+        setExplainLoading(true);
+        setExplainError('');
+        try {
+            const explainResult = await SystemRepository.executeRaw(`EXPLAIN QUERY PLAN ${trimmed}`);
+            setExplainRows(explainResult);
+        } catch (err) {
+            setExplainRows([]);
+            setExplainError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setExplainLoading(false);
+        }
+    }, []);
 
     const toggleFavoriteQuery = (query: string) => {
         const trimmed = query.trim();
@@ -434,6 +439,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             setExplainLoading(false);
         }
     }, [mode]);
+
+    useEffect(() => {
+        if (mode !== 'sql' || sqlOutputView !== 'explain') return;
+        const timer = window.setTimeout(() => {
+            void runExplainPlan(inputSql);
+        }, 250);
+        return () => window.clearTimeout(timer);
+    }, [mode, sqlOutputView, inputSql, runExplainPlan]);
 
     const sqlTemplates = [
         { key: 'top10', sql: `SELECT * FROM ${selectedTable || 'table_name'} LIMIT 10` },
@@ -752,7 +765,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         <PageLayout
             header={{
                 title: t('sidebar.data_inspector'),
-                subtitle: t('datainspector.subtitle', { count: items?.length || 0, mode: mode === 'table' ? selectedTable : t('datainspector.sql_mode') }),
+                subtitle: t('datainspector.subtitle', {
+                    count: mode === 'sql' && sqlOutputView === 'explain' ? explainRows.length : (items?.length || 0),
+                    mode: mode === 'table' ? selectedTable : t('datainspector.sql_mode')
+                }),
                 onBack,
                 actions: (
                     <>
@@ -771,6 +787,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             <button
                                 onClick={() => {
                                     setMode('sql');
+                                    setSqlOutputView(explainMode ? 'explain' : 'result');
                                     if (!inputSql) setInputSql(`SELECT * FROM ${selectedTable} LIMIT 10`);
                                 }}
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'sql' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -938,6 +955,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             value={inputSql}
                             onChange={(e) => {
                                 setInputSql(e.target.value);
+                                setSqlOutputView('explain');
                                 setSqlCursor(e.target.selectionStart ?? e.target.value.length);
                             }}
                             onClick={(e) => setSqlCursor(e.currentTarget.selectionStart ?? 0)}
@@ -990,23 +1008,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             >
                                 {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
                                 {t('datainspector.run_sql')}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setExplainMode(!explainMode);
-                                    if (explainMode) {
-                                        setExplainRows([]);
-                                        setExplainError('');
-                                    }
-                                }}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                                    explainMode
-                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                                }`}
-                                title={t('datainspector.explain_mode')}
-                            >
-                                {t('datainspector.explain')}
                             </button>
                             <button
                                 onClick={() => setAutocompleteEnabled(!autocompleteEnabled)}
@@ -1193,46 +1194,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 </div>
             )}
 
-            {mode === 'sql' && explainMode && (
-                <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm flex-shrink-0">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">{t('datainspector.explain_title')}</h3>
-                        <span className="text-[11px] text-slate-400">{t('datainspector.explain_hint')}</span>
-                    </div>
-                    {explainLoading ? (
-                        <div className="text-xs text-slate-400 flex items-center gap-2">
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            {t('common.loading')}
-                        </div>
-                    ) : explainError ? (
-                        <div className="text-xs text-rose-600">{explainError}</div>
-                    ) : explainRows.length === 0 ? (
-                        <div className="text-xs text-slate-400">{t('datainspector.explain_empty')}</div>
-                    ) : (
-                        <div className="overflow-auto max-h-36 custom-scrollbar border border-slate-100 dark:border-slate-700 rounded">
-                            <table className="w-full text-xs min-w-[520px]">
-                                <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 text-slate-400 uppercase text-[10px]">
-                                    <tr>
-                                        {Object.keys(explainRows[0]).map(col => (
-                                            <th key={col} className="text-left px-2 py-1.5">{col}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {explainRows.map((row, idx) => (
-                                        <tr key={idx} className="border-t border-slate-100 dark:border-slate-700">
-                                            {Object.keys(explainRows[0]).map(col => (
-                                                <td key={col} className="px-2 py-1.5 text-slate-600 dark:text-slate-300">{String(row[col] ?? '')}</td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
             {mode === 'table' && showProfiling && (
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
                     <div className="flex items-center justify-between mb-2">
@@ -1368,7 +1329,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
             <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative">
                 {/* Opaque loading overlay when refreshing results */}
-                {loading && items && items.length > 0 && (
+                {loading && items && items.length > 0 && !(mode === 'sql' && sqlOutputView === 'explain') && (
                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-800/40 z-10 flex items-center justify-center backdrop-blur-[1px]">
                         <div className="bg-white dark:bg-slate-900 p-4 rounded-full shadow-xl border border-slate-100 dark:border-slate-700">
                             <RefreshCw className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
@@ -1376,8 +1337,68 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                     </div>
                 )}
 
+                {mode === 'sql' && (
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 flex items-center justify-between gap-3">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
+                            <button
+                                onClick={() => setSqlOutputView('result')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlOutputView === 'result'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100'
+                                    }`}
+                            >
+                                {t('datainspector.output_results', 'Results')}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSqlOutputView('explain');
+                                }}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlOutputView === 'explain'
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100'
+                                    }`}
+                            >
+                                {t('datainspector.output_explain', 'Explain')}
+                            </button>
+                        </div>
+                        <span className="text-[11px] text-slate-400">{t('datainspector.explain_hint')}</span>
+                    </div>
+                )}
+
                 <div className="flex-1 overflow-hidden flex flex-col relative min-h-0">
-                    {loading && !items ? (
+                    {mode === 'sql' && sqlOutputView === 'explain' ? (
+                        explainLoading ? (
+                            <div className="flex-1 flex items-center justify-center p-6 text-xs text-slate-400 gap-2">
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                {t('common.loading')}
+                            </div>
+                        ) : explainError ? (
+                            <div className="flex-1 p-4 text-xs text-rose-600">{explainError}</div>
+                        ) : explainRows.length === 0 ? (
+                            <div className="flex-1 p-4 text-xs text-slate-400">{t('datainspector.explain_empty')}</div>
+                        ) : (
+                            <div className="flex-1 overflow-auto custom-scrollbar">
+                                <table className="w-full text-xs min-w-[520px]">
+                                    <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 text-slate-400 uppercase text-[10px] z-[1]">
+                                        <tr>
+                                            {Object.keys(explainRows[0]).map(col => (
+                                                <th key={col} className="text-left px-2 py-1.5">{col}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {explainRows.map((row, idx) => (
+                                            <tr key={idx} className="border-t border-slate-100 dark:border-slate-700">
+                                                {Object.keys(explainRows[0]).map(col => (
+                                                    <td key={col} className="px-2 py-1.5 text-slate-600 dark:text-slate-300">{String(row[col] ?? '')}</td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    ) : loading && !items ? (
                         <div className="flex-1 flex items-center justify-center p-12 text-center text-slate-400 animate-pulse">
                             <div className="flex flex-col items-center gap-4">
                                 <Search className="w-12 h-12 opacity-20" />
@@ -1404,7 +1425,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 </div>
                 <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-[10px] flex justify-between items-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="font-medium">
-                        {mode === 'table' ? t('datainspector.auto_limit', { limit: pageSize }) : t('datainspector.sql_mode')}
+                        {mode === 'table'
+                            ? t('datainspector.auto_limit', { limit: pageSize })
+                            : sqlOutputView === 'explain'
+                                ? t('datainspector.output_explain', 'Explain')
+                                : t('datainspector.sql_mode')}
                     </div>
                     <div className="flex items-center gap-4">
                         {mode === 'table' && (
@@ -1456,7 +1481,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </div>
                         )}
                         <span className="flex items-center gap-1"><Database className="w-3 h-3" /> LiteBI Studio DB</span>
-                        <span className="font-medium">{t('common.results_count', { count: items?.length || 0 })}</span>
+                        <span className="font-medium">
+                            {t('common.results_count', {
+                                count: mode === 'sql' && sqlOutputView === 'explain'
+                                    ? explainRows.length
+                                    : (items?.length || 0)
+                            })}
+                        </span>
                     </div>
                 </div>
             </div>

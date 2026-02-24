@@ -315,6 +315,11 @@ export async function getDiagnostics(): Promise<Record<string, unknown>> {
     return send<Record<string, unknown>>('GET_DIAGNOSTICS');
 }
 
+export async function getStorageStatus(): Promise<{ mode: 'opfs' | 'memory'; reason: string | null }> {
+    await initDB();
+    return send<{ mode: 'opfs' | 'memory'; reason: string | null }>('GET_STORAGE_STATUS');
+}
+
 export function genericBulkInsert(tableName: string, records: DbRow[]): Promise<number> {
     return send<number>('GENERIC_BULK_INSERT', { tableName, records });
 }

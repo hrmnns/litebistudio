@@ -35,6 +35,8 @@
         "refresh": "Refresh",
         "show": "Show",
         "hide": "Hide",
+        "storage_memory_warning": "Local persistence is currently unavailable. The database runs in memory and changes may be lost after reload.",
+        "storage_memory_reason": "Reason",
         "name": "Name",
         "description": "Description",
         "saving": "Saving..."
@@ -114,6 +116,8 @@
         "subtitle": "{{count}} Results · {{mode}}",
         "table_mode": "Table",
         "sql_mode": "SQL",
+        "output_results": "Results",
+        "output_explain": "Explain",
         "refresh_title": "Refresh data",
         "export_excel": "Export Excel",
         "search_placeholder": "Search in visible columns...",
