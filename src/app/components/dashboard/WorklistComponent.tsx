@@ -4,6 +4,9 @@ import { ClipboardList, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-rea
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 import type { DbRow } from '../../../types';
+import { createLogger } from '../../../lib/logger';
+
+const logger = createLogger('WorklistComponent');
 
 interface WorklistStatusComponentProps extends DashboardTileProps {
     isOverlay?: boolean;
@@ -27,7 +30,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
             const pending = list.filter((item: DbRow) => item.status === 'pending' || !item.status).length;
             setStats({ total, pending });
         } catch (e) {
-            console.error('Failed to load worklist stats', e);
+            logger.error('Failed to load worklist stats', e);
         } finally {
             setLoading(false);
         }

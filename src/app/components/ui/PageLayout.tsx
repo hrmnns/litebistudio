@@ -126,6 +126,10 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         });
     }
 
+    const handleAbortQueries = async () => {
+        await SystemRepository.abortActiveQueries();
+    };
+
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
@@ -252,6 +256,16 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                         </>
                                     )}
                                 </div>
+                            )}
+                            {activeQueries > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => { void handleAbortQueries(); }}
+                                    className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-700 transition-colors"
+                                    title={t('common.stop_sql', 'Stop')}
+                                >
+                                    {t('common.stop_sql', 'Stop')}
+                                </button>
                             )}
                         </div>
 

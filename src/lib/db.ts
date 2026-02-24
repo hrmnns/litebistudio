@@ -1,12 +1,15 @@
 import DBWorker from './db.worker?worker';
 import type { DbRow } from '../types';
+import { getActiveLogLevel, createLogger } from './logger';
 
 let worker: Worker | null = null;
 let msgId = 0;
+const logger = createLogger('DB');
 
 type PendingRequest = {
     resolve: (val: unknown) => void;
     reject: (err: unknown) => void;
+    actionType: string;
 };
 
 type ImportReport = {
@@ -85,7 +88,7 @@ export function setReadOnlyMode(skipRedirect = false) {
 function processTabConflict() {
     if (hasConflict) return;
     hasConflict = true;
-    console.warn('[DB] Tab conflict detected! Access restricted to one tab.');
+    logger.warn('Tab conflict detected! Access restricted to one tab.');
 
     if (sessionStorage.getItem('litebistudio_accepted_readonly') === 'true') {
         setReadOnlyMode(true);
@@ -108,6 +111,21 @@ channel.postMessage({ type: 'PING', instanceId });
 
 let lifecycleInitPromise: Promise<void> | null = null;
 
+function createAndConfigureWorker() {
+    const w = new DBWorker();
+    w.onmessage = (e) => {
+        const { id, result, error } = e.data;
+        if (pending.has(id)) {
+            const request = pending.get(id)!;
+            pending.delete(id);
+            if (error) request.reject(new Error(error));
+            else request.resolve(result);
+        }
+    };
+    w.postMessage({ id: ++msgId, type: 'SET_LOG_LEVEL', payload: { level: getActiveLogLevel() } });
+    return w;
+}
+
 function getWorker(): Promise<Worker | 'SLAVE'> {
     if (!lifecycleInitPromise) {
         lifecycleInitPromise = new Promise((resolveLifecycle) => {
@@ -124,12 +142,12 @@ function getWorker(): Promise<Worker | 'SLAVE'> {
                     // Here we CAN use the signal to cancel if this tab enters explicit Read-Only mode.
                     try {
                         await navigator.locks.request('litebistudio_db_lifecycle', { signal: lockAbortController.signal }, async () => {
-                            console.log('[DB] Previous master tab closed. Reloading to take over...');
+                            logger.info('Previous master tab closed. Reloading to take over...');
                             window.location.reload();
                         });
                     } catch (e: unknown) {
                         if (!(e instanceof DOMException && e.name === 'AbortError')) {
-                            console.error('[DB] Background lock request failed:', e);
+                            logger.error('Background lock request failed:', e);
                         }
                     }
                     return;
@@ -145,24 +163,14 @@ function getWorker(): Promise<Worker | 'SLAVE'> {
 
                 // We acquired the lock. We are the master.
                 isMaster = true;
-                const w = new DBWorker();
-                w.onmessage = (e) => {
-                    const { id, result, error } = e.data;
-                    if (pending.has(id)) {
-                        const { resolve, reject } = pending.get(id)!;
-                        pending.delete(id);
-                        if (error) reject(new Error(error));
-                        else resolve(result);
-                    }
-                };
-                worker = w;
+                worker = createAndConfigureWorker();
                 resolveLifecycle();
 
                 // Hold the lock forever
                 await new Promise(() => { });
             }).catch(err => {
                 if (err.name !== 'AbortError') {
-                    console.error('Failed to acquire DB lock:', err);
+                    logger.error('Failed to acquire DB lock:', err);
                 }
                 isMaster = false;
                 resolveLifecycle();
@@ -217,12 +225,13 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
             const timeout = setTimeout(() => {
                 if (pending.has(id)) {
                     pending.delete(id);
-                    console.error(`[DB] RPC Timeout for action: ${type} (Master tab unresponsive)`);
+                    logger.error(`RPC Timeout for action: ${type} (Master tab unresponsive)`);
                     reject(new Error(`Database Master unresponsive (Timeout after 5s). Please focus the first tab or refresh.`));
                 }
             }, 5000);
 
             pending.set(id, {
+                actionType: type,
                 resolve: (val) => { clearTimeout(timeout); resolve(val as T); },
                 reject: (err) => { clearTimeout(timeout); reject(err); }
             });
@@ -242,7 +251,7 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
             const w = result as Worker;
             return new Promise<T>((resolve, reject) => {
                 const id = ++msgId;
-                pending.set(id, { resolve: (val) => resolve(val as T), reject });
+                pending.set(id, { actionType: type, resolve: (val) => resolve(val as T), reject });
                 w.postMessage({ id, type, payload });
             });
         });
@@ -252,10 +261,43 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
 }
 
 export function notifyDbChange(count: number = 1, type: string = 'insert') {
-    console.log(`[DB] Dispatched db-changed event: type=${type}, count=${count}`);
+    logger.debug(`Dispatched db-changed event: type=${type}, count=${count}`);
     window.dispatchEvent(new CustomEvent('db-changed', {
         detail: { type, count }
     }));
+}
+
+export async function abortActiveQueries(): Promise<boolean> {
+    const hasPendingExec = Array.from(pending.values()).some((request) => request.actionType === 'EXEC');
+    if (!hasPendingExec) return false;
+
+    if (!isMaster || !worker) {
+        logger.warn('Abort requested without local DB master. Query cancel is only available in the active master tab.');
+        return false;
+    }
+
+    logger.warn('Aborting active SQL execution by restarting DB worker.');
+
+    for (const [id, request] of Array.from(pending.entries())) {
+        pending.delete(id);
+        if (request.actionType === 'EXEC') {
+            request.reject(new Error('Query cancelled by user.'));
+        } else {
+            request.reject(new Error('Operation interrupted by query cancellation.'));
+        }
+    }
+
+    worker.terminate();
+    worker = createAndConfigureWorker();
+    return true;
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('app-log-level-changed', () => {
+        if (worker) {
+            worker.postMessage({ id: ++msgId, type: 'SET_LOG_LEVEL', payload: { level: getActiveLogLevel() } });
+        }
+    });
 }
 
 export function initDB() {

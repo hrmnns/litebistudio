@@ -17,6 +17,7 @@ import { encryptBuffer, decryptBuffer } from '../../lib/utils/crypto';
 import { Lock, Unlock } from 'lucide-react';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { TableIndexInfo } from '../../lib/repositories/SystemRepository';
+import { createLogger } from '../../lib/logger';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -45,6 +46,8 @@ interface ViewMetaStatus {
     rows?: number;
     error?: string;
 }
+
+const logger = createLogger('DatasourceView');
 
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
     const { t, i18n } = useTranslation();
@@ -199,7 +202,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     }))
                 });
             } catch (e) {
-                console.error("Failed to load schema", e);
+                logger.error('Failed to load schema', e);
                 setTableSchema(null);
             }
         };
@@ -728,24 +731,24 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                             onChange={async (e) => {
                                                 const logTime = () => new Date().toLocaleTimeString();
-                                                console.log(`[Restore][${logTime()}] onChange triggered`);
+                                                logger.debug(`[Restore][${logTime()}] onChange triggered`);
                                                 setRestoreAlert(null);
                                                 const file = e.target.files?.[0];
                                                 if (!file) {
-                                                    console.log(`[Restore][${logTime()}] No file selected`);
+                                                    logger.debug(`[Restore][${logTime()}] No file selected`);
                                                     return;
                                                 }
-                                                console.log(`[Restore][${logTime()}] File selected:`, file.name, file.size, file.type);
+                                                logger.debug(`[Restore][${logTime()}] File selected:`, file.name, file.size, file.type);
 
                                                 try {
-                                                    console.log(`[Restore][${logTime()}] Calling file.arrayBuffer()...`);
+                                                    logger.debug(`[Restore][${logTime()}] Calling file.arrayBuffer()...`);
                                                     const buffer = await file.arrayBuffer();
-                                                    console.log(`[Restore][${logTime()}] Buffer received, size:`, buffer.byteLength);
+                                                    logger.debug(`[Restore][${logTime()}] Buffer received, size:`, buffer.byteLength);
 
                                                     const header = new Uint8Array(buffer.slice(0, 16));
                                                     const headerString = new TextDecoder().decode(header);
                                                     const isSqlite = headerString.startsWith('SQLite format 3');
-                                                    console.log('[Restore] Header check - isSqlite:', isSqlite);
+                                                    logger.debug('[Restore] Header check - isSqlite:', isSqlite);
 
                                                     let finalBuffer = buffer;
 
@@ -768,7 +771,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     }
 
                                                     if (confirm(t('datasource.restore_confirm'))) {
-                                                        console.log(`[Restore][${logTime()}] User confirmed restore. Starting process...`);
+                                                        logger.info(`[Restore][${logTime()}] User confirmed restore. Starting process...`);
                                                         setRestoreAlert({
                                                             type: 'warning',
                                                             title: t('common.loading'),
@@ -776,11 +779,11 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                         });
 
                                                         try {
-                                                            console.log(`[Restore][${logTime()}] Importing db module...`);
+                                                            logger.debug(`[Restore][${logTime()}] Importing db module...`);
                                                             const { importDatabase } = await import('../../lib/db');
-                                                            console.log(`[Restore][${logTime()}] Calling worker importDatabase...`);
+                                                            logger.debug(`[Restore][${logTime()}] Calling worker importDatabase...`);
                                                             const report = await importDatabase(finalBuffer) as unknown as RestoreReport;
-                                                            console.log(`[Restore][${logTime()}] Worker report received:`, report);
+                                                            logger.debug(`[Restore][${logTime()}] Worker report received:`, report);
                                                             const { versionInfo } = report;
 
                                                             if (!report.headerMatch) {
@@ -831,12 +834,12 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                     message: t('datasource.restore_success_reload'),
                                                                     details: versionInfo ? `Database Version: V${versionInfo.backup} (Upgraded to V${versionInfo.current})` : undefined
                                                                 });
-                                                                console.log(`[Restore][${logTime()}] Success! Reloading in 2s...`);
+                                                                logger.info(`[Restore][${logTime()}] Success! Reloading in 2s...`);
                                                                 markBackupComplete();
                                                                 setTimeout(() => window.location.reload(), 2000);
                                                             }
                                                         } catch (err: unknown) {
-                                                            console.error(`[Restore][${logTime()}] Inner Error:`, err);
+                                                            logger.error(`[Restore][${logTime()}] Inner Error:`, err);
                                                             setRestoreAlert({
                                                                 type: 'error',
                                                                 title: t('common.error'),
@@ -845,7 +848,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                         }
                                                     }
                                                 } catch (err: unknown) {
-                                                    console.error(`[Restore][${logTime()}] Outer Error:`, err);
+                                                    logger.error(`[Restore][${logTime()}] Outer Error:`, err);
                                                     setRestoreAlert({
                                                         type: 'error',
                                                         title: t('common.error'),

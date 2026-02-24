@@ -6,13 +6,14 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable, type Column, type DataTableSortConfig } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
-import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, ChevronDown, Save, ListPlus } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, ChevronDown, Save, ListPlus, ArrowLeft } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow } from '../../types';
 import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
 import type { DataSourceEntry } from '../../lib/repositories/SystemRepository';
+import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -58,6 +59,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [explainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
     const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
     const [autocompleteEnabled, setAutocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [sqlRequireLimitConfirm] = useLocalStorage<boolean>('data_inspector_sql_require_limit_confirm', true);
+    const [sqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
     const [explainRows, setExplainRows] = useState<DbRow[]>([]);
     const [explainError, setExplainError] = useState('');
     const [explainLoading, setExplainLoading] = useState(false);
@@ -67,6 +70,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [saveWidgetDescription, setSaveWidgetDescription] = useState('');
     const [saveToBuilderError, setSaveToBuilderError] = useState('');
     const [isSavingToBuilder, setIsSavingToBuilder] = useState(false);
+    const [sqlExecutionSql, setSqlExecutionSql] = useState('');
+    const [sqlLimitNotice, setSqlLimitNotice] = useState('');
     const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
     const [indexName, setIndexName] = useState('');
     const [indexColumns, setIndexColumns] = useState<string[]>([]);
@@ -115,10 +120,26 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [isResizingSqlPane, setIsResizingSqlPane] = useState(false);
     const sqlPaneResizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
     const sqlPaneLiveHeightRef = useRef<number>(sqlEditorHeight);
+    const [inspectorReturnHash, setInspectorReturnHash] = useState<string | null>(null);
 
     useEffect(() => {
         setShowTableFilters(defaultShowFilters);
     }, [defaultShowFilters, selectedTable]);
+
+    useEffect(() => {
+        const pendingSql = localStorage.getItem(INSPECTOR_PENDING_SQL_KEY);
+        const pendingReturnHash = localStorage.getItem(INSPECTOR_RETURN_HASH_KEY);
+        if (pendingReturnHash) {
+            const normalized = pendingReturnHash.startsWith('#/') ? pendingReturnHash : '#/';
+            setInspectorReturnHash(normalized);
+            localStorage.removeItem(INSPECTOR_RETURN_HASH_KEY);
+        }
+        if (!pendingSql) return;
+        localStorage.removeItem(INSPECTOR_PENDING_SQL_KEY);
+        setMode('sql');
+        setInputSql(pendingSql);
+        setSqlOutputView('result');
+    }, []);
 
     // Fetch available data sources (tables + views)
     const { data: dataSources } = useAsync<DataSourceEntry[]>(
@@ -158,11 +179,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 if (!selectedTable) return [];
                 return await SystemRepository.inspectTable(selectedTable, pageSize, searchTerm, offset, selectedSourceType);
             } else {
-                if (!inputSql) return []; // Don't run empty SQL
-                return await SystemRepository.executeRaw(inputSql);
+                if (!sqlExecutionSql) return []; // Don't run empty SQL
+                return await SystemRepository.executeRaw(sqlExecutionSql);
             }
         },
-        [mode, selectedTable, selectedSourceType, pageSize, currentPage] // Auto-run when mode/source/page changes
+        [mode, selectedTable, selectedSourceType, pageSize, currentPage, sqlExecutionSql] // Auto-run when mode/source/page changes
     );
 
     const { data: tableTotalRows } = useAsync<number>(
@@ -200,9 +221,32 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         const isPotentialWriteQuery = /^(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|REPLACE|TRUNCATE|VACUUM|ATTACH|DETACH)\b/.test(upper);
         if (isPotentialWriteQuery && !confirm(t('datainspector.write_confirm'))) return;
 
+        const isSelect = /^\s*SELECT\b/i.test(trimmed);
+        const hasLimitClause = /\bLIMIT\b/i.test(trimmed);
+        if (isSelect && !hasLimitClause && sqlRequireLimitConfirm) {
+            if (!confirm(t('datainspector.limit_confirm_prompt', { limit: sqlMaxRows }))) return;
+        }
+
+        let executionSql = trimmed.replace(/;\s*$/, '');
+        if (isSelect) {
+            const cappedLimit = Math.max(1, Math.floor(sqlMaxRows || 1));
+            executionSql = `SELECT * FROM (${executionSql}) AS __litebi_guard LIMIT ${cappedLimit}`;
+            setSqlLimitNotice(t('datainspector.limit_applied_notice', { limit: cappedLimit }));
+        } else {
+            setSqlLimitNotice('');
+        }
+
         setSqlOutputView('result');
+        setSqlExecutionSql(executionSql);
         execute();
         setSqlHistory(prev => [trimmed, ...prev.filter(q => q !== trimmed)].slice(0, 12));
+    };
+
+    const handleCancelSql = async () => {
+        const cancelled = await SystemRepository.abortActiveQueries();
+        if (!cancelled) {
+            alert(t('datainspector.cancel_not_available', 'No cancellable SQL query is currently running in this tab.'));
+        }
     };
 
     const runExplainPlan = useCallback(async (sql: string) => {
@@ -862,6 +906,16 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 onBack,
                 actions: (
                     <>
+                        {inspectorReturnHash && (
+                            <button
+                                onClick={() => { window.location.hash = inspectorReturnHash; }}
+                                className="h-10 flex items-center gap-2 px-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                                title={t('datainspector.back_to_dashboard')}
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="hidden sm:inline">{t('datainspector.back_to_dashboard')}</span>
+                            </button>
+                        )}
                         {/* Mode Toggle */}
                         <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                             <button
@@ -1045,6 +1099,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
                                 {t('datainspector.run_sql')}
                             </button>
+                            {loading && (
+                                <button
+                                    onClick={() => { void handleCancelSql(); }}
+                                    className="px-3 py-1.5 rounded-md text-sm font-medium border bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                >
+                                    {t('datainspector.stop_sql', 'Stop')}
+                                </button>
+                            )}
                             <button
                                 onClick={() => setAutocompleteEnabled(!autocompleteEnabled)}
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
@@ -1088,6 +1150,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </button>
                         </div>
                     </div>
+                    {sqlLimitNotice && (
+                        <div className="mt-2 px-3 py-2 text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-800">
+                            {sqlLimitNotice}
+                        </div>
+                    )}
                     <div className="border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/70 dark:bg-slate-900/40">
                         <button
                             type="button"

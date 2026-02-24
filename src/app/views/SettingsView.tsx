@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { hashPin, generateSalt } from '../../lib/utils/crypto';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { LOG_LEVEL_STORAGE_KEY, type AppLogLevel } from '../../lib/logging';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
 type AppsSubTab = 'inspector' | 'querybuilder' | 'datamanagement';
@@ -37,6 +38,8 @@ export const SettingsView: React.FC = () => {
     const [inspectorExplainMode, setInspectorExplainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
     const [inspectorSqlAssistOpen, setInspectorSqlAssistOpen] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
     const [inspectorAutocomplete, setInspectorAutocomplete] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [inspectorSqlRequireLimitConfirm, setInspectorSqlRequireLimitConfirm] = useLocalStorage<boolean>('data_inspector_sql_require_limit_confirm', true);
+    const [inspectorSqlMaxRows, setInspectorSqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
     const [inspectorThresholds, setInspectorThresholds] = useLocalStorage<{ nullRate: number; cardinalityRate: number }>(
         'data_inspector_profiling_thresholds',
         { nullRate: 30, cardinalityRate: 95 }
@@ -49,6 +52,30 @@ export const SettingsView: React.FC = () => {
     const [tableWrapCells, setTableWrapCells] = useLocalStorage<boolean>('ui_table_wrap_cells', false);
     const [tableDefaultShowFilters, setTableDefaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
     const [confirmDestructive, setConfirmDestructive] = useLocalStorage<boolean>('notifications_confirm_destructive', true);
+    const [appLogLevel, setAppLogLevel] = useLocalStorage<AppLogLevel>(LOG_LEVEL_STORAGE_KEY, 'error');
+
+    const confirmAction = (message: string): boolean => {
+        if (!confirmDestructive) return true;
+        return window.confirm(message);
+    };
+
+    const handleResetInspectorLayout = () => {
+        if (!confirmAction(t('settings.inspector_reset_layout_confirm'))) return;
+        localStorage.removeItem('data_inspector_column_widths_v1');
+        localStorage.removeItem('data_inspector_saved_views');
+        localStorage.removeItem('data_inspector_active_view');
+        localStorage.removeItem('data_inspector_sql_editor_height');
+        alert(t('settings.inspector_reset_layout_done'));
+    };
+
+    const handleClearInspectorSqlMemory = () => {
+        if (!confirmAction(t('settings.inspector_reset_sql_confirm'))) return;
+        localStorage.removeItem('data_inspector_sql_history');
+        localStorage.removeItem('data_inspector_favorite_queries');
+        localStorage.removeItem('data_inspector_custom_sql_templates');
+        localStorage.removeItem('data_inspector_selected_custom_template');
+        alert(t('settings.inspector_reset_sql_done'));
+    };
 
     const handleSavePin = async () => {
         if (pinInput.length < 4) {
@@ -89,8 +116,7 @@ export const SettingsView: React.FC = () => {
         <PageLayout
             header={{
                 title: t('sidebar.settings'),
-                subtitle: t('settings.subtitle'),
-                onBack: () => window.history.back()
+                subtitle: t('settings.subtitle')
             }}
             footer={footerText}
             breadcrumbs={[
@@ -370,6 +396,53 @@ export const SettingsView: React.FC = () => {
                                     </label>
                                 </div>
                             </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.inspector_sql_safety')}</p>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_sql_confirm_without_limit')}</span>
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={inspectorSqlRequireLimitConfirm}
+                                        onChange={() => setInspectorSqlRequireLimitConfirm(!inspectorSqlRequireLimitConfirm)}
+                                    />
+                                </label>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-slate-500">{t('settings.inspector_sql_max_rows')}</label>
+                                    <input
+                                        type="number"
+                                        min={100}
+                                        max={50000}
+                                        value={inspectorSqlMaxRows}
+                                        onChange={(e) => {
+                                            const next = Math.max(100, Math.min(50000, Number(e.target.value) || 100));
+                                            setInspectorSqlMaxRows(next);
+                                        }}
+                                        className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.inspector_reset_title')}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleResetInspectorLayout}
+                                        className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                    >
+                                        {t('settings.inspector_reset_layout')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleClearInspectorSqlMemory}
+                                        className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                    >
+                                        {t('settings.inspector_reset_sql')}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -496,6 +569,24 @@ export const SettingsView: React.FC = () => {
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.notifications_confirm_destructive')}</span>
                                 <input type="checkbox" className="h-4 w-4" checked={confirmDestructive} onChange={() => setConfirmDestructive(!confirmDestructive)} />
                             </label>
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.log_level')}</label>
+                                <select
+                                    value={appLogLevel}
+                                    onChange={(e) => {
+                                        const next = e.target.value as AppLogLevel;
+                                        setAppLogLevel(next);
+                                        window.dispatchEvent(new CustomEvent('app-log-level-changed', { detail: { level: next } }));
+                                    }}
+                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                >
+                                    <option value="off">{t('settings.log_level_off')}</option>
+                                    <option value="error">{t('settings.log_level_error')}</option>
+                                    <option value="warn">{t('settings.log_level_warn')}</option>
+                                    <option value="info">{t('settings.log_level_info')}</option>
+                                    <option value="debug">{t('settings.log_level_debug')}</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -525,7 +616,7 @@ export const SettingsView: React.FC = () => {
                                         <div className="font-semibold text-slate-900 dark:text-white">{t('about.view_info', 'Project Information')}</div>
                                         <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                                             <span>Version {version}</span>
-                                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                                            <span className="text-slate-300 dark:text-slate-600">|</span>
                                             <span>Build {buildNumber}</span>
                                         </div>
                                     </div>
@@ -539,3 +630,4 @@ export const SettingsView: React.FC = () => {
         </PageLayout>
     );
 };
+

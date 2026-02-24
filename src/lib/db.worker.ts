@@ -1,6 +1,7 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import schemaSql from '../datasets/schema.sql?raw';
 import viewsSql from '../datasets/views.sql?raw';
+import { DEFAULT_LOG_LEVEL, normalizeLogLevel, shouldLog, type AppLogLevel } from './logging';
 
 type SqliteRow = Record<string, unknown>;
 
@@ -51,9 +52,20 @@ let sqlite3: SqliteApiLike | null = null;
 let initPromise: Promise<boolean> | null = null;
 let dbStorageMode: 'opfs' | 'memory' = 'memory';
 let dbStorageReason: string | null = null;
+let workerLogLevel: AppLogLevel = DEFAULT_LOG_LEVEL;
 
-const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
-const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
+const log = (...args: unknown[]) => {
+    if (shouldLog(workerLogLevel, 'info')) console.info('[DB Worker]', ...args);
+};
+const debug = (...args: unknown[]) => {
+    if (shouldLog(workerLogLevel, 'debug')) console.debug('[DB Worker]', ...args);
+};
+const warn = (...args: unknown[]) => {
+    if (shouldLog(workerLogLevel, 'warn')) console.warn('[DB Worker]', ...args);
+};
+const error = (...args: unknown[]) => {
+    if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
+};
 
 const CURRENT_SCHEMA_VERSION = 7;
 
@@ -404,6 +416,15 @@ async function handleMessage(e: MessageEvent) {
                 break;
             }
 
+            case 'SET_LOG_LEVEL': {
+                const payloadObj = isRecord(payload) ? payload : {};
+                const nextLevel = typeof payloadObj.level === 'string' ? payloadObj.level : null;
+                workerLogLevel = normalizeLogLevel(nextLevel);
+                debug('Log level updated:', workerLogLevel);
+                result = true;
+                break;
+            }
+
             case 'GET_DIAGNOSTICS':
                 if (!db) await initDB();
                 result = getDiagnostics();
@@ -667,7 +688,7 @@ async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
         }
 
         // 3. Finalize Import (write to OPFS)
-        if (sqliteApi.oo1.OpfsDb) {
+                if (sqliteApi.oo1.OpfsDb) {
             if (db) {
                 db.close();
                 db = null;
@@ -675,7 +696,9 @@ async function importDatabase(buffer: ArrayBuffer): Promise<ImportReport> {
             const root = await navigator.storage.getDirectory();
             try {
                 await root.removeEntry('litebistudio.sqlite3');
-            } catch { /* ignore */ }
+            } catch {
+                warn('No OPFS file to delete or unable to remove existing file before import.');
+            }
 
             const fileHandle = await root.getFileHandle('litebistudio.sqlite3', { create: true });
             const writable = await fileHandle.createWritable();

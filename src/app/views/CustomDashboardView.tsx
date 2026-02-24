@@ -11,6 +11,9 @@ import { getComponent, SYSTEM_WIDGETS } from '../registry';
 import { COMPONENTS } from '../../config/components';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow, WidgetConfig } from '../../types';
+import { createLogger } from '../../lib/logger';
+
+const logger = createLogger('CustomDashboardView');
 
 interface FilterDef {
     column: string;
@@ -100,7 +103,13 @@ export const CustomDashboardView: React.FC = () => {
             }
 
             setDashboards(dbDashboards);
-            setActiveDashboardId(dbDashboards[0]?.id ?? null);
+            const hashPart = window.location.hash || '#/';
+            const queryString = hashPart.includes('?') ? hashPart.slice(hashPart.indexOf('?') + 1) : '';
+            const requestedDashboardId = queryString ? new URLSearchParams(queryString).get('dashboard') : null;
+            const resolvedDashboardId = requestedDashboardId && dbDashboards.some(d => d.id === requestedDashboardId)
+                ? requestedDashboardId
+                : (dbDashboards[0]?.id ?? null);
+            setActiveDashboardId(resolvedDashboardId);
             setIsLoaded(true);
         };
         init();
@@ -130,7 +139,7 @@ export const CustomDashboardView: React.FC = () => {
                         cols.forEach(c => allCols.add(c.name));
                     }
                 } catch (e) {
-                    console.error('Error fetching schema for table', table, e);
+                    logger.error('Error fetching schema for table', table, e);
                 }
             }
             setSuggestedColumns(Array.from(allCols).sort());
@@ -425,10 +434,10 @@ export const CustomDashboardView: React.FC = () => {
                                 return (
                                     <div key={widgetRef.id + idx} className={`relative group h-full ${meta.defaultColSpan === 2 ? 'md:col-span-2' : ''}`}>
                                         {!isReadOnly && (
-                                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="absolute -top-2 -right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); removeFromDashboard(widgetRef.id); }}
-                                                    className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
+                                                    className="p-1.5 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-full text-slate-400 hover:text-red-500 shadow-sm"
                                                     title={t('common.remove')}
                                                 >
                                                     <Trash2 className="w-3 h-3" />
@@ -437,7 +446,7 @@ export const CustomDashboardView: React.FC = () => {
                                         )}
                                         <div className="h-full">
                                             <Component
-                                                onRemove={() => removeFromDashboard(widgetRef.id)}
+                                                onRemove={undefined}
                                                 targetView={COMPONENTS.find(c => c.component === meta.id)?.targetView}
                                             />
                                         </div>
@@ -459,10 +468,10 @@ export const CustomDashboardView: React.FC = () => {
                             return (
                                 <div key={widgetRef.id + idx} className="relative group md:col-span-1 xl:col-span-2 h-full">
                                     {!isReadOnly && (
-                                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute -top-2 -right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => removeFromDashboard(widgetRef.id)}
-                                                className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded text-slate-400 hover:text-red-500 shadow-sm"
+                                                className="p-1.5 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-full text-slate-400 hover:text-red-500 shadow-sm"
                                                 title="Entfernen"
                                             >
                                                 <Trash2 className="w-3 h-3" />
@@ -474,6 +483,8 @@ export const CustomDashboardView: React.FC = () => {
                                         sql={dbWidget.sql_query}
                                         config={config}
                                         globalFilters={activeDashboard.filters}
+                                        showInspectorJump
+                                        inspectorReturnHash={activeDashboard?.id ? `#/?dashboard=${encodeURIComponent(activeDashboard.id)}` : '#/'}
                                     />
                                 </div>
                             );

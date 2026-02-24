@@ -26,12 +26,14 @@ import { useAsync } from '../../hooks/useAsync';
 import { SqlAssistant } from '../components/SqlAssistant';
 import { PivotTable } from '../components/PivotTable';
 import type { SchemaDefinition } from '../components/SchemaDocumentation';
+import { createLogger } from '../../lib/logger';
 
 type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text';
 type GuidedStep = 1 | 2 | 3 | 4;
 const DEFAULT_SQL = 'SELECT * FROM sqlite_master LIMIT 10';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const logger = createLogger('QueryBuilderView');
 
 interface SavedWidget {
     id: string;
@@ -181,7 +183,7 @@ export const QueryBuilderView: React.FC = () => {
                 setQueryConfig(undefined);
             }
         } catch (e) {
-            console.error('Error parsing widget config', e);
+            logger.error('Error parsing widget config', e);
         }
 
         setSidebarTab('query');

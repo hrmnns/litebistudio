@@ -2,6 +2,9 @@
 import React, { createContext, useContext, type ReactNode } from 'react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { COMPONENTS } from '../../config/components';
+import { createLogger } from '../logger';
+
+const logger = createLogger('DashboardContext');
 
 interface DashboardContextType {
     visibleComponentIds: string[];
@@ -54,15 +57,15 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         const handleDbChange = (e: Event) => {
             const detail = (e as CustomEvent<{ type?: string; count?: number }>).detail || {};
             if (detail.type === 'restore') {
-                console.log('[DashboardContext] DB Restore detected. Resetting count to 0.');
+                logger.debug('DB Restore detected. Resetting count to 0.');
                 setChangeCount(0);
                 setLastBackup(new Date().toISOString());
             } else if (detail.type === 'clear') {
-                console.log('[DashboardContext] DB Clear detected. Incrementing count.');
+                logger.debug('DB Clear detected. Incrementing count.');
                 setChangeCount((prev: number) => prev + 1);
             } else {
                 const count = detail.count || 1;
-                console.log(`[DashboardContext] DB Change detected (${detail.type}, count=${count}). New count will be based on current state.`);
+                logger.debug(`DB Change detected (${detail.type}, count=${count}). New count will be based on current state.`);
                 setChangeCount((prev: number) => prev + count);
             }
         };

@@ -35,6 +35,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Data Inspector SQL output toggle:
   - Compact switch between `Results` and `Explain` inside the result panel.
   - Explain plan refreshes while editing (debounced) in design-oriented flow.
+- Data Inspector table-view action bar:
+  - Integrated index creation action directly in table mode (reusing the structured index dialog).
+  - Compact, dedicated in-panel menu row for table-view actions (index + saved views).
+- Datasource schema coverage enhancements:
+  - Indexes are now displayed in `Schema & Structure` (including details like columns/flags).
+  - Added guided index creation directly from table structure management.
+  - Added table/view meta badges in lists (row count, index count where applicable).
+  - Added invalid-view detection and dedicated invalid-state hints.
+- Version/build transparency:
+  - About screen now shows app version and build number dynamically from build/runtime defines.
+- Diagnostics/logging controls:
+  - Introduced configurable application log levels (`off`, `error`, `warn`, `info`, `debug`) via Settings.
+  - Added centralized logging utilities and wired key app/worker logs to the configured level.
+- Dashboard-to-Inspector handoff:
+  - Added direct "Open" action on custom dashboard widgets to open the widget SQL in Data Inspector.
+  - Added context-aware "Back to Dashboard" action in Data Inspector after opening from a widget.
+  - Return navigation now restores the exact originating dashboard (not only the default/first dashboard).
+- SQL execution safety and cancellation:
+  - Added SQL `Stop` action in Data Inspector while queries are running.
+  - Added global SQL `Stop` action in the shared footer near the loading indicator.
+  - Added configurable SQL safety defaults in Settings (confirm `SELECT` without `LIMIT`, max rows per SQL run).
+  - SQL mode now applies a configurable safety cap for returned row count to keep UI responsive on very large datasets.
 
 ### Changed
 - Data Inspector SQL suggestion UI was moved to a floating overlay and positioned near the current cursor line to reduce editor obstruction.
@@ -47,12 +69,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Locale coverage was extended for newly added Inspector/Datasource/Query-Builder controls in both German and English.
 - Header navigation was simplified:
   - Removed page-level back buttons from shared view headers to reduce visual clutter and free horizontal space.
+- Data Inspector table-mode toolbar was streamlined:
+  - Moved page-size control to table footer.
+  - Removed redundant top `Auto-Limit`/page-size controls.
+  - Aligned control heights and combobox affordances for a more consistent header row.
+- Data Inspector split-panel behavior was refined:
+  - Added draggable splitter between SQL editor and lower results/explain area.
+  - Improved drag stability to reduce resize flicker.
+- Datasource view cards were decluttered:
+  - Removed redundant `VIEW` label and hidden irrelevant index count for views.
+  - Disabled info action for invalid views.
+- Runtime logging now defaults to minimal console output outside debug-oriented log levels to reduce noise and overhead.
+- Dashboard tile header controls were simplified:
+  - Removed obsolete drag-handle and duplicate maximize actions from tile headers.
+  - Unified system-tile and custom-tile remove affordance with consistent floating remove button behavior.
+- Fixed dashboard tile hover visuals by aligning hover-overlay border radius with tile radius.
 
 ### Fixed
 - Excel append import now ignores non-schema helper fields (e.g., `_rowid`) to prevent SQLite insert errors.
 - Excel export/import roundtrip stability improved by removing `_rowid` from exported table data.
 - Re-enabled import mapping flow before append import, including persisted column mappings and transformer application.
 - Fixed table/view inspection behavior by handling view sources without `rowid` assumptions.
+- Fixed index discovery/rendering reliability in schema inspection (including case-insensitive lookup and refresh behavior when opening schema dialogs).
 
 ## [1.0.0] - 2026-02-23
 

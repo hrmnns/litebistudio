@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('useLocalStorage');
 
 /**
  * A hook to persist state in localStorage.
@@ -23,7 +26,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
                 return item as unknown as T;
             }
         } catch (error) {
-            console.error('[useLocalStorage] Initial read error:', error);
+            logger.error('Initial read error:', error);
             return initialValue;
         }
     });
@@ -35,7 +38,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
                 try {
                     const nextValue = JSON.parse(e.newValue);
                     setStoredValue(nextValue);
-                    console.log(`[useLocalStorage] Synced ${key} from other tab:`, nextValue);
+                    logger.debug(`Synced ${key} from other tab:`, nextValue);
                 } catch {
                     setStoredValue(e.newValue as unknown as T);
                 }
@@ -57,7 +60,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
                 }
                 return valueToStore;
             } catch (error) {
-                console.error('[useLocalStorage] Write error:', error);
+                logger.error('Write error:', error);
                 return currentStoredValue;
             }
         });

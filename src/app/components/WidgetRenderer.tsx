@@ -9,12 +9,13 @@ import {
     ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
     ScatterChart, Scatter, LabelList
 } from 'recharts';
-import { Loader2, AlertCircle, BarChart3 } from 'lucide-react';
+import { Loader2, AlertCircle, BarChart3, ExternalLink } from 'lucide-react';
 import { RecordDetailModal } from './RecordDetailModal';
 import { formatValue } from '../utils/formatUtils';
 import { type WidgetConfig, type DbRow } from '../../types';
 import { PivotTable } from './PivotTable';
 import type { SchemaDefinition } from './SchemaDocumentation';
+import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 
 interface FilterDef {
     column: string;
@@ -27,50 +28,65 @@ interface WidgetRendererProps {
     sql: string;
     config: WidgetConfig;
     globalFilters?: FilterDef[];
+    showInspectorJump?: boolean;
+    inspectorReturnHash?: string;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, globalFilters }) => {
+const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, globalFilters, showInspectorJump = false, inspectorReturnHash }) => {
     const { t } = useTranslation();
+    const effectiveSql = useMemo(() => {
+        let nextSql = sql;
+        if (!globalFilters || globalFilters.length === 0) {
+            return nextSql;
+        }
+        const activeFilters = globalFilters.filter(f => f.column && (f.operator === 'is null' || f.value));
+        if (activeFilters.length === 0) {
+            return nextSql;
+        }
+
+        const whereClause = activeFilters.map(f => {
+            const col = `"${f.column.replace(/"/g, '""')}"`;
+            const val = typeof f.value === 'string' ? `'${f.value.replace(/'/g, "''")}'` : f.value;
+            const op = f.operator === 'contains' ? 'LIKE' : (f.operator === 'is null' ? 'IS NULL' : f.operator);
+
+            if (f.operator === 'is null') return `${col} IS NULL`;
+
+            const finalVal = f.operator === 'contains' ? `'%${f.value}%'` : val;
+            return `${col} ${op} ${finalVal}`;
+        }).join(' AND ');
+
+        if (nextSql.toUpperCase().includes('WHERE')) {
+            nextSql = nextSql.replace(/WHERE/i, `WHERE (${whereClause}) AND `);
+        } else if (nextSql.toUpperCase().includes('GROUP BY')) {
+            nextSql = nextSql.replace(/GROUP BY/i, `WHERE ${whereClause} GROUP BY `);
+        } else if (nextSql.toUpperCase().includes('ORDER BY')) {
+            nextSql = nextSql.replace(/ORDER BY/i, `WHERE ${whereClause} ORDER BY `);
+        } else if (nextSql.toUpperCase().includes('LIMIT')) {
+            nextSql = nextSql.replace(/LIMIT/i, `WHERE ${whereClause} LIMIT `);
+        } else {
+            nextSql += ` WHERE ${whereClause}`;
+        }
+        return nextSql;
+    }, [sql, globalFilters]);
+
+    const canOpenInInspector = showInspectorJump && /^\s*SELECT\b/i.test(effectiveSql);
+    const handleOpenInInspector = React.useCallback(() => {
+        if (!canOpenInInspector) return;
+        localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, effectiveSql);
+        const currentHash = window.location.hash || '#/';
+        localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, inspectorReturnHash || currentHash);
+        window.location.hash = '#/inspector';
+    }, [canOpenInInspector, effectiveSql, inspectorReturnHash]);
+
     const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {
             if (config.type === 'text') return [];
-            if (!sql) return [];
-            let effectiveSql = sql;
-
-            // Inject Global Filters
-            if (globalFilters && globalFilters.length > 0) {
-                const activeFilters = globalFilters.filter(f => f.column && (f.operator === 'is null' || f.value));
-                if (activeFilters.length > 0) {
-                    const whereClause = activeFilters.map(f => {
-                        const col = `"${f.column.replace(/"/g, '""')}"`;
-                        const val = typeof f.value === 'string' ? `'${f.value.replace(/'/g, "''")}'` : f.value;
-                        const op = f.operator === 'contains' ? 'LIKE' : (f.operator === 'is null' ? 'IS NULL' : f.operator);
-
-                        if (f.operator === 'is null') return `${col} IS NULL`;
-
-                        const finalVal = f.operator === 'contains' ? `'%${f.value}%'` : val;
-                        return `${col} ${op} ${finalVal}`;
-                    }).join(' AND ');
-
-                    if (effectiveSql.toUpperCase().includes('WHERE')) {
-                        effectiveSql = effectiveSql.replace(/WHERE/i, `WHERE (${whereClause}) AND `);
-                    } else if (effectiveSql.toUpperCase().includes('GROUP BY')) {
-                        effectiveSql = effectiveSql.replace(/GROUP BY/i, `WHERE ${whereClause} GROUP BY `);
-                    } else if (effectiveSql.toUpperCase().includes('ORDER BY')) {
-                        effectiveSql = effectiveSql.replace(/ORDER BY/i, `WHERE ${whereClause} ORDER BY `);
-                    } else if (effectiveSql.toUpperCase().includes('LIMIT')) {
-                        effectiveSql = effectiveSql.replace(/LIMIT/i, `WHERE ${whereClause} LIMIT `);
-                    } else {
-                        effectiveSql += ` WHERE ${whereClause}`;
-                    }
-                }
-            }
-
+            if (!effectiveSql) return [];
             return await SystemRepository.executeRaw(effectiveSql);
         },
-        [sql, globalFilters, config.type]
+        [effectiveSql, config.type]
     );
 
     const [isDetailOpen, setIsDetailOpen] = React.useState(false);
@@ -182,6 +198,17 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
                     </div>
                 </div>
+                {canOpenInInspector && (
+                    <button
+                        type="button"
+                        onClick={handleOpenInInspector}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+                        title={t('common.open_in_inspector')}
+                    >
+                        <ExternalLink className="w-3 h-3" />
+                        {t('common.open')}
+                    </button>
+                )}
             </div>
             <div className="flex-1 min-h-0 p-2">
                 {config.type === 'table' ? (

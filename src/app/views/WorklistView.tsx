@@ -6,8 +6,10 @@ import { PageLayout } from '../components/ui/PageLayout';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { TableColumn, WorklistStatus } from '../../types';
+import { createLogger } from '../../lib/logger';
 
 type WorklistFilter = 'all' | WorklistStatus;
+const logger = createLogger('WorklistView');
 
 interface WorklistItem {
     id: number;
@@ -90,7 +92,7 @@ export const WorklistView: React.FC = () => {
                     ) as Record<string, unknown>[];
                 }
             } catch (fallbackErr) {
-                console.error("Failed to load details for", item, fallbackErr);
+                logger.error('Failed to load details for', item, fallbackErr);
             }
         }
 

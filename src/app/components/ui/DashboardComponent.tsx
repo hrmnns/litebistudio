@@ -2,7 +2,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
-import { X, GripVertical, type LucideIcon, Maximize2, ChevronRight } from 'lucide-react';
+import { X, type LucideIcon, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export interface DashboardTileProps {
@@ -44,7 +44,6 @@ const DashboardComponent: React.FC<DashboardComponentProps> = ({
     onRemove,
     onClick,
     targetView,
-    dragHandleProps,
     footerLeft,
     footerRight,
     className,
@@ -91,21 +90,6 @@ const DashboardComponent: React.FC<DashboardComponentProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
-                    {onClick && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onClick(); }}
-                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                            title={t('common.expand')}
-                        >
-                            <Maximize2 className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                    <div
-                        {...dragHandleProps}
-                        className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-grab active:cursor-grabbing transition-colors"
-                    >
-                        <GripVertical className="w-3.5 h-3.5" />
-                    </div>
                     {onRemove && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onRemove(); }}
@@ -135,7 +119,7 @@ const DashboardComponent: React.FC<DashboardComponentProps> = ({
             )}
 
             {/* Subtle Hover Glow */}
-            <div className="absolute inset-0 pointer-events-none border border-transparent group-hover:border-blue-500/10 dark:group-hover:border-blue-400/10 rounded-3xl transition-colors" />
+            <div className="absolute inset-0 pointer-events-none border border-transparent group-hover:border-blue-500/10 dark:group-hover:border-blue-400/10 rounded-xl transition-colors" />
         </div>
     );
 };

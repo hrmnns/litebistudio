@@ -247,6 +247,10 @@ export const SystemRepository = {
         return result;
     },
 
+    async abortActiveQueries(): Promise<boolean> {
+        return await import('../db').then(m => m.abortActiveQueries());
+    },
+
     async bulkInsert(tableName: string, records: DbRow[]): Promise<number> {
         const { genericBulkInsert } = await import('../db');
         const count = await genericBulkInsert(tableName, records);

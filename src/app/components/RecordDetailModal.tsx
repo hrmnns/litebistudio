@@ -4,6 +4,7 @@ import { Modal } from './Modal';
 import { Bookmark, Info, Target, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import type { DbRow, TableColumn } from '../../types';
+import { createLogger } from '../../lib/logger';
 
 import { SchemaTable } from './SchemaDocumentation';
 import type { SchemaDefinition } from './SchemaDocumentation';
@@ -23,6 +24,8 @@ interface WorklistItemState extends DbRow {
     status?: string;
     comment?: string;
 }
+
+const logger = createLogger('RecordDetail');
 
 export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     isOpen,
@@ -172,7 +175,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         const recordId = await getRecordIdValueAsync(currentItem);
 
         if (!recordId) {
-            console.warn('[RecordDetail] Cannot toggle worklist: No unique ID found for record', currentItem);
+            logger.warn('Cannot toggle worklist: No unique ID found for record', currentItem);
             return;
         }
 
@@ -224,7 +227,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
             // Explicity dispatch db-changed so widgets update since executeRaw bypasses it
             window.dispatchEvent(new Event('db-changed'));
         } catch (err) {
-            console.error('Failed to toggle worklist status', err);
+            logger.error('Failed to toggle worklist status', err);
         } finally {
             setIsActionLoading(false);
         }
@@ -405,7 +408,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                                     await SystemRepository.updateWorklistItem(worklistItem.id, { status: newStatus });
                                                     // Global db-changed is automatically fired
                                                 } catch (err) {
-                                                    console.error('Failed to update status', err);
+                                                    logger.error('Failed to update status', err);
                                                 }
                                             }
                                         }}
@@ -428,7 +431,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                                     await SystemRepository.updateWorklistItem(worklistItem.id, { comment: e.target.value });
                                                     // Global db-changed is automatically fired
                                                 } catch (err) {
-                                                    console.error('Failed to update comment', err);
+                                                    logger.error('Failed to update comment', err);
                                                 }
                                             }
                                         }}

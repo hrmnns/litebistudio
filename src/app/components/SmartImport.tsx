@@ -4,6 +4,7 @@ import { Upload, FileSpreadsheet, ChevronRight, AlertCircle, Trash2, Database, T
 import { analyzeExcelFile } from '../../lib/utils/excelParser';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import type { DbRow } from '../../types';
+import { createLogger } from '../../lib/logger';
 
 interface TablePreview {
     sheetName: string;
@@ -16,6 +17,7 @@ interface TablePreview {
 
 export const SmartImport: React.FC = () => {
     const { t } = useTranslation();
+    const logger = createLogger('SmartImport');
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
     const [previews, setPreviews] = useState<TablePreview[]>([]);
     const [importedStats, setImportedStats] = useState<{ tables: number; records: number }>({ tables: 0, records: 0 });
@@ -41,7 +43,7 @@ export const SmartImport: React.FC = () => {
             setPreviews(initialPreviews);
             setStep(2);
         } catch (error) {
-            console.error('Analysis failed', error);
+            logger.error('Analysis failed', error);
             alert(t('datasource.smart_import.error_analyzing'));
         } finally {
             setIsAnalyzing(false);

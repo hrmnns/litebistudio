@@ -2,6 +2,7 @@ import { useState } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useTranslation } from 'react-i18next';
+import { createLogger } from '../lib/logger';
 
 interface ExportItem {
     elementId: string;
@@ -36,6 +37,7 @@ interface UseReportExportResult {
 
 export const useReportExport = (): UseReportExportResult => {
     const { t } = useTranslation();
+    const logger = createLogger('ReportExport');
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
 
@@ -196,7 +198,7 @@ export const useReportExport = (): UseReportExportResult => {
             pdf.addImage(captured.imgData, 'PNG', (pdfWidth - finalWidth) / 2, (pdfHeight - finalHeight) / 2, finalWidth, finalHeight);
             pdf.save(`${filename}.pdf`);
         } catch (error) {
-            console.error('Export failed:', error);
+            logger.error('Export failed:', error);
         } finally {
             setIsExporting(false);
         }
@@ -236,7 +238,7 @@ export const useReportExport = (): UseReportExportResult => {
                         const logoX = 210 - rightMargin - logoSize;
                         pdf.addImage(logo.data, logo.format, logoX, 25, logoSize, logoSize);
                     } catch (logoError) {
-                        console.warn('Cover logo could not be loaded for PDF export. The host likely blocks cross-origin image access.', logoError);
+                        logger.warn('Cover logo could not be loaded for PDF export. The host likely blocks cross-origin image access.', logoError);
                     }
                 }
 
@@ -274,7 +276,7 @@ export const useReportExport = (): UseReportExportResult => {
 
             pdf.save(`${filename}.pdf`);
         } catch (error) {
-            console.error('Batch Export failed:', error);
+            logger.error('Batch Export failed:', error);
             alert(t('reports.export_failed', 'Export failed.'));
         } finally {
             setIsExporting(false);
@@ -294,7 +296,7 @@ export const useReportExport = (): UseReportExportResult => {
             link.href = canvas.toDataURL('image/png');
             link.click();
         } catch (error) {
-            console.error('Export failed:', error);
+            logger.error('Export failed:', error);
         } finally {
             setIsExporting(false);
         }
