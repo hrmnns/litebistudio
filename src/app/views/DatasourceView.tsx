@@ -145,6 +145,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const [backupPassword, setBackupPassword] = useState('');
     const [restoreAlert, setRestoreAlert] = useState<{ type: AlertType; message: string; title?: string; details?: string } | null>(null);
     const [isResetting, setIsResetting] = useState(false);
+    const [isResettingSqlManager, setIsResettingSqlManager] = useState(false);
 
     // Fetch Tables
     const { data: tables, refresh: refreshTables } = useAsync<string[]>(
@@ -335,6 +336,27 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             await appDialog.info(t('datasource.cleared_success'));
         } catch (error: unknown) {
             await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
+        }
+    };
+
+    const handleResetSqlManager = async () => {
+        const confirmText = t('datasource.sql_manager_reset_confirm', 'Reset SQL Manager? All saved SQL statements and favorites will be deleted.');
+        if (!(await appDialog.confirm(confirmText))) return;
+        const promptText = await appDialog.prompt(t('datasource.sql_manager_reset_prompt', 'Please type "RESET" to continue:'));
+        if (promptText !== 'RESET') {
+            if (promptText !== null) {
+                await appDialog.warning(t('datasource.sql_manager_reset_aborted', 'Canceled: Wrong input.'));
+            }
+            return;
+        }
+        try {
+            setIsResettingSqlManager(true);
+            await SystemRepository.executeRaw('DELETE FROM sys_sql_statement;');
+            await appDialog.info(t('datasource.sql_manager_reset_success', 'SQL Manager was reset.'));
+        } catch (error: unknown) {
+            await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));
+        } finally {
+            setIsResettingSqlManager(false);
         }
     };
 
@@ -984,6 +1006,24 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             </button>
                                         </div>
                                         <p className="text-[10px] text-slate-400 italic">{t('datasource.drop_table_hint')}</p>
+                                    </div>
+                                </div>
+
+                                {/* SQL Manager Reset Card */}
+                                <div className="bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/20 rounded-xl p-4 shadow-sm">
+                                    <h4 className="text-xs font-black text-slate-400 uppercase mb-3">{t('datasource.sql_manager_reset_title', 'SQL Manager reset')}</h4>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                disabled={isResettingSqlManager}
+                                                onClick={() => { void handleResetSqlManager(); }}
+                                                className="flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isResettingSqlManager && <Loader2 className="w-4 h-4 animate-spin" />}
+                                                {t('datasource.sql_manager_reset_btn', 'Reset SQL Manager')}
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 italic">{t('datasource.sql_manager_reset_hint', 'Deletes all saved SQL statements in the SQL Manager, including favorites and usage counters.')}</p>
                                     </div>
                                 </div>
 
