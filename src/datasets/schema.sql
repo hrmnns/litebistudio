@@ -50,3 +50,21 @@ CREATE TABLE IF NOT EXISTS sys_report_packs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS sys_sql_statement (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    sql_text TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    scope TEXT NOT NULL DEFAULT 'global',
+    tags TEXT DEFAULT '',
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    use_count INTEGER NOT NULL DEFAULT 0,
+    last_used_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name, scope)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sys_sql_scope_name ON sys_sql_statement(scope, name);
+CREATE INDEX IF NOT EXISTS idx_sys_sql_last_used ON sys_sql_statement(last_used_at DESC);

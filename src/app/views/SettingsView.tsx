@@ -123,6 +123,63 @@ export const SettingsView: React.FC = () => {
                 title: t('sidebar.settings'),
                 subtitle: t('settings.subtitle')
             }}
+            rightPanel={{
+                title: t('settings.quick_access_panel', 'Quick Access'),
+                triggerTitle: t('settings.quick_access_open', 'Quick Access'),
+                width: 'sm',
+                content: (
+                    <div className="space-y-4 text-sm">
+                        <p className="text-slate-500">
+                            {t('settings.quick_access_hint', 'Open frequently used sections without adding more controls to the main layout.')}
+                        </p>
+                        <div className="grid grid-cols-1 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('appearance')}
+                                className={`px-3 py-2 rounded-lg text-left border transition-colors ${
+                                    activeTab === 'appearance'
+                                        ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                                {t('settings.tab_appearance')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('security')}
+                                className={`px-3 py-2 rounded-lg text-left border transition-colors ${
+                                    activeTab === 'security'
+                                        ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                                {t('settings.tab_security')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setActiveTab('apps');
+                                    setAppsSubTab('inspector');
+                                }}
+                                className={`px-3 py-2 rounded-lg text-left border transition-colors ${
+                                    activeTab === 'apps'
+                                        ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                                {t('sidebar.data_inspector')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsHealthModalOpen(true)}
+                                className="px-3 py-2 rounded-lg text-left border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                            >
+                                {t('settings.open_health_check', 'Open Health Check')}
+                            </button>
+                        </div>
+                    </div>
+                )
+            }}
             footer={footerText}
             breadcrumbs={[
                 { label: t('sidebar.settings') }

@@ -1,10 +1,11 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Activity, ShieldAlert, User, Lock } from 'lucide-react';
+import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useDashboard } from '../../../lib/context/DashboardContext';
 import { useAsync } from '../../../hooks/useAsync';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
+import { RightOverlayPanel, type RightOverlayPanelWidth } from './RightOverlayPanel';
 
 /* ─── Alert Types ─── */
 export type AlertLevel = 'error' | 'warning' | 'info' | 'success';
@@ -46,6 +47,20 @@ interface PageLayoutProps {
     className?: string;
     /** If true, children fill remaining height (no outer scroll). Useful for views with internal scroll like data tables. */
     fillHeight?: boolean;
+    /** Optional right-side modal panel configurable per view. */
+    rightPanel?: {
+        title: React.ReactNode;
+        content: React.ReactNode;
+        width?: RightOverlayPanelWidth;
+        noScroll?: boolean;
+        enabled?: boolean;
+        triggerLabel?: string;
+        triggerTitle?: string;
+        triggerClassName?: string;
+        isOpen?: boolean;
+        onOpenChange?: (open: boolean) => void;
+        defaultOpen?: boolean;
+    };
 }
 
 /* ─── Alert Color Map ─── */
@@ -86,11 +101,13 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     breadcrumbs,
     className,
     fillHeight,
+    rightPanel,
 }) => {
     const { t } = useTranslation();
     const { isAdminMode, isReadOnly } = useDashboard();
     const [activeQueries, setActiveQueries] = useState(0);
     const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
+    const [internalRightPanelOpen, setInternalRightPanelOpen] = useState(Boolean(rightPanel?.defaultOpen));
     const { data: storageStatus } = useAsync(
         () => SystemRepository.getStorageStatus(),
         [],
@@ -130,6 +147,18 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         await SystemRepository.abortActiveQueries();
     };
 
+    const isRightPanelControlled = rightPanel?.isOpen !== undefined;
+    const isRightPanelOpen = rightPanel
+        ? (isRightPanelControlled ? Boolean(rightPanel.isOpen) : internalRightPanelOpen)
+        : false;
+    const isRightPanelEnabled = Boolean(rightPanel && (rightPanel.enabled ?? true));
+    const isRightPanelOpenEffective = isRightPanelEnabled && isRightPanelOpen;
+    const setRightPanelOpen = (open: boolean) => {
+        if (!rightPanel) return;
+        if (!isRightPanelControlled) setInternalRightPanelOpen(open);
+        rightPanel.onOpenChange?.(open);
+    };
+
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
@@ -147,11 +176,33 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             )}
                         </div>
                     </div>
-                    {header.actions && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            {header.actions}
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {header.actions}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (!isRightPanelEnabled) return;
+                                setRightPanelOpen(true);
+                            }}
+                            title={isRightPanelEnabled
+                                ? (rightPanel?.triggerTitle || t('common.open', 'Open'))
+                                : t('common.not_available', 'Not available')}
+                            aria-label={isRightPanelEnabled
+                                ? (rightPanel?.triggerTitle || t('common.open', 'Open'))
+                                : t('common.not_available', 'Not available')}
+                            disabled={!isRightPanelEnabled}
+                            className={cn(
+                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                isRightPanelEnabled
+                                    ? 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                    : 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed',
+                                isRightPanelEnabled && isRightPanelOpenEffective && 'ring-2 ring-blue-500/30',
+                                rightPanel?.triggerClassName
+                            )}
+                        >
+                            <PanelRightOpen className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -306,6 +357,17 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                         </div>
                     </div>
                 </footer>
+            )}
+            {rightPanel && isRightPanelEnabled && (
+                <RightOverlayPanel
+                    isOpen={isRightPanelOpenEffective}
+                    onClose={() => setRightPanelOpen(false)}
+                    title={rightPanel.title}
+                    width={rightPanel.width}
+                    noScroll={rightPanel.noScroll}
+                >
+                    {rightPanel.content}
+                </RightOverlayPanel>
             )}
         </div>
     );

@@ -8,7 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- No changes yet.
+- Shared right-side overlay panel infrastructure in `PageLayout` (`rightPanel`) for view-specific tools/content with modal behavior and configurable width.
+- Data Inspector SQL Assistant was moved into the new right-side overlay panel.
+- Added SQL Manager foundation with reusable SQL statement storage in new system table `sys_sql_statement` (including migration of legacy saved templates/favorites from local storage).
+- Data Inspector sidepanel now includes a dedicated `Assistant` tab with visual SELECT builder support (table/column selection, WHERE, GROUP BY, aggregation, ORDER BY, LIMIT, generated SQL preview, and one-click apply/run actions).
+
+### Changed
+- Data Inspector SQL toolbar now uses a single `Save` action (disk icon) for saving into SQL Manager; the temporary `Save Report` action and modal were removed.
+- Header now includes a global icon-only sidepanel button; it is enabled only when the active view exposes a sidepanel and shown disabled otherwise.
+
+### Fixed
+- Data Inspector SQL split-resize now keeps the newly dragged pane height reliably instead of snapping back to the previous size after releasing the gripper.
 
 ## [1.1.0] - 2026-02-24
 

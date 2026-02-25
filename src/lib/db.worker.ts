@@ -85,7 +85,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -262,6 +262,35 @@ function applyMigrations(databaseInstance: DatabaseLike) {
         }
         databaseInstance.exec('PRAGMA user_version = 7');
         userVersion = 7;
+    }
+
+    // Version 8: Migration: Add reusable SQL statements library
+    if (userVersion < 8) {
+        log('Migration V8: Adding sys_sql_statement...');
+        try {
+            databaseInstance.exec(`
+                CREATE TABLE IF NOT EXISTS sys_sql_statement (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    sql_text TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    scope TEXT NOT NULL DEFAULT 'global',
+                    tags TEXT DEFAULT '',
+                    is_favorite INTEGER NOT NULL DEFAULT 0,
+                    use_count INTEGER NOT NULL DEFAULT 0,
+                    last_used_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(name, scope)
+                );
+                CREATE INDEX IF NOT EXISTS idx_sys_sql_scope_name ON sys_sql_statement(scope, name);
+                CREATE INDEX IF NOT EXISTS idx_sys_sql_last_used ON sys_sql_statement(last_used_at DESC);
+            `);
+        } catch (e) {
+            error('Migration failed for V8', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 8');
+        userVersion = 8;
     }
 
     log(`Database migrated to version ${userVersion}`);
