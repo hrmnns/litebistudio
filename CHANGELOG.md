@@ -12,13 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Data Inspector SQL Assistant was moved into the new right-side overlay panel.
 - Added SQL Manager foundation with reusable SQL statement storage in new system table `sys_sql_statement` (including migration of legacy saved templates/favorites from local storage).
 - Data Inspector sidepanel now includes a dedicated `Assistant` tab with visual SELECT builder support (table/column selection, WHERE, GROUP BY, aggregation, ORDER BY, LIMIT, generated SQL preview, and one-click apply/run actions).
+- Data Inspector table mode now has a dedicated `Table Tools` sidepanel with tabs for `Columns`, `Filters`, and `Actions`.
+- Added a column `Field Picker` in `Table Tools` with multi-select and direct actions to:
+  - apply selected columns to table view
+  - open generated SELECT in SQL Workspace
+  - execute generated SELECT immediately
+- Added quick table-toolbar icon buttons (Columns/Filters/Actions) to open the sidepanel directly on the corresponding tab.
+- Added heuristic index suggestion generation in `Table Tools > Actions` (based on active filters, sort configuration, cardinality, and existing indexes) with one-click index creation.
 
 ### Changed
 - Data Inspector SQL toolbar now uses a single `Save` action (disk icon) for saving into SQL Manager; the temporary `Save Report` action and modal were removed.
 - Header now includes a global icon-only sidepanel button; it is enabled only when the active view exposes a sidepanel and shown disabled otherwise.
+- Data Inspector sidepanel naming was refined to reduce terminology overlap:
+  - panel title: `SQL Workspace`
+  - second SQL tab: `SQL Builder`
+- SQL Manager sidepanel actions were compacted to icon-only buttons and templates were redesigned to the same list/action pattern as saved SQL statements.
+- SQL Manager sections (`Templates`, `SQL Manager`, `Recent Queries`) are now collapsible and persist their open/closed state.
+- Table Tools `Columns` tab now highlights the currently active sort column and direction.
+- Field Picker action labels were compacted using icon-first controls for better space usage.
 
 ### Fixed
 - Data Inspector SQL split-resize now keeps the newly dragged pane height reliably instead of snapping back to the previous size after releasing the gripper.
+- Fixed z-index stacking so rename prompts in SQL Manager are no longer hidden behind the sidepanel.
+- Opening or running a saved SQL statement from the sidepanel now closes the sidepanel immediately.
+- SQL Manager/Recent layout in sidepanel now uses internal scroll regions to prevent unwanted outer sidepanel scrolling.
+- In `Columns` tab, selected fields are now initialized from currently displayed table columns when the panel is opened.
 
 ## [1.1.0] - 2026-02-24
 

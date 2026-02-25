@@ -6,7 +6,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable, type Column, type DataTableSortConfig } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
-import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, Pencil, Trash2, FolderOpen, ChevronDown } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, ArrowRight, Pencil, Trash2, FolderOpen, ChevronDown, ListChecks, Eraser, Table2, Filter, SlidersHorizontal } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow } from '../../types';
@@ -35,6 +35,15 @@ interface ProfilingThresholds {
     cardinalityRate: number;
 }
 
+interface IndexSuggestion {
+    id: string;
+    indexName: string;
+    columns: string[];
+    reason: string;
+    sql: string;
+    score: number;
+}
+
 const SQL_KEYWORDS = [
     'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET',
     'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'ON',
@@ -58,6 +67,15 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
     const [sqlLibrarySearch, setSqlLibrarySearch] = useState('');
     const [sqlAssistTab, setSqlAssistTab] = useState<'manager' | 'assistant'>('manager');
+    const [showTableTools, setShowTableTools] = useLocalStorage<boolean>('data_inspector_table_tools_open', false);
+    const [tableToolsTab, setTableToolsTab] = useLocalStorage<'columns' | 'filters' | 'actions'>(
+        'data_inspector_table_tools_tab_v1',
+        'columns'
+    );
+    const [tableSelectedColumns, setTableSelectedColumns] = useState<string[]>([]);
+    const [tableVisibleColumns, setTableVisibleColumns] = useState<string[]>([]);
+    const [tableFilterColumn, setTableFilterColumn] = useState('');
+    const [tableFilterValue, setTableFilterValue] = useState('');
     const [managerPanels, setManagerPanels] = useLocalStorage<{ templates: boolean; manager: boolean; recent: boolean }>(
         'data_inspector_sql_manager_panels_v1',
         { templates: true, manager: true, recent: true }
@@ -84,6 +102,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [indexUnique, setIndexUnique] = useState(false);
     const [indexWhere, setIndexWhere] = useState('');
     const [isCreatingIndex, setIsCreatingIndex] = useState(false);
+    const [indexSuggestions, setIndexSuggestions] = useState<IndexSuggestion[]>([]);
+    const [isGeneratingIndexSuggestions, setIsGeneratingIndexSuggestions] = useState(false);
+    const [applyingIndexSuggestionId, setApplyingIndexSuggestionId] = useState('');
     const [storedSqlEditorHeight, setStoredSqlEditorHeight] = useLocalStorage<number>('data_inspector_sql_editor_height', 160);
     const [sqlEditorHeight, setSqlEditorHeight] = useState(storedSqlEditorHeight);
     const sqlInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -280,6 +301,41 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         [assistantTable]
     );
 
+    useEffect(() => {
+        const schemaColumns = (selectedTableSchema || []).map(col => col.name);
+        if (schemaColumns.length === 0) {
+            setTableFilterColumn('');
+            return;
+        }
+        if (!tableFilterColumn || !schemaColumns.includes(tableFilterColumn)) {
+            setTableFilterColumn(schemaColumns[0]);
+        }
+    }, [selectedTableSchema, tableFilterColumn]);
+
+    useEffect(() => {
+        const schemaColumns = (selectedTableSchema || []).map(col => col.name);
+        setTableSelectedColumns(prev => prev.filter(col => schemaColumns.includes(col)));
+    }, [selectedTableSchema]);
+
+    const displayedTableColumns = React.useMemo(() => {
+        const rowKeys = items && items.length > 0
+            ? Object.keys(items[0]).filter(k => k !== '_rowid')
+            : [];
+        return tableVisibleColumns.length > 0
+            ? rowKeys.filter(key => tableVisibleColumns.includes(key))
+            : rowKeys;
+    }, [items, tableVisibleColumns]);
+
+    useEffect(() => {
+        if (mode !== 'table' || !showTableTools || tableToolsTab !== 'columns') return;
+        if (displayedTableColumns.length === 0) return;
+        setTableSelectedColumns(displayedTableColumns);
+    }, [displayedTableColumns, mode, showTableTools, tableToolsTab]);
+
+    useEffect(() => {
+        setTableVisibleColumns([]);
+    }, [selectedTable]);
+
     // Debounced search for table mode
     useEffect(() => {
         if (mode === 'table') {
@@ -430,7 +486,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         setActiveViewId('');
     };
 
-    const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
+    const quoteIdentifier = useCallback((identifier: string) => `"${identifier.replace(/"/g, '""')}"`, []);
 
     const openCreateIndexModal = () => {
         if (!selectedTable || selectedSourceType !== 'table') return;
@@ -489,12 +545,155 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         }
     };
 
+    const buildSuggestedIndexName = useCallback((table: string, columns: string[]) => {
+        const raw = `idx_${table}_${columns.join('_')}`.toLowerCase();
+        return raw.replace(/[^a-z0-9_]/g, '_').slice(0, 60);
+    }, []);
+
+    const getExistingIndexColumns = useCallback(async (table: string): Promise<string[][]> => {
+        const tableQuoted = quoteIdentifier(table);
+        const list = await SystemRepository.executeRaw(`PRAGMA index_list(${tableQuoted});`);
+        const indexNames = list.map(row => String(row.name ?? '')).filter(Boolean);
+        const allColumns: string[][] = [];
+        for (const indexName of indexNames) {
+            const info = await SystemRepository.executeRaw(`PRAGMA index_info(${quoteIdentifier(indexName)});`);
+            const cols = info
+                .map(row => String(row.name ?? ''))
+                .filter(Boolean);
+            if (cols.length > 0) allColumns.push(cols);
+        }
+        return allColumns;
+    }, [quoteIdentifier]);
+
+    const generateIndexSuggestions = useCallback(async () => {
+        if (!selectedTable || selectedSourceType !== 'table') return;
+        setIsGeneratingIndexSuggestions(true);
+        try {
+            const schemaColumns = (selectedTableSchema || []).map(col => col.name);
+            if (schemaColumns.length === 0) {
+                setIndexSuggestions([]);
+                return;
+            }
+
+            const existingIndexes = await getExistingIndexColumns(selectedTable);
+            const totalRowResult = await SystemRepository.executeRaw(`SELECT COUNT(*) AS total_rows FROM ${quoteIdentifier(selectedTable)};`);
+            const totalRows = Number(totalRowResult[0]?.total_rows ?? 0);
+            const sampleColumns = schemaColumns.slice(0, 14);
+
+            const cardinalityStats = await Promise.all(sampleColumns.map(async (col) => {
+                const stats = await SystemRepository.executeRaw(
+                    `SELECT COUNT(DISTINCT ${quoteIdentifier(col)}) AS distinct_count FROM ${quoteIdentifier(selectedTable)};`
+                );
+                const distinctCount = Number(stats[0]?.distinct_count ?? 0);
+                const ratio = totalRows > 0 ? distinctCount / totalRows : 0;
+                return { column: col, distinctCount, ratio };
+            }));
+
+            const candidates: Array<{ columns: string[]; reason: string; score: number }> = [];
+            const seen = new Set<string>();
+            const addCandidate = (columns: string[], reason: string, score: number) => {
+                const cleaned = columns.filter(Boolean);
+                if (cleaned.length === 0) return;
+                const key = cleaned.join('|').toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                candidates.push({ columns: cleaned, reason, score });
+            };
+
+            const filteredColumns = Object.keys(tableFilters).filter(col => schemaColumns.includes(col));
+            filteredColumns.forEach((col, idx) => {
+                addCandidate([col], t('datainspector.index_suggestion_reason_filter', 'Used in active table filter'), 95 - idx);
+            });
+
+            if (tableSortConfig?.key && schemaColumns.includes(String(tableSortConfig.key))) {
+                addCandidate([String(tableSortConfig.key)], t('datainspector.index_suggestion_reason_sort', 'Used as active sort column'), 92);
+            }
+
+            if (filteredColumns.length > 1) {
+                addCandidate(
+                    filteredColumns.slice(0, 2),
+                    t('datainspector.index_suggestion_reason_composite', 'Composite index for combined filters'),
+                    96
+                );
+            } else if (filteredColumns.length === 1 && tableSortConfig?.key && schemaColumns.includes(String(tableSortConfig.key))) {
+                const sortCol = String(tableSortConfig.key);
+                if (sortCol !== filteredColumns[0]) {
+                    addCandidate(
+                        [filteredColumns[0], sortCol],
+                        t('datainspector.index_suggestion_reason_filter_sort', 'Composite index for filter + sort'),
+                        97
+                    );
+                }
+            }
+
+            cardinalityStats
+                .sort((a, b) => b.ratio - a.ratio)
+                .slice(0, 3)
+                .forEach((stat, idx) => {
+                    if (stat.ratio < 0.08) return;
+                    addCandidate(
+                        [stat.column],
+                        t('datainspector.index_suggestion_reason_cardinality', 'High cardinality column'),
+                        86 - idx
+                    );
+                });
+
+            const isCoveredByExisting = (candidateCols: string[]) => {
+                return existingIndexes.some(existingCols =>
+                    existingCols.length >= candidateCols.length
+                    && candidateCols.every((col, idx) => existingCols[idx] === col)
+                );
+            };
+
+            const suggestions = candidates
+                .filter(candidate => !isCoveredByExisting(candidate.columns))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5)
+                .map(candidate => {
+                    const indexName = buildSuggestedIndexName(selectedTable, candidate.columns);
+                    const quotedColumns = candidate.columns.map(col => quoteIdentifier(col)).join(', ');
+                    return {
+                        id: `${selectedTable}:${candidate.columns.join('|')}`,
+                        indexName,
+                        columns: candidate.columns,
+                        reason: candidate.reason,
+                        score: candidate.score,
+                        sql: `CREATE INDEX ${quoteIdentifier(indexName)} ON ${quoteIdentifier(selectedTable)} (${quotedColumns});`
+                    } as IndexSuggestion;
+                });
+
+            setIndexSuggestions(suggestions);
+        } catch (err) {
+            await appDialog.error(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+            setIsGeneratingIndexSuggestions(false);
+        }
+    }, [buildSuggestedIndexName, getExistingIndexColumns, quoteIdentifier, selectedSourceType, selectedTable, selectedTableSchema, tableFilters, tableSortConfig, t]);
+
+    const applyIndexSuggestion = useCallback(async (suggestion: IndexSuggestion) => {
+        setApplyingIndexSuggestionId(suggestion.id);
+        try {
+            await SystemRepository.executeRaw(suggestion.sql);
+            await appDialog.info(t('datasource.index_create_success', 'Index created.'));
+            setIndexSuggestions(prev => prev.filter(item => item.id !== suggestion.id));
+            execute();
+        } catch (err) {
+            await appDialog.error(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+            setApplyingIndexSuggestionId('');
+        }
+    }, [execute, t]);
+
     // Generate Columns dynamically
     const columns: Column<DbRow>[] = React.useMemo(() => {
         if (!items || items.length === 0) return [];
 
         const keys = Object.keys(items[0]).filter(k => k !== '_rowid');
-        return keys.map(key => {
+        const effectiveKeys = tableVisibleColumns.length > 0
+            ? keys.filter(k => tableVisibleColumns.includes(k))
+            : keys;
+        if (effectiveKeys.length === 0) return [];
+        return effectiveKeys.map(key => {
             const isAmount = key.toLowerCase().includes('amount') || key.toLowerCase().includes('price');
             const isId = key.toLowerCase().includes('id');
             const sampleVal = items[0][key];
@@ -516,7 +715,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 ) : undefined
             };
         });
-    }, [items]);
+    }, [items, tableVisibleColumns]);
 
     const locale = i18n.language.startsWith('de') ? 'de-DE' : 'en-US';
     const now = new Date();
@@ -726,6 +925,90 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         });
         await loadSqlStatements();
     }, [loadSqlStatements, sqlStatements, t]);
+
+    const handleExportCurrentRows = useCallback(() => {
+        if (!items || items.length === 0) return;
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const exportRows = items.map((row) => {
+            const cleaned = { ...row };
+            delete cleaned._rowid;
+            return cleaned;
+        });
+        exportToExcel(exportRows, `export_${timestamp}`, 'Export');
+    }, [items]);
+
+    const applyTableSideFilter = useCallback(() => {
+        const column = tableFilterColumn.trim();
+        if (!column) return;
+        setTableFilters(prev => ({
+            ...prev,
+            [column]: tableFilterValue
+        }));
+        setShowTableFilters(true);
+    }, [setShowTableFilters, tableFilterColumn, tableFilterValue]);
+
+    const clearTableSideFilter = useCallback((column: string) => {
+        setTableFilters(prev => {
+            const next = { ...prev };
+            delete next[column];
+            return next;
+        });
+    }, []);
+
+    const clearAllTableSideFilters = useCallback(() => {
+        setTableFilters({});
+        setSearchTerm('');
+        setShowTableFilters(false);
+        setTableFilterValue('');
+    }, [setShowTableFilters]);
+
+    const openSelectedTableInSql = useCallback(() => {
+        const safeTable = selectedTable.replace(/"/g, '""');
+        const sql = `SELECT * FROM "${safeTable}" LIMIT 100`;
+        setMode('sql');
+        setInputSql(sql);
+        setSqlCursor(sql.length);
+        setSqlOutputView('result');
+        setShowTableTools(false);
+    }, [selectedTable, setShowTableTools]);
+
+    const openTableToolsTab = useCallback((tab: 'columns' | 'filters' | 'actions') => {
+        setTableToolsTab(tab);
+        setShowTableTools(true);
+    }, [setShowTableTools, setTableToolsTab]);
+
+    const buildFieldPickerSql = useCallback((columns: string[]) => {
+        const safeTable = selectedTable.replace(/"/g, '""');
+        const quoteIdentifier = (value: string) => `"${value.replace(/"/g, '""')}"`;
+        const selectList = columns.length > 0 ? columns.map(quoteIdentifier).join(', ') : '*';
+        return `SELECT ${selectList}\nFROM "${safeTable}"\nLIMIT 100`;
+    }, [selectedTable]);
+
+    const applyFieldPickerSql = useCallback(async (runImmediately: boolean) => {
+        if (tableSelectedColumns.length === 0) {
+            await appDialog.info(t('datainspector.table_tools_pick_fields_required', 'Select at least one field.'));
+            return;
+        }
+        const sql = buildFieldPickerSql(tableSelectedColumns);
+        setMode('sql');
+        setInputSql(sql);
+        setSqlCursor(sql.length);
+        setSqlOutputView('result');
+        setShowTableTools(false);
+        if (runImmediately) {
+            await executeSqlText(sql);
+        }
+    }, [buildFieldPickerSql, executeSqlText, setShowTableTools, tableSelectedColumns, t]);
+
+    const applyFieldPickerToTable = useCallback(async () => {
+        if (tableSelectedColumns.length === 0) {
+            await appDialog.info(t('datainspector.table_tools_pick_fields_required', 'Select at least one field.'));
+            return;
+        }
+        setMode('table');
+        setTableVisibleColumns(tableSelectedColumns);
+        setShowTableTools(false);
+    }, [setShowTableTools, tableSelectedColumns, t]);
 
     const getTokenAtCursor = useCallback((sql: string, cursor: number) => {
         let start = cursor;
@@ -1117,16 +1400,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                         {/* Export */}
                         <button
-                            onClick={() => {
-                                if (!items || items.length === 0) return;
-                                const timestamp = new Date().toISOString().slice(0, 10);
-                                const exportRows = items.map((row) => {
-                                    const cleaned = { ...row };
-                                    delete cleaned._rowid;
-                                    return cleaned;
-                                });
-                                exportToExcel(exportRows, `export_${timestamp}`, "Export");
-                            }}
+                            onClick={handleExportCurrentRows}
                             className="h-10 flex items-center gap-2 px-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                         >
                             <Download className="w-4 h-4" />
@@ -1136,13 +1410,342 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 ),
             }}
             rightPanel={{
-                title: t('datainspector.sql_assist', 'SQL Workspace'),
-                enabled: mode === 'sql',
-                triggerTitle: t('datainspector.sql_assist', 'SQL Workspace'),
+                title: mode === 'table'
+                    ? t('datainspector.table_tools', 'Table Tools')
+                    : t('datainspector.sql_assist', 'SQL Workspace'),
+                enabled: mode === 'sql' || mode === 'table',
+                triggerTitle: mode === 'table'
+                    ? t('datainspector.table_tools', 'Table Tools')
+                    : t('datainspector.sql_assist', 'SQL Workspace'),
                 width: 'sm',
-                isOpen: showSqlAssist,
-                onOpenChange: setShowSqlAssist,
+                isOpen: mode === 'table' ? showTableTools : showSqlAssist,
+                onOpenChange: mode === 'table' ? setShowTableTools : setShowSqlAssist,
                 content: (
+                    mode === 'table' ? (
+                    <div className="h-full min-h-0 flex flex-col gap-4">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 flex-shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setTableToolsTab('columns')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'columns' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {t('datainspector.table_tools_tab_columns', 'Columns')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTableToolsTab('filters')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'filters' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {t('datainspector.table_tools_tab_filters', 'Filters')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTableToolsTab('actions')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'actions' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {t('datainspector.table_tools_tab_actions', 'Actions')}
+                            </button>
+                        </div>
+
+                        {tableToolsTab === 'columns' && (
+                            <div className="flex-1 min-h-0 flex flex-col gap-2">
+                                <p className="text-xs text-slate-500">{t('datainspector.table_tools_columns_hint', 'Inspect schema and set sorting per column.')}</p>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500">
+                                            {t('datainspector.table_tools_field_picker', 'Field Picker')}
+                                        </span>
+                                        <span className="text-[11px] text-slate-500">
+                                            {t('datainspector.table_tools_selected_count', { count: tableSelectedColumns.length, defaultValue: '{{count}} selected' })}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setTableSelectedColumns((selectedTableSchema || []).map(col => col.name))}
+                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                            title={t('datainspector.table_tools_select_all_fields', 'Select all')}
+                                            aria-label={t('datainspector.table_tools_select_all_fields', 'Select all')}
+                                        >
+                                            <ListChecks className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTableSelectedColumns([])}
+                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                            title={t('datainspector.table_tools_clear_field_selection', 'Clear')}
+                                            aria-label={t('datainspector.table_tools_clear_field_selection', 'Clear')}
+                                        >
+                                            <Eraser className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { void applyFieldPickerSql(false); }}
+                                            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                        >
+                                            <ArrowRight className="w-3.5 h-3.5" />
+                                            {t('datainspector.sql_assist', 'SQL Workspace')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { void applyFieldPickerToTable(); }}
+                                            className="h-7 w-7 inline-flex items-center justify-center text-[11px] rounded border border-blue-200 bg-blue-600 hover:bg-blue-700 text-white"
+                                            title={t('datainspector.table_tools_apply_to_table', 'Apply to Table')}
+                                            aria-label={t('datainspector.table_tools_apply_to_table', 'Apply to Table')}
+                                        >
+                                            <Play className="w-3.5 h-3.5 fill-current" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                    {(selectedTableSchema || []).length === 0 ? (
+                                        <div className="p-3 text-xs text-slate-400">{t('common.no_data')}</div>
+                                    ) : (
+                                        (selectedTableSchema || []).map(col => {
+                                            const isSortedColumn = tableSortConfig?.key === col.name;
+                                            const sortDirection = isSortedColumn ? tableSortConfig?.direction : null;
+                                            const isSelectedColumn = tableSelectedColumns.includes(col.name);
+                                            return (
+                                            <div
+                                                key={col.name}
+                                                className={`p-3 space-y-2 ${isSortedColumn ? 'bg-blue-50/60' : ''} ${isSelectedColumn ? 'ring-1 ring-inset ring-blue-200' : ''}`}
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <label className="flex items-center gap-2 min-w-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelectedColumn}
+                                                                onChange={() => {
+                                                                    setTableSelectedColumns(prev => (
+                                                                        prev.includes(col.name)
+                                                                            ? prev.filter(name => name !== col.name)
+                                                                            : [...prev, col.name]
+                                                                    ));
+                                                                }}
+                                                            />
+                                                        <div className="text-xs font-semibold text-slate-700 truncate flex items-center gap-2">
+                                                            <span className="truncate">{col.name}</span>
+                                                            {isSortedColumn && (
+                                                                <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold">
+                                                                    {sortDirection === 'asc' ? 'ASC' : 'DESC'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        </label>
+                                                        <div className="text-[10px] text-slate-400">{col.type || '-'}</div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTableSortConfig({ key: col.name, direction: 'asc' })}
+                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'asc' ? 'border-blue-300 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'}`}
+                                                            title={t('datainspector.table_tools_sort_asc', 'Sort ascending')}
+                                                        >
+                                                            ASC
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTableSortConfig({ key: col.name, direction: 'desc' })}
+                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'desc' ? 'border-blue-300 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'}`}
+                                                            title={t('datainspector.table_tools_sort_desc', 'Sort descending')}
+                                                        >
+                                                            DESC
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {tableToolsTab === 'filters' && (
+                            <div className="flex-1 min-h-0 flex flex-col gap-3">
+                                <p className="text-xs text-slate-500">{t('datainspector.table_tools_filters_hint', 'Manage global search and column filters.')}</p>
+                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.table_tools_global_search', 'Global Search')}</label>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder={t('datainspector.search_placeholder')}
+                                    className="w-full h-9 px-3 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.table_tools_column', 'Column')}</label>
+                                        <select
+                                            value={tableFilterColumn}
+                                            onChange={(e) => setTableFilterColumn(e.target.value)}
+                                            className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                        >
+                                            {(selectedTableSchema || []).map(col => (
+                                                <option key={col.name} value={col.name}>{col.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.table_tools_filter_value', 'Filter')}</label>
+                                        <input
+                                            type="text"
+                                            value={tableFilterValue}
+                                            onChange={(e) => setTableFilterValue(e.target.value)}
+                                            className="w-full h-9 px-3 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={applyTableSideFilter}
+                                        className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100"
+                                    >
+                                        {t('datainspector.table_tools_filter_apply', 'Apply')}
+                                    </button>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                                        <input
+                                            type="checkbox"
+                                            checked={showTableFilters}
+                                            onChange={(e) => setShowTableFilters(e.target.checked)}
+                                        />
+                                        {t('datainspector.table_tools_toggle_filter_row', 'Show filter row in table')}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={clearAllTableSideFilters}
+                                        className="text-[11px] text-slate-500 hover:text-slate-700"
+                                    >
+                                        {t('datainspector.table_tools_clear_all', 'Clear all')}
+                                    </button>
+                                </div>
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                    {Object.keys(tableFilters).length === 0 ? (
+                                        <div className="p-3 text-xs text-slate-400">{t('datainspector.table_tools_no_filters', 'No active column filters')}</div>
+                                    ) : (
+                                        Object.entries(tableFilters).map(([col, val]) => (
+                                            <div key={col} className="p-3 flex items-center justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <div className="text-xs font-semibold text-slate-700 truncate">{col}</div>
+                                                    <div className="text-[11px] text-slate-500 truncate">{val || '-'}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => clearTableSideFilter(col)}
+                                                    className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                                >
+                                                    {t('common.remove', 'Remove')}
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {tableToolsTab === 'actions' && (
+                            <div className="flex-1 min-h-0 flex flex-col gap-3">
+                                <p className="text-xs text-slate-500">{t('datainspector.table_tools_actions_hint', 'Quick actions for current table context.')}</p>
+                                <button
+                                    type="button"
+                                    onClick={() => execute()}
+                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                >
+                                    {t('common.refresh', 'Refresh')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleExportCurrentRows}
+                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                >
+                                    {t('datainspector.table_tools_export_rows', 'Export current rows')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={openSelectedTableInSql}
+                                    className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 text-left"
+                                >
+                                    {t('datainspector.table_tools_open_sql', 'Open as SQL')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveCurrentView}
+                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                >
+                                    {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { void handleDeleteCurrentView(); }}
+                                    disabled={!activeViewId}
+                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left disabled:opacity-40"
+                                >
+                                    {t('datainspector.delete_view')}
+                                </button>
+                                {selectedSourceType === 'table' && (
+                                    <button
+                                        type="button"
+                                        onClick={openCreateIndexModal}
+                                        className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                    >
+                                        {t('datainspector.table_tools_create_index', 'Create index')}
+                                    </button>
+                                )}
+                                {selectedSourceType === 'table' && (
+                                    <div className="mt-1 pt-3 border-t border-slate-200 min-h-0 flex-1 flex flex-col gap-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500">
+                                                {t('datainspector.index_suggestions_title', 'Index Suggestions')}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => { void generateIndexSuggestions(); }}
+                                                disabled={isGeneratingIndexSuggestions}
+                                                className="h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-[11px] disabled:opacity-40"
+                                            >
+                                                {isGeneratingIndexSuggestions
+                                                    ? t('common.loading', 'Loading...')
+                                                    : t('datainspector.index_suggestions_generate', 'Generate')}
+                                            </button>
+                                        </div>
+                                        <div className="text-[11px] text-slate-500">
+                                            {t('datainspector.index_suggestions_hint', 'Based on active filters, sorting, cardinality and existing indexes.')}
+                                        </div>
+                                        <div className="min-h-0 flex-1 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                            {indexSuggestions.length === 0 ? (
+                                                <div className="p-3 text-xs text-slate-400">
+                                                    {t('datainspector.index_suggestions_empty', 'No suggestions yet. Generate to analyze this table.')}
+                                                </div>
+                                            ) : (
+                                                indexSuggestions.map((suggestion) => (
+                                                    <div key={suggestion.id} className="p-3 space-y-2">
+                                                        <div className="text-xs font-semibold text-slate-700">{suggestion.indexName}</div>
+                                                        <div className="text-[11px] text-slate-500">{suggestion.reason}</div>
+                                                        <div className="text-[11px] text-slate-500">
+                                                            {t('datainspector.index_suggestions_columns', 'Columns')}: <span className="font-mono">{suggestion.columns.join(', ')}</span>
+                                                        </div>
+                                                        <div className="font-mono text-[10px] text-slate-400 break-all">{suggestion.sql}</div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void applyIndexSuggestion(suggestion); }}
+                                                            disabled={applyingIndexSuggestionId === suggestion.id}
+                                                            className="h-7 px-2 rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] disabled:opacity-40"
+                                                        >
+                                                            {applyingIndexSuggestionId === suggestion.id
+                                                                ? t('common.saving', 'Saving...')
+                                                                : t('datainspector.index_suggestions_apply', 'Create')}
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    ) : (
                     <div className="h-full min-h-0 flex flex-col gap-4">
                         <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 flex-shrink-0">
                             <button
@@ -1523,6 +2126,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         </div>
                     )}
                     </div>
+                    )
                 )
             }}
             footer={footerText}
@@ -1860,17 +2464,43 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                 {mode === 'table' && tableResultTab === 'data' && (
                     <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between gap-3 text-[11px]">
-                        <button
-                            onClick={openCreateIndexModal}
-                            disabled={selectedSourceType !== 'table'}
-                            className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 flex items-center gap-1"
-                            title={selectedSourceType !== 'table'
-                                ? t('datasource.view_type', 'VIEW')
-                                : t('datasource.create_index_title', 'Create index')}
-                        >
-                            <ListPlus className="w-3.5 h-3.5" />
-                            {t('datasource.create_index_btn', 'Create index')}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={() => openTableToolsTab('columns')}
+                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                title={t('datainspector.table_tools_tab_columns', 'Columns')}
+                                aria-label={t('datainspector.table_tools_tab_columns', 'Columns')}
+                            >
+                                <Table2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => openTableToolsTab('filters')}
+                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                title={t('datainspector.table_tools_tab_filters', 'Filters')}
+                                aria-label={t('datainspector.table_tools_tab_filters', 'Filters')}
+                            >
+                                <Filter className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => openTableToolsTab('actions')}
+                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                title={t('datainspector.table_tools_tab_actions', 'Actions')}
+                                aria-label={t('datainspector.table_tools_tab_actions', 'Actions')}
+                            >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={openCreateIndexModal}
+                                disabled={selectedSourceType !== 'table'}
+                                className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 flex items-center gap-1"
+                                title={selectedSourceType !== 'table'
+                                    ? t('datasource.view_type', 'VIEW')
+                                    : t('datasource.create_index_title', 'Create index')}
+                            >
+                                <ListPlus className="w-3.5 h-3.5" />
+                                {t('datasource.create_index_btn', 'Create index')}
+                            </button>
+                        </div>
                         <div className="flex items-center gap-2 justify-end">
                             <span className="text-slate-500 font-semibold uppercase tracking-wider">
                                 {t('datainspector.saved_views', 'Saved Views')}
