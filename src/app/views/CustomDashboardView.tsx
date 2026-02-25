@@ -3,8 +3,22 @@ import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useAsync } from '../../hooks/useAsync';
-import { Plus, Layout, Trash2, Database, Star, Settings, Check, X, Edit2, Download, Maximize2, Filter } from 'lucide-react';
+import { Plus, Layout, Trash2, Database, Star, Settings, Check, X, Edit2, Download, Maximize2, Filter, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    KeyboardSensor,
+    useSensor,
+    useSensors,
+    useDraggable,
+    useDroppable,
+    type DragEndEvent
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useReportExport } from '../../hooks/useReportExport';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 import WidgetRenderer from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
 import { getComponent, SYSTEM_WIDGETS } from '../registry';
@@ -43,6 +57,40 @@ interface CustomWidgetRecord extends DbRow {
     visualization_config: string;
 }
 
+interface DashboardSortableItemProps {
+    id: string;
+    className?: string;
+    children: React.ReactNode;
+}
+
+const DashboardSortableItem: React.FC<DashboardSortableItemProps> = ({ id, className, children }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef: setDraggableRef,
+        transform,
+        isDragging
+    } = useDraggable({ id });
+    const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id });
+
+    const setNodeRef = (node: HTMLElement | null) => {
+        setDraggableRef(node);
+        setDroppableRef(node);
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={{ transform: CSS.Translate.toString(transform) }}
+            className={`${className || ''} ${isDragging ? 'opacity-50 z-10' : ''} ${isOver && !isDragging ? 'ring-2 ring-blue-300 rounded-xl' : ''}`}
+            {...attributes}
+            {...listeners}
+        >
+            {children}
+        </div>
+    );
+};
+
 export const CustomDashboardView: React.FC = () => {
     const { t } = useTranslation();
     // Dashboards State
@@ -60,9 +108,21 @@ export const CustomDashboardView: React.FC = () => {
     const [isCreating, setIsCreating] = useState(false);
 
     const [showFilters, setShowFilters] = useState(false);
+    const [showDashboardTools, setShowDashboardTools] = useLocalStorage<boolean>('dashboard_tools_open', false);
+    const [dashboardToolsTab, setDashboardToolsTab] = useLocalStorage<'layout' | 'filters'>('dashboard_tools_tab_v1', 'layout');
     const [suggestedColumns, setSuggestedColumns] = useState<string[]>([]);
     const { visibleSidebarComponentIds, setVisibleSidebarComponentIds, togglePresentationMode, isReadOnly } = useDashboard();
     const { isExporting, exportToPdf } = useReportExport();
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8
+            }
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates
+        })
+    );
 
     // Fetch custom widgets
     const { data: customWidgets, refresh: refreshCustomWidgets } = useAsync<CustomWidgetRecord[]>(
@@ -176,6 +236,68 @@ export const CustomDashboardView: React.FC = () => {
         await syncDashboard(updated);
     };
 
+    const handleDashboardDragEnd = async (event: DragEndEvent) => {
+        if (isReadOnly || !activeDashboard) return;
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = activeDashboard.layout.findIndex(w => w.id === String(active.id));
+        const newIndex = activeDashboard.layout.findIndex(w => w.id === String(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const reorderedLayout = arrayMove(activeDashboard.layout, oldIndex, newIndex);
+        await syncDashboard({
+            ...activeDashboard,
+            layout: reorderedLayout
+        });
+    };
+
+    const moveWidgetInLayout = async (widgetId: string, delta: -1 | 1) => {
+        if (!activeDashboard) return;
+        const index = activeDashboard.layout.findIndex(w => w.id === widgetId);
+        if (index < 0) return;
+        const nextIndex = index + delta;
+        if (nextIndex < 0 || nextIndex >= activeDashboard.layout.length) return;
+        const nextLayout = arrayMove(activeDashboard.layout, index, nextIndex);
+        await syncDashboard({ ...activeDashboard, layout: nextLayout });
+    };
+
+    const addDashboardFilter = async (column = '') => {
+        if (!activeDashboard) return;
+        await syncDashboard({
+            ...activeDashboard,
+            filters: [...(activeDashboard.filters || []), { column, operator: '=', value: '' }]
+        });
+    };
+
+    const updateDashboardFilter = async (index: number, patch: Partial<FilterDef>) => {
+        if (!activeDashboard) return;
+        const next = [...(activeDashboard.filters || [])];
+        next[index] = { ...next[index], ...patch };
+        await syncDashboard({ ...activeDashboard, filters: next });
+    };
+
+    const removeDashboardFilter = async (index: number) => {
+        if (!activeDashboard) return;
+        await syncDashboard({
+            ...activeDashboard,
+            filters: (activeDashboard.filters || []).filter((_, idx) => idx !== index)
+        });
+    };
+
+    const clearDashboardFilters = async () => {
+        if (!activeDashboard) return;
+        await syncDashboard({ ...activeDashboard, filters: [] });
+    };
+
+    const getWidgetLabel = (widget: SavedWidget) => {
+        if (widget.type === 'system') {
+            const meta = SYSTEM_WIDGETS.find(w => w.id === widget.id);
+            return meta ? t(meta.titleKey) : widget.id;
+        }
+        return customWidgets?.find(w => w.id === widget.id)?.name || widget.id;
+    };
+
     const deleteCustomWidget = async (id: string) => {
         if (await appDialog.confirm(t('dashboard.confirm_delete_report'))) {
             await SystemRepository.executeRaw(`DELETE FROM sys_user_widgets WHERE id = '${id}'`);
@@ -250,6 +372,159 @@ export const CustomDashboardView: React.FC = () => {
                                 <Plus className="w-4 h-4" />
                                 {t('dashboard.add_title')}
                             </button>
+                        )}
+                    </div>
+                )
+            }}
+            rightPanel={{
+                title: t('dashboard.tools_title', 'Dashboard Tools'),
+                enabled: Boolean(activeDashboard),
+                triggerTitle: t('dashboard.tools_title', 'Dashboard Tools'),
+                width: 'sm',
+                isOpen: showDashboardTools,
+                onOpenChange: setShowDashboardTools,
+                content: (
+                    <div className="h-full min-h-0 flex flex-col gap-4">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 flex-shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setDashboardToolsTab('layout')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${dashboardToolsTab === 'layout' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {t('dashboard.tools_tab_layout', 'Layout')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDashboardToolsTab('filters')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${dashboardToolsTab === 'filters' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {t('dashboard.tools_tab_filters', 'Filters')}
+                            </button>
+                        </div>
+
+                        {!activeDashboard ? (
+                            <div className="text-xs text-slate-500">{t('common.no_data')}</div>
+                        ) : dashboardToolsTab === 'layout' ? (
+                            <div className="flex-1 min-h-0 flex flex-col gap-2">
+                                <p className="text-xs text-slate-500">{t('dashboard.tools_layout_hint', 'Reorder widgets and remove items without leaving the dashboard.')}</p>
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                    {activeDashboard.layout.length === 0 ? (
+                                        <div className="p-3 text-xs text-slate-400">{t('dashboard.no_reports')}</div>
+                                    ) : (
+                                        activeDashboard.layout.map((widget, index) => (
+                                            <div key={`${widget.type}:${widget.id}`} className="p-3 flex items-center justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <div className="text-xs font-semibold text-slate-700 truncate">{getWidgetLabel(widget)}</div>
+                                                    <div className="text-[10px] text-slate-400 uppercase">{widget.type}</div>
+                                                </div>
+                                                {!isReadOnly && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void moveWidgetInLayout(widget.id, -1); }}
+                                                            disabled={index === 0}
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40"
+                                                            title={t('dashboard.tools_move_up', 'Move up')}
+                                                        >
+                                                            <ArrowUp className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void moveWidgetInLayout(widget.id, 1); }}
+                                                            disabled={index === activeDashboard.layout.length - 1}
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40"
+                                                            title={t('dashboard.tools_move_down', 'Move down')}
+                                                        >
+                                                            <ArrowDown className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void removeFromDashboard(widget.id); }}
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700"
+                                                            title={t('common.remove')}
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex-1 min-h-0 flex flex-col gap-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs text-slate-500">{t('dashboard.tools_filters_hint', 'Manage global dashboard filters in one place.')}</p>
+                                    {!isReadOnly && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { void addDashboardFilter(''); }}
+                                            className="h-7 px-2 rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold"
+                                        >
+                                            {t('dashboard.add_filter')}
+                                        </button>
+                                    )}
+                                </div>
+                                {!isReadOnly && (
+                                    <div className="flex items-center justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => { void clearDashboardFilters(); }}
+                                            className="text-[11px] text-slate-500 hover:text-slate-700"
+                                        >
+                                            {t('dashboard.tools_clear_filters', 'Clear filters')}
+                                        </button>
+                                    </div>
+                                )}
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                    {(activeDashboard.filters || []).length === 0 ? (
+                                        <div className="p-3 text-xs text-slate-400">{t('dashboard.no_filters')}</div>
+                                    ) : (
+                                        (activeDashboard.filters || []).map((f, i) => (
+                                            <div key={i} className="p-3 space-y-2">
+                                                <input
+                                                    list="suggested-columns"
+                                                    value={f.column}
+                                                    onChange={(e) => { void updateDashboardFilter(i, { column: e.target.value }); }}
+                                                    placeholder={t('dashboard.filter_column')}
+                                                    className="w-full h-8 px-2 border border-slate-200 rounded bg-white text-xs outline-none"
+                                                />
+                                                <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                                                    <select
+                                                        value={f.operator}
+                                                        onChange={(e) => { void updateDashboardFilter(i, { operator: e.target.value }); }}
+                                                        className="h-8 px-2 border border-slate-200 rounded bg-white text-xs outline-none"
+                                                    >
+                                                        <option value="=">=</option>
+                                                        <option value="!=">!=</option>
+                                                        <option value=">">&gt;</option>
+                                                        <option value="<">&lt;</option>
+                                                        <option value="contains">{t('dashboard.op_contains')}</option>
+                                                        <option value="is null">{t('dashboard.op_is_null')}</option>
+                                                    </select>
+                                                    <input
+                                                        value={f.value}
+                                                        onChange={(e) => { void updateDashboardFilter(i, { value: e.target.value }); }}
+                                                        placeholder={t('dashboard.filter_value')}
+                                                        className="h-8 px-2 border border-slate-200 rounded bg-white text-xs outline-none"
+                                                    />
+                                                    {!isReadOnly && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void removeDashboardFilter(i); }}
+                                                            className="h-8 w-8 inline-flex items-center justify-center rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700"
+                                                            title={t('common.remove')}
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
                 )
@@ -423,8 +698,13 @@ export const CustomDashboardView: React.FC = () => {
                         )}
                     </div>
                 ) : activeDashboard ? (
-                    <div id="dashboard-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 auto-rows-[300px]">
-                        {activeDashboard.layout.map((widgetRef, idx) => {
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(event) => { void handleDashboardDragEnd(event); }}
+                    >
+                        <div id="dashboard-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 auto-rows-[300px]">
+                        {activeDashboard.layout.map((widgetRef) => {
                             // Render System Widget
                             if (widgetRef.type === 'system') {
                                 const meta = SYSTEM_WIDGETS.find(w => w.id === widgetRef.id);
@@ -433,7 +713,7 @@ export const CustomDashboardView: React.FC = () => {
                                 if (!Component) return null;
 
                                 return (
-                                    <div key={widgetRef.id + idx} className={`relative group h-full ${meta.defaultColSpan === 2 ? 'md:col-span-2' : ''}`}>
+                                    <DashboardSortableItem key={widgetRef.id} id={widgetRef.id} className={`relative group h-full ${meta.defaultColSpan === 2 ? 'md:col-span-2' : ''}`}>
                                         {!isReadOnly && (
                                             <div className="absolute -top-2 -right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
@@ -451,7 +731,7 @@ export const CustomDashboardView: React.FC = () => {
                                                 targetView={COMPONENTS.find(c => c.component === meta.id)?.targetView}
                                             />
                                         </div>
-                                    </div>
+                                    </DashboardSortableItem>
                                 );
                             }
 
@@ -467,7 +747,7 @@ export const CustomDashboardView: React.FC = () => {
                             }
 
                             return (
-                                <div key={widgetRef.id + idx} className="relative group md:col-span-1 xl:col-span-2 h-full">
+                                <DashboardSortableItem key={widgetRef.id} id={widgetRef.id} className="relative group md:col-span-1 xl:col-span-2 h-full">
                                     {!isReadOnly && (
                                         <div className="absolute -top-2 -right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
@@ -487,10 +767,11 @@ export const CustomDashboardView: React.FC = () => {
                                         showInspectorJump
                                         inspectorReturnHash={activeDashboard?.id ? `#/?dashboard=${encodeURIComponent(activeDashboard.id)}` : '#/'}
                                     />
-                                </div>
+                                </DashboardSortableItem>
                             );
                         })}
-                    </div>
+                        </div>
+                    </DndContext>
                 ) : null
             }
 

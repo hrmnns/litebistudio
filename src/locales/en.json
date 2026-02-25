@@ -94,7 +94,15 @@
         "pin_sidebar": "Add to menu",
         "unpin_sidebar": "Remove from menu",
         "active": "Active",
-        "no_reports": "No saved reports found."
+        "no_reports": "No saved reports found.",
+        "tools_title": "Dashboard Tools",
+        "tools_tab_layout": "Layout",
+        "tools_tab_filters": "Filters",
+        "tools_layout_hint": "Reorder widgets and remove items without leaving the dashboard.",
+        "tools_filters_hint": "Manage global dashboard filters in one place.",
+        "tools_move_up": "Move up",
+        "tools_move_down": "Move down",
+        "tools_clear_filters": "Clear filters"
     },
     "worklist": {
         "subtitle": "Bookmarked records and verification results",

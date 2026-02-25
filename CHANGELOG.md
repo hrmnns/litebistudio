@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - execute generated SELECT immediately
 - Added quick table-toolbar icon buttons (Columns/Filters/Actions) to open the sidepanel directly on the corresponding tab.
 - Added heuristic index suggestion generation in `Table Tools > Actions` (based on active filters, sort configuration, cardinality, and existing indexes) with one-click index creation.
+- Dashboard view now includes a dedicated right-side tools panel (`Dashboard Tools`) with tabs for:
+  - `Layout` (reorder/remove widgets from a compact list)
+  - `Filters` (central global filter management)
+- Dashboard widget order can now be changed directly in the dashboard grid via drag & drop (persisted per dashboard).
 
 ### Changed
 - Data Inspector SQL toolbar now uses a single `Save` action (disk icon) for saving into SQL Manager; the temporary `Save Report` action and modal were removed.
@@ -30,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - SQL Manager sections (`Templates`, `SQL Manager`, `Recent Queries`) are now collapsible and persist their open/closed state.
 - Table Tools `Columns` tab now highlights the currently active sort column and direction.
 - Field Picker action labels were compacted using icon-first controls for better space usage.
+- Dashboard sidepanel follows the shared global sidepanel pattern in `PageLayout` and is opened via the same header trigger.
 
 ### Fixed
 - Data Inspector SQL split-resize now keeps the newly dragged pane height reliably instead of snapping back to the previous size after releasing the gripper.

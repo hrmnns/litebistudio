@@ -94,7 +94,15 @@
         "pin_sidebar": "Zum Menü hinzufügen",
         "unpin_sidebar": "Vom Menü entfernen",
         "active": "Aktiv",
-        "no_reports": "Keine gespeicherten Berichte gefunden."
+        "no_reports": "Keine gespeicherten Berichte gefunden.",
+        "tools_title": "Dashboard Tools",
+        "tools_tab_layout": "Layout",
+        "tools_tab_filters": "Filter",
+        "tools_layout_hint": "Widgets umsortieren und entfernen, ohne die Uebersicht zu verlassen.",
+        "tools_filters_hint": "Globale Dashboard-Filter zentral verwalten.",
+        "tools_move_up": "Nach oben",
+        "tools_move_down": "Nach unten",
+        "tools_clear_filters": "Filter leeren"
     },
     "worklist": {
         "subtitle": "Gemerkte Datensätze und Prüfergebnisse",
