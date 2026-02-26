@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle, Loader2, ListPlus } from 'lucide-react';
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
@@ -19,6 +19,8 @@ import { useDashboard } from '../../lib/context/DashboardContext';
 import type { TableIndexInfo } from '../../lib/repositories/SystemRepository';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -76,6 +78,28 @@ const FACTORY_RESET_SESSIONSTORAGE_PREFIXES = [
     'data_inspector_',
     'query_builder_'
 ];
+
+const pad2 = (value: number): string => String(value).padStart(2, '0');
+
+const buildBackupFileName = (pattern: string, secure: boolean): string => {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+    const time = `${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
+    const dateTime = `${date}_${time}`;
+    const mode = secure ? 'secure' : 'standard';
+    const basePattern = (pattern || 'backup_{date}_{mode}').trim();
+    const withTokens = basePattern
+        .replace(/\{date\}/gi, date)
+        .replace(/\{time\}/gi, time)
+        .replace(/\{datetime\}/gi, dateTime)
+        .replace(/\{mode\}/gi, mode);
+    const withoutReserved = withTokens.replace(/[<>:"/\\|?*]/g, '_');
+    const withoutControlChars = Array.from(withoutReserved)
+        .map((ch) => (ch.charCodeAt(0) < 32 ? '_' : ch))
+        .join('');
+    const sanitized = withoutControlChars.trim() || `backup_${date}_${mode}`;
+    return sanitized.toLowerCase().endsWith('.sqlite3') ? sanitized : `${sanitized}.sqlite3`;
+};
 
 const resetEnvironmentSettings = (): void => {
     const localKeys = Object.keys(window.localStorage);
@@ -146,6 +170,144 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const [restoreAlert, setRestoreAlert] = useState<{ type: AlertType; message: string; title?: string; details?: string } | null>(null);
     const [isResetting, setIsResetting] = useState(false);
     const [isResettingSqlManager, setIsResettingSqlManager] = useState(false);
+    const [backupNamePattern] = useLocalStorage<string>('backup_file_name_pattern', 'backup_{date}_{mode}');
+    const [backupUseSavedLocation] = useLocalStorage<boolean>('backup_use_saved_location', true);
+    const restoreInputRef = useRef<HTMLInputElement | null>(null);
+    const backupDirectorySupported = isBackupDirectorySupported();
+
+    const processRestoreFile = async (file: File): Promise<void> => {
+        const logTime = () => new Date().toLocaleTimeString();
+        logger.debug(`[Restore][${logTime()}] File selected:`, file.name, file.size, file.type);
+
+        try {
+            logger.debug(`[Restore][${logTime()}] Calling file.arrayBuffer()...`);
+            const buffer = await file.arrayBuffer();
+            logger.debug(`[Restore][${logTime()}] Buffer received, size:`, buffer.byteLength);
+
+            const header = new Uint8Array(buffer.slice(0, 16));
+            const headerString = new TextDecoder().decode(header);
+            const isSqlite = headerString.startsWith('SQLite format 3');
+            logger.debug('[Restore] Header check - isSqlite:', isSqlite);
+
+            let finalBuffer = buffer;
+
+            if (!isSqlite) {
+                const pwd = await appDialog.prompt(t('datasource.restore_encrypted_prompt'));
+                if (!pwd) return;
+
+                try {
+                    const decrypted = await decryptBuffer(buffer, pwd);
+                    finalBuffer = decrypted;
+                } catch {
+                    setRestoreAlert({
+                        type: 'error',
+                        title: t('common.error'),
+                        message: t('datasource.restore_failed')
+                    });
+                    return;
+                }
+            }
+
+            if (!(await appDialog.confirm(t('datasource.restore_confirm')))) return;
+            logger.info(`[Restore][${logTime()}] User confirmed restore. Starting process...`);
+            setRestoreAlert({
+                type: 'warning',
+                title: t('common.loading'),
+                message: 'Verarbeite Backup-Datei...'
+            });
+
+            try {
+                logger.debug(`[Restore][${logTime()}] Importing db module...`);
+                const { importDatabase } = await import('../../lib/db');
+                logger.debug(`[Restore][${logTime()}] Calling worker importDatabase...`);
+                const report = await importDatabase(finalBuffer) as unknown as RestoreReport;
+                logger.debug(`[Restore][${logTime()}] Worker report received:`, report);
+                const { versionInfo } = report;
+
+                if (!report.headerMatch) {
+                    setRestoreAlert({
+                        type: 'error',
+                        title: t('datasource.restore_invalid'),
+                        message: report.error || t('datasource.restore_warning_hint')
+                    });
+                    return;
+                }
+
+                if (report.error) {
+                    setRestoreAlert({
+                        type: 'error',
+                        title: report.isDowngrade ? 'Incompatible Backup' : t('common.error'),
+                        message: report.error,
+                        details: versionInfo ? `Backup Version: V${versionInfo.backup} | App Version: V${versionInfo.current}` : undefined
+                    });
+                    return;
+                }
+
+                if (!report.isValid) {
+                    let details = '';
+                    if (versionInfo) {
+                        details += `Schema: V${versionInfo.backup} â†’ V${versionInfo.current} (Update required)\n\n`;
+                    }
+                    if (report.missingTables.length > 0) {
+                        details += t('datasource.restore_missing_tables') + '\n- ' + report.missingTables.join('\n- ') + '\n\n';
+                    }
+
+                    if (Object.keys(report.missingColumns).length > 0) {
+                        details += t('datasource.restore_missing_columns') + '\n';
+                        for (const [tbl, cols] of Object.entries(report.missingColumns)) {
+                            details += `- ${tbl}: ${(cols as string[]).join(', ')}\n`;
+                        }
+                    }
+
+                    setRestoreAlert({
+                        type: 'warning',
+                        title: t('datasource.restore_warning_title'),
+                        message: t('datasource.restore_warning_hint'),
+                        details
+                    });
+                } else {
+                    setRestoreAlert({
+                        type: 'success',
+                        title: t('common.success'),
+                        message: t('datasource.restore_success_reload'),
+                        details: versionInfo ? `Database Version: V${versionInfo.backup} (Upgraded to V${versionInfo.current})` : undefined
+                    });
+                    logger.info(`[Restore][${logTime()}] Success! Reloading in 2s...`);
+                    markBackupComplete();
+                    setTimeout(() => window.location.reload(), 2000);
+                }
+            } catch (err: unknown) {
+                logger.error(`[Restore][${logTime()}] Inner Error:`, err);
+                setRestoreAlert({
+                    type: 'error',
+                    title: t('common.error'),
+                    message: getErrorMessage(err)
+                });
+            }
+        } catch (err: unknown) {
+            logger.error(`[Restore][${logTime()}] Outer Error:`, err);
+            setRestoreAlert({
+                type: 'error',
+                title: t('common.error'),
+                message: getErrorMessage(err)
+            });
+        }
+    };
+
+    const handleStartRestore = async (): Promise<void> => {
+        setRestoreAlert(null);
+        if (backupUseSavedLocation && backupDirectorySupported) {
+            const picked = await pickBackupFileFromRememberedDirectoryWithStatus();
+            if (picked.cancelled) return;
+            if (picked.file) {
+                await processRestoreFile(picked.file);
+                return;
+            }
+            if (restoreInputRef.current) restoreInputRef.current.click();
+            return;
+        }
+        if (restoreInputRef.current) restoreInputRef.current.click();
+    };
 
     // Fetch Tables
     const { data: tables, refresh: refreshTables } = useAsync<string[]>(
@@ -778,12 +940,24 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 outputBuffer = await encryptBuffer(plainBuffer, backupPassword);
                                             }
 
-                                            const blob = new Blob([outputBuffer], { type: 'application/x-sqlite3' });
-                                            const url = URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = `backup_${new Date().toISOString().split('T')[0]}${useEncryption ? '_secure' : ''}.sqlite3`;
-                                            a.click();
+                                            const fileName = buildBackupFileName(backupNamePattern, useEncryption);
+                                            let savedToRememberedLocation = false;
+                                            if (backupUseSavedLocation && backupDirectorySupported) {
+                                                try {
+                                                    savedToRememberedLocation = await saveBackupToRememberedDirectory(outputBuffer, fileName);
+                                                } catch {
+                                                    savedToRememberedLocation = false;
+                                                }
+                                            }
+
+                                            if (!savedToRememberedLocation) {
+                                                const blob = new Blob([outputBuffer], { type: 'application/x-sqlite3' });
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = fileName;
+                                                a.click();
+                                            }
                                             markBackupComplete();
                                             if (useEncryption) setBackupPassword('');
                                         }}
@@ -793,141 +967,26 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         {useEncryption ? t('datasource.save_backup_secure') : t('datasource.save_backup_standard')}
                                     </button>
 
-                                    <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition-colors">
-                                        <input
-                                            type="file"
-                                            accept=".sqlite3,.sqlite,.db"
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            onChange={async (e) => {
-                                                const logTime = () => new Date().toLocaleTimeString();
-                                                logger.debug(`[Restore][${logTime()}] onChange triggered`);
-                                                setRestoreAlert(null);
-                                                const file = e.target.files?.[0];
-                                                if (!file) {
-                                                    logger.debug(`[Restore][${logTime()}] No file selected`);
-                                                    return;
-                                                }
-                                                logger.debug(`[Restore][${logTime()}] File selected:`, file.name, file.size, file.type);
-
-                                                try {
-                                                    logger.debug(`[Restore][${logTime()}] Calling file.arrayBuffer()...`);
-                                                    const buffer = await file.arrayBuffer();
-                                                    logger.debug(`[Restore][${logTime()}] Buffer received, size:`, buffer.byteLength);
-
-                                                    const header = new Uint8Array(buffer.slice(0, 16));
-                                                    const headerString = new TextDecoder().decode(header);
-                                                    const isSqlite = headerString.startsWith('SQLite format 3');
-                                                    logger.debug('[Restore] Header check - isSqlite:', isSqlite);
-
-                                                    let finalBuffer = buffer;
-
-                                                    if (!isSqlite) {
-                                                        // Assume encrypted
-                                                        const pwd = await appDialog.prompt(t('datasource.restore_encrypted_prompt'));
-                                                        if (!pwd) return;
-
-                                                        try {
-                                                            const decrypted = await decryptBuffer(buffer, pwd);
-                                                            finalBuffer = decrypted;
-                                                        } catch {
-                                                            setRestoreAlert({
-                                                                type: 'error',
-                                                                title: t('common.error'),
-                                                                message: t('datasource.restore_failed')
-                                                            });
-                                                            return;
-                                                        }
-                                                    }
-
-                                                    if (await appDialog.confirm(t('datasource.restore_confirm'))) {
-                                                        logger.info(`[Restore][${logTime()}] User confirmed restore. Starting process...`);
-                                                        setRestoreAlert({
-                                                            type: 'warning',
-                                                            title: t('common.loading'),
-                                                            message: 'Verarbeite Backup-Datei...',
-                                                        });
-
-                                                        try {
-                                                            logger.debug(`[Restore][${logTime()}] Importing db module...`);
-                                                            const { importDatabase } = await import('../../lib/db');
-                                                            logger.debug(`[Restore][${logTime()}] Calling worker importDatabase...`);
-                                                            const report = await importDatabase(finalBuffer) as unknown as RestoreReport;
-                                                            logger.debug(`[Restore][${logTime()}] Worker report received:`, report);
-                                                            const { versionInfo } = report;
-
-                                                            if (!report.headerMatch) {
-                                                                setRestoreAlert({
-                                                                    type: 'error',
-                                                                    title: t('datasource.restore_invalid'),
-                                                                    message: report.error || t('datasource.restore_warning_hint')
-                                                                });
-                                                                return;
-                                                            }
-
-                                                            if (report.error) {
-                                                                setRestoreAlert({
-                                                                    type: 'error',
-                                                                    title: report.isDowngrade ? 'Incompatible Backup' : t('common.error'),
-                                                                    message: report.error,
-                                                                    details: versionInfo ? `Backup Version: V${versionInfo.backup} | App Version: V${versionInfo.current}` : undefined
-                                                                });
-                                                                return;
-                                                            }
-
-                                                            if (!report.isValid) {
-                                                                let details = "";
-                                                                if (versionInfo) {
-                                                                    details += `Schema: V${versionInfo.backup} → V${versionInfo.current} (Update required)\n\n`;
-                                                                }
-                                                                if (report.missingTables.length > 0) {
-                                                                    details += t('datasource.restore_missing_tables') + '\n- ' + report.missingTables.join('\n- ') + '\n\n';
-                                                                }
-
-                                                                if (Object.keys(report.missingColumns).length > 0) {
-                                                                    details += t('datasource.restore_missing_columns') + '\n';
-                                                                    for (const [tbl, cols] of Object.entries(report.missingColumns)) {
-                                                                        details += `- ${tbl}: ${(cols as string[]).join(', ')}\n`;
-                                                                    }
-                                                                }
-
-                                                                setRestoreAlert({
-                                                                    type: 'warning',
-                                                                    title: t('datasource.restore_warning_title'),
-                                                                    message: t('datasource.restore_warning_hint'),
-                                                                    details: details
-                                                                });
-                                                            } else {
-                                                                setRestoreAlert({
-                                                                    type: 'success',
-                                                                    title: t('common.success'),
-                                                                    message: t('datasource.restore_success_reload'),
-                                                                    details: versionInfo ? `Database Version: V${versionInfo.backup} (Upgraded to V${versionInfo.current})` : undefined
-                                                                });
-                                                                logger.info(`[Restore][${logTime()}] Success! Reloading in 2s...`);
-                                                                markBackupComplete();
-                                                                setTimeout(() => window.location.reload(), 2000);
-                                                            }
-                                                        } catch (err: unknown) {
-                                                            logger.error(`[Restore][${logTime()}] Inner Error:`, err);
-                                                            setRestoreAlert({
-                                                                type: 'error',
-                                                                title: t('common.error'),
-                                                                message: getErrorMessage(err)
-                                                            });
-                                                        }
-                                                    }
-                                                } catch (err: unknown) {
-                                                    logger.error(`[Restore][${logTime()}] Outer Error:`, err);
-                                                    setRestoreAlert({
-                                                        type: 'error',
-                                                        title: t('common.error'),
-                                                        message: getErrorMessage(err)
-                                                    });
-                                                }
-                                            }}
-                                        />
+                                    <button
+                                        type="button"
+                                        onClick={() => { void handleStartRestore(); }}
+                                        className={`flex items-center justify-center gap-2 p-3 border rounded-lg text-sm font-bold transition-colors ${useEncryption ? 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700' : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                    >
                                         <Upload className="w-4 h-4 text-amber-500" /> {t('datasource.restore_backup')}
-                                    </div>
+                                    </button>
+                                    <input
+                                        ref={restoreInputRef}
+                                        type="file"
+                                        accept=".sqlite3,.sqlite,.db"
+                                        className="hidden"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            setRestoreAlert(null);
+                                            await processRestoreFile(file);
+                                            e.currentTarget.value = '';
+                                        }}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -1231,4 +1290,5 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         </PageLayout >
     );
 };
+
 

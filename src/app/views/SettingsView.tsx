@@ -10,6 +10,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { LOG_LEVEL_STORAGE_KEY, type AppLogLevel } from '../../lib/logging';
 import { appDialog } from '../../lib/appDialog';
 import { SystemHealthModal } from '../components/SystemHealthModal';
+import { clearSavedBackupDirectory, getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickAndSaveBackupDirectory } from '../../lib/utils/backupLocation';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
 type AppsSubTab = 'inspector' | 'querybuilder' | 'datamanagement';
@@ -51,6 +52,9 @@ export const SettingsView: React.FC = () => {
     const [qbSqlEditorHeight, setQbSqlEditorHeight] = useLocalStorage<number>('query_builder_sql_editor_height', 384);
     const [importDefaultMode, setImportDefaultMode] = useLocalStorage<'append' | 'overwrite'>('import_default_mode', 'append');
     const [importAutoSaveMappings, setImportAutoSaveMappings] = useLocalStorage<boolean>('import_auto_save_mappings', true);
+    const [backupNamePattern, setBackupNamePattern] = useLocalStorage<string>('backup_file_name_pattern', 'backup_{date}_{mode}');
+    const [backupUseSavedLocation, setBackupUseSavedLocation] = useLocalStorage<boolean>('backup_use_saved_location', true);
+    const [backupFolderLabel, setBackupFolderLabel] = useLocalStorage<string>('backup_saved_folder_label', '');
     const [tableDensity, setTableDensity] = useLocalStorage<'compact' | 'normal'>('ui_table_density', 'normal');
     const [tableWrapCells, setTableWrapCells] = useLocalStorage<boolean>('ui_table_wrap_cells', false);
     const [tableDefaultShowFilters, setTableDefaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
@@ -112,10 +116,25 @@ export const SettingsView: React.FC = () => {
 
     const now = new Date();
     const lang = i18n.language.startsWith('de') ? 'de-DE' : 'en-US';
+    const backupFolderSupported = isBackupDirectorySupported();
     const footerText = t('settings.last_update', {
         date: now.toLocaleDateString(lang),
         time: now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
     });
+
+    const handleChooseBackupFolder = async () => {
+        try {
+            const label = await pickAndSaveBackupDirectory();
+            setBackupFolderLabel(label || getSavedBackupDirectoryLabel());
+        } catch {
+            await appDialog.warning(t('settings.backup_folder_select_error', 'Folder could not be selected.'));
+        }
+    };
+
+    const handleClearBackupFolder = async () => {
+        await clearSavedBackupDirectory();
+        setBackupFolderLabel('');
+    };
 
     return (
         <PageLayout
@@ -649,14 +668,9 @@ export const SettingsView: React.FC = () => {
                 )}
 
                 {activeTab === 'apps' && appsSubTab === 'datamanagement' && (
-                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
-                            </span>
-                            {t('settings.import_title')}
-                        </h3>
-                        <div className="space-y-5">
+                    <div className={`space-y-6 transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm space-y-5">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.import_title')}</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.import_hint')}</p>
 
                             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
@@ -675,6 +689,63 @@ export const SettingsView: React.FC = () => {
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.import_auto_save_mappings')}</span>
                                 <input type="checkbox" className="h-4 w-4" checked={importAutoSaveMappings} onChange={() => setImportAutoSaveMappings(!importAutoSaveMappings)} />
                             </label>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm space-y-5">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{t('datasource.backup_restore')}</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.backup_hint', 'Defaults for backup and restore behavior.')}</p>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.backup_name_pattern', 'Backup filename pattern')}</label>
+                                <input
+                                    value={backupNamePattern}
+                                    onChange={(e) => setBackupNamePattern(e.target.value)}
+                                    placeholder="backup_{date}_{mode}"
+                                    className="w-full sm:w-[28rem] p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                />
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {t('settings.backup_name_pattern_hint', 'Tokens: {date}, {time}, {datetime}, {mode}.')}
+                                </p>
+                            </div>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.backup_use_saved_location', 'Use saved backup folder')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={backupUseSavedLocation} onChange={() => setBackupUseSavedLocation(!backupUseSavedLocation)} />
+                            </label>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
+                                {t('settings.backup_use_saved_location_hint', 'Default: try the selected backup folder first, then fall back to file picker.')}
+                            </p>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.backup_folder', 'Backup folder')}</label>
+                                {!backupFolderSupported ? (
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        {t('settings.backup_folder_not_supported', 'Your browser does not support persistent folder access.')}
+                                    </p>
+                                ) : (
+                                    <>
+                                        <p className="text-sm text-slate-700 dark:text-slate-200">
+                                            {backupFolderLabel || t('settings.backup_folder_none', 'No folder selected')}
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => { void handleChooseBackupFolder(); }}
+                                                className="px-3 py-1.5 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+                                            >
+                                                {t('settings.backup_folder_choose', 'Choose folder')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { void handleClearBackupFolder(); }}
+                                                className="px-3 py-1.5 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                            >
+                                                {t('common.clear', 'Clear')}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
