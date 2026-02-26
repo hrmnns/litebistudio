@@ -9,6 +9,7 @@ interface UserWidgetInput {
     id: string;
     name: string;
     description?: string | null;
+    sql_statement_id?: string | null;
     sql_query: string;
     visualization_config?: unknown;
     visual_builder_config?: unknown;
@@ -295,13 +296,13 @@ export const SystemRepository = {
         const existing = await runQuery('SELECT id FROM sys_user_widgets WHERE id = ?', [widget.id]);
         if (existing.length > 0) {
             await runQuery(
-                'UPDATE sys_user_widgets SET name = ?, description = ?, sql_query = ?, visualization_config = ?, visual_builder_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [widget.name, widget.description, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config), widget.id]
+                'UPDATE sys_user_widgets SET name = ?, description = ?, sql_statement_id = ?, sql_query = ?, visualization_config = ?, visual_builder_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config), widget.id]
             );
         } else {
             await runQuery(
-                'INSERT INTO sys_user_widgets (id, name, description, sql_query, visualization_config, visual_builder_config) VALUES (?, ?, ?, ?, ?, ?)',
-                [widget.id, widget.name, widget.description, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config)]
+                'INSERT INTO sys_user_widgets (id, name, description, sql_statement_id, sql_query, visualization_config, visual_builder_config) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [widget.id, widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config)]
             );
         }
         notifyDbChange();

@@ -17,21 +17,21 @@ import {
     ScatterChart, Scatter, LabelList
 } from 'recharts';
 import { formatValue } from '../utils/formatUtils';
-import type { DbRow, TableColumn, WidgetConfig } from '../../types';
-import { VisualQueryBuilder, type QueryConfig } from '../components/VisualQueryBuilder';
+import type { DbRow, WidgetConfig } from '../../types';
+import type { QueryConfig } from '../components/VisualQueryBuilder';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { useAsync } from '../../hooks/useAsync';
-import { SqlAssistant } from '../components/SqlAssistant';
 import { PivotTable } from '../components/PivotTable';
 import type { SchemaDefinition } from '../components/SchemaDocumentation';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
+import type { SqlStatementRecord } from '../../lib/repositories/SystemRepository';
 
 type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text';
 type GuidedStep = 1 | 2 | 3 | 4;
-const DEFAULT_SQL = 'SELECT * FROM sqlite_master LIMIT 10';
+const DEFAULT_SQL = '';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const logger = createLogger('QueryBuilderView');
@@ -39,10 +39,13 @@ const logger = createLogger('QueryBuilderView');
 interface SavedWidget {
     id: string;
     name: string;
+    sql_statement_id?: string | null;
     sql_query: string;
     visualization_config: string;
     visual_builder_config?: string | null;
 }
+
+const normalizeSqlText = (value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase();
 
 export const QueryBuilderView: React.FC = () => {
     const { t } = useTranslation();
@@ -55,12 +58,10 @@ export const QueryBuilderView: React.FC = () => {
     const [savedSnapshot, setSavedSnapshot] = useState('');
 
     // Mode State
-    const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>(() => {
-        const preferred = localStorage.getItem('query_builder_default_mode');
-        return preferred === 'sql' ? 'sql' : 'visual';
-    });
+    const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
     const [sidebarTab, setSidebarTab] = useState<'query' | 'vis'>('query');
     const [entryMode, setEntryMode] = useState<'new' | 'existing'>('new');
+    const [startAction, setStartAction] = useState<'new' | 'open'>('new');
     const [isMaximized, setIsMaximized] = useState(false);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
     const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
@@ -77,45 +78,30 @@ export const QueryBuilderView: React.FC = () => {
     const [saveModalOpen, setSaveModalOpen] = useState(false);
     const [widgetName, setWidgetName] = useState('');
     const [widgetSearchTerm, setWidgetSearchTerm] = useState('');
+    const [sqlStatementSearchTerm, setSqlStatementSearchTerm] = useState('');
+    const [selectedSqlStatementId, setSelectedSqlStatementId] = useState<string>('');
 
     // Detail View State
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [activeSchema, setActiveSchema] = useState<SchemaDefinition | null>(null);
     const { isExporting, exportToPdf } = useReportExport();
-    const { togglePresentationMode, isReadOnly, isAdminMode } = useDashboard();
+    const { togglePresentationMode, isReadOnly } = useDashboard();
 
     // Fetch saved widgets
     const { data: savedWidgets, refresh: refreshWidgets } = useAsync<SavedWidget[]>(
         async () => await SystemRepository.getUserWidgets() as unknown as SavedWidget[],
         []
     );
+    const { data: sqlStatements, refresh: refreshSqlStatements } = useAsync<SqlStatementRecord[]>(
+        async () => await SystemRepository.listSqlStatements('global'),
+        []
+    );
 
-    // Auto-Schema Generation
+    // Widget Studio no longer builds SQL visually; schema metadata is optional.
     useEffect(() => {
-        const tableName = queryConfig?.table;
-        if (!tableName) {
-            setActiveSchema(null);
-            return;
-        }
-        SystemRepository.getTableSchema(tableName).then(cols => {
-            if (cols && cols.length > 0) {
-                const dynamicSchema = {
-                    title: `Tabelle: ${tableName}`,
-                    description: `Automatisch generiertes Schema fÃ¼r die Tabelle "${tableName}".`,
-                    type: 'object',
-                    properties: cols.reduce((acc: Record<string, { type: string; description: string }>, col: TableColumn) => {
-                        acc[col.name] = {
-                            type: col.type.toLowerCase().includes('int') || col.type.toLowerCase().includes('real') ? 'number' : 'string',
-                            description: `Feld: ${col.name} (Typ: ${col.type})`
-                        };
-                        return acc;
-                    }, {})
-                };
-                setActiveSchema(dynamicSchema);
-            }
-        });
-    }, [queryConfig?.table]);
+        setActiveSchema(null);
+    }, []);
 
     const handleRun = useCallback(async (overrideSql?: string): Promise<boolean> => {
         setLoading(true);
@@ -151,11 +137,16 @@ export const QueryBuilderView: React.FC = () => {
         let parsedVisType: VisualizationType = 'table';
         let parsedBuilderMode: 'sql' | 'visual' = 'sql';
         let parsedQueryConfig: QueryConfig | undefined;
-        const widgetSql = (widget.sql_query || '').trim() || DEFAULT_SQL;
+        const linkedStatement = widget.sql_statement_id
+            ? (sqlStatements || []).find(stmt => stmt.id === widget.sql_statement_id)
+            : undefined;
+        const widgetSql = (linkedStatement?.sql_text || widget.sql_query || '').trim() || DEFAULT_SQL;
 
         setActiveWidgetId(widget.id);
         setWidgetName(widget.name);
         setSql(widgetSql);
+        const matchedBySql = (sqlStatements || []).find(stmt => normalizeSqlText(stmt.sql_text) === normalizeSqlText(widgetSql));
+        setSelectedSqlStatementId(linkedStatement?.id || matchedBySql?.id || '');
         setLastRunSql('');
         setResults([]);
         setError('');
@@ -171,28 +162,25 @@ export const QueryBuilderView: React.FC = () => {
             setVisType(parsedVisType);
             setVisConfig(parsedVisConfig);
 
+            parsedBuilderMode = 'sql';
             if (widget.visual_builder_config) {
-                const qConfig = JSON.parse(widget.visual_builder_config) as QueryConfig;
-                parsedQueryConfig = qConfig;
-                parsedBuilderMode = 'visual';
-                setQueryConfig(qConfig);
-                setBuilderMode(parsedBuilderMode);
+                parsedQueryConfig = JSON.parse(widget.visual_builder_config) as QueryConfig;
             } else {
-                parsedBuilderMode = 'sql';
                 parsedQueryConfig = undefined;
-                setBuilderMode(parsedBuilderMode);
-                setQueryConfig(undefined);
             }
+            setBuilderMode(parsedBuilderMode);
+            setQueryConfig(undefined);
         } catch (e) {
             logger.error('Error parsing widget config', e);
         }
 
         setSidebarTab('query');
         setEntryMode('existing');
+        setStartAction('open');
         if (parsedVisType === 'text') {
             setSql('');
             setLastRunSql('');
-            setBuilderMode('visual');
+            setBuilderMode('sql');
             setQueryConfig(undefined);
             setGuidedStep(3);
         } else {
@@ -215,13 +203,20 @@ export const QueryBuilderView: React.FC = () => {
     const handleSaveWidget = async () => {
         if (!widgetName || isReadOnly) return;
         try {
+            const linkedStatement = (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId);
+            const sqlText = sql.trim();
+            const linkedStatementId =
+                linkedStatement && normalizeSqlText(linkedStatement.sql_text) === normalizeSqlText(sqlText)
+                    ? linkedStatement.id
+                    : null;
             const widget = {
                 id: activeWidgetId || crypto.randomUUID(),
                 name: widgetName,
                 description: '',
-                sql_query: sql,
+                sql_statement_id: linkedStatementId,
+                sql_query: sqlText,
                 visualization_config: { ...visConfig, type: visType },
-                visual_builder_config: builderMode === 'visual' ? queryConfig : null
+                visual_builder_config: null
             };
 
             await SystemRepository.saveUserWidget(widget);
@@ -233,7 +228,7 @@ export const QueryBuilderView: React.FC = () => {
             setSavedSnapshot(buildSnapshot({
                 currentSql: widget.sql_query,
                 currentBuilderMode: builderMode,
-                currentQueryConfig: builderMode === 'visual' ? queryConfig : undefined,
+                currentQueryConfig: undefined,
                 currentVisType: visType,
                 currentVisConfig: { ...visConfig, type: visType },
                 currentWidgetName: widget.name,
@@ -276,8 +271,29 @@ export const QueryBuilderView: React.FC = () => {
             (widget.sql_query || '').toLowerCase().includes(term)
         );
     }, [savedWidgets, widgetSearchTerm]);
+    const filteredSqlStatements = useMemo(() => {
+        const all = sqlStatements || [];
+        const term = sqlStatementSearchTerm.trim().toLowerCase();
+        if (!term) return all;
+        return all.filter((stmt) =>
+            stmt.name.toLowerCase().includes(term) ||
+            stmt.sql_text.toLowerCase().includes(term) ||
+            (stmt.description || '').toLowerCase().includes(term)
+        );
+    }, [sqlStatements, sqlStatementSearchTerm]);
 
-    const resultColumns = results.length > 0 ? Object.keys(results[0]) : [];
+    const selectedSqlStatement = useMemo(
+        () => (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId),
+        [sqlStatements, selectedSqlStatementId]
+    );
+    const sqlMatchesSelectedStatement = useMemo(
+        () => Boolean(selectedSqlStatement && normalizeSqlText(selectedSqlStatement.sql_text) === normalizeSqlText(sql)),
+        [selectedSqlStatement, sql]
+    );
+    const resultColumns = useMemo(
+        () => (results.length > 0 ? Object.keys(results[0]) : []),
+        [results]
+    );
     const numericColumns = useMemo(() => {
         if (results.length === 0) return [] as string[];
         return resultColumns.filter((col) =>
@@ -300,7 +316,7 @@ export const QueryBuilderView: React.FC = () => {
     const previewVisType: VisualizationType = (guidedStep === 2 && !isTextWidget) ? 'table' : visType;
     const canPersistWidget = isTextWidget || results.length > 0;
     const exportDisabled = isExporting || (!isTextWidget && results.length === 0);
-    const saveDisabled = !canPersistWidget || isReadOnly;
+    const saveDisabled = !canPersistWidget || isReadOnly || (!isTextWidget && !sqlMatchesSelectedStatement);
     const exportDisabledReason = isExporting
         ? t('common.exporting')
         : (!isTextWidget && results.length === 0 ? t('querybuilder.hint_run_query_before_export') : '');
@@ -313,9 +329,7 @@ export const QueryBuilderView: React.FC = () => {
     } as const;
 
     const hasEntrySelection = entryMode === 'new' || (entryMode === 'existing' && Boolean(activeWidgetId));
-    const hasSourceConfig = builderMode === 'visual'
-        ? Boolean(queryConfig?.table)
-        : sql.trim().length > 0;
+    const hasSourceConfig = isTextWidget || sqlMatchesSelectedStatement;
     const hasRunOutput = isTextWidget || (results.length > 0 && !error && lastRunSql.trim() === sql.trim());
     const hasVisualizationConfig = useMemo(() => {
         if (visType === 'text') {
@@ -429,7 +443,17 @@ export const QueryBuilderView: React.FC = () => {
     const modeInfoText =
         entryMode === 'new' && !activeWidgetId
             ? (isTextWidget ? t('querybuilder.mode_new_text_active') : t('querybuilder.mode_new_active'))
-            : t('querybuilder.mode_editing_active', { name: widgetName });
+            : (!activeWidgetId
+                ? t('querybuilder.mode_open_select', 'Waehle ein bestehendes Widget aus der Liste.')
+                : t('querybuilder.mode_editing_active', { name: widgetName }));
+    const applySqlStatementSource = useCallback((statement: SqlStatementRecord) => {
+        setSelectedSqlStatementId(statement.id);
+        setQueryConfig(undefined);
+        setSql(statement.sql_text);
+        setLastRunSql('');
+        setResults([]);
+        setError('');
+    }, [setQueryConfig]);
     const previewTypeMeta = useMemo(() => {
         const iconClass = 'w-5 h-5';
         switch (previewVisType) {
@@ -632,118 +656,143 @@ export const QueryBuilderView: React.FC = () => {
                                 <div className="space-y-4">
                                     {guidedStep === 1 && (
                                         <div className="space-y-4">
-                                            <div className="space-y-2 animate-in fade-in duration-300">
-                                                <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
-                                                    {t('querybuilder.new_report')}
-                                                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">1</span>
-                                                </h3>
+                                            <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
                                                 <button
+                                                    type="button"
                                                     onClick={() => {
+                                                        setStartAction('new');
                                                         setEntryMode('new');
-                                                        setActiveWidgetId(null);
-                                                        setWidgetName('');
-                                                        setResults([]);
-                                                        setError('');
-                                                        setVisType('table');
-                                                        gotoStep(2);
                                                     }}
-                                                    className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
-                                                        !isTextWidget && entryMode === 'new' && !activeWidgetId
-                                                            ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
-                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
-                                                    }`}
+                                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${startAction === 'new' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                                 >
-                                                    <Edit3 className="w-4 h-4 flex-shrink-0" />
-                                                    <div className="flex-1 min-w-0 text-left">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-sm font-bold truncate">{t('querybuilder.new_query_card_title')}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 text-[10px]">
-                                                            <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_query_card_subtitle')}</span>
-                                                            <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
-                                                                {t('querybuilder.new_query_card_type')}
-                                                            </span>
-                                                        </div>
-                                                    </div>
+                                                    {t('querybuilder.start_new', 'Neu')}
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     onClick={() => {
-                                                        setEntryMode('new');
-                                                        setActiveWidgetId(null);
-                                                        setWidgetName('');
-                                                        setResults([]);
-                                                        setError('');
-                                                        setVisType('text');
-                                                        setVisConfig(prev => ({ ...prev, type: 'text', textContent: prev.textContent || '' }));
-                                                        gotoStep(3);
+                                                        setStartAction('open');
+                                                        setEntryMode('existing');
                                                     }}
-                                                    className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
-                                                        isTextWidget && entryMode === 'new' && !activeWidgetId
-                                                            ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
-                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
-                                                    }`}
+                                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${startAction === 'open' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                                 >
-                                                    <Edit3 className="w-4 h-4 flex-shrink-0" />
-                                                    <div className="flex-1 min-w-0 text-left">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-sm font-bold truncate">{t('querybuilder.new_text_card_title')}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 text-[10px]">
-                                                            <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_text_card_subtitle')}</span>
-                                                            <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
-                                                                {t('querybuilder.new_text_card_type')}
-                                                            </span>
-                                                        </div>
-                                                    </div>
+                                                    {t('querybuilder.start_open', 'Oeffnen')}
                                                 </button>
                                             </div>
-                                            <div className="space-y-2 animate-in fade-in duration-300">
-                                                <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
-                                                    {t('querybuilder.saved_reports')}
-                                                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">
-                                                        {filteredSavedWidgets.length}/{savedWidgets?.length || 0}
-                                                    </span>
-                                                </h3>
-                                                <div className="relative">
-                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                                    <input
-                                                        value={widgetSearchTerm}
-                                                        onChange={(e) => setWidgetSearchTerm(e.target.value)}
-                                                        placeholder={t('querybuilder.search_saved_reports', 'Search saved widgets...')}
-                                                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                                <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                                                    {filteredSavedWidgets.map(w => (
-                                                        <div key={w.id} className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="font-bold text-slate-700 dark:text-slate-200 text-xs truncate">{w.name}</span>
-                                                                {!isReadOnly && (
-                                                                    <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                                )}
+                                            {startAction === 'new' ? (
+                                                <div className="space-y-2 animate-in fade-in duration-300">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEntryMode('new');
+                                                            setStartAction('new');
+                                                            setActiveWidgetId(null);
+                                                            setWidgetName('');
+                                                            setSelectedSqlStatementId('');
+                                                            setResults([]);
+                                                            setError('');
+                                                            setVisType('table');
+                                                            gotoStep(2);
+                                                        }}
+                                                        className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
+                                                            !isTextWidget && entryMode === 'new' && !activeWidgetId
+                                                                ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
+                                                                : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
+                                                        }`}
+                                                    >
+                                                        <Edit3 className="w-4 h-4 flex-shrink-0" />
+                                                        <div className="flex-1 min-w-0 text-left">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-sm font-bold truncate">{t('querybuilder.new_query_card_title')}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-[9px]">
-                                                                <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query || '-'}</span>
+                                                            <div className="flex items-center gap-2 text-[10px]">
+                                                                <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_query_card_subtitle')}</span>
                                                                 <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
-                                                                    {(() => {
-                                                                        try {
-                                                                            const parsed = JSON.parse(w.visualization_config) as { type?: string };
-                                                                            return (parsed.type || 'table').toUpperCase();
-                                                                        } catch {
-                                                                            return 'TABLE';
-                                                                        }
-                                                                    })()}
+                                                                    {t('querybuilder.new_query_card_type')}
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                    ))}
-                                                    {filteredSavedWidgets.length === 0 && (
-                                                        <div className="p-3 rounded-lg border border-dashed border-slate-200 text-[11px] text-slate-400 text-center">
-                                                            {t('querybuilder.no_saved_reports_filtered', 'No matching widgets found.')}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEntryMode('new');
+                                                            setStartAction('new');
+                                                            setActiveWidgetId(null);
+                                                            setWidgetName('');
+                                                            setSelectedSqlStatementId('');
+                                                            setResults([]);
+                                                            setError('');
+                                                            setVisType('text');
+                                                            setVisConfig(prev => ({ ...prev, type: 'text', textContent: prev.textContent || '' }));
+                                                            gotoStep(3);
+                                                        }}
+                                                        className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
+                                                            isTextWidget && entryMode === 'new' && !activeWidgetId
+                                                                ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
+                                                                : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
+                                                        }`}
+                                                    >
+                                                        <Edit3 className="w-4 h-4 flex-shrink-0" />
+                                                        <div className="flex-1 min-w-0 text-left">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-sm font-bold truncate">{t('querybuilder.new_text_card_title')}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-[10px]">
+                                                                <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_text_card_subtitle')}</span>
+                                                                <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
+                                                                    {t('querybuilder.new_text_card_type')}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    )}
+                                                    </button>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <div className="space-y-2 animate-in fade-in duration-300">
+                                                    <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
+                                                        {t('querybuilder.saved_reports')}
+                                                        <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">
+                                                            {filteredSavedWidgets.length}/{savedWidgets?.length || 0}
+                                                        </span>
+                                                    </h3>
+                                                    <div className="relative">
+                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                        <input
+                                                            value={widgetSearchTerm}
+                                                            onChange={(e) => setWidgetSearchTerm(e.target.value)}
+                                                            placeholder={t('querybuilder.search_saved_reports', 'Search saved widgets...')}
+                                                            className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                                                        {filteredSavedWidgets.map(w => (
+                                                            <div key={w.id} className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="font-bold text-slate-700 dark:text-slate-200 text-xs truncate">{w.name}</span>
+                                                                    {!isReadOnly && (
+                                                                        <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-[9px]">
+                                                                    <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query || '-'}</span>
+                                                                    <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
+                                                                        {(() => {
+                                                                            try {
+                                                                                const parsed = JSON.parse(w.visualization_config) as { type?: string };
+                                                                                return (parsed.type || 'table').toUpperCase();
+                                                                            } catch {
+                                                                                return 'TABLE';
+                                                                            }
+                                                                        })()}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {filteredSavedWidgets.length === 0 && (
+                                                            <div className="p-3 rounded-lg border border-dashed border-slate-200 text-[11px] text-slate-400 text-center">
+                                                                {t('querybuilder.no_saved_reports_filtered', 'No matching widgets found.')}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                     {guidedStep === 1 ? null : showFinalizePanel ? (
@@ -764,9 +813,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     <div className="mt-1 text-slate-700">
                                                         {isTextWidget
                                                             ? t('querybuilder.new_text_card_type')
-                                                            : builderMode === 'visual'
-                                                                ? (queryConfig?.table || t('querybuilder.please_select'))
-                                                                : t('querybuilder.direct_editor')}
+                                                            : t('querybuilder.sql_manager_source', 'SQL Manager Source')}
                                                     </div>
                                                 </div>
                                                 <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
@@ -805,34 +852,74 @@ export const QueryBuilderView: React.FC = () => {
                                         </div>
                                     ) : (
                                         <div className="space-y-0">
+                                            <div className="mb-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                                        {t('querybuilder.sql_manager_source', 'SQL Manager Source')}
+                                                    </h4>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { void refreshSqlStatements(); }}
+                                                        className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
+                                                    >
+                                                        {t('common.refresh', 'Refresh')}
+                                                    </button>
+                                                </div>
+                                                <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                    <input
+                                                        value={sqlStatementSearchTerm}
+                                                        onChange={(e) => setSqlStatementSearchTerm(e.target.value)}
+                                                        placeholder={t('querybuilder.search_sql_statements', 'Search SQL statements...')}
+                                                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <div className="max-h-36 overflow-y-auto custom-scrollbar space-y-1 pr-1">
+                                                    {filteredSqlStatements.map((stmt) => (
+                                                        <button
+                                                            key={stmt.id}
+                                                            type="button"
+                                                            onClick={() => applySqlStatementSource(stmt)}
+                                                            className={`w-full text-left p-2 rounded-lg border transition-all ${
+                                                                selectedSqlStatementId === stmt.id
+                                                                    ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700'
+                                                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'
+                                                            }`}
+                                                        >
+                                                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{stmt.name}</div>
+                                                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">{stmt.sql_text}</div>
+                                                        </button>
+                                                    ))}
+                                                    {filteredSqlStatements.length === 0 && (
+                                                        <div className="p-2 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 text-center">
+                                                            {t('querybuilder.no_sql_statements', 'No SQL statements found.')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                             <div className="overflow-hidden rounded-t-xl border border-b-0 border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex">
-                                                <button onClick={() => setBuilderMode('visual')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase transition-all border-r border-slate-200 dark:border-slate-800 ${builderMode === 'visual' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-400 hover:text-slate-600 bg-transparent'}`}>
-                                                    <Layout className="w-3.5 h-3.5" /> {t('querybuilder.visual_builder')}
-                                                </button>
-                                                <button onClick={() => setBuilderMode('sql')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase transition-all ${builderMode === 'sql' ? 'bg-slate-900 dark:bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-600 bg-transparent'}`}>
+                                                <div className="flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase bg-slate-900 dark:bg-slate-800 text-slate-100">
                                                     <span className="font-mono text-[10px]">SQL</span> {t('querybuilder.direct_editor')}
-                                                </button>
+                                                </div>
                                             </div>
                                             <div className="p-4 rounded-b-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-2 -mt-px">
-                                                {builderMode === 'sql' ? (
-                                                    <>
-                                                        <div className="flex items-center justify-between">
-                                                            <label className="text-[10px] font-black uppercase text-slate-400">{t('querybuilder.sql_query')}</label>
-                                                            <SqlAssistant
-                                                                tableName={queryConfig?.table}
-                                                                columns={results.length > 0 ? Object.keys(results[0]).map(c => ({ name: c, type: typeof results[0][c] })) : []}
-                                                                onSelectSnippet={snippet => setSql(prev => prev + '\n' + snippet)}
-                                                            />
-                                                        </div>
-                                                        <textarea value={sql} onChange={e => setSql(e.target.value)} className="w-full font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none" style={{ height: `${Math.max(220, Math.min(700, sqlEditorHeight))}px` }} placeholder="SELECT * FROM..." />
-                                                    </>
-                                                ) : (
-                                                    <VisualQueryBuilder
-                                                        initialConfig={queryConfig}
-                                                        isAdminMode={isAdminMode}
-                                                        onChange={(newSql, newConfig) => { setSql(newSql); setQueryConfig(newConfig); }}
+                                                <>
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[10px] font-black uppercase text-slate-400">{t('querybuilder.sql_query')}</label>
+                                                        {!isTextWidget && (
+                                                            <span className="text-[10px] text-slate-500">
+                                                                {t('querybuilder.widget_studio_sql_source_hint', 'SQL waehlen im SQL-Manager oben')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <textarea
+                                                        value={sql}
+                                                        readOnly
+                                                        className="w-full font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none cursor-default"
+                                                        style={{ height: `${Math.max(220, Math.min(700, sqlEditorHeight))}px` }}
+                                                        placeholder="SELECT * FROM..."
                                                     />
-                                                )}
+                                                </>
                                             </div>
                                         </div>
                                     )}
@@ -1342,7 +1429,7 @@ export const QueryBuilderView: React.FC = () => {
                 onClose={() => setDetailModalOpen(false)}
                 items={results}
                 initialIndex={selectedItemIndex}
-                tableName={queryConfig?.table}
+                tableName={undefined}
                 schema={activeSchema || undefined}
             />
         </PageLayout>

@@ -465,20 +465,35 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         if (!trimmedSql) return;
 
         const normalized = normalizeSql(trimmedSql);
-        const matchingStatement = sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === normalized);
+        const matchingStatement = sqlStatements.find(
+            stmt => stmt.scope === SQL_LIBRARY_SCOPE && normalizeSql(stmt.sql_text) === normalized
+        );
         const suggestedName = matchingStatement?.name || lastSavedSqlTemplateName || `${selectedTable || 'Query'} Template`;
-        const name = (await appDialog.prompt(t('datainspector.custom_template_prompt'), { defaultValue: suggestedName }))?.trim();
+        const promptLabel = matchingStatement
+            ? t('datainspector.custom_template_prompt_update', 'Template name (updates existing):')
+            : t('datainspector.custom_template_prompt');
+        const name = (await appDialog.prompt(promptLabel, { defaultValue: suggestedName }))?.trim();
         if (!name) return;
 
-        const existing = sqlStatements.find(tpl => tpl.name.toLowerCase() === name.toLowerCase() && tpl.scope === SQL_LIBRARY_SCOPE);
-        if (existing && !(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return;
-        const targetId = existing?.id || crypto.randomUUID();
+        const existingByName = sqlStatements.find(
+            tpl => tpl.name.toLowerCase() === name.toLowerCase() && tpl.scope === SQL_LIBRARY_SCOPE
+        );
+        if (existingByName && matchingStatement && existingByName.id !== matchingStatement.id) {
+            if (!(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return;
+            await SystemRepository.deleteSqlStatement(existingByName.id);
+        } else if (existingByName && !matchingStatement) {
+            if (!(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return;
+        }
+        const targetId = matchingStatement?.id || existingByName?.id || crypto.randomUUID();
+        const targetFavorite = matchingStatement
+            ? Number(matchingStatement.is_favorite) === 1
+            : (existingByName ? Number(existingByName.is_favorite) === 1 : false);
         await SystemRepository.saveSqlStatement({
             id: targetId,
             name,
             sql_text: trimmedSql,
             scope: SQL_LIBRARY_SCOPE,
-            is_favorite: existing ? Number(existing.is_favorite) === 1 : false
+            is_favorite: targetFavorite
         });
         setLastSavedSqlTemplateName(name);
         await loadSqlStatements();

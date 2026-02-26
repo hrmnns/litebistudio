@@ -85,7 +85,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -291,6 +291,39 @@ function applyMigrations(databaseInstance: DatabaseLike) {
         }
         databaseInstance.exec('PRAGMA user_version = 8');
         userVersion = 8;
+    }
+
+    // Version 9: Migration: Link widgets to reusable SQL statements
+    if (userVersion < 9) {
+        log('Migration V9: Adding sql_statement_id to sys_user_widgets...');
+        try {
+            const columns: string[] = [];
+            databaseInstance.exec({
+                sql: "PRAGMA table_info(sys_user_widgets)",
+                rowMode: 'object',
+                callback: (row: SqliteRow) => columns.push(getRowString(row, 'name'))
+            });
+            if (columns.length > 0 && !columns.includes('sql_statement_id')) {
+                databaseInstance.exec("ALTER TABLE sys_user_widgets ADD COLUMN sql_statement_id TEXT");
+            }
+            databaseInstance.exec("CREATE INDEX IF NOT EXISTS idx_sys_user_widgets_sql_statement ON sys_user_widgets(sql_statement_id)");
+
+            // Best-effort backfill by matching exact SQL text.
+            databaseInstance.exec(`
+                UPDATE sys_user_widgets
+                SET sql_statement_id = (
+                    SELECT s.id
+                    FROM sys_sql_statement s
+                    WHERE TRIM(s.sql_text) = TRIM(sys_user_widgets.sql_query)
+                    LIMIT 1
+                )
+                WHERE (sql_statement_id IS NULL OR TRIM(sql_statement_id) = '')
+            `);
+        } catch (e) {
+            error('Migration failed for V9', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 9');
+        userVersion = 9;
     }
 
     log(`Database migrated to version ${userVersion}`);

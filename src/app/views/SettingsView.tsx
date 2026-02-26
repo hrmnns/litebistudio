@@ -48,7 +48,7 @@ export const SettingsView: React.FC = () => {
         'data_inspector_profiling_thresholds',
         { nullRate: 30, cardinalityRate: 95 }
     );
-    const [qbDefaultMode, setQbDefaultMode] = useLocalStorage<'sql' | 'visual'>('query_builder_default_mode', 'visual');
+    const [qbDefaultMode, setQbDefaultMode] = useLocalStorage<'sql'>('query_builder_default_mode', 'sql');
     const [qbSqlEditorHeight, setQbSqlEditorHeight] = useLocalStorage<number>('query_builder_sql_editor_height', 384);
     const [importDefaultMode, setImportDefaultMode] = useLocalStorage<'append' | 'overwrite'>('import_default_mode', 'append');
     const [importAutoSaveMappings, setImportAutoSaveMappings] = useLocalStorage<boolean>('import_auto_save_mappings', true);
@@ -641,10 +641,9 @@ export const SettingsView: React.FC = () => {
                                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.querybuilder_default_mode')}</label>
                                 <select
                                     value={qbDefaultMode}
-                                    onChange={(e) => setQbDefaultMode(e.target.value as 'sql' | 'visual')}
+                                    onChange={(e) => setQbDefaultMode(e.target.value as 'sql')}
                                     className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
                                 >
-                                    <option value="visual">{t('querybuilder.visual_builder')}</option>
                                     <option value="sql">{t('querybuilder.direct_editor')}</option>
                                 </select>
                             </div>

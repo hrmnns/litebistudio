@@ -8,12 +8,14 @@ CREATE TABLE IF NOT EXISTS sys_user_widgets (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
+    sql_statement_id TEXT,
     sql_query TEXT NOT NULL,
     visualization_config TEXT, -- JSON
     visual_builder_config TEXT, -- JSON string of QueryConfig (for reload)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_sys_user_widgets_sql_statement ON sys_user_widgets(sql_statement_id);
 
 CREATE TABLE IF NOT EXISTS sys_worklist (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
