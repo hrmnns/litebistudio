@@ -1423,25 +1423,25 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 content: (
                     mode === 'table' ? (
                     <div className="h-full min-h-0 flex flex-col gap-4">
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 flex-shrink-0">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 flex-shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setTableToolsTab('columns')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'columns' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'columns' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                                 {t('datainspector.table_tools_tab_columns', 'Columns')}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setTableToolsTab('filters')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'filters' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'filters' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                                 {t('datainspector.table_tools_tab_filters', 'Filters')}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setTableToolsTab('actions')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'actions' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'actions' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                                 {t('datainspector.table_tools_tab_actions', 'Actions')}
                             </button>
@@ -1449,13 +1449,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                         {tableToolsTab === 'columns' && (
                             <div className="flex-1 min-h-0 flex flex-col gap-2">
-                                <p className="text-xs text-slate-500">{t('datainspector.table_tools_columns_hint', 'Inspect schema and set sorting per column.')}</p>
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 space-y-2">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_columns_hint', 'Inspect schema and set sorting per column.')}</p>
+                                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2 space-y-2">
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500">
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
                                             {t('datainspector.table_tools_field_picker', 'Field Picker')}
                                         </span>
-                                        <span className="text-[11px] text-slate-500">
+                                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
                                             {t('datainspector.table_tools_selected_count', { count: tableSelectedColumns.length, defaultValue: '{{count}} selected' })}
                                         </span>
                                     </div>
@@ -1463,7 +1463,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         <button
                                             type="button"
                                             onClick={() => setTableSelectedColumns((selectedTableSchema || []).map(col => col.name))}
-                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                             title={t('datainspector.table_tools_select_all_fields', 'Select all')}
                                             aria-label={t('datainspector.table_tools_select_all_fields', 'Select all')}
                                         >
@@ -1472,7 +1472,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         <button
                                             type="button"
                                             onClick={() => setTableSelectedColumns([])}
-                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                             title={t('datainspector.table_tools_clear_field_selection', 'Clear')}
                                             aria-label={t('datainspector.table_tools_clear_field_selection', 'Clear')}
                                         >
@@ -1481,7 +1481,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         <button
                                             type="button"
                                             onClick={() => { void applyFieldPickerSql(false); }}
-                                            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                                         >
                                             <ArrowRight className="w-3.5 h-3.5" />
                                             {t('datainspector.sql_assist', 'SQL Workspace')}
@@ -1497,9 +1497,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         </button>
                                     </div>
                                 </div>
-                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                     {(selectedTableSchema || []).length === 0 ? (
-                                        <div className="p-3 text-xs text-slate-400">{t('common.no_data')}</div>
+                                        <div className="p-3 text-xs text-slate-400 dark:text-slate-500">{t('common.no_data')}</div>
                                     ) : (
                                         (selectedTableSchema || []).map(col => {
                                             const isSortedColumn = tableSortConfig?.key === col.name;
@@ -1508,7 +1508,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                             return (
                                             <div
                                                 key={col.name}
-                                                className={`p-3 space-y-2 ${isSortedColumn ? 'bg-blue-50/60' : ''} ${isSelectedColumn ? 'ring-1 ring-inset ring-blue-200' : ''}`}
+                                                className={`p-3 space-y-2 ${isSortedColumn ? 'bg-blue-50/60 dark:bg-blue-900/20' : ''} ${isSelectedColumn ? 'ring-1 ring-inset ring-blue-200 dark:ring-blue-700/60' : ''}`}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="min-w-0">
@@ -1524,22 +1524,22 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                                                     ));
                                                                 }}
                                                             />
-                                                        <div className="text-xs font-semibold text-slate-700 truncate flex items-center gap-2">
+                                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex items-center gap-2">
                                                             <span className="truncate">{col.name}</span>
                                                             {isSortedColumn && (
-                                                                <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold">
+                                                                <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
                                                                     {sortDirection === 'asc' ? 'ASC' : 'DESC'}
                                                                 </span>
                                                             )}
                                                         </div>
                                                         </label>
-                                                        <div className="text-[10px] text-slate-400">{col.type || '-'}</div>
+                                                        <div className="text-[10px] text-slate-400 dark:text-slate-500">{col.type || '-'}</div>
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <button
                                                             type="button"
                                                             onClick={() => setTableSortConfig({ key: col.name, direction: 'asc' })}
-                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'asc' ? 'border-blue-300 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'}`}
+                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'asc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
                                                             title={t('datainspector.table_tools_sort_asc', 'Sort ascending')}
                                                         >
                                                             ASC
@@ -1547,7 +1547,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                                         <button
                                                             type="button"
                                                             onClick={() => setTableSortConfig({ key: col.name, direction: 'desc' })}
-                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'desc' ? 'border-blue-300 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'}`}
+                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'desc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
                                                             title={t('datainspector.table_tools_sort_desc', 'Sort descending')}
                                                         >
                                                             DESC
@@ -1564,22 +1564,22 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                         {tableToolsTab === 'filters' && (
                             <div className="flex-1 min-h-0 flex flex-col gap-3">
-                                <p className="text-xs text-slate-500">{t('datainspector.table_tools_filters_hint', 'Manage global search and column filters.')}</p>
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.table_tools_global_search', 'Global Search')}</label>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_filters_hint', 'Manage global search and column filters.')}</p>
+                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_global_search', 'Global Search')}</label>
                                 <input
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     placeholder={t('datainspector.search_placeholder')}
-                                    className="w-full h-9 px-3 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                                 <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
                                     <div className="space-y-1">
-                                        <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.table_tools_column', 'Column')}</label>
+                                        <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_column', 'Column')}</label>
                                         <select
                                             value={tableFilterColumn}
                                             onChange={(e) => setTableFilterColumn(e.target.value)}
-                                            className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                            className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                         >
                                             {(selectedTableSchema || []).map(col => (
                                                 <option key={col.name} value={col.name}>{col.name}</option>
@@ -1587,24 +1587,24 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         </select>
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.table_tools_filter_value', 'Filter')}</label>
+                                        <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_filter_value', 'Filter')}</label>
                                         <input
                                             type="text"
                                             value={tableFilterValue}
                                             onChange={(e) => setTableFilterValue(e.target.value)}
-                                            className="w-full h-9 px-3 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
                                     <button
                                         type="button"
                                         onClick={applyTableSideFilter}
-                                        className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100"
+                                        className="h-9 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30"
                                     >
                                         {t('datainspector.table_tools_filter_apply', 'Apply')}
                                     </button>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                                    <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                                         <input
                                             type="checkbox"
                                             checked={showTableFilters}
@@ -1615,25 +1615,25 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     <button
                                         type="button"
                                         onClick={clearAllTableSideFilters}
-                                        className="text-[11px] text-slate-500 hover:text-slate-700"
+                                        className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                                     >
                                         {t('datainspector.table_tools_clear_all', 'Clear all')}
                                     </button>
                                 </div>
-                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                     {Object.keys(tableFilters).length === 0 ? (
-                                        <div className="p-3 text-xs text-slate-400">{t('datainspector.table_tools_no_filters', 'No active column filters')}</div>
+                                        <div className="p-3 text-xs text-slate-400 dark:text-slate-500">{t('datainspector.table_tools_no_filters', 'No active column filters')}</div>
                                     ) : (
                                         Object.entries(tableFilters).map(([col, val]) => (
                                             <div key={col} className="p-3 flex items-center justify-between gap-2">
                                                 <div className="min-w-0">
-                                                    <div className="text-xs font-semibold text-slate-700 truncate">{col}</div>
-                                                    <div className="text-[11px] text-slate-500 truncate">{val || '-'}</div>
+                                                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{col}</div>
+                                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{val || '-'}</div>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => clearTableSideFilter(col)}
-                                                    className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                                    className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                                 >
                                                     {t('common.remove', 'Remove')}
                                                 </button>
@@ -1646,32 +1646,32 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                         {tableToolsTab === 'actions' && (
                             <div className="flex-1 min-h-0 flex flex-col gap-3">
-                                <p className="text-xs text-slate-500">{t('datainspector.table_tools_actions_hint', 'Quick actions for current table context.')}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_actions_hint', 'Quick actions for current table context.')}</p>
                                 <button
                                     type="button"
                                     onClick={() => execute()}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
                                 >
                                     {t('common.refresh', 'Refresh')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleExportCurrentRows}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
                                 >
                                     {t('datainspector.table_tools_export_rows', 'Export current rows')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={openSelectedTableInSql}
-                                    className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 text-left"
+                                    className="h-9 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30 text-left"
                                 >
                                     {t('datainspector.table_tools_open_sql', 'Open as SQL')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleSaveCurrentView}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
                                 >
                                     {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
                                 </button>
@@ -1679,7 +1679,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     type="button"
                                     onClick={() => { void handleDeleteCurrentView(); }}
                                     disabled={!activeViewId}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left disabled:opacity-40"
+                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left disabled:opacity-40"
                                 >
                                     {t('datainspector.delete_view')}
                                 </button>
@@ -1687,50 +1687,50 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     <button
                                         type="button"
                                         onClick={openCreateIndexModal}
-                                        className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 text-left"
+                                        className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
                                     >
                                         {t('datainspector.table_tools_create_index', 'Create index')}
                                     </button>
                                 )}
                                 {selectedSourceType === 'table' && (
-                                    <div className="mt-1 pt-3 border-t border-slate-200 min-h-0 flex-1 flex flex-col gap-2">
+                                    <div className="mt-1 pt-3 border-t border-slate-200 dark:border-slate-700 min-h-0 flex-1 flex flex-col gap-2">
                                         <div className="flex items-center justify-between gap-2">
-                                            <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500">
+                                            <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
                                                 {t('datainspector.index_suggestions_title', 'Index Suggestions')}
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={() => { void generateIndexSuggestions(); }}
                                                 disabled={isGeneratingIndexSuggestions}
-                                                className="h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-[11px] disabled:opacity-40"
+                                                className="h-7 px-2 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] disabled:opacity-40"
                                             >
                                                 {isGeneratingIndexSuggestions
                                                     ? t('common.loading', 'Loading...')
                                                     : t('datainspector.index_suggestions_generate', 'Generate')}
                                             </button>
                                         </div>
-                                        <div className="text-[11px] text-slate-500">
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
                                             {t('datainspector.index_suggestions_hint', 'Based on active filters, sorting, cardinality and existing indexes.')}
                                         </div>
-                                        <div className="min-h-0 flex-1 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                        <div className="min-h-0 flex-1 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                             {indexSuggestions.length === 0 ? (
-                                                <div className="p-3 text-xs text-slate-400">
+                                                <div className="p-3 text-xs text-slate-400 dark:text-slate-500">
                                                     {t('datainspector.index_suggestions_empty', 'No suggestions yet. Generate to analyze this table.')}
                                                 </div>
                                             ) : (
                                                 indexSuggestions.map((suggestion) => (
                                                     <div key={suggestion.id} className="p-3 space-y-2">
-                                                        <div className="text-xs font-semibold text-slate-700">{suggestion.indexName}</div>
-                                                        <div className="text-[11px] text-slate-500">{suggestion.reason}</div>
-                                                        <div className="text-[11px] text-slate-500">
+                                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">{suggestion.indexName}</div>
+                                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{suggestion.reason}</div>
+                                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
                                                             {t('datainspector.index_suggestions_columns', 'Columns')}: <span className="font-mono">{suggestion.columns.join(', ')}</span>
                                                         </div>
-                                                        <div className="font-mono text-[10px] text-slate-400 break-all">{suggestion.sql}</div>
+                                                        <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 break-all">{suggestion.sql}</div>
                                                         <button
                                                             type="button"
                                                             onClick={() => { void applyIndexSuggestion(suggestion); }}
                                                             disabled={applyingIndexSuggestionId === suggestion.id}
-                                                            className="h-7 px-2 rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] disabled:opacity-40"
+                                                            className="h-7 px-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[11px] disabled:opacity-40"
                                                         >
                                                             {applyingIndexSuggestionId === suggestion.id
                                                                 ? t('common.saving', 'Saving...')
@@ -1747,18 +1747,18 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                     </div>
                     ) : (
                     <div className="h-full min-h-0 flex flex-col gap-4">
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 flex-shrink-0">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 flex-shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setSqlAssistTab('manager')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlAssistTab === 'manager' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlAssistTab === 'manager' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                                 {t('datainspector.sql_manager_tab', 'SQL Manager')}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setSqlAssistTab('assistant')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlAssistTab === 'assistant' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlAssistTab === 'assistant' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                                 {t('datainspector.assistant_tab', 'SQL Builder')}
                             </button>
@@ -1771,25 +1771,25 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 onClick={() => toggleManagerPanel('templates')}
                                 className="flex items-center justify-between text-left"
                             >
-                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.templates')}</span>
-                                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${managerPanels.templates ? 'rotate-180' : ''}`} />
+                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.templates')}</span>
+                                <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${managerPanels.templates ? 'rotate-180' : ''}`} />
                             </button>
                             {managerPanels.templates && (
-                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                 {sqlTemplates.map(template => (
                                     <div
                                         key={template.key}
                                         className="p-3 space-y-2"
                                     >
-                                        <div className="text-xs font-semibold text-slate-700">
+                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                                             {t(`datainspector.template_${template.key}`)}
                                         </div>
-                                        <div className="font-mono text-[10px] text-slate-400 truncate">{template.sql}</div>
+                                        <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate">{template.sql}</div>
                                         <div className="flex flex-wrap gap-1">
                                             <button
                                                 type="button"
                                                 onClick={() => { void applySqlTemplate(template.sql, false); }}
-                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                                 title={t('common.open', 'Open')}
                                                 aria-label={t('common.open', 'Open')}
                                             >
@@ -1798,7 +1798,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => { void applySqlTemplate(template.sql, true); }}
-                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                                                 title={t('datainspector.run_sql')}
                                                 aria-label={t('datainspector.run_sql')}
                                             >
@@ -1817,10 +1817,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     onClick={() => toggleManagerPanel('manager')}
                                     className="flex items-center justify-between text-left"
                                 >
-                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500">
+                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
                                     {t('datainspector.sql_manager_tab', 'SQL Manager')} ({sqlStatements.length})
                                 </span>
-                                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${managerPanels.manager ? 'rotate-180' : ''}`} />
+                                <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${managerPanels.manager ? 'rotate-180' : ''}`} />
                                 </button>
                                 {managerPanels.manager && (
                                 <>
@@ -1829,28 +1829,28 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 value={sqlLibrarySearch}
                                 onChange={(e) => setSqlLibrarySearch(e.target.value)}
                                 placeholder={t('datainspector.sql_manager_search_placeholder', 'Search patterns...')}
-                                className="w-full h-9 px-3 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0"
+                                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0"
                             />
-                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                 {filteredSqlStatements.length === 0 ? (
-                                    <div className="p-4 text-xs text-slate-400">{t('datainspector.sql_manager_no_results', 'No matches')}</div>
+                                    <div className="p-4 text-xs text-slate-400 dark:text-slate-500">{t('datainspector.sql_manager_no_results', 'No matches')}</div>
                                 ) : (
                                     filteredSqlStatements.map((statement) => (
                                         <div key={statement.id} className="p-3 space-y-2">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
-                                                    <div className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                                                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                                                         {statement.name}
                                                         {Number(statement.is_favorite) === 1 && <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />}
                                                     </div>
-                                                    <div className="font-mono text-[10px] text-slate-400 truncate">{statement.sql_text}</div>
+                                                    <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate">{statement.sql_text}</div>
                                                 </div>
                                             </div>
                                             <div className="flex flex-wrap gap-1">
                                                 <button
                                                     type="button"
                                                     onClick={() => { void applySqlStatement(statement, false); }}
-                                                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                                     title={t('common.open', 'Open')}
                                                     aria-label={t('common.open', 'Open')}
                                                 >
@@ -1859,7 +1859,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                                 <button
                                                     type="button"
                                                     onClick={() => { void applySqlStatement(statement, true); }}
-                                                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                                                     title={t('datainspector.run_sql')}
                                                     aria-label={t('datainspector.run_sql')}
                                                 >
@@ -1868,7 +1868,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                                 <button
                                                     type="button"
                                                     onClick={() => { void SystemRepository.setSqlStatementFavorite(statement.id, Number(statement.is_favorite) !== 1).then(loadSqlStatements); }}
-                                                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
+                                                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300"
                                                     title={Number(statement.is_favorite) === 1 ? t('datainspector.unpin') : t('datainspector.pin')}
                                                     aria-label={Number(statement.is_favorite) === 1 ? t('datainspector.unpin') : t('datainspector.pin')}
                                                 >
@@ -1877,7 +1877,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                                 <button
                                                     type="button"
                                                     onClick={() => { void handleRenameSqlStatement(statement); }}
-                                                    className="px-2 py-1 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                                    className="px-2 py-1 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                                     title={t('datainspector.rename_template')}
                                                 >
                                                     <Pencil className="w-3 h-3" />
@@ -1885,7 +1885,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                                 <button
                                                     type="button"
                                                     onClick={() => { void handleDeleteSqlStatement(statement); }}
-                                                    className="px-2 py-1 text-[11px] rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700"
+                                                    className="px-2 py-1 text-[11px] rounded border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-300"
                                                     title={t('datainspector.delete_template')}
                                                 >
                                                     <Trash2 className="w-3 h-3" />
@@ -1906,32 +1906,32 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     onClick={() => toggleManagerPanel('recent')}
                                     className="flex items-center justify-between gap-2 text-left flex-1"
                                 >
-                                    <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.recent_queries')}</span>
-                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${managerPanels.recent ? 'rotate-180' : ''}`} />
+                                    <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.recent_queries')}</span>
+                                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${managerPanels.recent ? 'rotate-180' : ''}`} />
                                 </button>
                                 {managerPanels.recent && (
                                 <button
                                     type="button"
                                     onClick={() => setSqlHistory([])}
-                                    className="text-[11px] text-slate-500 hover:text-slate-700"
+                                    className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                                 >
                                     {t('datainspector.clear_history')}
                                 </button>
                                 )}
                             </div>
                             {managerPanels.recent && (
-                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                 {sqlHistory.length === 0 ? (
-                                    <div className="p-3 text-xs text-slate-400">{t('common.no_data')}</div>
+                                    <div className="p-3 text-xs text-slate-400 dark:text-slate-500">{t('common.no_data')}</div>
                                 ) : (
                                     sqlHistory.map((sql, idx) => (
                                         <button
                                             key={`${idx}-${sql.slice(0, 16)}`}
                                             type="button"
                                             onClick={() => setInputSql(sql)}
-                                            className="w-full text-left p-3 hover:bg-slate-50"
+                                            className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-700/60"
                                         >
-                                            <div className="font-mono text-[11px] text-slate-600 truncate">{sql}</div>
+                                            <div className="font-mono text-[11px] text-slate-600 dark:text-slate-300 truncate">{sql}</div>
                                         </button>
                                     ))
                                 )}
@@ -1941,13 +1941,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <p className="text-xs text-slate-500">{t('datainspector.assistant_hint', 'Build SQL by selecting table, columns and optional aggregation.')}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.assistant_hint', 'Build SQL by selecting table, columns and optional aggregation.')}</p>
                             <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_table', 'Table')}</label>
+                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_table', 'Table')}</label>
                                 <select
                                     value={assistantTable}
                                     onChange={(e) => setAssistantTable(e.target.value)}
-                                    className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     {tables.map(table => (
                                         <option key={table} value={table}>{table}</option>
@@ -1957,18 +1957,18 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_columns', 'Columns')}</label>
+                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_columns', 'Columns')}</label>
                                     <button
                                         type="button"
                                         onClick={() => setAssistantSelectedColumns(assistantColumns)}
-                                        className="text-[11px] text-slate-500 hover:text-slate-700"
+                                        className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                                     >
                                         {t('datainspector.assistant_select_all', 'Select all')}
                                     </button>
                                 </div>
-                                <div className="max-h-28 overflow-auto border border-slate-200 rounded-lg p-2 space-y-1">
+                                <div className="max-h-28 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
                                     {assistantColumns.map(col => (
-                                        <label key={col} className="flex items-center gap-2 text-xs text-slate-600">
+                                        <label key={col} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                                             <input
                                                 type="checkbox"
                                                 checked={assistantSelectedColumns.includes(col)}
@@ -1986,11 +1986,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_aggregation', 'Aggregation')}</label>
+                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation', 'Aggregation')}</label>
                                     <select
                                         value={assistantAggregation}
                                         onChange={(e) => setAssistantAggregation(e.target.value as 'none' | 'count' | 'sum' | 'avg' | 'min' | 'max')}
-                                        className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                     >
                                         <option value="none">{t('datainspector.assistant_none', 'None')}</option>
                                         <option value="count">COUNT</option>
@@ -2001,12 +2001,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     </select>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_aggregation_field', 'Aggregation Field')}</label>
+                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation_field', 'Aggregation Field')}</label>
                                     <select
                                         value={assistantAggregationColumn}
                                         disabled={assistantAggregation === 'none' || assistantAggregation === 'count'}
                                         onChange={(e) => setAssistantAggregationColumn(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none disabled:opacity-40"
+                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none disabled:opacity-40"
                                     >
                                         <option value="">-</option>
                                         {assistantColumns.map(col => (
@@ -2018,11 +2018,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_group_by', 'Group by')}</label>
+                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_group_by', 'Group by')}</label>
                                     <select
                                         value={assistantGroupBy}
                                         onChange={(e) => setAssistantGroupBy(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                     >
                                         <option value="">{t('datainspector.assistant_none', 'None')}</option>
                                         {assistantColumns.map(col => (
@@ -2031,34 +2031,34 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     </select>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_metric_alias', 'Metric Alias')}</label>
+                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_metric_alias', 'Metric Alias')}</label>
                                     <input
                                         type="text"
                                         value={assistantMetricAlias}
                                         onChange={(e) => setAssistantMetricAlias(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_where', 'WHERE')}</label>
+                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_where', 'WHERE')}</label>
                                 <input
                                     type="text"
                                     value={assistantWhereClause}
                                     onChange={(e) => setAssistantWhereClause(e.target.value)}
                                     placeholder={t('datainspector.assistant_where_placeholder', "status = 'active'")}
-                                    className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                 />
                             </div>
 
                             <div className="grid grid-cols-3 gap-2">
                                 <div className="space-y-1 col-span-2">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_order_by', 'Order by')}</label>
+                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_order_by', 'Order by')}</label>
                                     <select
                                         value={assistantOrderBy}
                                         onChange={(e) => setAssistantOrderBy(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                     >
                                         <option value="">{t('datainspector.assistant_auto', 'Auto')}</option>
                                         {assistantColumns.map(col => (
@@ -2067,11 +2067,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     </select>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_direction', 'Direction')}</label>
+                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_direction', 'Direction')}</label>
                                     <select
                                         value={assistantOrderDir}
                                         onChange={(e) => setAssistantOrderDir(e.target.value as 'ASC' | 'DESC')}
-                                        className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                     >
                                         <option value="DESC">DESC</option>
                                         <option value="ASC">ASC</option>
@@ -2080,23 +2080,23 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_limit', 'Limit')}</label>
+                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_limit', 'Limit')}</label>
                                 <input
                                     type="number"
                                     min={1}
                                     max={100000}
                                     value={assistantLimit}
                                     onChange={(e) => setAssistantLimit(Number(e.target.value))}
-                                    className="w-full h-9 px-2 border border-slate-200 rounded-lg bg-white text-sm outline-none"
+                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                 />
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{t('datainspector.assistant_generated_sql', 'Generated SQL')}</label>
+                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_generated_sql', 'Generated SQL')}</label>
                                 <textarea
                                     readOnly
                                     value={assistantSqlPreview}
-                                    className="w-full min-h-36 p-2 font-mono text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-700"
+                                    className="w-full min-h-36 p-2 font-mono text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200"
                                 />
                             </div>
 
@@ -2104,21 +2104,21 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 <button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('replace'); }}
-                                    className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-slate-600 text-xs hover:bg-slate-50"
+                                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
                                 >
                                     {t('datainspector.assistant_replace_editor', 'Replace Editor')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('append'); }}
-                                    className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-slate-600 text-xs hover:bg-slate-50"
+                                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
                                 >
                                     {t('datainspector.assistant_append', 'Append')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('run'); }}
-                                    className="px-3 py-1.5 rounded-md border border-blue-200 bg-blue-50 text-blue-700 text-xs hover:bg-blue-100"
+                                    className="px-3 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs hover:bg-blue-100 dark:hover:bg-blue-900/30"
                                 >
                                     {t('datainspector.run_sql')}
                                 </button>
@@ -2187,7 +2187,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
 
                             <button
                                 onClick={() => execute()}
-                                className="h-10 px-3 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium"
+                                className="h-10 px-3 flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium"
                                 title={t('datainspector.refresh_title')}
                             >
                                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -2261,7 +2261,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             {loading && (
                                 <button
                                     onClick={() => { void handleCancelSql(); }}
-                                    className="px-3 py-1.5 rounded-md text-sm font-medium border bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                    className="px-3 py-1.5 rounded-md text-sm font-medium border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                                 >
                                     {t('datainspector.stop_sql', 'Stop')}
                                 </button>
@@ -2270,8 +2270,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 onClick={() => setAutocompleteEnabled(!autocompleteEnabled)}
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
                                     autocompleteEnabled
-                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                                 }`}
                                 title={t('datainspector.autocomplete_toggle_title', 'Toggle SQL autocomplete')}
                             >
@@ -2281,7 +2281,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </button>
                             <button
                                 onClick={() => setShowSqlAssist(true)}
-                                className="h-9 w-9 flex items-center justify-center rounded-md border bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                className="h-9 w-9 flex items-center justify-center rounded-md border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                                 title={t('datainspector.sql_assist', 'SQL Workspace')}
                                 aria-label={t('datainspector.sql_assist', 'SQL Workspace')}
                             >
@@ -2289,7 +2289,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </button>
                             <button
                                 onClick={handleSaveCustomTemplate}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                                 title={t('common.save', 'Save')}
                             >
                                 <Save className="w-3.5 h-3.5" />
@@ -2299,8 +2299,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 onClick={() => { void toggleFavoriteQuery(inputSql); }}
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
                                     isCurrentSqlFavorite
-                                        ? 'bg-amber-50 border-amber-200 text-amber-700'
-                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                                 }`}
                                 title={isCurrentSqlFavorite ? t('datainspector.unpin_query') : t('datainspector.pin_query')}
                             >
@@ -2419,7 +2419,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <div className="font-semibold uppercase tracking-wider text-slate-500">
                             {t('datainspector.profiling_settings', 'Profiling Settings')}
                         </div>
-                        <div className="flex items-center gap-2 text-slate-500">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                             <label className="flex items-center gap-1">
                                 <span>{t('datainspector.null_threshold')}</span>
                                 <input
@@ -2432,7 +2432,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         if (Number.isNaN(value)) return;
                                         setProfilingThresholds({ ...profilingThresholds, nullRate: Math.max(0, Math.min(100, value)) });
                                     }}
-                                    className="w-14 px-1.5 py-0.5 border border-slate-200 rounded bg-white text-slate-700"
+                                    className="w-14 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
                                 />
                                 <span>%</span>
                             </label>
@@ -2448,13 +2448,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         if (Number.isNaN(value)) return;
                                         setProfilingThresholds({ ...profilingThresholds, cardinalityRate: Math.max(0, Math.min(100, value)) });
                                     }}
-                                    className="w-14 px-1.5 py-0.5 border border-slate-200 rounded bg-white text-slate-700"
+                                    className="w-14 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
                                 />
                                 <span>%</span>
                             </label>
                             <button
                                 onClick={() => setProfilingThresholds({ nullRate: 30, cardinalityRate: 95 })}
-                                className="px-2 py-0.5 rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                className="px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                             >
                                 {t('datainspector.reset_thresholds')}
                             </button>
@@ -2467,7 +2467,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         <div className="flex items-center gap-1.5">
                             <button
                                 onClick={() => openTableToolsTab('columns')}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                 title={t('datainspector.table_tools_tab_columns', 'Columns')}
                                 aria-label={t('datainspector.table_tools_tab_columns', 'Columns')}
                             >
@@ -2475,7 +2475,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </button>
                             <button
                                 onClick={() => openTableToolsTab('filters')}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                 title={t('datainspector.table_tools_tab_filters', 'Filters')}
                                 aria-label={t('datainspector.table_tools_tab_filters', 'Filters')}
                             >
@@ -2483,7 +2483,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </button>
                             <button
                                 onClick={() => openTableToolsTab('actions')}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                 title={t('datainspector.table_tools_tab_actions', 'Actions')}
                                 aria-label={t('datainspector.table_tools_tab_actions', 'Actions')}
                             >
@@ -2492,7 +2492,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             <button
                                 onClick={openCreateIndexModal}
                                 disabled={selectedSourceType !== 'table'}
-                                className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 flex items-center gap-1"
+                                className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 flex items-center gap-1"
                                 title={selectedSourceType !== 'table'
                                     ? t('datasource.view_type', 'VIEW')
                                     : t('datasource.create_index_title', 'Create index')}
@@ -2502,7 +2502,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </button>
                         </div>
                         <div className="flex items-center gap-2 justify-end">
-                            <span className="text-slate-500 font-semibold uppercase tracking-wider">
+                            <span className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
                                 {t('datainspector.saved_views', 'Saved Views')}
                             </span>
                             <select
@@ -2514,7 +2514,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                     const preset = savedViews.find(v => v.id === nextId);
                                     if (preset) applyViewPreset(preset);
                                 }}
-                                className="h-7 px-2 border border-slate-200 rounded bg-white text-slate-600 text-[11px] outline-none min-w-[180px]"
+                                className="h-7 px-2 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] outline-none min-w-[180px]"
                             >
                                 <option value="">{t('datainspector.select_view')}</option>
                                 {savedViews.map(view => (
@@ -2523,14 +2523,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                             </select>
                             <button
                                 onClick={handleSaveCurrentView}
-                                className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                             >
                                 {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
                             </button>
                             <button
                                 onClick={handleDeleteCurrentView}
                                 disabled={!activeViewId}
-                                className="h-7 px-2 text-[11px] rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
+                                className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 disabled:opacity-40"
                             >
                                 {t('datainspector.delete_view')}
                             </button>
@@ -2673,7 +2673,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         setPageSize(Number(e.target.value));
                                         setCurrentPage(1);
                                     }}
-                                    className="h-7 px-2 border border-slate-200 rounded bg-white text-slate-600 text-[10px] outline-none"
+                                    className="h-7 px-2 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] outline-none"
                                     title={t('datainspector.page_size')}
                                 >
                                     {[50, 100, 250, 500].map(size => (
@@ -2691,11 +2691,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 <button
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                     disabled={currentPage <= 1}
-                                    className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
+                                    className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 disabled:opacity-40"
                                 >
                                     {t('datainspector.prev_page')}
                                 </button>
-                                <span className="text-[10px] font-semibold text-slate-500">
+                                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-300">
                                     {t('datainspector.page_info', {
                                         page: currentPage,
                                         pages: totalPages,
@@ -2705,7 +2705,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 <button
                                     onClick={() => setCurrentPage(p => p + 1)}
                                     disabled={currentPage >= totalPages}
-                                    className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-40"
+                                    className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 disabled:opacity-40"
                                 >
                                     {t('datainspector.next_page')}
                                 </button>
@@ -2717,7 +2717,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                         value={pageJumpInput}
                                         onChange={(e) => setPageJumpInput(e.target.value)}
                                         placeholder={t('datainspector.page_number_placeholder')}
-                                        className="w-16 px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 text-[10px] outline-none"
+                                        className="w-16 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] outline-none"
                                     />
                                     <button
                                         onClick={() => {
@@ -2727,7 +2727,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                             setCurrentPage(target);
                                             setPageJumpInput('');
                                         }}
-                                        className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 text-[10px]"
+                                        className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px]"
                                     >
                                         {t('datainspector.go')}
                                     </button>

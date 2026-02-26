@@ -344,7 +344,7 @@ export const CustomDashboardView: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={togglePresentationMode}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                            className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-transparent hover:border-blue-100 dark:hover:border-blue-800/40"
                             title={t('dashboard.presentation_mode')}
                         >
                             <Maximize2 className="w-5 h-5" />
@@ -352,14 +352,14 @@ export const CustomDashboardView: React.FC = () => {
                         <button
                             onClick={() => exportToPdf('dashboard-grid', `dashboard-${activeDashboard?.name || 'export'}`)}
                             disabled={isExporting}
-                            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
                         >
                             <Download className="w-4 h-4" />
                             {isExporting ? t('common.exporting') : t('common.export_pdf')}
                         </button>
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`p-2 rounded-lg transition-colors border ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50 border-transparent hover:border-blue-100'}`}
+                            className={`p-2 rounded-lg transition-colors border ${showFilters ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-transparent hover:border-blue-100 dark:hover:border-blue-800/40'}`}
                             title={t('querybuilder.filter')}
                         >
                             <Filter className="w-5 h-5" />
@@ -385,37 +385,37 @@ export const CustomDashboardView: React.FC = () => {
                 onOpenChange: setShowDashboardTools,
                 content: (
                     <div className="h-full min-h-0 flex flex-col gap-4">
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 flex-shrink-0">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 flex-shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setDashboardToolsTab('layout')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${dashboardToolsTab === 'layout' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${dashboardToolsTab === 'layout' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                                 {t('dashboard.tools_tab_layout', 'Layout')}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setDashboardToolsTab('filters')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${dashboardToolsTab === 'filters' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${dashboardToolsTab === 'filters' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                                 {t('dashboard.tools_tab_filters', 'Filters')}
                             </button>
                         </div>
 
                         {!activeDashboard ? (
-                            <div className="text-xs text-slate-500">{t('common.no_data')}</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">{t('common.no_data')}</div>
                         ) : dashboardToolsTab === 'layout' ? (
                             <div className="flex-1 min-h-0 flex flex-col gap-2">
-                                <p className="text-xs text-slate-500">{t('dashboard.tools_layout_hint', 'Reorder widgets and remove items without leaving the dashboard.')}</p>
-                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.tools_layout_hint', 'Reorder widgets and remove items without leaving the dashboard.')}</p>
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                     {activeDashboard.layout.length === 0 ? (
-                                        <div className="p-3 text-xs text-slate-400">{t('dashboard.no_reports')}</div>
+                                        <div className="p-3 text-xs text-slate-400 dark:text-slate-500">{t('dashboard.no_reports')}</div>
                                     ) : (
                                         activeDashboard.layout.map((widget, index) => (
                                             <div key={`${widget.type}:${widget.id}`} className="p-3 flex items-center justify-between gap-2">
                                                 <div className="min-w-0">
-                                                    <div className="text-xs font-semibold text-slate-700 truncate">{getWidgetLabel(widget)}</div>
-                                                    <div className="text-[10px] text-slate-400 uppercase">{widget.type}</div>
+                                                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{getWidgetLabel(widget)}</div>
+                                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase">{widget.type}</div>
                                                 </div>
                                                 {!isReadOnly && (
                                                     <div className="flex items-center gap-1">
@@ -423,7 +423,7 @@ export const CustomDashboardView: React.FC = () => {
                                                             type="button"
                                                             onClick={() => { void moveWidgetInLayout(widget.id, -1); }}
                                                             disabled={index === 0}
-                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40"
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40"
                                                             title={t('dashboard.tools_move_up', 'Move up')}
                                                         >
                                                             <ArrowUp className="w-3.5 h-3.5" />
@@ -432,7 +432,7 @@ export const CustomDashboardView: React.FC = () => {
                                                             type="button"
                                                             onClick={() => { void moveWidgetInLayout(widget.id, 1); }}
                                                             disabled={index === activeDashboard.layout.length - 1}
-                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40"
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40"
                                                             title={t('dashboard.tools_move_down', 'Move down')}
                                                         >
                                                             <ArrowDown className="w-3.5 h-3.5" />
@@ -440,7 +440,7 @@ export const CustomDashboardView: React.FC = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => { void removeFromDashboard(widget.id); }}
-                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700"
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-300"
                                                             title={t('common.remove')}
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
@@ -455,12 +455,12 @@ export const CustomDashboardView: React.FC = () => {
                         ) : (
                             <div className="flex-1 min-h-0 flex flex-col gap-2">
                                 <div className="flex items-center justify-between gap-2">
-                                    <p className="text-xs text-slate-500">{t('dashboard.tools_filters_hint', 'Manage global dashboard filters in one place.')}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.tools_filters_hint', 'Manage global dashboard filters in one place.')}</p>
                                     {!isReadOnly && (
                                         <button
                                             type="button"
                                             onClick={() => { void addDashboardFilter(''); }}
-                                            className="h-7 px-2 rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold"
+                                            className="h-7 px-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[11px] font-semibold"
                                         >
                                             {t('dashboard.add_filter')}
                                         </button>
@@ -471,15 +471,15 @@ export const CustomDashboardView: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => { void clearDashboardFilters(); }}
-                                            className="text-[11px] text-slate-500 hover:text-slate-700"
+                                            className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                                         >
                                             {t('dashboard.tools_clear_filters', 'Clear filters')}
                                         </button>
                                     </div>
                                 )}
-                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                     {(activeDashboard.filters || []).length === 0 ? (
-                                        <div className="p-3 text-xs text-slate-400">{t('dashboard.no_filters')}</div>
+                                        <div className="p-3 text-xs text-slate-400 dark:text-slate-500">{t('dashboard.no_filters')}</div>
                                     ) : (
                                         (activeDashboard.filters || []).map((f, i) => (
                                             <div key={i} className="p-3 space-y-2">
@@ -488,13 +488,13 @@ export const CustomDashboardView: React.FC = () => {
                                                     value={f.column}
                                                     onChange={(e) => { void updateDashboardFilter(i, { column: e.target.value }); }}
                                                     placeholder={t('dashboard.filter_column')}
-                                                    className="w-full h-8 px-2 border border-slate-200 rounded bg-white text-xs outline-none"
+                                                    className="w-full h-8 px-2 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none"
                                                 />
                                                 <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                                                     <select
                                                         value={f.operator}
                                                         onChange={(e) => { void updateDashboardFilter(i, { operator: e.target.value }); }}
-                                                        className="h-8 px-2 border border-slate-200 rounded bg-white text-xs outline-none"
+                                                        className="h-8 px-2 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none"
                                                     >
                                                         <option value="=">=</option>
                                                         <option value="!=">!=</option>
@@ -507,13 +507,13 @@ export const CustomDashboardView: React.FC = () => {
                                                         value={f.value}
                                                         onChange={(e) => { void updateDashboardFilter(i, { value: e.target.value }); }}
                                                         placeholder={t('dashboard.filter_value')}
-                                                        className="h-8 px-2 border border-slate-200 rounded bg-white text-xs outline-none"
+                                                        className="h-8 px-2 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none"
                                                     />
                                                     {!isReadOnly && (
                                                         <button
                                                             type="button"
                                                             onClick={() => { void removeDashboardFilter(i); }}
-                                                            className="h-8 w-8 inline-flex items-center justify-center rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700"
+                                                            className="h-8 w-8 inline-flex items-center justify-center rounded border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-300"
                                                             title={t('common.remove')}
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
