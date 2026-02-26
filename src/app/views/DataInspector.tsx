@@ -6,7 +6,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable, type Column, type DataTableSortConfig } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
-import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, ArrowRight, Pencil, Trash2, FolderOpen, ChevronDown, ListChecks, Eraser, Table2, Filter, SlidersHorizontal } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Pencil, Trash2, FolderOpen, ChevronDown, ListChecks, Eraser, Table2, Filter, SlidersHorizontal, Plus } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow } from '../../types';
@@ -42,6 +42,20 @@ interface IndexSuggestion {
     reason: string;
     sql: string;
     score: number;
+}
+
+interface AssistantFilter {
+    id: string;
+    connector: 'AND' | 'OR';
+    column: string;
+    operator: '=' | '!=' | '>' | '>=' | '<' | '<=' | 'LIKE' | 'NOT LIKE' | 'IS NULL' | 'IS NOT NULL';
+    value: string;
+}
+
+interface AssistantSort {
+    id: string;
+    column: string;
+    direction: 'ASC' | 'DESC';
 }
 
 const SQL_KEYWORDS = [
@@ -80,15 +94,33 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         'data_inspector_sql_manager_panels_v1',
         { templates: true, manager: true, recent: true }
     );
+    const [assistantPanels, setAssistantPanels] = useLocalStorage<{
+        table: boolean;
+        columns: boolean;
+        aggregation: boolean;
+        grouping: boolean;
+        filter: boolean;
+        sorting: boolean;
+        preview: boolean;
+    }>(
+        'data_inspector_sql_assistant_panels_v1',
+        { table: true, columns: true, aggregation: true, grouping: true, filter: true, sorting: true, preview: true }
+    );
     const [assistantTable, setAssistantTable] = useState('');
     const [assistantSelectedColumns, setAssistantSelectedColumns] = useState<string[]>([]);
     const [assistantWhereClause, setAssistantWhereClause] = useState('');
-    const [assistantOrderBy, setAssistantOrderBy] = useState('');
-    const [assistantOrderDir, setAssistantOrderDir] = useState<'ASC' | 'DESC'>('DESC');
+    const [assistantWhereConnector, setAssistantWhereConnector] = useState<'AND' | 'OR'>('AND');
+    const [assistantColumnSearch, setAssistantColumnSearch] = useState('');
+    const [assistantFilters, setAssistantFilters] = useState<AssistantFilter[]>([
+        { id: 'f0', connector: 'AND', column: '', operator: '=', value: '' }
+    ]);
+    const [assistantSorts, setAssistantSorts] = useState<AssistantSort[]>([
+        { id: 's0', column: '', direction: 'DESC' }
+    ]);
     const [assistantLimit, setAssistantLimit] = useState(100);
     const [assistantAggregation, setAssistantAggregation] = useState<'none' | 'count' | 'sum' | 'avg' | 'min' | 'max'>('none');
     const [assistantAggregationColumn, setAssistantAggregationColumn] = useState('');
-    const [assistantGroupBy, setAssistantGroupBy] = useState('');
+    const [assistantGroupByColumns, setAssistantGroupByColumns] = useState<string[]>([]);
     const [assistantMetricAlias, setAssistantMetricAlias] = useState('metric_value');
     const [explainRows, setExplainRows] = useState<DbRow[]>([]);
     const [explainError, setExplainError] = useState('');
@@ -761,19 +793,30 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             .map(col => col.name),
         [assistantTableSchema]
     );
+    const filteredAssistantColumns = React.useMemo(() => {
+        const query = assistantColumnSearch.trim().toLowerCase();
+        if (!query) return assistantColumns;
+        return assistantColumns.filter(col => col.toLowerCase().includes(query));
+    }, [assistantColumnSearch, assistantColumns]);
+    const isAggregationActive = assistantAggregation !== 'none';
 
     useEffect(() => {
         setAssistantSelectedColumns(prev => prev.filter(col => assistantColumns.includes(col)));
         if (assistantAggregation !== 'none' && assistantAggregation !== 'count' && assistantAggregationColumn && !assistantColumns.includes(assistantAggregationColumn)) {
             setAssistantAggregationColumn('');
         }
-        if (assistantOrderBy && !assistantColumns.includes(assistantOrderBy) && assistantOrderBy !== assistantMetricAlias) {
-            setAssistantOrderBy('');
-        }
-        if (assistantGroupBy && !assistantColumns.includes(assistantGroupBy)) {
-            setAssistantGroupBy('');
-        }
-    }, [assistantAggregation, assistantAggregationColumn, assistantColumns, assistantGroupBy, assistantMetricAlias, assistantOrderBy]);
+        setAssistantGroupByColumns(prev => prev.filter(col => assistantColumns.includes(col)));
+        setAssistantFilters(prev => prev.map(filter => (
+            filter.column && !assistantColumns.includes(filter.column)
+                ? { ...filter, column: '' }
+                : filter
+        )));
+        setAssistantSorts(prev => prev.map(sort => (
+            sort.column && !assistantColumns.includes(sort.column) && sort.column !== assistantMetricAlias
+                ? { ...sort, column: '' }
+                : sort
+        )));
+    }, [assistantAggregation, assistantAggregationColumn, assistantColumns, assistantMetricAlias]);
 
     useEffect(() => {
         if (assistantAggregation === 'none' || assistantAggregation === 'count') return;
@@ -785,9 +828,86 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         }
     }, [assistantAggregation, assistantAggregationColumn, assistantColumns, assistantNumericColumns]);
 
+    const resetAssistantBuilder = useCallback(() => {
+        setAssistantSelectedColumns([]);
+        setAssistantColumnSearch('');
+        setAssistantFilters([{ id: 'f0', connector: 'AND', column: '', operator: '=', value: '' }]);
+        setAssistantWhereClause('');
+        setAssistantWhereConnector('AND');
+        setAssistantSorts([{ id: 's0', column: '', direction: 'DESC' }]);
+        setAssistantLimit(100);
+        setAssistantAggregation('none');
+        setAssistantAggregationColumn('');
+        setAssistantGroupByColumns([]);
+        setAssistantMetricAlias('metric_value');
+    }, []);
+
+    const addAssistantFilter = useCallback(() => {
+        const id = `f_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        setAssistantFilters(prev => [...prev, { id, connector: 'AND', column: '', operator: '=', value: '' }]);
+    }, []);
+
+    const updateAssistantFilter = useCallback((id: string, patch: Partial<AssistantFilter>) => {
+        setAssistantFilters(prev => prev.map(filter => (filter.id === id ? { ...filter, ...patch } : filter)));
+    }, []);
+
+    const removeAssistantFilter = useCallback((id: string) => {
+        setAssistantFilters(prev => {
+            const next = prev.filter(filter => filter.id !== id);
+            return next.length > 0 ? next : [{ id: 'f0', connector: 'AND', column: '', operator: '=', value: '' }];
+        });
+    }, []);
+    const moveAssistantFilter = useCallback((id: string, direction: 'up' | 'down') => {
+        setAssistantFilters(prev => {
+            const index = prev.findIndex(filter => filter.id === id);
+            if (index < 0) return prev;
+            const target = direction === 'up' ? index - 1 : index + 1;
+            if (target < 0 || target >= prev.length) return prev;
+            const next = [...prev];
+            const [item] = next.splice(index, 1);
+            next.splice(target, 0, item);
+            return next;
+        });
+    }, []);
+
+    const addAssistantSort = useCallback(() => {
+        const id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        setAssistantSorts(prev => [...prev, { id, column: '', direction: 'DESC' }]);
+    }, []);
+
+    const updateAssistantSort = useCallback((id: string, patch: Partial<AssistantSort>) => {
+        setAssistantSorts(prev => prev.map(sort => (sort.id === id ? { ...sort, ...patch } : sort)));
+    }, []);
+
+    const removeAssistantSort = useCallback((id: string) => {
+        setAssistantSorts(prev => {
+            const next = prev.filter(sort => sort.id !== id);
+            return next.length > 0 ? next : [{ id: 's0', column: '', direction: 'DESC' }];
+        });
+    }, []);
+    const moveAssistantSort = useCallback((id: string, direction: 'up' | 'down') => {
+        setAssistantSorts(prev => {
+            const index = prev.findIndex(sort => sort.id === id);
+            if (index < 0) return prev;
+            const target = direction === 'up' ? index - 1 : index + 1;
+            if (target < 0 || target >= prev.length) return prev;
+            const next = [...prev];
+            const [item] = next.splice(index, 1);
+            next.splice(target, 0, item);
+            return next;
+        });
+    }, []);
+
     const buildAssistantSql = useCallback(() => {
         if (!assistantTable) return '';
         const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
+        const toSqlValue = (raw: string) => {
+            const value = raw.trim();
+            if (!value) return '';
+            if (/^'.*'$|^".*"$/.test(value)) return value;
+            if (/^-?\d+(\.\d+)?$/.test(value)) return value;
+            return `'${value.replace(/'/g, "''")}'`;
+        };
         const from = `FROM ${quote(assistantTable)}`;
         const aggFn = assistantAggregation.toUpperCase();
         const metricExpr = assistantAggregation === 'count'
@@ -800,17 +920,54 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             const cols = assistantSelectedColumns.length > 0 ? assistantSelectedColumns.map(quote).join(', ') : '*';
             selectClause = `SELECT ${cols}`;
         } else {
-            const dims = assistantGroupBy ? [quote(assistantGroupBy)] : [];
+            const dims = assistantGroupByColumns.map(quote);
             groupByParts.push(...dims);
             const selectParts = [...dims, metricExpr];
             selectClause = `SELECT ${selectParts.join(', ')}`;
         }
 
-        const where = assistantWhereClause.trim() ? `WHERE ${assistantWhereClause.trim()}` : '';
+        const filterExpr = (() => {
+            const validFilters = assistantFilters
+                .map(filter => {
+                    if (!filter.column.trim() || !filter.operator.trim()) return null;
+                    const col = quote(filter.column.trim());
+                    if (filter.operator === 'IS NULL' || filter.operator === 'IS NOT NULL') {
+                        return { connector: filter.connector, expr: `${col} ${filter.operator}` };
+                    }
+                    const value = toSqlValue(filter.value);
+                    if (!value) return null;
+                    return { connector: filter.connector, expr: `${col} ${filter.operator} ${value}` };
+                })
+                .filter((item): item is { connector: 'AND' | 'OR'; expr: string } => Boolean(item));
+
+            return validFilters.reduce((sql, item, index) => {
+                if (index === 0) return item.expr;
+                return `${sql} ${item.connector} ${item.expr}`;
+            }, '');
+        })();
+        const customWhere = assistantWhereClause.trim();
+        const where = (() => {
+            if (filterExpr && customWhere) {
+                return `WHERE (${filterExpr}) ${assistantWhereConnector} (${customWhere})`;
+            }
+            if (filterExpr) return `WHERE ${filterExpr}`;
+            if (customWhere) return `WHERE ${customWhere}`;
+            return '';
+        })();
         const groupBy = groupByParts.length > 0 ? `GROUP BY ${groupByParts.join(', ')}` : '';
-        const orderTarget = assistantOrderBy.trim()
-            || (assistantAggregation !== 'none' ? quote(assistantMetricAlias || 'metric_value') : '');
-        const orderBy = orderTarget ? `ORDER BY ${orderTarget} ${assistantOrderDir}` : '';
+        const sortParts = assistantSorts
+            .filter(sort => sort.column.trim())
+            .map(sort => {
+                const target = sort.column === assistantMetricAlias
+                    ? quote(assistantMetricAlias || 'metric_value')
+                    : quote(sort.column);
+                return `${target} ${sort.direction}`;
+            });
+        const fallbackSort = assistantAggregation !== 'none'
+            ? [`${quote(assistantMetricAlias || 'metric_value')} DESC`]
+            : [];
+        const orderByParts = sortParts.length > 0 ? sortParts : fallbackSort;
+        const orderBy = orderByParts.length > 0 ? `ORDER BY ${orderByParts.join(', ')}` : '';
         const limitValue = Math.max(1, Math.min(100000, Math.floor(Number(assistantLimit) || 100)));
         const limit = `LIMIT ${limitValue}`;
 
@@ -818,37 +975,31 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     }, [
         assistantAggregation,
         assistantAggregationColumn,
-        assistantGroupBy,
+        assistantFilters,
+        assistantGroupByColumns,
         assistantLimit,
         assistantMetricAlias,
-        assistantOrderBy,
-        assistantOrderDir,
+        assistantSorts,
         assistantSelectedColumns,
         assistantTable,
+        assistantWhereConnector,
         assistantWhereClause
     ]);
 
     const assistantSqlPreview = buildAssistantSql();
 
-    const applyAssistantSql = useCallback(async (mode: 'replace' | 'append' | 'run') => {
+    const applyAssistantSql = useCallback(async (mode: 'replace' | 'run') => {
         const sql = assistantSqlPreview.trim();
         if (!sql) return;
         setMode('sql');
-        if (mode === 'replace' || !inputSql.trim()) {
-            setInputSql(sql);
-            setSqlCursor(sql.length);
-        } else {
-            const base = inputSql.trim().replace(/;?\s*$/, ';');
-            const merged = `${base}\n${sql}`;
-            setInputSql(merged);
-            setSqlCursor(merged.length);
-        }
+        setInputSql(sql);
+        setSqlCursor(sql.length);
         setSqlOutputView('result');
         setShowSqlAssist(false);
         if (mode === 'run') {
             await executeSqlText(sql);
         }
-    }, [assistantSqlPreview, executeSqlText, inputSql, setShowSqlAssist]);
+    }, [assistantSqlPreview, executeSqlText, setShowSqlAssist]);
 
     const currentSqlNormalized = normalizeSql(inputSql);
     const currentSqlStatement = sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === currentSqlNormalized);
@@ -897,6 +1048,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             [panel]: !prev[panel]
         }));
     }, [setManagerPanels]);
+    const toggleAssistantPanel = useCallback((panel: 'table' | 'columns' | 'aggregation' | 'grouping' | 'filter' | 'sorting' | 'preview') => {
+        setAssistantPanels(prev => ({
+            ...prev,
+            [panel]: !prev[panel]
+        }));
+    }, [setAssistantPanels]);
 
     const handleDeleteSqlStatement = useCallback(async (statement: SqlStatementRecord) => {
         if (!(await appDialog.confirm(t('datainspector.custom_template_delete_confirm')))) return;
@@ -1940,166 +2097,432 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                         </div>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.assistant_hint', 'Build SQL by selecting table, columns and optional aggregation.')}</p>
-                            <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_table', 'Table')}</label>
-                                <select
-                                    value={assistantTable}
-                                    onChange={(e) => setAssistantTable(e.target.value)}
-                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                        <div className="h-full min-h-0 flex flex-col">
+                            <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.assistant_hint', 'Build SQL by selecting table, columns and optional aggregation.')}</p>
+                                <button
+                                    type="button"
+                                    onClick={resetAssistantBuilder}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
                                 >
-                                    {tables.map(table => (
-                                        <option key={table} value={table}>{table}</option>
-                                    ))}
-                                </select>
+                                    <Eraser className="w-3 h-3" />
+                                    {t('datainspector.assistant_reset', 'Reset')}
+                                </button>
                             </div>
-
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_columns', 'Columns')}</label>
+                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
                                     <button
                                         type="button"
-                                        onClick={() => setAssistantSelectedColumns(assistantColumns)}
-                                        className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                        onClick={() => toggleAssistantPanel('table')}
+                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                                     >
-                                        {t('datainspector.assistant_select_all', 'Select all')}
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_table', 'Table')}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.table ? 'rotate-180' : ''}`} />
                                     </button>
+                                    {assistantPanels.table && (
+                                    <select
+                                        value={assistantTable}
+                                        onChange={(e) => setAssistantTable(e.target.value)}
+                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        {tables.map(table => (
+                                            <option key={table} value={table}>{table}</option>
+                                        ))}
+                                    </select>
+                                    )}
                                 </div>
-                                <div className="max-h-28 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
-                                    {assistantColumns.map(col => (
-                                        <label key={col} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+
+                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAssistantPanel('columns')}
+                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                    >
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_columns', 'Columns')}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.columns ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {assistantPanels.columns && (
+                                    <>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setAssistantSelectedColumns(assistantColumns)}
+                                                className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                            >
+                                                {t('datainspector.assistant_select_all', 'Select all')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAssistantSelectedColumns([])}
+                                                className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                            >
+                                                {t('datainspector.assistant_clear_all', 'Clear')}
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={assistantColumnSearch}
+                                            onChange={(e) => setAssistantColumnSearch(e.target.value)}
+                                            placeholder={t('datainspector.assistant_column_search_placeholder', 'Search columns...')}
+                                            className="w-full h-8 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none"
+                                        />
+                                        <div className="max-h-28 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
+                                            {filteredAssistantColumns.map(col => (
+                                                <label key={col} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={assistantSelectedColumns.includes(col)}
+                                                        onChange={() => {
+                                                            setAssistantSelectedColumns(prev => (
+                                                                prev.includes(col) ? prev.filter(item => item !== col) : [...prev, col]
+                                                            ));
+                                                        }}
+                                                    />
+                                                    <span className="font-mono">{col}</span>
+                                                </label>
+                                            ))}
+                                            {filteredAssistantColumns.length === 0 && (
+                                                <p className="text-[11px] text-slate-400 dark:text-slate-500 px-1 py-0.5">{t('datainspector.sql_manager_no_results', 'No matches')}</p>
+                                            )}
+                                        </div>
+                                    </>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAssistantPanel('aggregation')}
+                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                    >
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation', 'Aggregation')}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.aggregation ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {assistantPanels.aggregation && (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation_function', 'Function')}</label>
+                                                <select
+                                                    value={assistantAggregation}
+                                                    onChange={(e) => setAssistantAggregation(e.target.value as 'none' | 'count' | 'sum' | 'avg' | 'min' | 'max')}
+                                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                                >
+                                                    <option value="none">{t('datainspector.assistant_none', 'None')}</option>
+                                                    <option value="count">COUNT</option>
+                                                    <option value="sum">SUM</option>
+                                                    <option value="avg">AVG</option>
+                                                    <option value="min">MIN</option>
+                                                    <option value="max">MAX</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation_field', 'Aggregation Field')}</label>
+                                                <select
+                                                    value={assistantAggregationColumn}
+                                                    disabled={assistantAggregation === 'none' || assistantAggregation === 'count'}
+                                                    onChange={(e) => setAssistantAggregationColumn(e.target.value)}
+                                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none disabled:opacity-40"
+                                                >
+                                                    <option value="">-</option>
+                                                    {assistantColumns.map(col => (
+                                                        <option key={col} value={col}>{col}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAssistantPanel('grouping')}
+                                        disabled={!isAggregationActive}
+                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_group_by', 'Group by')}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.grouping ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {!isAggregationActive ? (
+                                        <p className="text-[11px] text-slate-400 dark:text-slate-500 px-1 py-1">{t('datainspector.assistant_grouping_requires_aggregation', 'Enable aggregation to configure grouping.')}</p>
+                                    ) : assistantPanels.grouping && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_grouping_columns', 'Grouping Columns')}</label>
+                                            <div className="max-h-20 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
+                                                {assistantColumns.map(col => (
+                                                    <label key={col} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={assistantGroupByColumns.includes(col)}
+                                                            onChange={() => {
+                                                                setAssistantGroupByColumns(prev => (
+                                                                    prev.includes(col) ? prev.filter(item => item !== col) : [...prev, col]
+                                                                ));
+                                                            }}
+                                                        />
+                                                        <span className="font-mono">{col}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_metric_alias', 'Metric Alias')}</label>
                                             <input
-                                                type="checkbox"
-                                                checked={assistantSelectedColumns.includes(col)}
-                                                onChange={() => {
-                                                    setAssistantSelectedColumns(prev => (
-                                                        prev.includes(col) ? prev.filter(item => item !== col) : [...prev, col]
-                                                    ));
-                                                }}
+                                                type="text"
+                                                value={assistantMetricAlias}
+                                                onChange={(e) => setAssistantMetricAlias(e.target.value)}
+                                                className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                             />
-                                            <span className="font-mono">{col}</span>
-                                        </label>
-                                    ))}
+                                        </div>
+                                    </div>
+                                    )}
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation', 'Aggregation')}</label>
-                                    <select
-                                        value={assistantAggregation}
-                                        onChange={(e) => setAssistantAggregation(e.target.value as 'none' | 'count' | 'sum' | 'avg' | 'min' | 'max')}
-                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAssistantPanel('filter')}
+                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                                     >
-                                        <option value="none">{t('datainspector.assistant_none', 'None')}</option>
-                                        <option value="count">COUNT</option>
-                                        <option value="sum">SUM</option>
-                                        <option value="avg">AVG</option>
-                                        <option value="min">MIN</option>
-                                        <option value="max">MAX</option>
-                                    </select>
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_filter', 'Filter')}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.filter ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {assistantPanels.filter && (
+                                    <>
+                                        <div className="flex items-center justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={addAssistantFilter}
+                                                className="h-7 px-2 inline-flex items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                                            >
+                                                <Plus className="w-3 h-3" />
+                                                {t('datainspector.assistant_add_filter', 'Add filter')}
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {assistantFilters.map((filter, index) => (
+                                                <div key={filter.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-2 bg-white/60 dark:bg-slate-900/40 space-y-2">
+                                                    <div className="grid grid-cols-[70px_minmax(0,1fr)] gap-2">
+                                                        {index > 0 ? (
+                                                            <select
+                                                                value={filter.connector}
+                                                                onChange={(e) => updateAssistantFilter(filter.id, { connector: e.target.value as 'AND' | 'OR' })}
+                                                                className="h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none"
+                                                            >
+                                                                <option value="AND">AND</option>
+                                                                <option value="OR">OR</option>
+                                                            </select>
+                                                        ) : (
+                                                            <div className="h-9 flex items-center text-[11px] font-semibold text-slate-400 dark:text-slate-500 px-1">WHERE</div>
+                                                        )}
+                                                        <select
+                                                            value={filter.column}
+                                                            onChange={(e) => updateAssistantFilter(filter.id, { column: e.target.value })}
+                                                            className="h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                                        >
+                                                            <option value="">{t('datainspector.assistant_sort_field', 'Field')}</option>
+                                                            {assistantColumns.map(col => (
+                                                                <option key={col} value={col}>{col}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="grid grid-cols-[110px_minmax(0,1fr)_auto] gap-2">
+                                                        <select
+                                                            value={filter.operator}
+                                                            onChange={(e) => updateAssistantFilter(filter.id, { operator: e.target.value as AssistantFilter['operator'] })}
+                                                            className="h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                                        >
+                                                            <option value="=">=</option>
+                                                            <option value="!=">!=</option>
+                                                            <option value=">">&gt;</option>
+                                                            <option value=">=">&gt;=</option>
+                                                            <option value="<">&lt;</option>
+                                                            <option value="<=">&lt;=</option>
+                                                            <option value="LIKE">LIKE</option>
+                                                            <option value="NOT LIKE">NOT LIKE</option>
+                                                            <option value="IS NULL">IS NULL</option>
+                                                            <option value="IS NOT NULL">IS NOT NULL</option>
+                                                        </select>
+                                                        <input
+                                                            type="text"
+                                                            value={filter.value}
+                                                            onChange={(e) => updateAssistantFilter(filter.id, { value: e.target.value })}
+                                                            placeholder={t('datainspector.assistant_filter_value', 'Value')}
+                                                            disabled={filter.operator === 'IS NULL' || filter.operator === 'IS NOT NULL'}
+                                                            className="h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none disabled:opacity-40"
+                                                        />
+                                                        <div className="h-9 flex items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => moveAssistantFilter(filter.id, 'up')}
+                                                                disabled={index === 0}
+                                                                className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                                title={t('common.move_up', 'Move up')}
+                                                            >
+                                                                <ArrowUp className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => moveAssistantFilter(filter.id, 'down')}
+                                                                disabled={index === assistantFilters.length - 1}
+                                                                className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                                title={t('common.move_down', 'Move down')}
+                                                            >
+                                                                <ArrowDown className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeAssistantFilter(filter.id)}
+                                                                className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                                                title={t('datainspector.assistant_clear_all', 'Clear')}
+                                                            >
+                                                                <Eraser className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_where', 'WHERE')}</label>
+                                                <select
+                                                    value={assistantWhereConnector}
+                                                    onChange={(e) => setAssistantWhereConnector(e.target.value as 'AND' | 'OR')}
+                                                    className="h-7 px-2 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-[11px] text-slate-700 dark:text-slate-200 outline-none"
+                                                    title={t('datainspector.assistant_where_connector', 'Join with filters')}
+                                                >
+                                                    <option value="AND">AND</option>
+                                                    <option value="OR">OR</option>
+                                                </select>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={assistantWhereClause}
+                                                onChange={(e) => setAssistantWhereClause(e.target.value)}
+                                                placeholder={t('datainspector.assistant_where_placeholder', "status = 'active'")}
+                                                className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                            />
+                                        </div>
+                                    </>
+                                    )}
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation_field', 'Aggregation Field')}</label>
-                                    <select
-                                        value={assistantAggregationColumn}
-                                        disabled={assistantAggregation === 'none' || assistantAggregation === 'count'}
-                                        onChange={(e) => setAssistantAggregationColumn(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none disabled:opacity-40"
-                                    >
-                                        <option value="">-</option>
-                                        {assistantColumns.map(col => (
-                                            <option key={col} value={col}>{col}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_group_by', 'Group by')}</label>
-                                    <select
-                                        value={assistantGroupBy}
-                                        onChange={(e) => setAssistantGroupBy(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAssistantPanel('sorting')}
+                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                                     >
-                                        <option value="">{t('datainspector.assistant_none', 'None')}</option>
-                                        {assistantColumns.map(col => (
-                                            <option key={col} value={col}>{col}</option>
-                                        ))}
-                                    </select>
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_order_by', 'Order by')}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.sorting ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {assistantPanels.sorting && (
+                                    <>
+                                        <div className="flex items-center justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={addAssistantSort}
+                                                className="h-7 px-2 inline-flex items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                                            >
+                                                <Plus className="w-3 h-3" />
+                                                {t('datainspector.assistant_add_sort', 'Add sort')}
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {assistantSorts.map((sort, index) => (
+                                                <div key={sort.id} className="grid grid-cols-[minmax(0,1fr)_110px_auto] gap-2">
+                                                    <select
+                                                        value={sort.column}
+                                                        onChange={(e) => updateAssistantSort(sort.id, { column: e.target.value })}
+                                                        className="h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                                    >
+                                                        <option value="">{t('datainspector.assistant_auto', 'Auto')}</option>
+                                                        {assistantAggregation !== 'none' && (
+                                                            <option value={assistantMetricAlias || 'metric_value'}>{assistantMetricAlias || 'metric_value'}</option>
+                                                        )}
+                                                        {assistantColumns.map(col => (
+                                                            <option key={col} value={col}>{col}</option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        value={sort.direction}
+                                                        onChange={(e) => updateAssistantSort(sort.id, { direction: e.target.value as 'ASC' | 'DESC' })}
+                                                        className="h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                                    >
+                                                        <option value="DESC">DESC</option>
+                                                        <option value="ASC">ASC</option>
+                                                    </select>
+                                                    <div className="h-9 flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => moveAssistantSort(sort.id, 'up')}
+                                                            disabled={index === 0}
+                                                            className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                            title={t('common.move_up', 'Move up')}
+                                                        >
+                                                            <ArrowUp className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => moveAssistantSort(sort.id, 'down')}
+                                                            disabled={index === assistantSorts.length - 1}
+                                                            className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                            title={t('common.move_down', 'Move down')}
+                                                        >
+                                                            <ArrowDown className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeAssistantSort(sort.id)}
+                                                            className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                                            title={t('datainspector.assistant_clear_all', 'Clear')}
+                                                        >
+                                                            <Eraser className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_limit', 'Limit')}</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={100000}
+                                                value={assistantLimit}
+                                                onChange={(e) => setAssistantLimit(Number(e.target.value))}
+                                                className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                            />
+                                        </div>
+                                    </>
+                                    )}
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_metric_alias', 'Metric Alias')}</label>
-                                    <input
-                                        type="text"
-                                        value={assistantMetricAlias}
-                                        onChange={(e) => setAssistantMetricAlias(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+
+                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAssistantPanel('preview')}
+                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                    >
+                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_generated_sql', 'Generated SQL')}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.preview ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {assistantPanels.preview && (
+                                    <textarea
+                                        readOnly
+                                        value={assistantSqlPreview}
+                                        className="w-full h-32 p-2 font-mono text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200"
                                     />
+                                    )}
                                 </div>
+
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_where', 'WHERE')}</label>
-                                <input
-                                    type="text"
-                                    value={assistantWhereClause}
-                                    onChange={(e) => setAssistantWhereClause(e.target.value)}
-                                    placeholder={t('datainspector.assistant_where_placeholder', "status = 'active'")}
-                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2">
-                                <div className="space-y-1 col-span-2">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_order_by', 'Order by')}</label>
-                                    <select
-                                        value={assistantOrderBy}
-                                        onChange={(e) => setAssistantOrderBy(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
-                                    >
-                                        <option value="">{t('datainspector.assistant_auto', 'Auto')}</option>
-                                        {assistantColumns.map(col => (
-                                            <option key={col} value={col}>{col}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_direction', 'Direction')}</label>
-                                    <select
-                                        value={assistantOrderDir}
-                                        onChange={(e) => setAssistantOrderDir(e.target.value as 'ASC' | 'DESC')}
-                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
-                                    >
-                                        <option value="DESC">DESC</option>
-                                        <option value="ASC">ASC</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_limit', 'Limit')}</label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={100000}
-                                    value={assistantLimit}
-                                    onChange={(e) => setAssistantLimit(Number(e.target.value))}
-                                    className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_generated_sql', 'Generated SQL')}</label>
-                                <textarea
-                                    readOnly
-                                    value={assistantSqlPreview}
-                                    className="w-full min-h-36 p-2 font-mono text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200"
-                                />
-                            </div>
-
+                            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     type="button"
@@ -2110,18 +2533,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => { void applyAssistantSql('append'); }}
-                                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
-                                >
-                                    {t('datainspector.assistant_append', 'Append')}
-                                </button>
-                                <button
-                                    type="button"
                                     onClick={() => { void applyAssistantSql('run'); }}
                                     className="px-3 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs hover:bg-blue-100 dark:hover:bg-blue-900/30"
                                 >
                                     {t('datainspector.run_sql')}
                                 </button>
+                            </div>
                             </div>
                         </div>
                     )}
