@@ -80,6 +80,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const [sqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
     const [sqlLibrarySearch, setSqlLibrarySearch] = useState('');
+    const [lastSavedSqlTemplateName, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
     const [sqlAssistTab, setSqlAssistTab] = useState<'manager' | 'assistant'>('manager');
     const [showTableTools, setShowTableTools] = useLocalStorage<boolean>('data_inspector_table_tools_open', false);
     const [tableToolsTab, setTableToolsTab] = useLocalStorage<'columns' | 'filters' | 'actions'>(
@@ -463,7 +464,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         const trimmedSql = inputSql.trim();
         if (!trimmedSql) return;
 
-        const suggestedName = `${selectedTable || 'Query'} Template`;
+        const normalized = normalizeSql(trimmedSql);
+        const matchingStatement = sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === normalized);
+        const suggestedName = matchingStatement?.name || lastSavedSqlTemplateName || `${selectedTable || 'Query'} Template`;
         const name = (await appDialog.prompt(t('datainspector.custom_template_prompt'), { defaultValue: suggestedName }))?.trim();
         if (!name) return;
 
@@ -477,6 +480,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             scope: SQL_LIBRARY_SCOPE,
             is_favorite: existing ? Number(existing.is_favorite) === 1 : false
         });
+        setLastSavedSqlTemplateName(name);
         await loadSqlStatements();
     };
 
