@@ -502,14 +502,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                     <select
                                         value={selectedTable}
                                         onChange={e => setSelectedTable(e.target.value)}
-                                        className="w-full md:w-1/2 p-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full md:w-1/2 p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="" disabled>{t('datasource.select_target_table')}</option>
                                         {tables?.filter((t: string) => !isSystemTable(t)).map((t: string) => (
                                             <option key={t} value={t}>{t}</option>
                                         ))}
                                     </select>
-                                    <button onClick={() => refreshTables()} className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 rounded-lg">
+                                    <button onClick={() => refreshTables()} className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg">
                                         <RefreshCw className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -549,20 +549,20 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                             </div>
 
                             {userTables.length === 0 ? (
-                                <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-                                    <p className="text-slate-400 text-sm">{t('datasource.no_user_tables')}</p>
+                                <div className="p-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/40">
+                                    <p className="text-slate-400 dark:text-slate-500 text-sm">{t('datasource.no_user_tables')}</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {userTables.map((t_name: string) => (
-                                        <div key={t_name} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between group">
+                                        <div key={t_name} className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between group">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-white rounded-lg shadow-sm text-blue-600">
+                                                <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600 dark:text-blue-400">
                                                     <TableIcon className="w-4 h-4" />
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="font-bold text-slate-700 truncate">{t_name}</span>
-                                                    <span className="text-[10px] text-slate-400">
+                                                    <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{t_name}</span>
+                                                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
                                                         {t('datasource.table_meta_rows', { count: tableMetaStats?.[t_name]?.rows ?? 0 })}
                                                         {' • '}
                                                         {t('datasource.table_meta_indexes', { count: tableMetaStats?.[t_name]?.indexes ?? 0 })}
@@ -572,7 +572,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => { setSelectedTable(t_name); setIsSchemaOpen(true); }}
-                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
                                                     title={t('datasource.show_schema')}
                                                 >
                                                     <Info className="w-4 h-4" />
@@ -581,21 +581,21 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     <>
                                                         <button
                                                             onClick={() => { void openCreateIndexModal(t_name); }}
-                                                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors"
                                                             title={t('datasource.create_index_title', 'Index erstellen')}
                                                         >
                                                             <ListPlus className="w-4 h-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => { setSelectedTable(t_name); setActiveTab('import'); }}
-                                                            className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
                                                             title={t('datasource.append_data_short')}
                                                         >
                                                             <Upload className="w-4 h-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => handleDropTable(t_name)}
-                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                                                             title={t('common.delete')}
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -623,19 +623,19 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                             </div>
 
                             {userViews.length === 0 ? (
-                                <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-                                    <p className="text-slate-400 text-sm">{t('datasource.no_user_views', 'No views available.')}</p>
+                                <div className="p-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/40">
+                                    <p className="text-slate-400 dark:text-slate-500 text-sm">{t('datasource.no_user_views', 'No views available.')}</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {userViews.map((view) => (
-                                        <div key={view.name} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between group">
+                                        <div key={view.name} className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between group">
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
+                                                <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-indigo-600 dark:text-indigo-400">
                                                     <TableIcon className="w-4 h-4" />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <span className="font-bold text-slate-700 block truncate">{view.name}</span>
+                                                    <span className="font-bold text-slate-700 dark:text-slate-200 block truncate">{view.name}</span>
                                                     {viewMetaStats?.[view.name]?.valid === false ? (
                                                         <span
                                                             className="text-[10px] text-rose-500 block"
@@ -644,7 +644,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                             {t('datasource.view_invalid', 'Defekter View')}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-[10px] text-slate-400 block">
+                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
                                                             {t('datasource.table_meta_rows', { count: viewMetaStats?.[view.name]?.rows ?? 0 })}
                                                         </span>
                                                     )}
@@ -656,8 +656,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     disabled={viewMetaStats?.[view.name]?.valid === false}
                                                     className={`p-1.5 rounded transition-colors ${
                                                         viewMetaStats?.[view.name]?.valid === false
-                                                            ? 'text-slate-300 cursor-not-allowed'
-                                                            : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                                                            ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                                            : 'text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                                                     }`}
                                                     title={viewMetaStats?.[view.name]?.valid === false
                                                         ? t('datasource.view_invalid', 'Defekter View')
@@ -668,7 +668,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 {!isReadOnly && (
                                                     <button
                                                         onClick={() => handleDropView(view.name)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                        className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                                                         title={t('datasource.drop_view_title', 'Delete view')}
                                                     >
                                                         <Trash2 className="w-4 h-4" />
@@ -690,7 +690,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         <button
                                             key={t_name}
                                             onClick={() => { setSelectedTable(t_name); setIsSchemaOpen(true); }}
-                                            className="px-3 py-2 bg-white/50 border border-slate-200/50 rounded text-xs font-mono text-slate-500 hover:bg-white hover:text-blue-600 text-left transition-colors"
+                                            className="px-3 py-2 bg-white/50 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700 rounded text-xs font-mono text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 text-left transition-colors"
                                         >
                                             {t_name}
                                         </button>
@@ -709,7 +709,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">{t('datasource.backup_restore')}</h3>
 
                             {isBackupRecommended && (
-                                <div className="mb-4 p-3 bg-amber-50 text-amber-800 rounded-lg border border-amber-200 text-xs flex items-center gap-2">
+                                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 rounded-lg border border-amber-200 dark:border-amber-800/50 text-xs flex items-center gap-2">
                                     <AlertTriangle className="w-4 h-4" />
                                     <span>{t('datasource.backup_recommended', { count: changeCount })}</span>
                                 </div>
@@ -720,16 +720,16 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => setUseEncryption(!useEncryption)}
-                                        className={`flex-1 p-3 rounded-xl border flex items-center gap-3 transition-all ${useEncryption ? 'bg-emerald-50 border-emerald-200 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200'}`}
+                                        className={`flex-1 p-3 rounded-xl border flex items-center gap-3 transition-all ${useEncryption ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 ring-1 ring-emerald-500/70 dark:ring-emerald-700/70' : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700'}`}
                                     >
-                                        <div className={`p-2 rounded-lg ${useEncryption ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                                        <div className={`p-2 rounded-lg ${useEncryption ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>
                                             {useEncryption ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                                         </div>
                                         <div className="text-left">
-                                            <div className={`text-sm font-bold ${useEncryption ? 'text-emerald-900' : 'text-slate-600'}`}>
+                                            <div className={`text-sm font-bold ${useEncryption ? 'text-emerald-900 dark:text-emerald-200' : 'text-slate-600 dark:text-slate-200'}`}>
                                                 {useEncryption ? t('datasource.encryption_active') : t('datasource.encryption_standard')}
                                             </div>
-                                            <div className="text-xs text-slate-400">
+                                            <div className="text-xs text-slate-400 dark:text-slate-500">
                                                 {useEncryption ? t('datasource.encryption_active_hint') : t('datasource.encryption_standard_hint')}
                                             </div>
                                         </div>
@@ -743,7 +743,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             placeholder={t('datasource.backup_password_placeholder')}
                                             value={backupPassword}
                                             onChange={e => setBackupPassword(e.target.value)}
-                                            className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                                            className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                                             autoFocus
                                         />
                                     </div>
@@ -787,13 +787,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             markBackupComplete();
                                             if (useEncryption) setBackupPassword('');
                                         }}
-                                        className={`flex items-center justify-center gap-2 p-3 border rounded-lg text-sm font-bold transition-colors ${useEncryption ? 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                                        className={`flex items-center justify-center gap-2 p-3 border rounded-lg text-sm font-bold transition-colors ${useEncryption ? 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700' : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                                     >
                                         <Database className="w-4 h-4" />
                                         {useEncryption ? t('datasource.save_backup_secure') : t('datasource.save_backup_standard')}
                                     </button>
 
-                                    <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-bold transition-colors">
+                                    <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition-colors">
                                         <input
                                             type="file"
                                             accept=".sqlite3,.sqlite,.db"

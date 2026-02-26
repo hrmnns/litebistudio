@@ -206,24 +206,24 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
 
     if (!config) {
         return (
-            <div className="p-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
-                <p className="text-slate-400 text-sm">{t('datasource.excel_import.none_selected')}</p>
+            <div className="p-8 text-center bg-slate-50 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                <p className="text-slate-400 dark:text-slate-500 text-sm">{t('datasource.excel_import.none_selected')}</p>
             </div>
         );
     }
 
     return (
         <div className="space-y-4">
-            <div className="flex bg-slate-100 p-1 rounded-lg w-fit">
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-fit">
                 <button
                     onClick={() => setImportMode('append')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${importMode === 'append' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${importMode === 'append' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400'}`}
                 >
                     <Layers className="w-3.5 h-3.5" /> {t('datasource.excel_import.append')}
                 </button>
                 <button
                     onClick={() => setImportMode('overwrite')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${importMode === 'overwrite' ? 'bg-white shadow text-red-600' : 'text-slate-500'}`}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${importMode === 'overwrite' ? 'bg-white dark:bg-slate-700 shadow text-red-600 dark:text-red-300' : 'text-slate-500 dark:text-slate-400'}`}
                 >
                     <RefreshCw className="w-3.5 h-3.5" /> {t('datasource.excel_import.overwrite')}
                 </button>
@@ -236,7 +236,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
                 onClick={() => fileInputRef.current?.click()}
                 className={`
                     relative group border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer text-center
-                    ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'}
+                    ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-900/40'}
                     ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
                 `}
             >
@@ -249,18 +249,18 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
                 />
 
                 <div className="flex flex-col items-center gap-3">
-                    <div className={`p-3 rounded-xl transition-colors ${isDragging ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200 group-hover:text-slate-600'}`}>
+                    <div className={`p-3 rounded-xl transition-colors ${isDragging ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 group-hover:bg-slate-200 dark:group-hover:bg-slate-700 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`}>
                         <FileSpreadsheet className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-sm font-bold text-slate-700">{t('datasource.smart_import.upload_label')}</p>
-                        <p className="text-xs text-slate-400 mt-1">{t('datasource.excel_import.drop_hint')}</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{t('datasource.smart_import.upload_label')}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('datasource.excel_import.drop_hint')}</p>
                     </div>
                 </div>
 
                 {isProcessing && (
-                    <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-2xl backdrop-blur-[1px]">
-                        <div className="flex items-center gap-3 text-blue-600">
+                    <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center rounded-2xl backdrop-blur-[1px]">
+                        <div className="flex items-center gap-3 text-blue-600 dark:text-blue-300">
                             <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                             <span className="text-xs font-bold">{t('datasource.excel_import.processing_file')}</span>
                         </div>
@@ -269,26 +269,26 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ config, onImportComple
             </div>
 
             {error && (
-                <div className="p-4 bg-red-50 border-2 border-red-100 rounded-2xl flex items-start gap-3 text-red-600 text-xs animate-in slide-in-from-top-2 relative">
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-100 dark:border-red-800/50 rounded-2xl flex items-start gap-3 text-red-600 dark:text-red-300 text-xs animate-in slide-in-from-top-2 relative">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                     <div className="flex-1">
                         <p className="font-black uppercase tracking-widest text-[10px] mb-1">{t('common.error')}</p>
                         <p className="font-medium leading-relaxed">{error}</p>
                     </div>
-                    <button onClick={() => setError(null)} className="p-1 hover:bg-red-100 rounded-lg transition-colors">
+                    <button onClick={() => setError(null)} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
             )}
 
             {success && (
-                <div className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl flex items-start gap-3 text-emerald-600 text-xs animate-in slide-in-from-top-2 relative">
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-100 dark:border-emerald-800/50 rounded-2xl flex items-start gap-3 text-emerald-600 dark:text-emerald-300 text-xs animate-in slide-in-from-top-2 relative">
                     <Check className="w-5 h-5 shrink-0 mt-0.5" />
                     <div className="flex-1">
                         <p className="font-black uppercase tracking-widest text-[10px] mb-1">{t('common.success')}</p>
                         <p className="font-medium leading-relaxed">{success}</p>
                     </div>
-                    <button onClick={() => setSuccess(null)} className="p-1 hover:bg-emerald-100 rounded-lg transition-colors">
+                    <button onClick={() => setSuccess(null)} className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg transition-colors">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
