@@ -825,16 +825,16 @@ export const CustomDashboardView: React.FC = () => {
                 onClose={() => setIsAddModalOpen(false)}
                 title={t('dashboard.add_title')}
             >
-                <div className="flex gap-4 mb-4 border-b border-slate-200">
+                <div className="flex gap-4 mb-4 border-b border-slate-200 dark:border-slate-700">
                     <button
                         onClick={() => setActiveTab('system')}
-                        className={`pb-2 text-sm font-bold ${activeTab === 'system' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
+                        className={`pb-2 text-sm font-bold ${activeTab === 'system' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
                     >
                         {t('dashboard.system_widgets')}
                     </button>
                     <button
                         onClick={() => setActiveTab('custom')}
-                        className={`pb-2 text-sm font-bold ${activeTab === 'custom' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
+                        className={`pb-2 text-sm font-bold ${activeTab === 'custom' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
                     >
                         {t('dashboard.custom_widgets')}
                     </button>
@@ -850,14 +850,14 @@ export const CustomDashboardView: React.FC = () => {
                                 const isPinned = hasView && visibleSidebarComponentIds.includes(componentConfig!.id);
 
                                 return (
-                                    <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
+                                    <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
+                                            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-300">
                                                 <w.icon className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <div className="font-bold text-slate-700">{t(w.titleKey)}</div>
-                                                <div className="text-xs text-slate-400">{t(w.descriptionKey)}</div>
+                                                <div className="font-bold text-slate-700 dark:text-slate-100">{t(w.titleKey)}</div>
+                                                <div className="text-xs text-slate-400 dark:text-slate-500">{t(w.descriptionKey)}</div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -873,7 +873,7 @@ export const CustomDashboardView: React.FC = () => {
                                                         }
                                                     }}
                                                     title={isPinned ? t('dashboard.unpin_sidebar') : t('dashboard.pin_sidebar')}
-                                                    className={`p-1.5 rounded-md border transition-all ${isPinned ? 'bg-amber-50 border-amber-200 text-amber-500' : 'bg-white border-slate-200 text-slate-300 hover:text-amber-400'}`}
+                                                    className={`p-1.5 rounded-md border transition-all ${isPinned ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-500 dark:text-amber-300' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-500 hover:text-amber-400 dark:hover:text-amber-300'}`}
                                                 >
                                                     <Star className={`w-4 h-4 ${isPinned ? 'fill-current' : ''}`} />
                                                 </button>
@@ -882,7 +882,7 @@ export const CustomDashboardView: React.FC = () => {
                                             <button
                                                 onClick={() => addToDashboard(w.id, 'system')}
                                                 disabled={isAdded}
-                                                className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'}`}
                                             >
                                                 {isAdded ? t('dashboard.active') : t('common.add')}
                                             </button>
@@ -898,20 +898,20 @@ export const CustomDashboardView: React.FC = () => {
                             {customWidgets && customWidgets.length > 0 ? customWidgets.map(w => {
                                 const isAdded = activeDashboard?.layout.some(dw => dw.id === w.id);
                                 return (
-                                    <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
+                                    <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-50 rounded-lg text-blue-500">
+                                            <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 dark:text-blue-300">
                                                 <Database className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <div className="font-bold text-slate-700">{w.name}</div>
-                                                <div className="text-xs text-slate-400 truncate max-w-[200px]">{w.sql_query}</div>
+                                                <div className="font-bold text-slate-700 dark:text-slate-100">{w.name}</div>
+                                                <div className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[200px]">{w.sql_query}</div>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => deleteCustomWidget(w.id)}
-                                                className="p-2 text-slate-400 hover:text-red-500"
+                                                className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300"
                                                 title={t('common.delete')}
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -919,7 +919,7 @@ export const CustomDashboardView: React.FC = () => {
                                             <button
                                                 onClick={() => addToDashboard(w.id, 'custom')}
                                                 disabled={isAdded}
-                                                className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'}`}
                                             >
                                                 {isAdded ? t('dashboard.active') : t('common.add')}
                                             </button>
@@ -927,7 +927,7 @@ export const CustomDashboardView: React.FC = () => {
                                     </div>
                                 );
                             }) : (
-                                <p className="text-center text-slate-400 py-4">{t('dashboard.no_reports')}</p>
+                                <p className="text-center text-slate-400 dark:text-slate-500 py-4">{t('dashboard.no_reports')}</p>
                             )}
                         </div>
                     )}

@@ -5,6 +5,7 @@ import { Bookmark, Info, Target, ChevronLeft, ChevronRight, AlertCircle, Refresh
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import type { DbRow, TableColumn } from '../../types';
 import { createLogger } from '../../lib/logger';
+import { appDialog } from '../../lib/appDialog';
 
 import { SchemaTable } from './SchemaDocumentation';
 import type { SchemaDefinition } from './SchemaDocumentation';
@@ -23,6 +24,8 @@ interface WorklistItemState extends DbRow {
     id: number | string;
     status?: string;
     comment?: string;
+    priority?: string;
+    due_at?: string | null;
 }
 
 const logger = createLogger('RecordDetail');
@@ -189,6 +192,41 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 setIsInWorklist(false);
                 setWorklistItem(null);
             } else {
+                const parsePriority = (value: string | null): 'low' | 'normal' | 'high' | 'critical' | null => {
+                    if (value === null) return null;
+                    const normalized = value.trim().toLowerCase();
+                    if (normalized === 'low' || normalized === 'normal' || normalized === 'high' || normalized === 'critical') {
+                        return normalized;
+                    }
+                    return 'normal';
+                };
+                const parseDueDate = (value: string | null): string | null => {
+                    if (value === null) return null;
+                    const trimmed = value.trim();
+                    if (!trimmed) return '';
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+                    return '';
+                };
+
+                const priorityPrompt = await appDialog.prompt(
+                    t('worklist.add_priority_prompt', 'Prioritaet (low, normal, high, critical)'),
+                    { title: t('worklist.add_dialog_title', 'Zum Arbeitsvorrat') , defaultValue: 'normal' }
+                );
+                if (priorityPrompt === null) {
+                    return;
+                }
+                const priority = parsePriority(priorityPrompt) ?? 'normal';
+
+                const duePrompt = await appDialog.prompt(
+                    t('worklist.add_due_prompt', 'Faelligkeit optional (YYYY-MM-DD), leer lassen fuer keine'),
+                    { title: t('worklist.add_dialog_title', 'Zum Arbeitsvorrat') }
+                );
+                if (duePrompt === null) {
+                    return;
+                }
+                const parsedDue = parseDueDate(duePrompt);
+                const dueAt = parsedDue === '' ? null : parsedDue;
+
                 // Label: Use generic label detection or fallback to ID
                 const labelCandidates = ['name', 'title', 'description', 'label', 'display_name', 'VendorName', 'Description'];
                 let label = '';
@@ -214,8 +252,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 }
 
                 await SystemRepository.executeRaw(
-                    'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context) VALUES (?, ?, ?, ?)',
-                    [activeTable, recordId, label, context]
+                    'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context, priority, due_at) VALUES (?, ?, ?, ?, ?, ?)',
+                    [activeTable, recordId, label, context, priority, dueAt]
                 );
 
                 // Fetch the newly created item once
@@ -395,7 +433,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     {/* Worklist Details Editor */}
                     {isInWorklist && (
                         <div className="shrink-0 px-6 py-4 bg-amber-50/30 dark:bg-amber-900/5 border-b border-slate-200 dark:border-slate-700 space-y-3">
-                            <div className="flex items-start gap-4">
+                            <div className="flex items-start gap-4 flex-wrap">
                                 <div className="w-48 shrink-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.status_label')}</label>
                                     <select
@@ -412,7 +450,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                                 }
                                             }
                                         }}
-                                        className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
+                                        className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
                                     >
                                         <option value="open">{t('worklist.status_open', 'Neu / Offen')}</option>
                                         <option value="in_progress">{t('worklist.status_in_progress', 'In Bearbeitung')}</option>
@@ -420,7 +458,49 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         <option value="closed">{t('worklist.status_closed', 'Geschlossen')}</option>
                                     </select>
                                 </div>
-                                <div className="flex-1 min-w-0">
+                                <div className="w-48 shrink-0">
+                                    <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('worklist.priority_label', 'Prioritaet')}</label>
+                                    <select
+                                        value={typeof worklistItem?.priority === 'string' ? worklistItem.priority : 'normal'}
+                                        onChange={async (e) => {
+                                            if (worklistItem) {
+                                                const newPriority = e.target.value;
+                                                setWorklistItem(prev => prev ? ({ ...prev, priority: newPriority }) : prev);
+                                                try {
+                                                    await SystemRepository.updateWorklistItem(worklistItem.id, { priority: newPriority });
+                                                } catch (err) {
+                                                    logger.error('Failed to update priority', err);
+                                                }
+                                            }
+                                        }}
+                                        className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
+                                    >
+                                        <option value="low">{t('worklist.priority_low', 'Niedrig')}</option>
+                                        <option value="normal">{t('worklist.priority_normal', 'Normal')}</option>
+                                        <option value="high">{t('worklist.priority_high', 'Hoch')}</option>
+                                        <option value="critical">{t('worklist.priority_critical', 'Kritisch')}</option>
+                                    </select>
+                                </div>
+                                <div className="w-48 shrink-0">
+                                    <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('worklist.due_label', 'Faellig')}</label>
+                                    <input
+                                        type="date"
+                                        value={typeof worklistItem?.due_at === 'string' ? worklistItem.due_at.slice(0, 10) : ''}
+                                        onChange={async (e) => {
+                                            if (worklistItem) {
+                                                const newDue = e.target.value || null;
+                                                setWorklistItem(prev => prev ? ({ ...prev, due_at: newDue }) : prev);
+                                                try {
+                                                    await SystemRepository.updateWorklistItem(worklistItem.id, { due_at: newDue });
+                                                } catch (err) {
+                                                    logger.error('Failed to update due date', err);
+                                                }
+                                            }
+                                        }}
+                                        className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
+                                    />
+                                </div>
+                                <div className="flex-1 min-w-[320px]">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.comment_label')}</label>
                                     <textarea
                                         value={typeof worklistItem?.comment === 'string' ? worklistItem.comment : ''}
@@ -436,7 +516,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                             }
                                         }}
                                         placeholder={t('record_detail.comment_placeholder')}
-                                        className="w-full p-2 h-[37px] bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/20 transition-all resize-none overflow-hidden hover:overflow-y-auto"
+                                        className="w-full p-2 h-[88px] bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500/20 transition-all resize-none"
                                     />
                                 </div>
                             </div>
@@ -537,3 +617,4 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         </>
     );
 };
+

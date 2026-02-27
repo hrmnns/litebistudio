@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS sys_worklist (
     display_label TEXT,
     display_context TEXT,
     status TEXT DEFAULT 'open',
+    priority TEXT DEFAULT 'normal',
+    due_at TIMESTAMP,
     comment TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

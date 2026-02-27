@@ -326,6 +326,32 @@ function applyMigrations(databaseInstance: DatabaseLike) {
         userVersion = 9;
     }
 
+    // Version 10: Migration: Worklist priority and due date
+    if (userVersion < 10) {
+        log('Migration V10: Adding priority and due_at to sys_worklist...');
+        try {
+            const columns: string[] = [];
+            databaseInstance.exec({
+                sql: "PRAGMA table_info(sys_worklist)",
+                rowMode: 'object',
+                callback: (row: SqliteRow) => columns.push(getRowString(row, 'name'))
+            });
+            if (columns.length > 0) {
+                if (!columns.includes('priority')) {
+                    databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN priority TEXT DEFAULT 'normal'");
+                }
+                if (!columns.includes('due_at')) {
+                    databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN due_at TIMESTAMP");
+                }
+                databaseInstance.exec("UPDATE sys_worklist SET priority = 'normal' WHERE priority IS NULL OR TRIM(priority) = ''");
+            }
+        } catch (e) {
+            error('Migration failed for V10', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 10');
+        userVersion = 10;
+    }
+
     log(`Database migrated to version ${userVersion}`);
 }
 

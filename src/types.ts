@@ -42,6 +42,7 @@ export interface SystemRecord {
 // ─── Worklist ─────────────────────────────────────────────────
 
 export type WorklistStatus = 'open' | 'in_progress' | 'done' | 'closed';
+export type WorklistPriority = 'low' | 'normal' | 'high' | 'critical';
 
 export interface WorklistEntry {
     id: number;
@@ -49,6 +50,8 @@ export interface WorklistEntry {
     source_id: number;
     display_label: string | null;
     display_context: string | null;
+    priority?: WorklistPriority;
+    due_at?: string | null;
     added_at: string;
     status: WorklistStatus;
 }

@@ -18,11 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - page status/threshold metadata
   - global and per-page quality checks with quick-fix actions.
 - Added a global Reporting sidepanel with overview metrics, quick actions, and package quality overview.
+- Worklist enhancements:
+  - added `priority` and `due_at` fields to `sys_worklist` (with migration support)
+  - added quick capture prompts for priority and optional due date when adding records to worklist
+  - added a new Worklist sidepanel (`Focus`, `Batch`, `Preview`) with quick filters, multi-select batch actions, and item preview.
 
 ### Changed
 - Report Packages area was renamed to `Reporting` / `Berichtswesen` in navigation and main view titles.
 - Reporting package settings were moved from modal dialog to a right-side panel with fixed/sticky footer actions.
 - Reporting export actions were visually grouped and icon semantics were clarified for better usability.
+- Worklist UI was refined with consistent control heights, improved dark-mode readability, and larger note input area in record details.
 
 ### Fixed
 - Fixed dark-mode styling in the `Manage Categories` dialog within Reporting.

@@ -451,7 +451,7 @@ export const SystemRepository = {
         return await runQuery('SELECT * FROM sys_worklist ORDER BY created_at DESC');
     },
 
-    async updateWorklistItem(id: number | string, data: { status?: string; comment?: string }): Promise<void> {
+    async updateWorklistItem(id: number | string, data: { status?: string; comment?: string; priority?: string; due_at?: string | null }): Promise<void> {
         const fields: string[] = [];
         const params: BindValue[] = [];
 
@@ -462,6 +462,14 @@ export const SystemRepository = {
         if (data.comment !== undefined) {
             fields.push('comment = ?');
             params.push(data.comment);
+        }
+        if (data.priority !== undefined) {
+            fields.push('priority = ?');
+            params.push(data.priority);
+        }
+        if (data.due_at !== undefined) {
+            fields.push('due_at = ?');
+            params.push(data.due_at);
         }
 
         if (fields.length === 0) return;
