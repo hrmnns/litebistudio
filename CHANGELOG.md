@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `Layout` (reorder/remove widgets from a compact list)
   - `Filters` (central global filter management)
 - Dashboard widget order can now be changed directly in the dashboard grid via drag & drop (persisted per dashboard).
+- Widget preview now supports dedicated tabs:
+  - `Graphic` (always visible)
+  - `Table` (available with query data source; disabled for text widgets)
+  - `SQL` (available with query data source; disabled for text widgets)
+- Added explicit source selection model in Widgets start step:
+  - `None` (continue without data source)
+  - `Select query`
+  - `Select widget`
+- Added duplicate-name overwrite confirmation when saving widgets (`A widget with this name already exists. Overwrite?`).
 
 ### Changed
 - Data Inspector SQL toolbar now uses a single `Save` action (disk icon) for saving into SQL Manager; the temporary `Save Report` action and modal were removed.
@@ -35,6 +44,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Table Tools `Columns` tab now highlights the currently active sort column and direction.
 - Field Picker action labels were compacted using icon-first controls for better space usage.
 - Dashboard sidepanel follows the shared global sidepanel pattern in `PageLayout` and is opened via the same header trigger.
+- Query Builder was simplified and reoriented as `Widgets` in navigation and settings labels.
+- Widgets guided source flow was streamlined:
+  - selecting no source and pressing `Next` now opens visualization type selection for text-widget creation
+  - selecting a query updates preview immediately
+  - selecting a widget updates preview immediately
+  - selecting query/widget and pressing `Next` jumps directly to visualization step (no redundant intermediate step)
+- Widgets finalize mode labeling now distinguishes:
+  - `Create new widget (Text - No data)`
+  - `Create new widget (Query)`
+  - `Edit widget`
+- Widgets preview header and tab controls were visually aligned with the guided panel style; focus button placement and tab sizing were refined for consistency.
+- Save dialog actions were simplified to a single primary save path; redundant `Save New` button was removed.
+- After successful widget save, guided flow now returns to source step with `Select widget` active and the saved widget preselected.
 
 ### Fixed
 - Data Inspector SQL split-resize now keeps the newly dragged pane height reliably instead of snapping back to the previous size after releasing the gripper.
@@ -42,6 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Opening or running a saved SQL statement from the sidepanel now closes the sidepanel immediately.
 - SQL Manager/Recent layout in sidepanel now uses internal scroll regions to prevent unwanted outer sidepanel scrolling.
 - In `Columns` tab, selected fields are now initialized from currently displayed table columns when the panel is opened.
+- Fixed widget save semantics:
+  - `Save` updates current widget
+  - name conflicts can now intentionally overwrite the existing widget after confirmation
+- Fixed preview behavior for text widgets:
+  - graphic tab now renders text content reliably
+  - table/sql tabs show clear no-data-source messaging when no query is available
 
 ## [1.1.0] - 2026-02-24
 

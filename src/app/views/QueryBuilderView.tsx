@@ -1,11 +1,11 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
     Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
     Layout, Maximize2, Minimize2, Folder, Trash2,
-    Edit3, X, Download, Check, Search
+    Edit3, X, Download, Check, Search, FileCode2
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { DataTable } from '../../components/ui/DataTable';
@@ -55,13 +55,13 @@ export const QueryBuilderView: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [lastRunSql, setLastRunSql] = useState('');
     const [previewRenderVersion, setPreviewRenderVersion] = useState(0);
+    const [previewTab, setPreviewTab] = useState<'graphic' | 'table' | 'sql'>('graphic');
     const [savedSnapshot, setSavedSnapshot] = useState('');
 
     // Mode State
     const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
-    const [sidebarTab, setSidebarTab] = useState<'query' | 'vis'>('query');
-    const [entryMode, setEntryMode] = useState<'new' | 'existing'>('new');
-    const [startAction, setStartAction] = useState<'new' | 'open'>('new');
+    const [sidebarTab, setSidebarTab] = useState<'source' | 'visual' | 'widget'>('source');
+    const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>('none');
     const [isMaximized, setIsMaximized] = useState(false);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
     const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
@@ -93,7 +93,7 @@ export const QueryBuilderView: React.FC = () => {
         async () => await SystemRepository.getUserWidgets() as unknown as SavedWidget[],
         []
     );
-    const { data: sqlStatements, refresh: refreshSqlStatements } = useAsync<SqlStatementRecord[]>(
+    const { data: sqlStatements } = useAsync<SqlStatementRecord[]>(
         async () => await SystemRepository.listSqlStatements('global'),
         []
     );
@@ -132,7 +132,7 @@ export const QueryBuilderView: React.FC = () => {
         }
     }, [sql, visConfig.xAxis]);
 
-    const loadWidget = (widget: SavedWidget) => {
+    const loadWidget = (widget: SavedWidget, navigate = true) => {
         let parsedVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
         let parsedVisType: VisualizationType = 'table';
         let parsedBuilderMode: 'sql' | 'visual' = 'sql';
@@ -150,6 +150,7 @@ export const QueryBuilderView: React.FC = () => {
         setLastRunSql('');
         setResults([]);
         setError('');
+        setPreviewTab('graphic');
         setQueryConfig(undefined);
         setBuilderMode('sql');
         setVisType('table');
@@ -174,21 +175,26 @@ export const QueryBuilderView: React.FC = () => {
             logger.error('Error parsing widget config', e);
         }
 
-        setSidebarTab('query');
-        setEntryMode('existing');
-        setStartAction('open');
+        if (navigate) {
+            setSidebarTab('source');
+        }
         if (parsedVisType === 'text') {
             setSql('');
             setLastRunSql('');
             setBuilderMode('sql');
             setQueryConfig(undefined);
-            setGuidedStep(3);
+            if (navigate) {
+                setGuidedStep(3);
+                setSidebarTab('visual');
+            }
         } else {
             setSql(widgetSql);
-            setGuidedStep(2);
             setTimeout(() => handleRun(widgetSql), 100);
+            if (navigate) {
+                setGuidedStep(3);
+                setSidebarTab('visual');
+            }
         }
-        setSidebarTab('query');
         setSavedSnapshot(buildSnapshot({
             currentSql: parsedVisType === 'text' ? '' : widgetSql,
             currentBuilderMode: parsedBuilderMode,
@@ -200,8 +206,23 @@ export const QueryBuilderView: React.FC = () => {
         }));
     };
 
-    const handleSaveWidget = async () => {
+    const handleSaveWidget = async (mode: 'update' | 'new' = 'update') => {
         if (!widgetName || isReadOnly) return;
+        const shouldCreateNew = mode === 'new';
+        let targetId = shouldCreateNew ? crypto.randomUUID() : (activeWidgetId || crypto.randomUUID());
+        const trimmedName = widgetName.trim();
+        const normalizedName = trimmedName.toLowerCase();
+        const conflictingWidget = (savedWidgets || []).find((w) =>
+            w.id !== targetId && w.name.trim().toLowerCase() === normalizedName
+        );
+        if (conflictingWidget) {
+            const overwrite = await appDialog.confirm(t('querybuilder.confirm_overwrite_widget_name', {
+                name: trimmedName,
+                defaultValue: `Ein Widget mit dem Namen "${trimmedName}" existiert bereits. Ueberschreiben?`
+            }));
+            if (!overwrite) return;
+            targetId = conflictingWidget.id;
+        }
         try {
             const linkedStatement = (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId);
             const sqlText = sql.trim();
@@ -210,8 +231,8 @@ export const QueryBuilderView: React.FC = () => {
                     ? linkedStatement.id
                     : null;
             const widget = {
-                id: activeWidgetId || crypto.randomUUID(),
-                name: widgetName,
+                id: targetId,
+                name: trimmedName,
                 description: '',
                 sql_statement_id: linkedStatementId,
                 sql_query: sqlText,
@@ -222,7 +243,6 @@ export const QueryBuilderView: React.FC = () => {
             await SystemRepository.saveUserWidget(widget);
 
             setSaveModalOpen(false);
-            if (!activeWidgetId) setWidgetName('');
             refreshWidgets();
             setActiveWidgetId(widget.id);
             setSavedSnapshot(buildSnapshot({
@@ -234,11 +254,15 @@ export const QueryBuilderView: React.FC = () => {
                 currentWidgetName: widget.name,
                 currentActiveWidgetId: widget.id
             }));
+            setGuidedStep(1);
+            setSidebarTab('source');
+            setSourceSelectTab('widget');
+            setPreviewTab('graphic');
         } catch (err: unknown) {
             await appDialog.error(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
             return;
         }
-        await appDialog.info(activeWidgetId ? t('querybuilder.success_update') : t('querybuilder.success_save'));
+        await appDialog.info(shouldCreateNew ? t('querybuilder.success_save') : t('querybuilder.success_update'));
     };
 
     const deleteWidget = async (id: string) => {
@@ -314,24 +338,32 @@ export const QueryBuilderView: React.FC = () => {
             .filter((row) => Number.isFinite(row[scatterXKey] as number) && Number.isFinite(row[scatterYKey] as number));
     }, [results, scatterXKey, scatterYKey, visType]);
     const previewVisType: VisualizationType = (guidedStep === 2 && !isTextWidget) ? 'table' : visType;
+    const hasQueryPreviewTabs = !isTextWidget && sql.trim().length > 0;
+    const isGraphicCapableType = previewVisType !== 'table' && previewVisType !== 'pivot' && previewVisType !== 'text';
     const canPersistWidget = isTextWidget || results.length > 0;
     const exportDisabled = isExporting || (!isTextWidget && results.length === 0);
     const saveDisabled = !canPersistWidget || isReadOnly || (!isTextWidget && !sqlMatchesSelectedStatement);
+    const saveBlockedHint = isReadOnly
+        ? t('common.read_only')
+        : (!canPersistWidget
+            ? t('querybuilder.hint_run_query_before_save')
+            : (!isTextWidget && !sqlMatchesSelectedStatement
+                ? t('querybuilder.hint_select_sql_statement_before_save', 'Bitte ein SQL-Statement aus dem SQL-Manager auswaehlen.')
+                : ''));
     const exportDisabledReason = isExporting
         ? t('common.exporting')
         : (!isTextWidget && results.length === 0 ? t('querybuilder.hint_run_query_before_export') : '');
-    const textSizeClass = {
-        sm: 'text-sm',
-        md: 'text-base',
-        lg: 'text-lg',
-        xl: 'text-xl',
-        '2xl': 'text-2xl'
-    } as const;
-
-    const hasEntrySelection = entryMode === 'new' || (entryMode === 'existing' && Boolean(activeWidgetId));
+    const hasEntrySelection = true;
+    const canProceedFromStart = sourceSelectTab === 'none'
+        ? true
+        : (sourceSelectTab === 'query' ? sqlMatchesSelectedStatement : Boolean(activeWidgetId));
     const hasSourceConfig = isTextWidget || sqlMatchesSelectedStatement;
     const hasRunOutput = isTextWidget || (results.length > 0 && !error && lastRunSql.trim() === sql.trim());
     const hasVisualizationConfig = useMemo(() => {
+        if (!sqlMatchesSelectedStatement) {
+            if (visType !== 'text') return false;
+            return Boolean((visConfig.textContent || '').trim());
+        }
         if (visType === 'text') {
             return Boolean((visConfig.textContent || '').trim());
         }
@@ -360,28 +392,34 @@ export const QueryBuilderView: React.FC = () => {
             });
         });
         return hasRenderableData;
-    }, [visType, visConfig, numericColumns, scatterData.length, scatterXKey, scatterYKey, results]);
+    }, [visType, visConfig, numericColumns, scatterData.length, scatterXKey, scatterYKey, results, sqlMatchesSelectedStatement]);
     const previewVisualizationInvalid = !isTextWidget
         && results.length > 0
         && previewVisType !== 'table'
         && previewVisType !== 'pivot'
         && !hasVisualizationConfig;
-    const suggestedGuidedStep: GuidedStep = !hasEntrySelection
-        ? 1
-        : isTextWidget
-            ? (!hasVisualizationConfig ? 3 : 4)
-            : (!hasSourceConfig || !hasRunOutput
-                ? 2
-                : !hasVisualizationConfig
-                    ? 3
-                    : 4);
+    const suggestedGuidedStep: GuidedStep = (() => {
+        if (!hasEntrySelection) return 1;
+        if (sourceSelectTab === 'none') {
+            return visType === 'text' && hasVisualizationConfig ? 4 : 3;
+        }
+        if (sourceSelectTab === 'query') {
+            if (!sqlMatchesSelectedStatement) return 1;
+            if (!hasRunOutput) return 2;
+            return hasVisualizationConfig ? 4 : 3;
+        }
+        if (!activeWidgetId) return 1;
+        if (isTextWidget) return hasVisualizationConfig ? 4 : 3;
+        if (!hasRunOutput) return 2;
+        return hasVisualizationConfig ? 4 : 3;
+    })();
     const canGoToStep = (step: GuidedStep) => {
         if (isTextWidget && step === 2) return false;
         return step <= suggestedGuidedStep;
     };
     const guidedNextDisabled = loading || (
         guidedStep === 1
-            ? !hasEntrySelection
+            ? !canProceedFromStart
             : guidedStep === 2
                 ? (isTextWidget ? false : (!hasSourceConfig || !hasRunOutput))
                 : guidedStep === 3
@@ -391,7 +429,7 @@ export const QueryBuilderView: React.FC = () => {
     const guidedPrimaryLabel = guidedStep >= 4
         ? t('querybuilder.finish')
         : t('querybuilder.next');
-    const guidedApplyVisible = guidedStep === 2 || guidedStep === 3;
+    const guidedApplyVisible = guidedStep === 2 && !isTextWidget;
     const guidedApplyDisabled = loading || (
         guidedStep === 2
             ? (isTextWidget || !hasSourceConfig)
@@ -401,10 +439,38 @@ export const QueryBuilderView: React.FC = () => {
     );
     const guidedApplyLabel = loading
         ? t('common.loading')
-        : t('querybuilder.apply');
-    const effectiveSidebarTab: 'query' | 'vis' = sidebarTab;
+        : t('querybuilder.step_run');
+    const guidedBlockedHint = (() => {
+        if (guidedStep === 1) {
+            if (sourceSelectTab === 'query' && !sqlMatchesSelectedStatement) {
+                return t('querybuilder.hint_select_sql_statement_for_widget', 'Bitte zuerst ein SQL-Statement im SQL-Manager auswaehlen.');
+            }
+            if (sourceSelectTab === 'widget' && !activeWidgetId) {
+                return t('querybuilder.mode_open_select', 'Waehle ein bestehendes Widget aus der Liste.');
+            }
+            return '';
+        }
+        if (guidedStep === 2) {
+            if (!sqlMatchesSelectedStatement) {
+                return t('querybuilder.hint_select_sql_statement_for_widget', 'Bitte zuerst ein SQL-Statement im SQL-Manager auswaehlen.');
+            }
+            if (!hasRunOutput) {
+                return t('querybuilder.hint_run_query_before_continue', 'Bitte die Abfrage zuerst ausfuehren.');
+            }
+            return '';
+        }
+        if (guidedStep === 3 && !hasVisualizationConfig) {
+            return t('querybuilder.hint_configure_visualization_before_continue', 'Bitte Visualisierung konfigurieren, um fortzufahren.');
+        }
+        if (guidedStep === 4 && saveDisabled) {
+            return saveBlockedHint;
+        }
+        return '';
+    })();
+    const effectiveSidebarTab: 'source' | 'visual' | 'widget' = sidebarTab;
     const showGuidedFooter = true;
-    const showFinalizePanel = guidedStep === 4 && effectiveSidebarTab === 'query';
+    const canOpenVisualTab = suggestedGuidedStep >= 3;
+    const canOpenWidgetTab = suggestedGuidedStep >= 4;
     const buildSnapshot = useCallback((overrides?: {
         currentSql?: string;
         currentBuilderMode?: 'sql' | 'visual';
@@ -427,25 +493,12 @@ export const QueryBuilderView: React.FC = () => {
         [buildSnapshot]
     );
     const hasUnsavedChanges = savedSnapshot.length > 0 && currentSnapshot !== savedSnapshot;
-    const stepLabels: Record<GuidedStep, string> = {
-        1: t('querybuilder.step_start'),
-        2: t('querybuilder.step_source_run'),
-        3: t('querybuilder.step_visualize'),
-        4: t('querybuilder.step_finalize')
-    };
-    const stepHelpText: Record<GuidedStep, string> = {
-        1: t('querybuilder.step_help_start'),
-        2: t('querybuilder.step_help_source_run'),
-        3: t('querybuilder.step_help_visualize'),
-        4: t('querybuilder.step_help_finalize')
-    };
-    const guidedSteps: GuidedStep[] = [1, 2, 3, 4];
     const modeInfoText =
-        entryMode === 'new' && !activeWidgetId
-            ? (isTextWidget ? t('querybuilder.mode_new_text_active') : t('querybuilder.mode_new_active'))
-            : (!activeWidgetId
-                ? t('querybuilder.mode_open_select', 'Waehle ein bestehendes Widget aus der Liste.')
-                : t('querybuilder.mode_editing_active', { name: widgetName }));
+        activeWidgetId
+            ? t('querybuilder.mode_widget_edit', 'Widget aendern')
+            : (sourceSelectTab === 'none'
+                ? t('querybuilder.mode_new_text_without_data', 'Neues Widget erstellen (Text - Ohne Daten)')
+                : t('querybuilder.mode_new_query_widget', 'Neues Widget erstellen (Abfrage)'));
     const applySqlStatementSource = useCallback((statement: SqlStatementRecord) => {
         setSelectedSqlStatementId(statement.id);
         setQueryConfig(undefined);
@@ -469,19 +522,50 @@ export const QueryBuilderView: React.FC = () => {
                 return { icon: <Layout className={iconClass} />, label: previewVisType.toUpperCase() };
         }
     }, [previewVisType, t]);
+    const previewHeaderTitle = activeWidgetId
+        ? (widgetName.trim() || t('querybuilder.new_report'))
+        : t('querybuilder.preview_new_widget_title', 'Neues Widget ...');
 
     const gotoStep = (step: GuidedStep) => {
         if (!canGoToStep(step)) return;
         setGuidedStep(step);
-        if (step <= 2) setSidebarTab('query');
-        if (step === 3) setSidebarTab('vis');
-        if (step === 4) setSidebarTab('query');
+        if (step <= 2) setSidebarTab('source');
+        if (step === 3) setSidebarTab('visual');
+        if (step === 4) setSidebarTab('widget');
     };
 
     const handleGuidedNext = async () => {
         if (guidedStep === 1) {
-            if (!hasEntrySelection) return;
-            gotoStep(isTextWidget ? 3 : 2);
+            if (sourceSelectTab === 'none') {
+                setVisType('table');
+                setSelectedSqlStatementId('');
+                setSql('');
+                setLastRunSql('');
+                setResults([]);
+                setError('');
+                setGuidedStep(3);
+                setSidebarTab('visual');
+                return;
+            }
+            if (sourceSelectTab === 'query') {
+                if (!sqlMatchesSelectedStatement) return;
+                setVisType('table');
+                const executed = await handleRun();
+                if (!executed) return;
+                setGuidedStep(3);
+                setSidebarTab('visual');
+                return;
+            }
+            if (!activeWidgetId) return;
+            if (isTextWidget) {
+                setGuidedStep(3);
+                setSidebarTab('visual');
+                return;
+            }
+            const executed = await handleRun();
+            if (!executed) return;
+            setGuidedStep(3);
+            setSidebarTab('visual');
             return;
         }
         if (guidedStep === 2) {
@@ -535,6 +619,7 @@ export const QueryBuilderView: React.FC = () => {
     useEffect(() => {
         setGuidedStep(prev => (prev > suggestedGuidedStep ? suggestedGuidedStep : prev));
     }, [suggestedGuidedStep]);
+
 
     useEffect(() => {
         if (visType !== 'scatter' || numericColumns.length === 0) return;
@@ -617,42 +702,52 @@ export const QueryBuilderView: React.FC = () => {
                                         {t('querybuilder.guided_panel')}
                                     </h3>
                                 </div>
-                                <div className="border-t border-slate-100 dark:border-slate-800 px-3 pt-2 pb-2">
-                                <div className="grid grid-cols-4 gap-1">
-                                    {guidedSteps.map((step) => (
-                                        <button
-                                            key={step}
-                                            onClick={() => gotoStep(step)}
-                                            disabled={!canGoToStep(step)}
-                                            className={`px-1 py-1.5 rounded border text-[9px] font-black uppercase tracking-wide transition-all ${
-                                                isTextWidget && step === 2
-                                                    ? 'bg-slate-100 text-slate-300 border-slate-200'
-                                                    : guidedStep === step
-                                                    ? 'bg-blue-50 text-blue-700 border-blue-200 ring-1 ring-blue-100'
-                                                    : step <= suggestedGuidedStep
-                                                        ? 'bg-white text-slate-600 border-slate-200'
-                                                        : 'bg-slate-100 text-slate-400 border-slate-200'
-                                            } disabled:opacity-50`}
-                                        >
-                                            {stepLabels[step]}
-                                        </button>
-                                    ))}
-                                </div>
-                                </div>
-                                <div className="mt-1 mb-2 px-4 space-y-1">
-                                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                                        {stepHelpText[guidedStep]}
-                                    </p>
-                                </div>
                             </div>
-                            <div className="px-4 py-2 border-b border-amber-200 bg-amber-50">
-                                <p className="text-[10px] text-amber-800">
-                                    {modeInfoText}
-                                </p>
+                            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+                                <div className="grid grid-cols-3 gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSidebarTab('source');
+                                            setGuidedStep(1);
+                                        }}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${effectiveSidebarTab === 'source'
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                        }`}
+                                    >
+                                        <Search className="w-3 h-3" />
+                                        {t('querybuilder.tab_source', 'Quelle')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => canOpenVisualTab && setSidebarTab('visual')}
+                                        disabled={!canOpenVisualTab}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${effectiveSidebarTab === 'visual'
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                        } disabled:opacity-40`}
+                                    >
+                                        <BarChart2 className="w-3 h-3" />
+                                        {t('querybuilder.tab_visualization', 'Visualisierung')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => canOpenWidgetTab && setSidebarTab('widget')}
+                                        disabled={!canOpenWidgetTab}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${effectiveSidebarTab === 'widget'
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                        } disabled:opacity-40`}
+                                    >
+                                        <Folder className="w-3 h-3" />
+                                        {t('querybuilder.tab_widget', 'Widget')}
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
-                            {effectiveSidebarTab === 'query' ? (
+                            {effectiveSidebarTab === 'source' ? (
                                 <div className="space-y-4">
                                     {guidedStep === 1 && (
                                         <div className="space-y-4">
@@ -660,89 +755,109 @@ export const QueryBuilderView: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        setStartAction('new');
-                                                        setEntryMode('new');
+                                                        setSourceSelectTab('none');
+                                                        setActiveWidgetId(null);
+                                                        setWidgetName('');
+                                                        setSelectedSqlStatementId('');
+                                                        setSql('');
+                                                        setLastRunSql('');
+                                                        setResults([]);
+                                                        setError('');
+                                                        setVisType('table');
                                                     }}
-                                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${startAction === 'new' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sourceSelectTab === 'none' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                                 >
-                                                    {t('querybuilder.start_new', 'Neu')}
+                                                    {t('querybuilder.source_tab_none', 'Kein')}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        setStartAction('open');
-                                                        setEntryMode('existing');
+                                                        setSourceSelectTab('query');
+                                                        setActiveWidgetId(null);
+                                                        setWidgetName('');
+                                                        setSelectedSqlStatementId('');
+                                                        setSql('');
+                                                        setLastRunSql('');
+                                                        setResults([]);
+                                                        setError('');
+                                                        setVisType('table');
                                                     }}
-                                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${startAction === 'open' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sourceSelectTab === 'query' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                                 >
-                                                    {t('querybuilder.start_open', 'Oeffnen')}
+                                                    {t('querybuilder.source_tab_query', 'Abfrage auswaehlen')}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSourceSelectTab('widget');
+                                                    }}
+                                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sourceSelectTab === 'widget' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                                                >
+                                                    {t('querybuilder.source_tab_widget', 'Widget auswaehlen')}
                                                 </button>
                                             </div>
-                                            {startAction === 'new' ? (
+                                            {sourceSelectTab === 'none' ? (
+                                                <div className="p-3 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-300">
+                                                    {t('querybuilder.source_tab_none_hint', 'Ohne Datenabfrage oder Widget mit Weiter zum naechsten Schritt gehen.')}
+                                                </div>
+                                            ) : sourceSelectTab === 'query' ? (
                                                 <div className="space-y-2 animate-in fade-in duration-300">
-                                                    <button
-                                                        onClick={() => {
-                                                            setEntryMode('new');
-                                                            setStartAction('new');
-                                                            setActiveWidgetId(null);
-                                                            setWidgetName('');
-                                                            setSelectedSqlStatementId('');
-                                                            setResults([]);
-                                                            setError('');
-                                                            setVisType('table');
-                                                            gotoStep(2);
-                                                        }}
-                                                        className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
-                                                            !isTextWidget && entryMode === 'new' && !activeWidgetId
-                                                                ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
-                                                                : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
-                                                        }`}
-                                                    >
-                                                        <Edit3 className="w-4 h-4 flex-shrink-0" />
-                                                        <div className="flex-1 min-w-0 text-left">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="text-sm font-bold truncate">{t('querybuilder.new_query_card_title')}</span>
+                                                    <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
+                                                        {t('querybuilder.sql_manager_source', 'SQL Manager Source')}
+                                                        <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">
+                                                            {filteredSqlStatements.length}/{sqlStatements?.length || 0}
+                                                        </span>
+                                                    </h3>
+                                                    <div className="relative">
+                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                        <input
+                                                            value={sqlStatementSearchTerm}
+                                                            onChange={(e) => setSqlStatementSearchTerm(e.target.value)}
+                                                            placeholder={t('querybuilder.search_sql_statements', 'Search SQL statements...')}
+                                                            className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                                                        {filteredSqlStatements.map((stmt) => (
+                                                            <button
+                                                                key={stmt.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (selectedSqlStatementId === stmt.id) {
+                                                                        setSelectedSqlStatementId('');
+                                                                        setSql('');
+                                                                        setLastRunSql('');
+                                                                        setResults([]);
+                                                                        setError('');
+                                                                        setVisType('table');
+                                                                        return;
+                                                                    }
+                                                                    setSourceSelectTab('query');
+                                                                    setActiveWidgetId(null);
+                                                                    setWidgetName('');
+                                                                    applySqlStatementSource(stmt);
+                                                                    setVisType('table');
+                                                                    void handleRun(stmt.sql_text);
+                                                                }}
+                                                                className={`w-full text-left p-2.5 rounded-lg border transition-all ${
+                                                                    selectedSqlStatementId === stmt.id
+                                                                        ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700'
+                                                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'
+                                                                }`}
+                                                            >
+                                                                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{stmt.name}</div>
+                                                                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">{stmt.sql_text}</div>
+                                                            </button>
+                                                        ))}
+                                                        {filteredSqlStatements.length === 0 && (
+                                                            <div className="p-3 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 text-center">
+                                                                {t('querybuilder.no_sql_statements', 'No SQL statements found.')}
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-[10px]">
-                                                                <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_query_card_subtitle')}</span>
-                                                                <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
-                                                                    {t('querybuilder.new_query_card_type')}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setEntryMode('new');
-                                                            setStartAction('new');
-                                                            setActiveWidgetId(null);
-                                                            setWidgetName('');
-                                                            setSelectedSqlStatementId('');
-                                                            setResults([]);
-                                                            setError('');
-                                                            setVisType('text');
-                                                            setVisConfig(prev => ({ ...prev, type: 'text', textContent: prev.textContent || '' }));
-                                                            gotoStep(3);
-                                                        }}
-                                                        className={`w-full p-3 rounded-lg border flex items-center gap-2 transition-all ${
-                                                            isTextWidget && entryMode === 'new' && !activeWidgetId
-                                                                ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 text-blue-700'
-                                                                : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'
-                                                        }`}
-                                                    >
-                                                        <Edit3 className="w-4 h-4 flex-shrink-0" />
-                                                        <div className="flex-1 min-w-0 text-left">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="text-sm font-bold truncate">{t('querybuilder.new_text_card_title')}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-[10px]">
-                                                                <span className="text-slate-400 truncate max-w-[180px] font-mono">{t('querybuilder.new_text_card_subtitle')}</span>
-                                                                <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
-                                                                    {t('querybuilder.new_text_card_type')}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </button>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 px-1">
+                                                        {t('querybuilder.new_without_query_hint', 'Ohne Auswahl und mit Klick auf Weiter wird ein neues Text-Widget ohne Datenabfrage erstellt.')}
+                                                    </p>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-2 animate-in fade-in duration-300">
@@ -763,7 +878,26 @@ export const QueryBuilderView: React.FC = () => {
                                                     </div>
                                                     <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar pr-1">
                                                         {filteredSavedWidgets.map(w => (
-                                                            <div key={w.id} className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`} onClick={() => loadWidget(w)}>
+                                                            <div
+                                                                key={w.id}
+                                                                className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`}
+                                                                onClick={() => {
+                                                                    if (activeWidgetId === w.id) {
+                                                                        setActiveWidgetId(null);
+                                                                        setWidgetName('');
+                                                                        setSelectedSqlStatementId('');
+                                                                        setSql('');
+                                                                        setLastRunSql('');
+                                                                        setResults([]);
+                                                                        setError('');
+                                                                        setVisType('table');
+                                                                        setSidebarTab('source');
+                                                                        setGuidedStep(1);
+                                                                        return;
+                                                                    }
+                                                                    loadWidget(w, false);
+                                                                }}
+                                                            >
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="font-bold text-slate-700 dark:text-slate-200 text-xs truncate">{w.name}</span>
                                                                     {!isReadOnly && (
@@ -795,141 +929,42 @@ export const QueryBuilderView: React.FC = () => {
                                             )}
                                         </div>
                                     )}
-                                    {guidedStep === 1 ? null : showFinalizePanel ? (
-                                        <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/60 space-y-3">
-                                            <p className="text-[10px] font-black uppercase tracking-wide text-blue-500">
-                                                {t('querybuilder.step_finalize')}
-                                            </p>
-                                            <p className="text-xs text-slate-700 font-semibold">
-                                                {widgetName || t('querybuilder.new_report')}
-                                            </p>
-                                            <div className="space-y-2 text-[11px]">
-                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
-                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_mode')}</div>
-                                                    <div className="mt-1 text-slate-700">{modeInfoText}</div>
-                                                </div>
-                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
-                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_source')}</div>
-                                                    <div className="mt-1 text-slate-700">
-                                                        {isTextWidget
-                                                            ? t('querybuilder.new_text_card_type')
-                                                            : t('querybuilder.sql_manager_source', 'SQL Manager Source')}
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
-                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_chart')}</div>
-                                                    <div className="mt-1 text-slate-700 font-semibold">{previewTypeMeta.label}</div>
-                                                    {!isTextWidget && (
-                                                        <div className="mt-1 text-[10px] text-slate-500">
-                                                            {t('querybuilder.finalize_axes', {
-                                                                x: visConfig.xAxis || '-',
-                                                                count: (visConfig.yAxes || []).length
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                    {isTextWidget && (
-                                                        <div className="mt-1 text-[10px] text-slate-500">
-                                                            {t('querybuilder.finalize_text_length', { count: (visConfig.textContent || '').trim().length })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
-                                                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.preview', { count: results.length })}</div>
-                                                    <div className={`mt-1 text-[11px] font-semibold ${previewVisualizationInvalid ? 'text-amber-700' : 'text-emerald-700'}`}>
-                                                        {previewVisualizationInvalid ? t('querybuilder.preview_not_renderable_title') : t('querybuilder.finalize_ready')}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {!isReadOnly && (
-                                                <button
-                                                    onClick={() => setSaveModalOpen(true)}
-                                                    disabled={saveDisabled}
-                                                    className="w-full px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-sm disabled:opacity-50"
-                                                >
-                                                    {activeWidgetId ? t('querybuilder.update_widget') : t('querybuilder.save_as_widget')}
-                                                </button>
-                                            )}
-                                        </div>
-                                    ) : (
+                                    {guidedStep === 1 ? null : (
                                         <div className="space-y-0">
-                                            <div className="mb-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                                                        {t('querybuilder.sql_manager_source', 'SQL Manager Source')}
-                                                    </h4>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => { void refreshSqlStatements(); }}
-                                                        className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
-                                                    >
-                                                        {t('common.refresh', 'Refresh')}
-                                                    </button>
+                                            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 overflow-hidden">
+                                                <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between">
+                                                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                        <span className="font-mono">SQL</span> {t('querybuilder.direct_editor')}
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-500">{t('common.read_only')}</span>
                                                 </div>
-                                                <div className="relative">
-                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                                    <input
-                                                        value={sqlStatementSearchTerm}
-                                                        onChange={(e) => setSqlStatementSearchTerm(e.target.value)}
-                                                        placeholder={t('querybuilder.search_sql_statements', 'Search SQL statements...')}
-                                                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                                <div className="max-h-36 overflow-y-auto custom-scrollbar space-y-1 pr-1">
-                                                    {filteredSqlStatements.map((stmt) => (
-                                                        <button
-                                                            key={stmt.id}
-                                                            type="button"
-                                                            onClick={() => applySqlStatementSource(stmt)}
-                                                            className={`w-full text-left p-2 rounded-lg border transition-all ${
-                                                                selectedSqlStatementId === stmt.id
-                                                                    ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700'
-                                                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'
-                                                            }`}
-                                                        >
-                                                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{stmt.name}</div>
-                                                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">{stmt.sql_text}</div>
-                                                        </button>
-                                                    ))}
-                                                    {filteredSqlStatements.length === 0 && (
-                                                        <div className="p-2 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 text-center">
-                                                            {t('querybuilder.no_sql_statements', 'No SQL statements found.')}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="overflow-hidden rounded-t-xl border border-b-0 border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex">
-                                                <div className="flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase bg-slate-900 dark:bg-slate-800 text-slate-100">
-                                                    <span className="font-mono text-[10px]">SQL</span> {t('querybuilder.direct_editor')}
-                                                </div>
-                                            </div>
-                                            <div className="p-4 rounded-b-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-2 -mt-px">
-                                                <>
+                                                <div className="p-3 space-y-2">
                                                     <div className="flex items-center justify-between">
                                                         <label className="text-[10px] font-black uppercase text-slate-400">{t('querybuilder.sql_query')}</label>
                                                         {!isTextWidget && (
                                                             <span className="text-[10px] text-slate-500">
-                                                                {t('querybuilder.widget_studio_sql_source_hint', 'SQL waehlen im SQL-Manager oben')}
+                                                                {t('querybuilder.widget_studio_sql_locked_hint', 'SQL-Auswahl erfolgt im Startschritt unter Neu.')}
                                                             </span>
                                                         )}
                                                     </div>
                                                     <textarea
                                                         value={sql}
                                                         readOnly
-                                                        className="w-full font-mono text-xs p-3 bg-slate-900 text-slate-100 rounded-lg outline-none resize-none cursor-default"
+                                                        className="w-full font-mono text-xs p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded-lg outline-none resize-none cursor-default"
                                                         style={{ height: `${Math.max(220, Math.min(700, sqlEditorHeight))}px` }}
                                                         placeholder="SELECT * FROM..."
                                                     />
-                                                </>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
                                     {error && <div className="bg-red-50 text-red-600 text-[10px] p-3 rounded-lg border border-red-100 flex items-start gap-2 font-mono break-all"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{error}</div>}
                                 </div>
-                            ) : (
+                            ) : effectiveSidebarTab === 'visual' ? (
                                 <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-4 animate-in slide-in-from-right-4 duration-300">
                                     <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><Layout className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.graph_type')}</h3>
                                     <div className="grid grid-cols-3 gap-2">
-                                            {(isTextWidget
+                                            {(!sqlMatchesSelectedStatement
                                                 ? [
                                                     { id: 'text', icon: Edit3, label: t('querybuilder.text') }
                                                 ]
@@ -951,6 +986,11 @@ export const QueryBuilderView: React.FC = () => {
                                             </button>
                                         ))}
                                     </div>
+                                    {!sqlMatchesSelectedStatement && (
+                                        <p className="text-[10px] text-slate-500">
+                                            {t('querybuilder.visual_text_only_hint', 'Ohne ausgewaehlte Abfrage ist nur ein Text-Widget verfuegbar.')}
+                                        </p>
+                                    )}
                                     {(visType !== 'table' && visType !== 'pivot' && visType !== 'text') && (
                                         <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('querybuilder.labels')}:</span>
@@ -1175,6 +1215,61 @@ export const QueryBuilderView: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+                            ) : (
+                                <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/60 dark:bg-blue-950/20 space-y-3 animate-in slide-in-from-right-4 duration-300">
+                                    <p className="text-[10px] font-black uppercase tracking-wide text-blue-500">
+                                        {t('querybuilder.step_finalize')}
+                                    </p>
+                                    <div className="rounded-lg border border-blue-100 dark:border-blue-900 bg-white dark:bg-slate-900 px-3 py-2">
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.archive_name')}</label>
+                                        <input
+                                            value={widgetName}
+                                            onChange={e => setWidgetName(e.target.value)}
+                                            placeholder={t('querybuilder.archive_placeholder')}
+                                            className="mt-1 w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 text-[11px]">
+                                        <div className="rounded-lg border border-blue-100 dark:border-blue-900 bg-white dark:bg-slate-900 px-3 py-2">
+                                            <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_mode')}</div>
+                                            <div className="mt-1 text-slate-700 dark:text-slate-200">{modeInfoText}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-blue-100 dark:border-blue-900 bg-white dark:bg-slate-900 px-3 py-2">
+                                            <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_source')}</div>
+                                            <div className="mt-1 text-slate-700 dark:text-slate-200">
+                                                {isTextWidget
+                                                    ? t('querybuilder.new_text_card_type')
+                                                    : t('querybuilder.sql_manager_source', 'SQL Manager Source')}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg border border-blue-100 dark:border-blue-900 bg-white dark:bg-slate-900 px-3 py-2">
+                                            <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.finalize_chart')}</div>
+                                            <div className="mt-1 text-slate-700 dark:text-slate-200 font-semibold">{previewTypeMeta.label}</div>
+                                            {!isTextWidget && (
+                                                <div className="mt-1 text-[10px] text-slate-500">
+                                                    {t('querybuilder.finalize_axes', {
+                                                        x: visConfig.xAxis || '-',
+                                                        count: (visConfig.yAxes || []).length
+                                                    })}
+                                                </div>
+                                            )}
+                                            {isTextWidget && (
+                                                <div className="mt-1 text-[10px] text-slate-500">
+                                                    {t('querybuilder.finalize_text_length', { count: (visConfig.textContent || '').trim().length })}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="rounded-lg border border-blue-100 dark:border-blue-900 bg-white dark:bg-slate-900 px-3 py-2">
+                                            <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">{t('querybuilder.preview', { count: results.length })}</div>
+                                            <div className={`mt-1 text-[11px] font-semibold ${previewVisualizationInvalid ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                {previewVisualizationInvalid ? t('querybuilder.preview_not_renderable_title') : t('querybuilder.finalize_ready')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {saveDisabled && saveBlockedHint && (
+                                        <p className="text-[10px] text-amber-700">{saveBlockedHint}</p>
+                                    )}
+                                </div>
                             )}
                         </div>
                         {showGuidedFooter && (
@@ -1183,7 +1278,7 @@ export const QueryBuilderView: React.FC = () => {
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => {
-                                                const previousStep = (isTextWidget && guidedStep === 3)
+                                                const previousStep = (guidedStep === 3)
                                                     ? 1
                                                     : Math.max(1, guidedStep - 1);
                                                 gotoStep(previousStep as GuidedStep);
@@ -1211,6 +1306,9 @@ export const QueryBuilderView: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
+                                {guidedNextDisabled && guidedBlockedHint && (
+                                    <p className="mt-2 text-center text-[10px] text-amber-700">{guidedBlockedHint}</p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1218,37 +1316,102 @@ export const QueryBuilderView: React.FC = () => {
 
                     {/* Preview Area */}
                     <div id="query-visualization" className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full min-h-[320px] sm:min-h-[380px] lg:min-h-[460px] relative">
-                        <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('querybuilder.preview', { count: results.length })}</h3>
-                            <button onClick={() => setIsMaximized(!isMaximized)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md text-slate-400 transition-all flex items-center gap-1.5 shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                                {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                                <span className="text-[9px] font-black uppercase tracking-widest">{isMaximized ? t('querybuilder.centered') : t('querybuilder.focus')}</span>
-                            </button>
+                        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                            <div className="p-3 flex items-center justify-between gap-2">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    {t('querybuilder.preview_panel_title', 'Vorschau')}
+                                </h3>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                                    {previewHeaderTitle}
+                                </p>
+                            </div>
+                            <div className="px-3 pb-2 border-t border-slate-100 dark:border-slate-800">
+                                <div className="pt-2 flex items-center justify-between gap-2">
+                                    <div className="inline-flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewTab('graphic')}
+                                            className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${previewTab === 'graphic'
+                                                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                            }`}
+                                        >
+                                            <BarChart2 className="w-3 h-3" />
+                                            {t('querybuilder.preview_tab_graphic', 'Grafisch')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (!isTextWidget) setPreviewTab('table'); }}
+                                            disabled={isTextWidget}
+                                            className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${previewTab === 'table'
+                                                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                            } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                        >
+                                            <TableIcon className="w-3 h-3" />
+                                            {t('querybuilder.preview_tab_table', 'Tabelle')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (!isTextWidget) setPreviewTab('sql'); }}
+                                            disabled={isTextWidget}
+                                            className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${previewTab === 'sql'
+                                                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                            } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                        >
+                                            <FileCode2 className="w-3 h-3" />
+                                            {t('querybuilder.preview_tab_sql', 'SQL')}
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsMaximized(!isMaximized)}
+                                        className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        {isMaximized ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+                                        <span>{isMaximized ? t('querybuilder.centered') : t('querybuilder.focus')}</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-auto p-4 min-h-0 container-scrollbar">
-                            {!isTextWidget && results.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                                    <Play className="w-12 h-12 mb-4 opacity-10" />
-                                    <p className="text-xs font-black uppercase tracking-widest text-center whitespace-pre-wrap">{t('querybuilder.no_data_prompt')}</p>
-                                </div>
-                            ) : (
-                                <div key={`${previewVisType}-${previewRenderVersion}`} className="h-full min-h-[260px] w-full flex flex-col">
-                                    {previewVisType === 'text' ? (
-                                        <div
-                                            className={`flex-1 p-6 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 ${
-                                                textSizeClass[visConfig.textSize || 'md']
-                                            } ${visConfig.textBold ? 'font-bold' : 'font-normal'} ${visConfig.textItalic ? 'italic' : 'not-italic'} ${visConfig.textUnderline ? 'underline' : 'no-underline'} ${
-                                                visConfig.textAlign === 'center' ? 'text-center' : visConfig.textAlign === 'right' ? 'text-right' : 'text-left'
-                                            }`}
-                                        >
-                                            {(visConfig.textContent || '').trim() || t('querybuilder.text_placeholder')}
-                                        </div>
-                                    ) : previewVisType === 'table' ? (
-                                        <DataTable columns={columns} data={results} onRowClick={item => { setSelectedItemIndex(results.indexOf(item)); setDetailModalOpen(true); }} />
-                                    ) : previewVisType === 'pivot' ? (
-                                        <PivotTable data={results} rows={visConfig.pivotRows || []} cols={visConfig.pivotCols || []} measures={visConfig.pivotMeasures || []} />
-                                    ) : previewVisualizationInvalid ? (
+                            {previewTab === 'graphic' ? (
+                                isTextWidget ? (
+                                    <div
+                                        className={`h-full min-h-[260px] p-6 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 ${
+                                            visConfig.textSize === 'sm' ? 'text-sm' :
+                                            visConfig.textSize === 'lg' ? 'text-lg' :
+                                            visConfig.textSize === 'xl' ? 'text-xl' :
+                                            visConfig.textSize === '2xl' ? 'text-2xl' : 'text-base'
+                                        } ${visConfig.textBold ? 'font-bold' : 'font-normal'} ${visConfig.textItalic ? 'italic' : 'not-italic'} ${visConfig.textUnderline ? 'underline' : 'no-underline'} ${
+                                            visConfig.textAlign === 'center' ? 'text-center' : visConfig.textAlign === 'right' ? 'text-right' : 'text-left'
+                                        }`}
+                                    >
+                                        {(visConfig.textContent || '').trim() || t('querybuilder.text_placeholder')}
+                                    </div>
+                                ) : !hasQueryPreviewTabs ? (
+                                    <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400">
+                                        <BarChart2 className="w-10 h-10 mb-3 opacity-40" />
+                                        <p className="text-xs font-bold text-center">{t('querybuilder.preview_graphic_no_query_hint', 'Keine Abfrage vorhanden. Fuer Text-Widgets steht nur die Textvorschau zur Verfuegung.')}</p>
+                                    </div>
+                                ) : results.length === 0 ? (
+                                    <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-300">
+                                        <Play className="w-12 h-12 mb-4 opacity-10" />
+                                        <p className="text-xs font-black uppercase tracking-widest text-center whitespace-pre-wrap">{t('querybuilder.no_data_prompt')}</p>
+                                    </div>
+                                ) : previewVisType === 'table' ? (
+                                    <DataTable columns={columns} data={results} onRowClick={item => { setSelectedItemIndex(results.indexOf(item)); setDetailModalOpen(true); }} />
+                                ) : previewVisType === 'pivot' ? (
+                                    <PivotTable data={results} rows={visConfig.pivotRows || []} cols={visConfig.pivotCols || []} measures={visConfig.pivotMeasures || []} />
+                                ) : !isGraphicCapableType ? (
+                                    <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400">
+                                        <Layout className="w-10 h-10 mb-3 opacity-40" />
+                                        <p className="text-xs font-bold text-center">{t('querybuilder.preview_graphic_not_selected_hint', 'Fuer die grafische Ansicht bitte einen Diagrammtyp auswaehlen.')}</p>
+                                    </div>
+                                ) : (
+                                    <div key={`${previewVisType}-${previewRenderVersion}`} className="h-full min-h-[260px] w-full flex flex-col">
+                                    {previewVisualizationInvalid ? (
                                         <div className="flex-1 flex items-center justify-center p-6">
                                             <div className="max-w-md w-full rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-4">
                                                 <div className="flex items-start gap-3">
@@ -1396,6 +1559,36 @@ export const QueryBuilderView: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+                                )
+                            ) : previewTab === 'table' ? (
+                                !hasQueryPreviewTabs ? (
+                                    <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400">
+                                        <TableIcon className="w-10 h-10 mb-3 opacity-40" />
+                                        <p className="text-xs font-bold text-center">{t('querybuilder.preview_no_data_source', 'Keine Datenquelle ausgewaehlt.')}</p>
+                                    </div>
+                                ) : results.length === 0 ? (
+                                    <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-300">
+                                        <Play className="w-12 h-12 mb-4 opacity-10" />
+                                        <p className="text-xs font-black uppercase tracking-widest text-center whitespace-pre-wrap">{t('querybuilder.no_data_prompt')}</p>
+                                    </div>
+                                ) : (
+                                    <DataTable columns={columns} data={results} onRowClick={item => { setSelectedItemIndex(results.indexOf(item)); setDetailModalOpen(true); }} />
+                                )
+                            ) : (
+                                !hasQueryPreviewTabs ? (
+                                    <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400">
+                                        <FileCode2 className="w-10 h-10 mb-3 opacity-40" />
+                                        <p className="text-xs font-bold text-center">{t('querybuilder.preview_no_data_source', 'Keine Datenquelle ausgewaehlt.')}</p>
+                                    </div>
+                                ) : (
+                                    <div className="h-full">
+                                        <textarea
+                                            value={sql}
+                                            readOnly
+                                            className="w-full h-full min-h-[260px] font-mono text-xs p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded-lg outline-none resize-none"
+                                        />
+                                    </div>
+                                )
                             )}
                         </div>
                     </div>
@@ -1412,12 +1605,7 @@ export const QueryBuilderView: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex justify-end gap-2 pt-2">
-                        {activeWidgetId && (
-                            <button onClick={() => { setActiveWidgetId(null); handleSaveWidget(); }} className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg flex items-center gap-2">
-                                {t('querybuilder.save_new')}
-                            </button>
-                        )}
-                        <button onClick={handleSaveWidget} disabled={!widgetName} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs shadow-lg flex items-center gap-2">
+                        <button onClick={() => { void handleSaveWidget('update'); }} disabled={!widgetName} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs shadow-lg flex items-center gap-2">
                             <Check className="w-4 h-4" /> {t('common.save')}
                         </button>
                     </div>
@@ -1435,5 +1623,6 @@ export const QueryBuilderView: React.FC = () => {
         </PageLayout>
     );
 };
+
 
 
