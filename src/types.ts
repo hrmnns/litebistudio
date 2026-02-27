@@ -154,6 +154,10 @@ export interface ReportPackItem {
     id: string;
     titleOverride?: string;
     orientation?: 'portrait' | 'landscape';
+    pageTemplate?: 'summary' | 'kpi' | 'detail';
+    pageComment?: string;
+    pageStatus?: 'ok' | 'warning' | 'critical' | 'info';
+    statusThreshold?: string;
 }
 
 export interface ReportPackConfig {
@@ -169,6 +173,8 @@ export interface ReportPackConfig {
         headerText?: string;
         footerText?: string;
         footerMode?: 'all' | 'content_only';
+        dataAsOf?: string;
+        includeAuditAppendix?: boolean;
     };
     items: ReportPackItem[];
 }

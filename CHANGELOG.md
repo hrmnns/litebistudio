@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Reporting now supports extended package export/import workflows:
+  - PDF export refinements (including optional audit appendix / context metadata support)
+  - HTML export for offline package sharing
+  - PPT export (`.ppt`) for presentation handoff
+  - JSON export/import for package definitions.
+- Added reporting package quality and structure helpers:
+  - page template presets
+  - page status/threshold metadata
+  - global and per-page quality checks with quick-fix actions.
+- Added a global Reporting sidepanel with overview metrics, quick actions, and package quality overview.
+
+### Changed
+- Report Packages area was renamed to `Reporting` / `Berichtswesen` in navigation and main view titles.
+- Reporting package settings were moved from modal dialog to a right-side panel with fixed/sticky footer actions.
+- Reporting export actions were visually grouped and icon semantics were clarified for better usability.
+
+### Fixed
+- Fixed dark-mode styling in the `Manage Categories` dialog within Reporting.
+- Fixed unstable text input behavior in report package settings sidepanel fields (characters could be dropped while typing).
+- Fixed mojibake in report package subtitle metadata (`â€¢`) by replacing it with a clean separator (`|`).
+
 ## [1.2.0] - 2026-02-27
 
 ### Added

@@ -20,7 +20,7 @@ import type { TableIndexInfo } from '../../lib/repositories/SystemRepository';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
+import { getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -926,40 +926,62 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                                     <button
                                         onClick={async () => {
-                                            if (useEncryption && backupPassword.length < 4) {
-                                                await appDialog.warning(t('datasource.backup_password_error'));
-                                                return;
-                                            }
-
-                                            const { exportDatabase } = await import('../../lib/db');
-                                            const bytes = await exportDatabase();
-                                            const plainBuffer = new Uint8Array(bytes).buffer;
-                                            let outputBuffer: ArrayBuffer = plainBuffer;
-
-                                            if (useEncryption) {
-                                                outputBuffer = await encryptBuffer(plainBuffer, backupPassword);
-                                            }
-
-                                            const fileName = buildBackupFileName(backupNamePattern, useEncryption);
-                                            let savedToRememberedLocation = false;
-                                            if (backupUseSavedLocation && backupDirectorySupported) {
-                                                try {
-                                                    savedToRememberedLocation = await saveBackupToRememberedDirectory(outputBuffer, fileName);
-                                                } catch {
-                                                    savedToRememberedLocation = false;
+                                            try {
+                                                if (useEncryption && backupPassword.length < 4) {
+                                                    await appDialog.warning(t('datasource.backup_password_error'));
+                                                    return;
                                                 }
-                                            }
 
-                                            if (!savedToRememberedLocation) {
-                                                const blob = new Blob([outputBuffer], { type: 'application/x-sqlite3' });
-                                                const url = URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                a.download = fileName;
-                                                a.click();
+                                                const { exportDatabase } = await import('../../lib/db');
+                                                const bytes = await exportDatabase();
+                                                const plainBuffer = new Uint8Array(bytes).buffer;
+                                                let outputBuffer: ArrayBuffer = plainBuffer;
+
+                                                if (useEncryption) {
+                                                    outputBuffer = await encryptBuffer(plainBuffer, backupPassword);
+                                                }
+
+                                                const fileName = buildBackupFileName(backupNamePattern, useEncryption);
+                                                let savedToRememberedLocation = false;
+                                                if (backupUseSavedLocation && backupDirectorySupported) {
+                                                    try {
+                                                        savedToRememberedLocation = await saveBackupToRememberedDirectory(outputBuffer, fileName);
+                                                    } catch {
+                                                        savedToRememberedLocation = false;
+                                                    }
+                                                }
+
+                                                if (!savedToRememberedLocation) {
+                                                    const blob = new Blob([outputBuffer], { type: 'application/x-sqlite3' });
+                                                    const url = URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = fileName;
+                                                    a.click();
+                                                }
+
+                                                markBackupComplete();
+                                                if (useEncryption) setBackupPassword('');
+                                                const savedFolderLabel = getSavedBackupDirectoryLabel();
+                                                const locationHint = savedToRememberedLocation
+                                                    ? (savedFolderLabel
+                                                        ? t('datasource.backup_saved_location_named', { folder: savedFolderLabel })
+                                                        : t('datasource.backup_saved_location_remembered', 'Remembered backup folder'))
+                                                    : t('datasource.backup_saved_location_downloads', 'Browser download folder');
+                                                await appDialog.info(
+                                                    t(
+                                                        'datasource.backup_saved_success_details',
+                                                        {
+                                                            fileName,
+                                                            location: locationHint
+                                                        }
+                                                    )
+                                                );
+                                            } catch (err: unknown) {
+                                                await appDialog.error(
+                                                    `${t('datasource.backup_save_failed', 'Backup could not be created.')}: ${getErrorMessage(err)}`
+                                                );
                                             }
-                                            markBackupComplete();
-                                            if (useEncryption) setBackupPassword('');
                                         }}
                                         className={`flex items-center justify-center gap-2 p-3 border rounded-lg text-sm font-bold transition-colors ${useEncryption ? 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700' : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                                     >

@@ -2236,6 +2236,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                                                 prev.includes(col) ? prev.filter(item => item !== col) : [...prev, col]
                                                             ));
                                                         }}
+                                                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 accent-blue-600 dark:accent-blue-500 focus:ring-blue-500/50"
                                                     />
                                                     <span className="font-mono">{col}</span>
                                                 </label>
@@ -2321,6 +2322,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                                                     prev.includes(col) ? prev.filter(item => item !== col) : [...prev, col]
                                                                 ));
                                                             }}
+                                                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 accent-blue-600 dark:accent-blue-500 focus:ring-blue-500/50"
                                                         />
                                                         <span className="font-mono">{col}</span>
                                                     </label>
@@ -2581,8 +2583,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
                             </div>
 
-                            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
-                            <div className="flex flex-wrap gap-2">
+                            <div className="mt-3 -mx-5 -mb-5 px-5 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/90">
+                            <div className="flex flex-wrap justify-center gap-2">
                                 <button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('replace'); }}
@@ -2786,7 +2788,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                         </div>
                     </div>
                     {sqlLimitNotice && (
-                        <div className="mt-2 px-3 py-2 text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-800">
+                        <div className="mt-2 px-3 py-2 text-xs rounded-md border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200">
                             {sqlLimitNotice}
                         </div>
                     )}

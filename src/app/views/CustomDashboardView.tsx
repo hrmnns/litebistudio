@@ -782,11 +782,11 @@ export const CustomDashboardView: React.FC = () => {
             <Modal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} title={t('dashboard.manage_title')}>
                 <div className="space-y-3">
                     {dashboards.map(d => (
-                        <div key={d.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg group">
+                        <div key={d.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg group">
                             <div className="flex items-center gap-3">
-                                <Layout className="w-4 h-4 text-slate-400" />
-                                <span className="font-bold text-slate-700">{d.name}</span>
-                                {d.is_default && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Default</span>}
+                                <Layout className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                <span className="font-bold text-slate-700 dark:text-slate-200">{d.name}</span>
+                                {d.is_default && <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Default</span>}
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
@@ -796,14 +796,14 @@ export const CustomDashboardView: React.FC = () => {
                                             syncDashboard({ ...d, name: newName });
                                         }
                                     }}
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
                                 >
                                     <Edit2 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                     onClick={() => removeDashboard(d.id)}
                                     disabled={dashboards.length <= 1}
-                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-30"
+                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded disabled:opacity-30"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -812,7 +812,7 @@ export const CustomDashboardView: React.FC = () => {
                     ))}
                     <button
                         onClick={() => { setIsManageModalOpen(false); setIsCreating(true); }}
-                        className="w-full p-3 border-2 border-dashed border-slate-100 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-200 text-sm font-bold transition-all flex items-center justify-center gap-2"
+                        className="w-full p-3 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-200 dark:hover:border-blue-700 text-sm font-bold transition-all flex items-center justify-center gap-2"
                     >
                         <Plus className="w-4 h-4" /> Neues Dashboard
                     </button>

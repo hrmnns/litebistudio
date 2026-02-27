@@ -5,13 +5,14 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { SettingsRepository } from '../../lib/repositories/SettingsRepository';
 import { useAsync } from '../../hooks/useAsync';
 import {
-    Plus, FileText, Trash2, Download,
+    Plus, FileText, Trash2, Globe, FileCode2, FileSpreadsheet,
     Layout, Database, ChevronRight, Settings,
-    BookOpen, User, MoveUp, MoveDown, Check, X, Edit2, Maximize2, Minimize2, ArrowRightLeft
+    BookOpen, User, MoveUp, MoveDown, Check, X, Edit2, Maximize2, Minimize2, ArrowRightLeft, Upload, FileDown
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import WidgetRenderer from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
+import { RightOverlayPanel } from '../components/ui/RightOverlayPanel';
 import { type ReportPack, type ReportPackItem, type DbRow, type WidgetConfig } from '../../types';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { appDialog } from '../../lib/appDialog';
@@ -52,17 +53,22 @@ const ReportPackView: React.FC = () => {
     const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
     const [moveMenuPackId, setMoveMenuPackId] = useState<string | null>(null);
     const logoFileInputRef = useRef<HTMLInputElement | null>(null);
+    const packImportInputRef = useRef<HTMLInputElement | null>(null);
+    const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+    const [importTargetPackId, setImportTargetPackId] = useState<string | null>(null);
     const [settingsSections, setSettingsSections] = useState({
         general: true,
         cover: true,
         headerFooter: true,
         pageOptions: true,
+        quality: true,
         preview: true
     });
+    const [isReportingPanelOpen, setIsReportingPanelOpen] = useState(false);
     const { isReadOnly } = useDashboard();
 
     // Export State
-    const { isExporting, exportProgress, exportPackageToPdf } = useReportExport();
+    const { isExporting, exportProgress, exportPackageToPdf, exportPackageToHtml, exportPackageToPpt } = useReportExport();
 
     // Data
     const { data: allDashboards } = useAsync<DashboardRow[]>(() => SystemRepository.getDashboards() as Promise<DashboardRow[]>, []);
@@ -162,6 +168,147 @@ const ReportPackView: React.FC = () => {
         setSettingsSections(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
+    const getPageTemplateDefaults = (templateId: 'summary' | 'kpi' | 'detail') => {
+        if (templateId === 'summary') {
+            return {
+                orientation: 'landscape' as const,
+                pageStatus: 'info' as const,
+                statusThreshold: t('reports.template_summary_threshold', 'Top KPIs within plan'),
+                pageComment: t('reports.template_summary_comment', 'Management summary with key trends and highlights.')
+            };
+        }
+        if (templateId === 'kpi') {
+            return {
+                orientation: 'portrait' as const,
+                pageStatus: 'ok' as const,
+                statusThreshold: t('reports.template_kpi_threshold', 'Target >= 95%'),
+                pageComment: t('reports.template_kpi_comment', 'Focused KPI page with target, variance and interpretation.')
+            };
+        }
+        return {
+            orientation: 'landscape' as const,
+            pageStatus: 'warning' as const,
+            statusThreshold: t('reports.template_detail_threshold', 'Review outliers and exceptions'),
+            pageComment: t('reports.template_detail_comment', 'Detailed analysis page with drilldown context and notes.')
+        };
+    };
+
+    const applyPageTemplate = (itemIndex: number, templateId: 'summary' | 'kpi' | 'detail', fallbackName: string) => {
+        if (!activePack) return;
+        const nextItems = [...activePack.config.items];
+        const current = nextItems[itemIndex];
+        if (!current) return;
+        const defaults = getPageTemplateDefaults(templateId);
+        nextItems[itemIndex] = {
+            ...current,
+            pageTemplate: templateId,
+            titleOverride: current.titleOverride || `${t(`reports.template_${templateId}`, templateId)} - ${fallbackName}`,
+            orientation: defaults.orientation,
+            pageStatus: defaults.pageStatus,
+            statusThreshold: defaults.statusThreshold,
+            pageComment: defaults.pageComment
+        };
+        void handleSave({ ...activePack, config: { ...activePack.config, items: nextItems } });
+    };
+
+    const getPackItemMetaName = useCallback((item: ReportPackItem): string => {
+        if (item.type === 'dashboard') return allDashboards?.find(d => d.id === item.id)?.name || 'Dashboard';
+        return allWidgets?.find(w => w.id === item.id)?.name || 'Widget';
+    }, [allDashboards, allWidgets]);
+
+    const getPackItemHasDataSource = useCallback((item: ReportPackItem): boolean => {
+        if (item.type === 'widget') {
+            const widget = allWidgets?.find(w => w.id === item.id);
+            return Boolean(widget?.sql_query && widget.sql_query.trim().length > 0);
+        }
+        const dashboard = allDashboards?.find(d => d.id === item.id) as DashboardRow & { layout?: Array<{ id?: string }> } | undefined;
+        const layout = Array.isArray(dashboard?.layout) ? (dashboard?.layout || []) : [];
+        return layout.some(ref => {
+            const widgetId = typeof ref?.id === 'string' ? ref.id : '';
+            const widget = allWidgets?.find(w => w.id === widgetId);
+            return Boolean(widget?.sql_query && widget.sql_query.trim().length > 0);
+        });
+    }, [allDashboards, allWidgets]);
+
+    const getPackItemIssues = useCallback((item: ReportPackItem): string[] => {
+        const issues: string[] = [];
+        if (!item.titleOverride?.trim()) issues.push(t('reports.quality_missing_title', 'Missing page title'));
+        if (!item.pageTemplate) issues.push(t('reports.quality_missing_template', 'No template selected'));
+        if (!item.pageStatus) issues.push(t('reports.quality_missing_status', 'No status set'));
+        if (!item.statusThreshold?.trim()) issues.push(t('reports.quality_missing_threshold', 'No threshold/target note'));
+        if (!item.pageComment?.trim()) issues.push(t('reports.quality_missing_comment', 'No page comment'));
+        if (!getPackItemHasDataSource(item)) issues.push(t('reports.quality_missing_data_source', 'No data source linked'));
+        return issues;
+    }, [getPackItemHasDataSource, t]);
+
+    const qualityChecks = useMemo(() => {
+        if (!activePack) return [];
+        return activePack.config.items.map((item, index) => {
+            const issues = getPackItemIssues(item);
+            return {
+                index,
+                name: getPackItemMetaName(item),
+                issues
+            };
+        });
+    }, [activePack, getPackItemIssues, getPackItemMetaName]);
+
+    const qualityIssueCount = qualityChecks.reduce((sum, entry) => sum + entry.issues.length, 0);
+
+    const globalQualityByPack = useMemo(() => {
+        return packs
+            .map((pack) => {
+                const issues = pack.config.items.reduce((sum, item) => sum + getPackItemIssues(item).length, 0);
+                return {
+                    id: pack.id,
+                    name: pack.name,
+                    pageCount: pack.config.items.length,
+                    issues
+                };
+            })
+            .sort((a, b) => b.issues - a.issues || a.name.localeCompare(b.name));
+    }, [packs, getPackItemIssues]);
+
+    const globalIssueCount = globalQualityByPack.reduce((sum, entry) => sum + entry.issues, 0);
+    const totalPageCount = packs.reduce((sum, pack) => sum + pack.config.items.length, 0);
+
+    const applyQualityFix = (itemIndex: number) => {
+        if (!activePack) return;
+        const nextItems = [...activePack.config.items];
+        const item = nextItems[itemIndex];
+        if (!item) return;
+        const fallbackName = getPackItemMetaName(item);
+        const nextTemplate = item.pageTemplate || 'summary';
+        const defaults = getPageTemplateDefaults(nextTemplate);
+        nextItems[itemIndex] = {
+            ...item,
+            pageTemplate: nextTemplate,
+            titleOverride: item.titleOverride?.trim() ? item.titleOverride : fallbackName,
+            pageStatus: item.pageStatus || defaults.pageStatus,
+            statusThreshold: item.statusThreshold?.trim() ? item.statusThreshold : defaults.statusThreshold,
+            pageComment: item.pageComment?.trim() ? item.pageComment : defaults.pageComment
+        };
+        void handleSave({ ...activePack, config: { ...activePack.config, items: nextItems } });
+    };
+
+    const applyQualityFixAll = () => {
+        if (!activePack) return;
+        const nextItems = activePack.config.items.map((item) => {
+            const fallbackName = getPackItemMetaName(item);
+            const nextTemplate = item.pageTemplate || 'summary';
+            const defaults = getPageTemplateDefaults(nextTemplate);
+            return {
+                ...item,
+                pageTemplate: nextTemplate,
+                titleOverride: item.titleOverride?.trim() ? item.titleOverride : fallbackName,
+                pageStatus: item.pageStatus || defaults.pageStatus,
+                statusThreshold: item.statusThreshold?.trim() ? item.statusThreshold : defaults.statusThreshold,
+                pageComment: item.pageComment?.trim() ? item.pageComment : defaults.pageComment
+            };
+        });
+        void handleSave({ ...activePack, config: { ...activePack.config, items: nextItems } });
+    };
+
     const fileToDataUrl = (file: File): Promise<string> =>
         new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -189,8 +336,26 @@ const ReportPackView: React.FC = () => {
         const normalizedCategory = typeof pack.category === 'string' && pack.category.trim().length > 0
             ? pack.category.trim()
             : defaultCategory;
-        await SystemRepository.saveReportPack({ ...pack, category: normalizedCategory });
-        await loadPacks();
+        const normalizedPack: ReportPack = { ...pack, category: normalizedCategory };
+
+        // Optimistic UI update to keep typing smooth in controlled inputs.
+        setPacks(prev => {
+            const index = prev.findIndex(p => p.id === normalizedPack.id);
+            if (index >= 0) {
+                const next = [...prev];
+                next[index] = normalizedPack;
+                return next;
+            }
+            return [normalizedPack, ...prev];
+        });
+
+        // Serialize writes so rapid keystrokes cannot overwrite newer values.
+        saveQueueRef.current = saveQueueRef.current
+            .catch(() => undefined)
+            .then(async () => {
+                await SystemRepository.saveReportPack({ ...normalizedPack, category: normalizedCategory });
+            });
+        await saveQueueRef.current;
     };
 
     const saveCustomCategories = async (categories: string[]) => {
@@ -222,7 +387,9 @@ const ReportPackView: React.FC = () => {
                     showFooter: true,
                     headerText: '',
                     footerText: '',
-                    footerMode: 'content_only'
+                    footerMode: 'content_only',
+                    dataAsOf: '',
+                    includeAuditAppendix: false
                 },
                 items: []
             }
@@ -361,26 +528,68 @@ const ReportPackView: React.FC = () => {
         setMoveMenuPackId(null);
     };
 
-    const handleRunExport = async (pack: ReportPack) => {
-        setActivePackId(pack.id);
-        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-
-        const exportItems = pack.config.items.map(item => {
+    const buildPackExportPayload = (pack: ReportPack) => {
+        const sqlSources: Array<{ source: string; sql: string }> = [];
+        const exportItems = pack.config.items.map((item) => {
             if (item.type === 'dashboard') {
                 const dash = allDashboards?.find(d => d.id === item.id);
+                const dashName = dash?.name || 'Dashboard';
+                const layout = Array.isArray((dash as DashboardRow & { layout?: unknown[] })?.layout)
+                    ? ((dash as DashboardRow & { layout?: Array<{ id?: string }> }).layout || [])
+                    : [];
+                layout.forEach((ref) => {
+                    const widgetId = typeof ref?.id === 'string' ? ref.id : '';
+                    if (!widgetId) return;
+                    const widget = allWidgets?.find(w => w.id === widgetId);
+                    if (widget?.sql_query) {
+                        sqlSources.push({
+                            source: `${dashName} / ${widget.name}`,
+                            sql: widget.sql_query
+                        });
+                    }
+                });
                 return {
                     elementId: `export-dash-${item.id}`,
-                    title: item.titleOverride || dash?.name || 'Dashboard',
+                    title: item.titleOverride || dashName,
+                    subtitle: item.pageComment || '',
+                    status: item.pageStatus,
+                    threshold: item.statusThreshold || '',
                     orientation: item.orientation || 'landscape' as const
                 };
             }
             const widget = allWidgets?.find(w => w.id === item.id);
+            const widgetName = widget?.name || 'Widget';
+            if (widget?.sql_query) {
+                sqlSources.push({
+                    source: widgetName,
+                    sql: widget.sql_query
+                });
+            }
             return {
                 elementId: `export-widget-${item.id}`,
-                title: item.titleOverride || widget?.name || 'Widget',
+                title: item.titleOverride || widgetName,
+                subtitle: item.pageComment || '',
+                status: item.pageStatus,
+                threshold: item.statusThreshold || '',
                 orientation: item.orientation || 'landscape' as const
             };
         });
+
+        return {
+            exportItems,
+            auditMeta: {
+                packName: pack.name,
+                generatedAt: new Date().toISOString(),
+                dataAsOf: pack.config.exportOptions?.dataAsOf,
+                sqlSources
+            }
+        };
+    };
+
+    const handleRunExport = async (pack: ReportPack) => {
+        setActivePackId(pack.id);
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        const { exportItems, auditMeta } = buildPackExportPayload(pack);
 
         await exportPackageToPdf(
             pack.name,
@@ -392,14 +601,140 @@ const ReportPackView: React.FC = () => {
                 logoUrl: pack.config.coverLogoUrl?.trim(),
                 themeColor: pack.config.themeColor
             },
-            pack.config.exportOptions
+            pack.config.exportOptions,
+            auditMeta
         );
+    };
+
+    const handleRunHtmlExport = async (pack: ReportPack) => {
+        setActivePackId(pack.id);
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        const { exportItems, auditMeta } = buildPackExportPayload(pack);
+
+        await exportPackageToHtml(
+            pack.name,
+            exportItems,
+            {
+                title: pack.config.coverTitle,
+                subtitle: pack.config.coverSubtitle,
+                author: pack.config.author,
+                logoUrl: pack.config.coverLogoUrl?.trim(),
+                themeColor: pack.config.themeColor
+            },
+            pack.config.exportOptions,
+            auditMeta
+        );
+    };
+
+    const handleRunPptExport = async (pack: ReportPack) => {
+        setActivePackId(pack.id);
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        const { exportItems, auditMeta } = buildPackExportPayload(pack);
+
+        await exportPackageToPpt(
+            pack.name,
+            exportItems,
+            {
+                title: pack.config.coverTitle,
+                subtitle: pack.config.coverSubtitle,
+                author: pack.config.author,
+                logoUrl: pack.config.coverLogoUrl?.trim(),
+                themeColor: pack.config.themeColor
+            },
+            pack.config.exportOptions,
+            auditMeta
+        );
+    };
+
+    const handleExportPackJson = (pack: ReportPack) => {
+        const payload = {
+            type: 'litebi-report-pack',
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            pack
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+        const link = document.createElement('a');
+        const safeName = (pack.name || 'report-pack').trim().replace(/[<>:"/\\|?*]/g, '_');
+        link.download = `${safeName || 'report-pack'}.litebi-report-pack.json`;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        URL.revokeObjectURL(link.href);
+    };
+
+    const openImportPackJson = (packId: string) => {
+        setImportTargetPackId(packId);
+        packImportInputRef.current?.click();
+    };
+
+    const openGlobalImportPackJson = () => {
+        setImportTargetPackId(null);
+        packImportInputRef.current?.click();
+    };
+
+    const handleImportPackJsonFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        try {
+            const raw = await file.text();
+            const parsed = JSON.parse(raw) as unknown;
+            const candidate = (parsed && typeof parsed === 'object' && 'pack' in parsed)
+                ? (parsed as { pack: unknown }).pack
+                : parsed;
+            if (!candidate || typeof candidate !== 'object') throw new Error('Invalid JSON structure');
+            const importedPack = candidate as ReportPack;
+            if (!importedPack.name || !importedPack.config || !Array.isArray(importedPack.config.items)) {
+                throw new Error('Invalid report package payload');
+            }
+
+            const target = importTargetPackId ? getPackById(importTargetPackId) : undefined;
+            if (target) {
+                const overwrite = await appDialog.confirm(
+                    t('reports.import_overwrite_confirm', {
+                        name: target.name,
+                        defaultValue: `Replace "${target.name}" with the imported definition?`
+                    })
+                );
+                if (overwrite) {
+                    const merged: ReportPack = {
+                        ...importedPack,
+                        id: target.id,
+                        category: target.category || defaultCategory
+                    };
+                    await handleSave(merged);
+                    setActivePackId(target.id);
+                } else {
+                    const cloned: ReportPack = {
+                        ...importedPack,
+                        id: crypto.randomUUID(),
+                        category: target.category || defaultCategory,
+                        name: `${importedPack.name} (Import)`
+                    };
+                    await handleSave(cloned);
+                    setActivePackId(cloned.id);
+                }
+            } else {
+                const fresh: ReportPack = {
+                    ...importedPack,
+                    id: crypto.randomUUID(),
+                    category: importedPack.category || defaultCategory
+                };
+                await handleSave(fresh);
+                setActivePackId(fresh.id);
+            }
+            await appDialog.info(t('reports.import_success', 'Report package was imported successfully.'));
+        } catch {
+            await appDialog.error(t('reports.import_failed', 'Import failed. Invalid report package JSON.'));
+        } finally {
+            setImportTargetPackId(null);
+        }
     };
 
     return (
         <PageLayout
             header={{
-                title: t('reports.title', 'Report Packages'),
+                title: t('reports.title', 'Reporting'),
                 subtitle: t('reports.subtitle', 'Build and export multi-page management reports.'),
                 actions: (
                     <div className="flex items-center gap-2">
@@ -410,6 +745,95 @@ const ReportPackView: React.FC = () => {
                         >
                             <Plus className="w-4 h-4" /> {t('common.add')}
                         </button>
+                    </div>
+                )
+            }}
+            rightPanel={{
+                title: t('reports.panel_title', 'Reporting Assistant'),
+                triggerTitle: t('reports.panel_title', 'Reporting Assistant'),
+                enabled: true,
+                width: 'md',
+                isOpen: isReportingPanelOpen,
+                onOpenChange: setIsReportingPanelOpen,
+                content: (
+                    <div className="h-full min-h-0 flex flex-col gap-4">
+                        <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-3 space-y-3">
+                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('reports.panel_overview', 'Overview')}</div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2">
+                                    <div className="text-[10px] text-slate-400">{t('reports.panel_metric_packs', 'Packs')}</div>
+                                    <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{packs.length}</div>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2">
+                                    <div className="text-[10px] text-slate-400">{t('reports.panel_metric_pages', 'Pages')}</div>
+                                    <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{totalPageCount}</div>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2">
+                                    <div className="text-[10px] text-slate-400">{t('reports.panel_metric_issues', 'Issues')}</div>
+                                    <div className={`text-sm font-bold ${globalIssueCount > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-emerald-600 dark:text-emerald-300'}`}>{globalIssueCount}</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-3 space-y-2">
+                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('reports.panel_quick_actions', 'Quick Actions')}</div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        createPack();
+                                        setIsReportingPanelOpen(false);
+                                    }}
+                                    disabled={isReadOnly}
+                                    className="px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+                                >
+                                    {t('reports.panel_action_new_pack', 'New Pack')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={openGlobalImportPackJson}
+                                    disabled={isReadOnly}
+                                    className="px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+                                >
+                                    {t('reports.panel_action_import_json', 'Import JSON')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAllPacksExpanded(true)}
+                                    className="px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                >
+                                    {t('reports.panel_action_expand_all', 'Expand all')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAllPacksExpanded(false)}
+                                    className="px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                >
+                                    {t('reports.panel_action_collapse_all', 'Collapse all')}
+                                </button>
+                            </div>
+                        </section>
+
+                        <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-3 space-y-2 min-h-0 flex-1 flex flex-col">
+                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('reports.panel_quality_global', 'Quality (Global)')}</div>
+                            <div className="min-h-0 overflow-auto custom-scrollbar space-y-2 pr-1">
+                                {globalQualityByPack.length === 0 ? (
+                                    <div className="text-xs text-slate-400">{t('common.no_data', 'No data')}</div>
+                                ) : (
+                                    globalQualityByPack.slice(0, 8).map((entry) => (
+                                        <div
+                                            key={entry.id}
+                                            className="w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 opacity-80"
+                                        >
+                                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{entry.name}</div>
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                {entry.pageCount} {t('reports.pages', 'Pages')} · {entry.issues} {t('reports.panel_metric_issues', 'Issues')}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </section>
                     </div>
                 )
             }}
@@ -537,7 +961,7 @@ const ReportPackView: React.FC = () => {
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-slate-800 dark:text-white leading-tight truncate">{pack.name}</h3>
                                             <p className="text-xs text-slate-400">
-                                                {(pack.category || defaultCategory)} â€¢ {pack.config.items.length} {t('reports.pages', 'Pages')}
+                                                {(pack.category || defaultCategory)} | {pack.config.items.length} {t('reports.pages', 'Pages')}
                                             </p>
                                         </div>
                                     </div>
@@ -598,18 +1022,56 @@ const ReportPackView: React.FC = () => {
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         )}
-                                        <button
-                                            onClick={() => handleRunExport(pack)}
-                                            disabled={isExporting || pack.config.items.length === 0}
-                                            className="flex items-center gap-2 px-2 sm:px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:opacity-90 transition-all font-bold text-sm shadow-lg shadow-slate-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title={isExporting && isActive ? `${exportProgress}%` : t('reports.export_batch')}
-                                            aria-label={isExporting && isActive ? `${exportProgress}%` : t('reports.export_batch')}
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            <span className="hidden sm:inline">
-                                                {isExporting && isActive ? `${exportProgress}%` : t('reports.export_batch')}
-                                            </span>
-                                        </button>
+                                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
+                                            <button
+                                                onClick={() => handleRunExport(pack)}
+                                                disabled={isExporting || pack.config.items.length === 0}
+                                                className="p-2 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={isExporting && isActive ? `${exportProgress}%` : `${t('reports.export_batch')} (.pdf)`}
+                                                aria-label={isExporting && isActive ? `${exportProgress}%` : `${t('reports.export_batch')} (.pdf)`}
+                                            >
+                                                <FileDown className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => { void handleRunPptExport(pack); }}
+                                                disabled={isExporting || pack.config.items.length === 0}
+                                                className="p-2 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={`${t('reports.export_ppt', 'Export PPT')} (.ppt)`}
+                                                aria-label={`${t('reports.export_ppt', 'Export PPT')} (.ppt)`}
+                                            >
+                                                <FileSpreadsheet className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => { void handleRunHtmlExport(pack); }}
+                                                disabled={isExporting || pack.config.items.length === 0}
+                                                className="p-2 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={`${t('reports.export_html', 'Export HTML')} (.html)`}
+                                                aria-label={`${t('reports.export_html', 'Export HTML')} (.html)`}
+                                            >
+                                                <Globe className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
+                                            <button
+                                                onClick={() => handleExportPackJson(pack)}
+                                                disabled={isExporting}
+                                                className="p-2 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={`${t('reports.export_json', 'Export JSON')} (.json)`}
+                                                aria-label={`${t('reports.export_json', 'Export JSON')} (.json)`}
+                                            >
+                                                <FileCode2 className="w-4 h-4" />
+                                            </button>
+                                            {!isReadOnly && (
+                                                <button
+                                                    onClick={() => openImportPackJson(pack.id)}
+                                                    className="p-2 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                                                    title={`${t('reports.import_json', 'Import JSON')} (.json)`}
+                                                    aria-label={`${t('reports.import_json', 'Import JSON')} (.json)`}
+                                                >
+                                                    <Upload className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -721,17 +1183,31 @@ const ReportPackView: React.FC = () => {
                         );
                     })}
                 </div>
+                <input
+                    ref={packImportInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={(e) => { void handleImportPackJsonFile(e); }}
+                />
             </div>
 
-            {/* Config Modal */}
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={t('reports.pack_settings', 'Package Settings')}>
+            {/* Settings Sidepanel */}
+            <RightOverlayPanel
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                title={t('reports.pack_settings', 'Package Settings')}
+                width="md"
+                noScroll
+            >
                 {activePack && (
-                    <div className="space-y-6">
-                        <section className="space-y-3">
+                    <div className="flex h-full min-h-0 flex-col">
+                        <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-6">
+                        <section className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 p-3">
                             <button
                                 type="button"
                                 onClick={() => toggleSettingsSection('general')}
-                                className="w-full flex items-center justify-between text-left"
+                                className="w-full flex items-center justify-between text-left rounded-lg px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                             >
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider cursor-pointer">{t('reports.general')}</label>
                                 <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${settingsSections.general ? 'rotate-90' : ''}`} />
@@ -739,13 +1215,13 @@ const ReportPackView: React.FC = () => {
                             {settingsSections.general && (
                                 <div className="space-y-3">
                                     <input
-                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-xl font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500"
                                         value={activePack.name}
                                         onChange={e => handleSave({ ...activePack, name: e.target.value })}
                                         placeholder={t('reports.pack_name_placeholder')}
                                     />
                                     <input
-                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-xl font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500"
                                         value={activePack.category || defaultCategory}
                                         onChange={e => handleSave({ ...activePack, category: e.target.value })}
                                         placeholder={t('reports.category', 'Category')}
@@ -754,11 +1230,73 @@ const ReportPackView: React.FC = () => {
                             )}
                         </section>
 
-                        <section className="space-y-3">
+                        <section className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 p-3">
+                            <button
+                                type="button"
+                                onClick={() => toggleSettingsSection('quality')}
+                                className="w-full flex items-center justify-between text-left rounded-lg px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                            >
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider cursor-pointer">{t('reports.quality', 'Quality')}</label>
+                                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${settingsSections.quality ? 'rotate-90' : ''}`} />
+                            </button>
+                            {settingsSections.quality && (
+                                <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-xs text-slate-600 dark:text-slate-300">
+                                            {qualityIssueCount === 0
+                                                ? t('reports.quality_all_good', 'All pages look good.')
+                                                : t('reports.quality_issues_count', { count: qualityIssueCount, defaultValue: '{{count}} quality issues found.' })}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={applyQualityFixAll}
+                                            disabled={qualityIssueCount === 0}
+                                            className="px-2 py-1.5 rounded text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+                                        >
+                                            {t('reports.quality_fix_all', 'Fix all')}
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2 max-h-56 overflow-auto custom-scrollbar pr-1">
+                                        {qualityChecks.map((entry) => (
+                                            <div key={`quality-${entry.index}`} className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
+                                                        {entry.index + 1}. {entry.name}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => applyQualityFix(entry.index)}
+                                                        disabled={entry.issues.length === 0}
+                                                        className="px-2 py-1 rounded text-[11px] font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                    >
+                                                        {t('reports.quality_fix', 'Fix')}
+                                                    </button>
+                                                </div>
+                                                {entry.issues.length > 0 ? (
+                                                    <ul className="mt-2 space-y-1">
+                                                        {entry.issues.map((issue, idx) => (
+                                                            <li key={`${entry.index}-${idx}`} className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                                • {issue}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <div className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-300">
+                                                        {t('reports.quality_row_ok', 'No issues')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+
+                        <section className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 p-3">
                             <button
                                 type="button"
                                 onClick={() => toggleSettingsSection('cover')}
-                                className="w-full flex items-center justify-between text-left"
+                                className="w-full flex items-center justify-between text-left rounded-lg px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                             >
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider cursor-pointer">{t('reports.cover_page')}</label>
                                 <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${settingsSections.cover ? 'rotate-90' : ''}`} />
@@ -766,33 +1304,33 @@ const ReportPackView: React.FC = () => {
                             {settingsSections.cover && (
                                 <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500"><FileText className="w-3 h-3" /> {t('reports.title_label')}</div>
+                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400"><FileText className="w-3 h-3" /> {t('reports.title_label')}</div>
                                         <input
-                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm border border-slate-100 dark:border-slate-700 outline-none"
+                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
                                             value={activePack.config.coverTitle}
                                             onChange={e => handleSave({ ...activePack, config: { ...activePack.config, coverTitle: e.target.value } })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500"><ChevronRight className="w-3 h-3" /> {t('reports.subtitle_label')}</div>
+                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400"><ChevronRight className="w-3 h-3" /> {t('reports.subtitle_label')}</div>
                                         <input
-                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm border border-slate-100 dark:border-slate-700 outline-none"
+                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
                                             value={activePack.config.coverSubtitle || ''}
                                             onChange={e => handleSave({ ...activePack, config: { ...activePack.config, coverSubtitle: e.target.value } })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500"><User className="w-3 h-3" /> {t('reports.author')}</div>
+                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400"><User className="w-3 h-3" /> {t('reports.author')}</div>
                                         <input
-                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm border border-slate-100 dark:border-slate-700 outline-none"
+                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
                                             value={activePack.config.author || ''}
                                             onChange={e => handleSave({ ...activePack, config: { ...activePack.config, author: e.target.value } })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">{t('reports.logo_url', 'Logo URL')}</div>
+                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('reports.logo_url', 'Logo URL')}</div>
                                         <input
-                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm border border-slate-100 dark:border-slate-700 outline-none"
+                                            className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
                                             value={activePack.config.coverLogoUrl || ''}
                                             onChange={e => {
                                                 setFailedLogoUrl(null);
@@ -811,7 +1349,7 @@ const ReportPackView: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => logoFileInputRef.current?.click()}
-                                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors"
                                             >
                                                 {t('reports.upload_logo', 'Upload logo')}
                                             </button>
@@ -822,7 +1360,7 @@ const ReportPackView: React.FC = () => {
                                                         setFailedLogoUrl(null);
                                                         handleSave({ ...activePack, config: { ...activePack.config, coverLogoUrl: '' } });
                                                     }}
-                                                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                                                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-300 transition-colors"
                                                 >
                                                     {t('common.remove', 'Remove')}
                                                 </button>
@@ -830,7 +1368,7 @@ const ReportPackView: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">{t('reports.theme_color', 'Theme Color')}</div>
+                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('reports.theme_color', 'Theme Color')}</div>
                                         <input
                                             type="color"
                                             className="w-full h-9 bg-white dark:bg-slate-900 px-1 py-1 rounded-lg border border-slate-100 dark:border-slate-700 outline-none"
@@ -842,11 +1380,11 @@ const ReportPackView: React.FC = () => {
                             )}
                         </section>
 
-                        <section className="space-y-3">
+                        <section className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 p-3">
                             <button
                                 type="button"
                                 onClick={() => toggleSettingsSection('headerFooter')}
-                                className="w-full flex items-center justify-between text-left"
+                                className="w-full flex items-center justify-between text-left rounded-lg px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                             >
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider cursor-pointer">{t('reports.export_options', 'Header / Footer')}</label>
                                 <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${settingsSections.headerFooter ? 'rotate-90' : ''}`} />
@@ -854,9 +1392,10 @@ const ReportPackView: React.FC = () => {
                             {settingsSections.headerFooter && (
                                 <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
                                     <div className="flex items-center gap-4">
-                                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                             <input
                                                 type="checkbox"
+                                                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 accent-blue-600 dark:accent-blue-500 focus:ring-blue-500/50"
                                                 checked={activePack.config.exportOptions?.showHeader ?? true}
                                                 onChange={e => handleSave({
                                                     ...activePack,
@@ -871,9 +1410,10 @@ const ReportPackView: React.FC = () => {
                                             />
                                             {t('reports.show_header', 'Show header')}
                                         </label>
-                                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                             <input
                                                 type="checkbox"
+                                                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 accent-blue-600 dark:accent-blue-500 focus:ring-blue-500/50"
                                                 checked={activePack.config.exportOptions?.showFooter ?? true}
                                                 onChange={e => handleSave({
                                                     ...activePack,
@@ -890,7 +1430,7 @@ const ReportPackView: React.FC = () => {
                                         </label>
                                     </div>
                                     <input
-                                        className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm border border-slate-100 dark:border-slate-700 outline-none"
+                                        className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
                                         value={activePack.config.exportOptions?.headerText || ''}
                                         onChange={e => handleSave({
                                             ...activePack,
@@ -905,7 +1445,7 @@ const ReportPackView: React.FC = () => {
                                         placeholder={t('reports.header_text', 'Header text (optional)')}
                                     />
                                     <input
-                                        className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm border border-slate-100 dark:border-slate-700 outline-none"
+                                        className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
                                         value={activePack.config.exportOptions?.footerText || ''}
                                         onChange={e => handleSave({
                                             ...activePack,
@@ -919,21 +1459,54 @@ const ReportPackView: React.FC = () => {
                                         })}
                                         placeholder={t('reports.footer_text', 'Footer text (optional)')}
                                     />
+                                    <input
+                                        className="w-full bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-sm text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
+                                        value={activePack.config.exportOptions?.dataAsOf || ''}
+                                        onChange={e => handleSave({
+                                            ...activePack,
+                                            config: {
+                                                ...activePack.config,
+                                                exportOptions: {
+                                                    ...(activePack.config.exportOptions || {}),
+                                                    dataAsOf: e.target.value
+                                                }
+                                            }
+                                        })}
+                                        placeholder={t('reports.data_as_of', 'Data as of')}
+                                    />
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 accent-blue-600 dark:accent-blue-500 focus:ring-blue-500/50"
+                                            checked={activePack.config.exportOptions?.includeAuditAppendix ?? false}
+                                            onChange={e => handleSave({
+                                                ...activePack,
+                                                config: {
+                                                    ...activePack.config,
+                                                    exportOptions: {
+                                                        ...(activePack.config.exportOptions || {}),
+                                                        includeAuditAppendix: e.target.checked
+                                                    }
+                                                }
+                                            })}
+                                        />
+                                        {t('reports.include_audit_appendix', 'Include audit appendix (SQL sources)')}
+                                    </label>
                                 </div>
                             )}
                         </section>
 
-                        <section className="space-y-3">
+                        <section className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 p-3">
                             <button
                                 type="button"
                                 onClick={() => toggleSettingsSection('pageOptions')}
-                                className="w-full flex items-center justify-between text-left"
+                                className="w-full flex items-center justify-between text-left rounded-lg px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                             >
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider cursor-pointer">{t('reports.page_options', 'Per-Page Options')}</label>
                                 <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${settingsSections.pageOptions ? 'rotate-90' : ''}`} />
                             </button>
                             {settingsSections.pageOptions && (
-                                <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl max-h-[260px] overflow-y-auto custom-scrollbar">
+                                <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
                                     {activePack.config.items.length === 0 && (
                                         <p className="text-xs text-slate-400">{t('reports.no_pages', 'No pages in this package yet.')}</p>
                                     )}
@@ -948,8 +1521,35 @@ const ReportPackView: React.FC = () => {
                                                 <div className="text-xs font-bold text-slate-700 dark:text-slate-200">
                                                     {idx + 1}. {meta.name}
                                                 </div>
+                                                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                                                    <select
+                                                        className="w-full bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-blue-500/50"
+                                                        value={item.pageTemplate || ''}
+                                                        onChange={e => {
+                                                            const nextItems = [...activePack.config.items];
+                                                            nextItems[idx] = { ...item, pageTemplate: (e.target.value || undefined) as 'summary' | 'kpi' | 'detail' | undefined };
+                                                            handleSave({ ...activePack, config: { ...activePack.config, items: nextItems } });
+                                                        }}
+                                                    >
+                                                        <option value="">{t('reports.template_none', 'No template')}</option>
+                                                        <option value="summary">{t('reports.template_summary', 'Management Summary')}</option>
+                                                        <option value="kpi">{t('reports.template_kpi', 'KPI Page')}</option>
+                                                        <option value="detail">{t('reports.template_detail', 'Detail Page')}</option>
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        disabled={!item.pageTemplate}
+                                                        onClick={() => {
+                                                            if (!item.pageTemplate) return;
+                                                            applyPageTemplate(idx, item.pageTemplate, meta.name);
+                                                        }}
+                                                        className="px-2 py-1.5 rounded text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                    >
+                                                        {t('common.apply', 'Apply')}
+                                                    </button>
+                                                </div>
                                                 <input
-                                                    className="w-full bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs border border-slate-200 dark:border-slate-700 outline-none"
+                                                    className="w-full bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
                                                     value={item.titleOverride || ''}
                                                     onChange={e => {
                                                         const nextItems = [...activePack.config.items];
@@ -959,7 +1559,7 @@ const ReportPackView: React.FC = () => {
                                                     placeholder={t('reports.page_title_override', 'Page title override (optional)')}
                                                 />
                                                 <select
-                                                    className="w-full bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs border border-slate-200 dark:border-slate-700 outline-none"
+                                                    className="w-full bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-blue-500/50"
                                                     value={item.orientation || 'landscape'}
                                                     onChange={e => {
                                                         const nextItems = [...activePack.config.items];
@@ -970,6 +1570,40 @@ const ReportPackView: React.FC = () => {
                                                     <option value="landscape">{t('reports.landscape', 'Landscape')}</option>
                                                     <option value="portrait">{t('reports.portrait', 'Portrait')}</option>
                                                 </select>
+                                                <select
+                                                    className="w-full bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-blue-500/50"
+                                                    value={item.pageStatus || 'info'}
+                                                    onChange={e => {
+                                                        const nextItems = [...activePack.config.items];
+                                                        nextItems[idx] = { ...item, pageStatus: e.target.value as 'ok' | 'warning' | 'critical' | 'info' };
+                                                        handleSave({ ...activePack, config: { ...activePack.config, items: nextItems } });
+                                                    }}
+                                                >
+                                                    <option value="info">{t('reports.status_info', 'Info')}</option>
+                                                    <option value="ok">{t('reports.status_ok', 'OK')}</option>
+                                                    <option value="warning">{t('reports.status_warning', 'Warning')}</option>
+                                                    <option value="critical">{t('reports.status_critical', 'Critical')}</option>
+                                                </select>
+                                                <input
+                                                    className="w-full bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
+                                                    value={item.statusThreshold || ''}
+                                                    onChange={e => {
+                                                        const nextItems = [...activePack.config.items];
+                                                        nextItems[idx] = { ...item, statusThreshold: e.target.value };
+                                                        handleSave({ ...activePack, config: { ...activePack.config, items: nextItems } });
+                                                    }}
+                                                    placeholder={t('reports.status_threshold', 'Threshold / target note')}
+                                                />
+                                                <textarea
+                                                    className="w-full min-h-[58px] bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/50"
+                                                    value={item.pageComment || ''}
+                                                    onChange={e => {
+                                                        const nextItems = [...activePack.config.items];
+                                                        nextItems[idx] = { ...item, pageComment: e.target.value };
+                                                        handleSave({ ...activePack, config: { ...activePack.config, items: nextItems } });
+                                                    }}
+                                                    placeholder={t('reports.page_comment', 'Page comment (analysis note)')}
+                                                />
                                             </div>
                                         );
                                     })}
@@ -977,11 +1611,11 @@ const ReportPackView: React.FC = () => {
                             )}
                         </section>
 
-                        <section className="space-y-3">
+                        <section className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 p-3">
                             <button
                                 type="button"
                                 onClick={() => toggleSettingsSection('preview')}
-                                className="w-full flex items-center justify-between text-left"
+                                className="w-full flex items-center justify-between text-left rounded-lg px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                             >
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider cursor-pointer">{t('reports.preview', 'Live Preview')}</label>
                                 <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${settingsSections.preview ? 'rotate-90' : ''}`} />
@@ -1026,6 +1660,21 @@ const ReportPackView: React.FC = () => {
                                             <div className={`text-[11px] text-slate-500 ${activePack.config.exportOptions?.showHeader === false ? 'opacity-30' : ''}`}>
                                                 {(activePack.config.exportOptions?.headerText || activePack.name || t('reports.header_text', 'Header text'))}
                                             </div>
+                                            {!!activePack.config.items[0] && (
+                                                <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                                                    <span className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                                                        {(activePack.config.items[0].pageStatus || 'info').toUpperCase()}
+                                                    </span>
+                                                    {activePack.config.items[0].statusThreshold && (
+                                                        <span>{activePack.config.items[0].statusThreshold}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {!!activePack.config.items[0]?.pageComment && (
+                                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                    {activePack.config.items[0].pageComment}
+                                                </div>
+                                            )}
                                             <div className="h-16 rounded border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center text-xs text-slate-400">
                                                 {t('reports.page_content', 'Page content')}
                                             </div>
@@ -1038,18 +1687,20 @@ const ReportPackView: React.FC = () => {
                                 </div>
                             )}
                         </section>
-
-                        <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+                        </div>
+                        <div className="mt-4 -mx-5 -mb-5 px-5 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/90">
+                            <div className="flex justify-end">
                             <button
                                 onClick={() => setIsEditModalOpen(false)}
-                                className="px-6 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl font-bold text-sm"
+                                className="px-6 py-2 rounded-xl font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                             >
                                 {t('common.done', 'Done')}
                             </button>
+                            </div>
                         </div>
                     </div>
                 )}
-            </Modal>
+            </RightOverlayPanel>
 
             {/* Picker Modal */}
             <Modal isOpen={isAddPickerOpen} onClose={() => setIsAddPickerOpen(false)} title={t('reports.pick_content', 'Add Page')}>
@@ -1100,16 +1751,16 @@ const ReportPackView: React.FC = () => {
                         const isDefaultCategory = category === defaultCategory;
                         const packCount = packs.filter(pack => (pack.category || defaultCategory) === category).length;
                         return (
-                            <div key={category} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg group">
+                            <div key={category} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg group">
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <Layout className="w-4 h-4 text-slate-400 shrink-0" />
-                                    <span className="font-bold text-slate-700 truncate">{category}</span>
+                                    <Layout className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                                    <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{category}</span>
                                     {isDefaultCategory && (
-                                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                        <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
                                             {t('common.default', 'Default')}
                                         </span>
                                     )}
-                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
                                         {packCount} {t('reports.packages', 'packages')}
                                     </span>
                                 </div>
@@ -1118,7 +1769,7 @@ const ReportPackView: React.FC = () => {
                                         <button
                                             onClick={() => void renameCategory(category)}
                                             disabled={isDefaultCategory}
-                                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent"
+                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded disabled:opacity-30 disabled:hover:text-slate-400 dark:disabled:hover:text-slate-500 disabled:hover:bg-transparent"
                                             title={t('common.rename', 'Rename')}
                                         >
                                             <Edit2 className="w-3.5 h-3.5" />
@@ -1126,7 +1777,7 @@ const ReportPackView: React.FC = () => {
                                         <button
                                             onClick={() => void deleteCategory(category)}
                                             disabled={isDefaultCategory}
-                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent"
+                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-30 disabled:hover:text-slate-400 dark:disabled:hover:text-slate-500 disabled:hover:bg-transparent"
                                             title={isDefaultCategory
                                                 ? t('reports.default_category_protected', 'Default category cannot be deleted')
                                                 : packCount > 0
