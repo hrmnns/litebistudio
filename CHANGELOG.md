@@ -5,9 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.2.0] - 2026-02-27
 
 ### Added
+- Added startup splash screen shown on app launch with:
+  - minimum display duration (3 seconds)
+  - automatic close only after app readiness
+  - animated progress indicator while LiteBI initializes in the background.
+- Added new no-query widget types in `Widgets`:
+  - `Markdown`
+  - `Status`
+  - `Section`
+  - `KPI Manual` (manual KPI with value/target/trend)
+  - `Image` (URL-based image widget with fit/alignment/caption).
+- Added KPI manual target-evaluation indicators (green/yellow/red + neutral fallback) based on value vs. target.
+- Added explicit image load error messaging in widget preview and renderer (instead of only broken-image visuals), including URL context.
+- Added a reusable shared app brand icon component and integrated it into startup screen, sidebar/app header, and about view.
+- Added updated favicon based on the same shared brand symbol for consistent app identity.
 - Shared right-side overlay panel infrastructure in `PageLayout` (`rightPanel`) for view-specific tools/content with modal behavior and configurable width.
 - Data Inspector SQL Assistant was moved into the new right-side overlay panel.
 - Added SQL Manager foundation with reusable SQL statement storage in new system table `sys_sql_statement` (including migration of legacy saved templates/favorites from local storage).
@@ -35,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Added a dedicated `SQL Workspace` app/route (`#/sql-workspace`) as a separate entry in the main navigation.
 
 ### Changed
+- Unified branding icon usage across key app entry points and browser tab icon.
+- Renamed and normalized manual KPI widget semantics from `KPU` to `KPI` in UI and configuration, with compatibility handling for legacy saved `kpu_*` widgets.
+- Improved startup splash readiness flow with fallback probe to avoid stuck progress when route-specific ready events are not emitted.
 - Data Inspector SQL toolbar now uses a single `Save` action (disk icon) for saving into SQL Manager; the temporary `Save Report` action and modal were removed.
 - Header now includes a global icon-only sidepanel button; it is enabled only when the active view exposes a sidepanel and shown disabled otherwise.
 - Data Inspector sidepanel naming was refined to reduce terminology overlap:
@@ -65,6 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Widget jump action `Open in Inspector` now opens the dedicated `SQL Workspace`.
 
 ### Fixed
+- Fixed startup splash screen hanging at ~93% by adding a robust app-ready fallback path.
+- Fixed dark-mode styling gaps in newly introduced widget-builder controls, including:
+  - guided panel footer controls
+  - status widget `Signal Animation` row
+  - text widget style buttons
+  - dashboard empty-state panel
+  - query-builder export button styling in dark mode.
+- Fixed external image widget rendering issues by updating CSP image sources and setting image loading policies (`referrerPolicy`, `crossOrigin`) where needed.
 - Data Inspector SQL split-resize now keeps the newly dragged pane height reliably instead of snapping back to the previous size after releasing the gripper.
 - Fixed z-index stacking so rename prompts in SQL Manager are no longer hidden behind the sidepanel.
 - Opening or running a saved SQL statement from the sidepanel now closes the sidepanel immediately.

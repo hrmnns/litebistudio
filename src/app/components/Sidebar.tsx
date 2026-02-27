@@ -1,11 +1,12 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock, Code2 } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock, Code2 } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import AppBrandIcon from './ui/AppBrandIcon';
 
 interface SidebarProps {
     isCollapsed: boolean;
@@ -129,9 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         `}>
             <div className={`p-6 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between ${isCollapsed ? 'md:p-4 md:justify-center' : ''}`}>
                 <div className="flex items-center gap-2.5 overflow-hidden">
-                    <div className="flex-shrink-0 p-1.5 bg-blue-600 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none">
-                        <ShieldCheck className="w-5 h-5 text-white" />
-                    </div>
+                    <AppBrandIcon size={32} className="flex-shrink-0" />
                     <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100 flex flex-col'}`}>
                         <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
                             LiteBI <span className="text-blue-600">Studio</span>

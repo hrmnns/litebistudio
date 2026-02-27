@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
-import { ShieldCheck, Github, BookOpen, FileText, Heart, Globe, Mail, ExternalLink } from 'lucide-react';
+import { Github, BookOpen, FileText, Heart, Globe, Mail, ExternalLink } from 'lucide-react';
+import AppBrandIcon from '../components/ui/AppBrandIcon';
 
 const LINKS = {
     github: 'https://github.com/hrmnns/litebistudio',
@@ -45,7 +46,7 @@ export const AboutView: React.FC = () => {
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden">
                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
                         <div className="p-4 bg-white/20 backdrop-blur-md rounded-2xl shadow-inner group transition-transform hover:scale-105">
-                            <ShieldCheck className="w-16 h-16 md:w-20 md:h-20 text-white" />
+                            <AppBrandIcon size={80} />
                         </div>
                         <div className="text-center md:text-left">
                             <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-2">LiteBI Studio</h2>

@@ -74,6 +74,7 @@ export const SettingsView: React.FC = () => {
         localStorage.removeItem('data_inspector_saved_views');
         localStorage.removeItem('data_inspector_active_view');
         localStorage.removeItem('data_inspector_sql_editor_height');
+        localStorage.removeItem('sql_workspace_sql_editor_height');
         await appDialog.info(t('settings.inspector_reset_layout_done'));
     };
 
@@ -83,6 +84,7 @@ export const SettingsView: React.FC = () => {
         localStorage.removeItem('data_inspector_favorite_queries');
         localStorage.removeItem('data_inspector_custom_sql_templates');
         localStorage.removeItem('data_inspector_selected_custom_template');
+        localStorage.removeItem('data_inspector_last_select_sql');
         await appDialog.info(t('settings.inspector_reset_sql_done'));
     };
 

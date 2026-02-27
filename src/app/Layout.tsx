@@ -7,6 +7,7 @@ import { onTabConflict } from '../lib/db';
 import { MultiTabModal } from './components/MultiTabModal';
 import { useEffect } from 'react';
 import { LockScreen } from './components/LockScreen';
+import AppBrandIcon from './components/ui/AppBrandIcon';
 
 export const Layout: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -46,6 +47,7 @@ export const Layout: React.FC = () => {
                             <Menu className="w-6 h-6" />
                         </button>
                         <h1 className="text-lg font-bold flex items-center gap-2">
+                            <AppBrandIcon size={24} />
                             LiteBI Studio
                             {isReadOnly && <span className="text-[10px] uppercase font-bold tracking-wider bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Lese-Modus</span>}
                         </h1>

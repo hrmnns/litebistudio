@@ -98,7 +98,7 @@ export interface AlertRule {
 }
 
 export interface WidgetConfig {
-    type: 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text';
+    type: 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'kpu_manual' | 'image';
     xAxis?: string;
     yAxes?: string[];
     yAxis?: string;
@@ -111,11 +111,40 @@ export interface WidgetConfig {
     pivotCols?: string[];
     pivotMeasures?: { field: string, agg: 'sum' | 'count' | 'avg' | 'min' | 'max' }[];
     textContent?: string;
+    markdownContent?: string;
     textSize?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
     textAlign?: 'left' | 'center' | 'right';
     textBold?: boolean;
     textItalic?: boolean;
     textUnderline?: boolean;
+    statusLevel?: 'ok' | 'warning' | 'critical' | 'info';
+    statusTitle?: string;
+    statusMessage?: string;
+    statusPulse?: boolean;
+    sectionTitle?: string;
+    sectionSubtitle?: string;
+    sectionAlign?: 'left' | 'center' | 'right';
+    sectionDividerStyle?: 'line' | 'double' | 'none';
+    kpiTitle?: string;
+    kpiValue?: string;
+    kpiUnit?: string;
+    kpiTarget?: string;
+    kpiTrend?: 'up' | 'down' | 'flat';
+    kpiAlign?: 'left' | 'center' | 'right';
+    kpiNote?: string;
+    imageUrl?: string;
+    imageAlt?: string;
+    imageCaption?: string;
+    imageFit?: 'contain' | 'cover';
+    imageAlign?: 'left' | 'center' | 'right';
+    // Legacy compatibility for previously saved widgets
+    kpuTitle?: string;
+    kpuValue?: string;
+    kpuUnit?: string;
+    kpuTarget?: string;
+    kpuTrend?: 'up' | 'down' | 'flat';
+    kpuAlign?: 'left' | 'center' | 'right';
+    kpuNote?: string;
 }
 
 // ─── Report Packages ────────────────────────────────────────────────
@@ -156,3 +185,4 @@ export interface ReportPack {
 
 /** Generic database row — use sparingly, prefer specific types */
 export type DbRow = Record<string, unknown>;
+

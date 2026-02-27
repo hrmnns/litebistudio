@@ -13,7 +13,7 @@ import type { DbRow } from '../../types';
 import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
 import type { DataSourceEntry, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
-import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
+import { INSPECTOR_LAST_SELECT_SQL_KEY, INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 import { appDialog } from '../../lib/appDialog';
 
 interface DataInspectorProps {
@@ -73,6 +73,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const { isAdminMode } = useDashboard();
     const SQL_LIBRARY_SCOPE = 'global';
     const SQL_LIBRARY_MIGRATION_KEY = 'data_inspector_sql_library_migrated_v1';
+    const sqlEditorHeightStorageKey = fixedMode === 'sql'
+        ? 'sql_workspace_sql_editor_height'
+        : 'data_inspector_sql_editor_height';
     const [mode, setMode] = useState<'table' | 'sql'>(fixedMode ?? 'table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
     const [sqlHistory, setSqlHistory] = useLocalStorage<string[]>('data_inspector_sql_history', []);
@@ -141,7 +144,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [indexSuggestions, setIndexSuggestions] = useState<IndexSuggestion[]>([]);
     const [isGeneratingIndexSuggestions, setIsGeneratingIndexSuggestions] = useState(false);
     const [applyingIndexSuggestionId, setApplyingIndexSuggestionId] = useState('');
-    const [storedSqlEditorHeight, setStoredSqlEditorHeight] = useLocalStorage<number>('data_inspector_sql_editor_height', 160);
+    const [storedSqlEditorHeight, setStoredSqlEditorHeight] = useLocalStorage<number>(sqlEditorHeightStorageKey, 160);
     const [sqlEditorHeight, setSqlEditorHeight] = useState(storedSqlEditorHeight);
     const sqlInputRef = useRef<HTMLTextAreaElement | null>(null);
     const [sqlCursor, setSqlCursor] = useState(0);
@@ -224,6 +227,16 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setInputSql(pendingSql);
         setSqlOutputView('result');
     }, [fixedMode, forwardSqlToWorkspace]);
+
+    useEffect(() => {
+        if (fixedMode !== 'sql') return;
+        if (inputSql.trim()) return;
+        const lastSelectSql = localStorage.getItem(INSPECTOR_LAST_SELECT_SQL_KEY);
+        if (!lastSelectSql || !/^\s*SELECT\b/i.test(lastSelectSql)) return;
+        setInputSql(lastSelectSql);
+        setSqlCursor(lastSelectSql.length);
+        setSqlOutputView('result');
+    }, [fixedMode, inputSql]);
 
     const normalizeSql = useCallback((value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase(), []);
 
@@ -429,6 +442,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setSqlExecutionSql(executionSql);
         execute();
         setSqlHistory(prev => [trimmed, ...prev.filter(q => q !== trimmed)].slice(0, 12));
+        if (isSelect) {
+            localStorage.setItem(INSPECTOR_LAST_SELECT_SQL_KEY, trimmed);
+        }
     }, [execute, setSqlHistory, sqlMaxRows, sqlRequireLimitConfirm, t]);
 
     const handleRunSql = async () => {
@@ -1388,26 +1404,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         if (!autocompleteOpen || suggestions.length === 0) return;
         updateAutocompletePosition();
     }, [autocompleteOpen, suggestions.length, sqlCursor, inputSql, updateAutocompletePosition]);
-
-    useEffect(() => {
-        const textarea = sqlInputRef.current;
-        if (!textarea) return;
-
-        const observer = new ResizeObserver((entries) => {
-            if (isResizingSqlPane) return;
-            if (Date.now() - sqlPaneCommitTimestampRef.current < 250) return;
-            const entry = entries[0];
-            if (!entry) return;
-            const next = Math.round(entry.contentRect.height);
-            const clamped = Math.max(120, Math.min(520, next));
-            if (clamped !== sqlEditorHeight) {
-                setSqlEditorHeight(clamped);
-            }
-        });
-
-        observer.observe(textarea);
-        return () => observer.disconnect();
-    }, [sqlEditorHeight, mode, isResizingSqlPane]);
 
     useEffect(() => {
         setSqlEditorHeight(storedSqlEditorHeight);
@@ -2695,7 +2691,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             }}
                             onKeyDown={handleSqlEditorKeyDown}
                             placeholder={t('datainspector.sql_placeholder')}
-                            className="w-full p-4 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y text-slate-800 dark:text-slate-200 min-h-[120px] max-h-[520px]"
+                            className="w-full p-4 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-slate-800 dark:text-slate-200 min-h-[120px] max-h-[520px]"
                             style={{ height: `${sqlEditorHeight}px` }}
                         />
                         {autocompleteEnabled && autocompleteOpen && suggestions.length > 0 && (

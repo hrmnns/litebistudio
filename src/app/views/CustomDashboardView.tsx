@@ -29,6 +29,7 @@ import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
 
 const logger = createLogger('CustomDashboardView');
+const APP_READY_EVENT = 'litebi:app-ready';
 
 interface FilterDef {
     column: string;
@@ -172,6 +173,8 @@ export const CustomDashboardView: React.FC = () => {
                 : (dbDashboards[0]?.id ?? null);
             setActiveDashboardId(resolvedDashboardId);
             setIsLoaded(true);
+            (window as Window & { __LITEBI_READY__?: boolean }).__LITEBI_READY__ = true;
+            window.dispatchEvent(new Event(APP_READY_EVENT));
         };
         init();
     }, [t]);
@@ -684,14 +687,14 @@ export const CustomDashboardView: React.FC = () => {
 
             {
                 activeDashboard && activeDashboard.layout.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-slate-400">
+                    <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500">
                         <Layout className="w-12 h-12 mb-4 opacity-50" />
-                        <h3 className="font-bold text-lg text-slate-600">{t('dashboard.empty_msg', { name: activeDashboard.name })}</h3>
-                        <p className="mb-4 text-sm text-center">{t('dashboard.empty_hint')}</p>
+                        <h3 className="font-bold text-lg text-slate-600 dark:text-slate-200">{t('dashboard.empty_msg', { name: activeDashboard.name })}</h3>
+                        <p className="mb-4 text-sm text-center text-slate-500 dark:text-slate-400">{t('dashboard.empty_hint')}</p>
                         {!isReadOnly && (
                             <button
                                 onClick={() => setIsAddModalOpen(true)}
-                                className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-blue-600 font-bold hover:shadow-sm transition-all text-sm"
+                                className="px-6 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-blue-600 dark:text-blue-300 font-bold hover:shadow-sm transition-all text-sm"
                             >
                                 {t('dashboard.add_title')}
                             </button>

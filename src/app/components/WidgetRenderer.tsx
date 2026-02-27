@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -9,13 +9,14 @@ import {
     ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
     ScatterChart, Scatter, LabelList
 } from 'recharts';
-import { Loader2, AlertCircle, BarChart3, ExternalLink } from 'lucide-react';
+import { Loader2, AlertCircle, BarChart3, ExternalLink, FileText, Layout, Gauge, Image as ImageIcon } from 'lucide-react';
 import { RecordDetailModal } from './RecordDetailModal';
 import { formatValue } from '../utils/formatUtils';
 import { type WidgetConfig, type DbRow } from '../../types';
 import { PivotTable } from './PivotTable';
 import type { SchemaDefinition } from './SchemaDocumentation';
 import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
+import { MarkdownContent } from './ui/MarkdownContent';
 
 interface FilterDef {
     column: string;
@@ -82,12 +83,17 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
 
     const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {
-            if (config.type === 'text') return [];
+            if (config.type === 'text' || config.type === 'markdown' || config.type === 'status' || config.type === 'section' || config.type === 'kpi_manual' || config.type === 'kpu_manual' || config.type === 'image') return [];
             if (!effectiveSql) return [];
             return await SystemRepository.executeRaw(effectiveSql);
         },
         [effectiveSql, config.type]
     );
+    const imageUrlForError = (config.imageUrl || '').trim();
+    const [imageLoadFailed, setImageLoadFailed] = React.useState(false);
+    React.useEffect(() => {
+        setImageLoadFailed(false);
+    }, [imageUrlForError]);
 
     const [isDetailOpen, setIsDetailOpen] = React.useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = React.useState(0);
@@ -154,6 +160,267 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                     }`}
                 >
                     {(config.textContent || '').trim() || t('querybuilder.text_placeholder')}
+                </div>
+            </div>
+        );
+    }
+
+    if (config.type === 'markdown') {
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
+                <div className="flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-1.5 rounded-xl shrink-0 shadow-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400">
+                            <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                            <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex-1 p-4 overflow-auto text-slate-800 dark:text-slate-100">
+                    <MarkdownContent
+                        markdown={(config.markdownContent || '').trim()}
+                        emptyText={t('querybuilder.markdown_placeholder', '# Titel\nText mit **Fett** und [Link](https://example.com)')}
+                        className="text-sm leading-6"
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    if (config.type === 'status') {
+        const level = config.statusLevel || 'ok';
+        const styleMap: Record<NonNullable<WidgetConfig['statusLevel']>, { ring: string; dot: string; title: string; text: string }> = {
+            ok: { ring: 'ring-emerald-200 bg-emerald-50 dark:bg-emerald-900/20', dot: 'bg-emerald-500', title: 'text-emerald-800 dark:text-emerald-300', text: 'text-emerald-700/90 dark:text-emerald-200/90' },
+            info: { ring: 'ring-blue-200 bg-blue-50 dark:bg-blue-900/20', dot: 'bg-blue-500', title: 'text-blue-800 dark:text-blue-300', text: 'text-blue-700/90 dark:text-blue-200/90' },
+            warning: { ring: 'ring-amber-200 bg-amber-50 dark:bg-amber-900/20', dot: 'bg-amber-500', title: 'text-amber-800 dark:text-amber-300', text: 'text-amber-700/90 dark:text-amber-200/90' },
+            critical: { ring: 'ring-rose-200 bg-rose-50 dark:bg-rose-900/20', dot: 'bg-rose-500', title: 'text-rose-800 dark:text-rose-300', text: 'text-rose-700/90 dark:text-rose-200/90' }
+        };
+        const styles = styleMap[level];
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
+                <div className="flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-1.5 rounded-xl shrink-0 shadow-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400">
+                            <AlertCircle className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                            <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex-1 p-4 flex items-center justify-center">
+                    <div className={`w-full rounded-xl ring-1 ${styles.ring} p-5`}>
+                        <div className="flex items-center gap-3">
+                            <span className={`relative inline-flex h-3.5 w-3.5 rounded-full ${styles.dot}`}>
+                                {config.statusPulse && <span className={`absolute inline-flex h-full w-full rounded-full ${styles.dot} opacity-75 animate-ping`} />}
+                            </span>
+                            <span className={`text-[11px] font-black uppercase tracking-wider ${styles.title}`}>
+                                {t(`querybuilder.status_level_${level}`, level)}
+                            </span>
+                        </div>
+                        <div className={`mt-3 text-lg font-bold ${styles.title}`}>
+                            {(config.statusTitle || '').trim() || t('querybuilder.status_placeholder_title', 'System status')}
+                        </div>
+                        <p className={`mt-2 text-sm ${styles.text}`}>
+                            {(config.statusMessage || '').trim() || t('querybuilder.status_placeholder_message', 'All core systems are running stable.')}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (config.type === 'section') {
+        const align = config.sectionAlign || 'left';
+        const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
+        const divider = config.sectionDividerStyle || 'line';
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
+                <div className="flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-1.5 rounded-xl shrink-0 shadow-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400">
+                            <Layout className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                            <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex-1 p-5 flex flex-col justify-center">
+                    <div className={`w-full ${alignClass}`}>
+                        <h2 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">
+                            {(config.sectionTitle || '').trim() || t('querybuilder.section_placeholder_title', 'Section title')}
+                        </h2>
+                        {(config.sectionSubtitle || '').trim() && (
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                {config.sectionSubtitle}
+                            </p>
+                        )}
+                        {divider === 'line' && (
+                            <div className={`mt-4 h-px bg-slate-300 dark:bg-slate-700 ${align === 'center' ? 'mx-auto w-2/3' : align === 'right' ? 'ml-auto w-2/3' : 'w-2/3'}`} />
+                        )}
+                        {divider === 'double' && (
+                            <div className={`mt-4 space-y-1 ${align === 'center' ? 'mx-auto w-2/3' : align === 'right' ? 'ml-auto w-2/3' : 'w-2/3'}`}>
+                                <div className="h-px bg-slate-300 dark:bg-slate-700" />
+                                <div className="h-px bg-slate-300 dark:bg-slate-700" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (config.type === 'kpi_manual' || config.type === 'kpu_manual') {
+        const trend = config.kpiTrend || config.kpuTrend || 'flat';
+        const parseNumericInput = (raw?: string) => {
+            if (!raw) return Number.NaN;
+            const normalized = raw.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.+-]/g, '');
+            return Number(normalized);
+        };
+        const valueNum = parseNumericInput(config.kpiValue || config.kpuValue);
+        const targetNum = parseNumericInput(config.kpiTarget || config.kpuTarget);
+        const align = config.kpiAlign || config.kpuAlign || 'left';
+        const alignTextClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
+        const chipsAlignClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+        const hasGoalCheck = Number.isFinite(valueNum) && Number.isFinite(targetNum) && targetNum !== 0;
+        const ratio = hasGoalCheck ? valueNum / targetNum : Number.NaN;
+        const status: 'ok' | 'warn' | 'crit' | 'neutral' = !hasGoalCheck
+            ? 'neutral'
+            : ratio >= 1
+                ? 'ok'
+                : ratio >= 0.95
+                    ? 'warn'
+                    : 'crit';
+        const trendStyle = trend === 'up'
+            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20'
+            : (trend === 'down'
+                ? 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-900/20'
+                : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/40');
+        const statusStyle = status === 'ok'
+            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+            : status === 'warn'
+                ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                : status === 'crit'
+                    ? 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800'
+                    : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/40 border-slate-200 dark:border-slate-700';
+        const valueStyle = status === 'ok'
+            ? 'text-emerald-700 dark:text-emerald-300'
+            : status === 'warn'
+                ? 'text-amber-700 dark:text-amber-300'
+                : status === 'crit'
+                    ? 'text-rose-700 dark:text-rose-300'
+                    : 'text-slate-900 dark:text-slate-100';
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
+                <div className="flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-1.5 rounded-xl shrink-0 shadow-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400">
+                            <Gauge className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                            <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex-1 p-5 flex items-center justify-center">
+                    <div className={`w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 ${alignTextClass}`}>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            {(config.kpiTitle || config.kpuTitle || '').trim() || t('querybuilder.kpi_placeholder_title', 'KPI')}
+                        </div>
+                        <div className={`mt-3 flex items-end gap-2 ${chipsAlignClass}`}>
+                            <div className={`text-4xl font-black tracking-tight ${valueStyle}`}>
+                                {(config.kpiValue || config.kpuValue || '').trim() || '--'}
+                            </div>
+                            {(config.kpiUnit || config.kpuUnit || '').trim() && (
+                                <div className="pb-1 text-sm font-bold text-slate-500 dark:text-slate-400">{config.kpiUnit || config.kpuUnit}</div>
+                            )}
+                        </div>
+                        <div className={`mt-3 flex flex-wrap items-center gap-2 ${chipsAlignClass}`}>
+                            <span className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                                {t('querybuilder.kpi_target', 'Target')}: {(config.kpiTarget || config.kpuTarget || '').trim() || '-'}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${trendStyle}`}>
+                                {t(`querybuilder.kpi_trend_${trend}`, trend)}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-wide ${statusStyle}`}>
+                                {status === 'ok'
+                                    ? t('querybuilder.kpi_status_on_target', 'On target')
+                                    : status === 'warn'
+                                        ? t('querybuilder.kpi_status_near_target', 'Near target')
+                                        : status === 'crit'
+                                            ? t('querybuilder.kpi_status_below_target', 'Below target')
+                                            : t('querybuilder.kpi_status_no_compare', 'No target comparison')}
+                            </span>
+                        </div>
+                        {(config.kpiNote || config.kpuNote || '').trim() && (
+                            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                                {config.kpiNote || config.kpuNote}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (config.type === 'image') {
+        const align = config.imageAlign || 'center';
+        const alignClass = align === 'left' ? 'items-start' : align === 'right' ? 'items-end' : 'items-center';
+        const imageUrl = imageUrlForError;
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
+                <div className="flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-1.5 rounded-xl shrink-0 shadow-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400">
+                            <ImageIcon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-xs font-bold leading-snug text-slate-800 dark:text-white truncate tracking-tight">{title}</h3>
+                            <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex-1 p-5">
+                    <div className={`h-full w-full flex flex-col ${alignClass} justify-center`}>
+                        {imageUrl && !imageLoadFailed ? (
+                            <>
+                                <img
+                                    src={imageUrl}
+                                    alt={(config.imageAlt || '').trim() || 'Image widget'}
+                                    referrerPolicy="no-referrer"
+                                    crossOrigin="anonymous"
+                                    onError={() => setImageLoadFailed(true)}
+                                    className={`max-h-[320px] w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 ${config.imageFit === 'cover' ? 'object-cover' : 'object-contain'}`}
+                                />
+                                {(config.imageCaption || '').trim() && (
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{config.imageCaption}</p>
+                                )}
+                            </>
+                        ) : imageUrl ? (
+                            <div className="w-full rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 text-amber-900 dark:text-amber-200">
+                                <div className="flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-bold">{t('querybuilder.image_load_error_title', 'Image could not be loaded.')}</p>
+                                        <p className="text-[11px] mt-1">{t('querybuilder.image_load_error_hint', 'Please check URL access and CORS/hotlink protection.')}</p>
+                                        <p className="text-[10px] mt-1 font-mono break-all opacity-80">{imageUrl}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-[220px] w-full rounded-lg border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center text-slate-400">
+                                <ImageIcon className="w-8 h-8 mb-2 opacity-60" />
+                                <p className="text-xs font-semibold text-center">{t('querybuilder.image_empty_hint', 'Please provide an image URL.')}</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -424,4 +691,5 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
 
 export { WidgetRenderer };
 export default WidgetRenderer;
+
 
