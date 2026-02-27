@@ -77,7 +77,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
         localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, effectiveSql);
         const currentHash = window.location.hash || '#/';
         localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, inspectorReturnHash || currentHash);
-        window.location.hash = '#/inspector';
+        window.location.hash = '#/sql-workspace';
     }, [canOpenInInspector, effectiveSql, inspectorReturnHash]);
 
     const { data: results, loading, error } = useAsync<DbRow[]>(

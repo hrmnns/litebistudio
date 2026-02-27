@@ -18,6 +18,9 @@ import { appDialog } from '../../lib/appDialog';
 
 interface DataInspectorProps {
     onBack: () => void;
+    fixedMode?: 'table' | 'sql';
+    titleKey?: string;
+    breadcrumbKey?: string;
 }
 
 interface InspectorViewPreset {
@@ -65,12 +68,12 @@ const SQL_KEYWORDS = [
     'COUNT(*)', 'SUM()', 'AVG()', 'MIN()', 'MAX()', 'DISTINCT'
 ];
 
-export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
+export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode, titleKey, breadcrumbKey }) => {
     const { t, i18n } = useTranslation();
     const { isAdminMode } = useDashboard();
     const SQL_LIBRARY_SCOPE = 'global';
     const SQL_LIBRARY_MIGRATION_KEY = 'data_inspector_sql_library_migrated_v1';
-    const [mode, setMode] = useState<'table' | 'sql'>('table');
+    const [mode, setMode] = useState<'table' | 'sql'>(fixedMode ?? 'table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
     const [sqlHistory, setSqlHistory] = useLocalStorage<string[]>('data_inspector_sql_history', []);
     const [explainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
@@ -182,10 +185,26 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const sqlPaneLiveHeightRef = useRef<number>(sqlEditorHeight);
     const sqlPaneCommitTimestampRef = useRef<number>(0);
     const [inspectorReturnHash, setInspectorReturnHash] = useState<string | null>(null);
+    const modeLocked = Boolean(fixedMode);
+    const pageTitle = t(titleKey || 'sidebar.data_inspector');
+    const pageBreadcrumb = t(breadcrumbKey || titleKey || 'sidebar.data_inspector');
+
+    const forwardSqlToWorkspace = useCallback((sql: string) => {
+        const trimmed = sql.trim();
+        if (!trimmed) return;
+        localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, trimmed);
+        localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, window.location.hash || '#/inspector');
+        window.location.hash = '#/sql-workspace';
+    }, []);
 
     useEffect(() => {
         setShowTableFilters(defaultShowFilters);
     }, [defaultShowFilters, selectedTable]);
+
+    useEffect(() => {
+        if (!fixedMode || mode === fixedMode) return;
+        setMode(fixedMode);
+    }, [fixedMode, mode]);
 
     useEffect(() => {
         const pendingSql = localStorage.getItem(INSPECTOR_PENDING_SQL_KEY);
@@ -197,10 +216,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         }
         if (!pendingSql) return;
         localStorage.removeItem(INSPECTOR_PENDING_SQL_KEY);
+        if (fixedMode === 'table') {
+            forwardSqlToWorkspace(pendingSql);
+            return;
+        }
         setMode('sql');
         setInputSql(pendingSql);
         setSqlOutputView('result');
-    }, []);
+    }, [fixedMode, forwardSqlToWorkspace]);
 
     const normalizeSql = useCallback((value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase(), []);
 
@@ -505,7 +528,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         setTableSortConfig(preset.sortConfig);
         setTableFilters(preset.filters || {});
         setShowTableFilters(Boolean(preset.showFilters));
-        setMode('table');
+        if (!modeLocked) setMode('table');
     };
 
     const handleSaveCurrentView = async () => {
@@ -1010,6 +1033,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const applyAssistantSql = useCallback(async (mode: 'replace' | 'run') => {
         const sql = assistantSqlPreview.trim();
         if (!sql) return;
+        if (fixedMode === 'table') {
+            forwardSqlToWorkspace(sql);
+            return;
+        }
         setMode('sql');
         setInputSql(sql);
         setSqlCursor(sql.length);
@@ -1018,7 +1045,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         if (mode === 'run') {
             await executeSqlText(sql);
         }
-    }, [assistantSqlPreview, executeSqlText, setShowSqlAssist]);
+    }, [assistantSqlPreview, executeSqlText, fixedMode, forwardSqlToWorkspace, setShowSqlAssist]);
 
     const currentSqlNormalized = normalizeSql(inputSql);
     const currentSqlStatement = sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === currentSqlNormalized);
@@ -1038,6 +1065,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     );
 
     const applySqlStatement = useCallback(async (statement: SqlStatementRecord, runImmediately: boolean) => {
+        if (fixedMode === 'table') {
+            forwardSqlToWorkspace(statement.sql_text);
+            return;
+        }
         setMode('sql');
         setInputSql(statement.sql_text);
         setSqlCursor(statement.sql_text.length);
@@ -1048,9 +1079,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             await executeSqlText(statement.sql_text);
         }
         await loadSqlStatements();
-    }, [executeSqlText, loadSqlStatements, setShowSqlAssist]);
+    }, [executeSqlText, fixedMode, forwardSqlToWorkspace, loadSqlStatements, setShowSqlAssist]);
 
     const applySqlTemplate = useCallback(async (sql: string, runImmediately: boolean) => {
+        if (fixedMode === 'table') {
+            forwardSqlToWorkspace(sql);
+            return;
+        }
         setMode('sql');
         setInputSql(sql);
         setSqlCursor(sql.length);
@@ -1059,7 +1094,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         if (runImmediately) {
             await executeSqlText(sql);
         }
-    }, [executeSqlText, setShowSqlAssist]);
+    }, [executeSqlText, fixedMode, forwardSqlToWorkspace, setShowSqlAssist]);
 
     const toggleManagerPanel = useCallback((panel: 'templates' | 'manager' | 'recent') => {
         setManagerPanels(prev => ({
@@ -1141,12 +1176,16 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const openSelectedTableInSql = useCallback(() => {
         const safeTable = selectedTable.replace(/"/g, '""');
         const sql = `SELECT * FROM "${safeTable}" LIMIT 100`;
+        if (fixedMode === 'table') {
+            forwardSqlToWorkspace(sql);
+            return;
+        }
         setMode('sql');
         setInputSql(sql);
         setSqlCursor(sql.length);
         setSqlOutputView('result');
         setShowTableTools(false);
-    }, [selectedTable, setShowTableTools]);
+    }, [fixedMode, forwardSqlToWorkspace, selectedTable, setShowTableTools]);
 
     const openTableToolsTab = useCallback((tab: 'columns' | 'filters' | 'actions') => {
         setTableToolsTab(tab);
@@ -1166,6 +1205,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             return;
         }
         const sql = buildFieldPickerSql(tableSelectedColumns);
+        if (fixedMode === 'table') {
+            forwardSqlToWorkspace(sql);
+            return;
+        }
         setMode('sql');
         setInputSql(sql);
         setSqlCursor(sql.length);
@@ -1174,7 +1217,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
         if (runImmediately) {
             await executeSqlText(sql);
         }
-    }, [buildFieldPickerSql, executeSqlText, setShowTableTools, tableSelectedColumns, t]);
+    }, [buildFieldPickerSql, executeSqlText, fixedMode, forwardSqlToWorkspace, setShowTableTools, tableSelectedColumns, t]);
 
     const applyFieldPickerToTable = useCallback(async () => {
         if (tableSelectedColumns.length === 0) {
@@ -1518,7 +1561,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     return (
         <PageLayout
             header={{
-                title: t('sidebar.data_inspector'),
+                title: pageTitle,
                 subtitle: t('datainspector.subtitle', {
                     count: mode === 'sql' && sqlOutputView === 'explain'
                         ? explainRows.length
@@ -1540,30 +1583,31 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                                 <span className="hidden sm:inline">{t('datainspector.back_to_dashboard')}</span>
                             </button>
                         )}
-                        {/* Mode Toggle */}
-                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                            <button
-                                onClick={() => {
-                                    setMode('table');
-                                    execute();
-                                }}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'table' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                            >
-                                <TableIcon className="w-4 h-4" />
-                                {t('datainspector.table_mode')}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setMode('sql');
-                                    setSqlOutputView(explainMode ? 'explain' : 'result');
-                                    if (!inputSql) setInputSql(`SELECT * FROM ${selectedTable} LIMIT 10`);
-                                }}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'sql' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                            >
-                                <Code className="w-4 h-4" />
-                                {t('datainspector.sql_mode')}
-                            </button>
-                        </div>
+                        {!modeLocked && (
+                            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                                <button
+                                    onClick={() => {
+                                        setMode('table');
+                                        execute();
+                                    }}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'table' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    <TableIcon className="w-4 h-4" />
+                                    {t('datainspector.table_mode')}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setMode('sql');
+                                        setSqlOutputView(explainMode ? 'explain' : 'result');
+                                        if (!inputSql) setInputSql(`SELECT * FROM ${selectedTable} LIMIT 10`);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${mode === 'sql' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    <Code className="w-4 h-4" />
+                                    {t('datainspector.sql_mode')}
+                                </button>
+                            </div>
+                        )}
 
                         {/* Refresh */}
                         <button
@@ -2567,7 +2611,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
             }}
             footer={footerText}
             breadcrumbs={[
-                { label: t('sidebar.data_inspector') }
+                { label: pageBreadcrumb }
             ]}
             fillHeight
         >

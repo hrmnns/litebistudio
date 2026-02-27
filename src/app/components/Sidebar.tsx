@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock, Code2 } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
@@ -97,6 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const staticBottomItems: NavItem[] = [
         { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.datasource') },
+        { to: '/sql-workspace', icon: <Code2 className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.sql_workspace') },
         { to: '/query', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.query_builder') },
         { to: '/reports', icon: <FileText className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.reports') },
         { to: '/about', icon: <Info className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.about') },
@@ -105,11 +106,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         '/': 0,
         '/datasource': 1,
         '/inspector': 2,
-        '/query': 3,
-        '/reports': 4,
-        '/worklist': 5,
-        '/settings': 6,
-        '/about': 7
+        '/sql-workspace': 3,
+        '/query': 4,
+        '/reports': 5,
+        '/worklist': 6,
+        '/settings': 7,
+        '/about': 8
     };
     const orderedNavItems = [...staticTopItems, ...dynamicItems, ...staticBottomItems]
         .sort((a, b) => {

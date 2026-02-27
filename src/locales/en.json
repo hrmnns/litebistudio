@@ -53,6 +53,7 @@
         "dashboard": "Overview",
         "worklist": "Worklist",
         "data_inspector": "Data Inspector",
+        "sql_workspace": "SQL Workspace",
         "query_builder": "Widgets",
         "datasource": "Data Management",
         "settings": "Settings",

@@ -21,7 +21,20 @@ export const AppRouter: React.FC = () => (
                 } />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="inspector" element={
-                    <DataInspector onBack={() => window.history.back()} />
+                    <DataInspector
+                        onBack={() => window.history.back()}
+                        fixedMode="table"
+                        titleKey="sidebar.data_inspector"
+                        breadcrumbKey="sidebar.data_inspector"
+                    />
+                } />
+                <Route path="sql-workspace" element={
+                    <DataInspector
+                        onBack={() => window.history.back()}
+                        fixedMode="sql"
+                        titleKey="sidebar.sql_workspace"
+                        breadcrumbKey="sidebar.sql_workspace"
+                    />
                 } />
                 <Route path="query" element={
                     <QueryBuilderView />

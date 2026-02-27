@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `Select query`
   - `Select widget`
 - Added duplicate-name overwrite confirmation when saving widgets (`A widget with this name already exists. Overwrite?`).
+- Added a dedicated `SQL Workspace` app/route (`#/sql-workspace`) as a separate entry in the main navigation.
 
 ### Changed
 - Data Inspector SQL toolbar now uses a single `Save` action (disk icon) for saving into SQL Manager; the temporary `Save Report` action and modal were removed.
@@ -57,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Widgets preview header and tab controls were visually aligned with the guided panel style; focus button placement and tab sizing were refined for consistency.
 - Save dialog actions were simplified to a single primary save path; redundant `Save New` button was removed.
 - After successful widget save, guided flow now returns to source step with `Select widget` active and the saved widget preselected.
+- `Data Inspector` and SQL work are now separated at app level:
+  - `Data Inspector` is focused on table inspection/analysis.
+  - `SQL Workspace` is focused on SQL editing/execution and SQL assistant workflows.
+- SQL handoff actions that originated in table tooling now open the new `SQL Workspace` instead of switching mode inside `Data Inspector`.
+- Widget jump action `Open in Inspector` now opens the dedicated `SQL Workspace`.
 
 ### Fixed
 - Data Inspector SQL split-resize now keeps the newly dragged pane height reliably instead of snapping back to the previous size after releasing the gripper.
