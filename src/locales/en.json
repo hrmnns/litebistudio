@@ -1,4 +1,4 @@
-{
+﻿{
     "common": {
         "loading": "Loading...",
         "save": "Save",
@@ -150,7 +150,7 @@
         "tools_selected_count": "{{count}} selected"
     },
     "datainspector": {
-        "subtitle": "{{count}} Results Â� {{mode}}",
+        "subtitle": "{{count}} Results ï¿½\u001aï¿½ {{mode}}",
         "table_mode": "Table",
         "sql_mode": "SQL",
         "output_results": "Results",
@@ -559,7 +559,7 @@
         "finalize_mode": "Mode",
         "finalize_source": "Source",
         "finalize_chart": "Visualization",
-        "finalize_axes": "X: {{x}} Â� Y series: {{count}}",
+        "finalize_axes": "X: {{x}} ï¿½\u001aï¿½ Y series: {{count}}",
         "finalize_text_length": "Characters: {{count}}",
         "finalize_status_level": "Status: {{level}}",
         "finalize_section_style": "Divider: {{style}}",
@@ -776,6 +776,10 @@
         "backup_folder_choose": "Choose folder",
         "backup_folder_not_supported": "Your browser does not support persistent folder access.",
         "backup_folder_select_error": "Folder could not be selected.",
+        "health_snapshot_retention_title": "Health snapshot retention",
+        "health_snapshot_retention_days": "Delete older than (days)",
+        "health_snapshot_keep_latest": "Always keep latest",
+        "health_snapshot_retention_hint": "Used by the cleanup action in the Health Check overview.",
         "datatable_title": "Data Table",
         "datatable_hint": "Central display defaults for data tables.",
         "datatable_density": "Row density",
@@ -860,7 +864,7 @@
         "restore_encrypted_prompt": "This file seems to be encrypted. Please enter password:",
         "restore_failed": "Decryption failed! Wrong password or corrupted file.",
         "danger_zone": "Danger Zone",
-        "danger_zone_hint": "Destructive actions â€“ changes cannot be undone.",
+        "danger_zone_hint": "Destructive actions - changes cannot be undone.",
         "clear_reset": "Clear Data (Reset)",
         "clear_reset_hint": "Removes all rows from the selected table but keeps the structure.",
         "clear_btn": "Clear",
@@ -989,7 +993,7 @@
         "support_title": "Support",
         "support_text": "Do you have questions or feedback We look forward to your message.",
         "contact_cta": "Contact us",
-        "copyright_prefix": "Â� {{year}} LiteBI Studio Project. Released under ",
+        "copyright_prefix": "ï¿½\u001aï¿½ {{year}} LiteBI Studio Project. Released under ",
         "settings_hint": "Learn more about the project, the version and the vision behind LiteBI Studio.",
         "view_info": "Project Information"
     },
@@ -1084,6 +1088,12 @@
             "overview_action_open_storage": "Open Storage",
             "overview_action_backup": "Backup Center",
             "overview_action_inspector": "Open Inspector",
+            "overview_action_prune_snapshots": "Delete old diagnostics",
+            "overview_snapshot_hint": "Each health check run stores a snapshot that can be evaluated in reporting.",
+            "snapshot_cleanup_admin_only": "This action is only available in admin mode.",
+            "snapshot_cleanup_confirm": "Delete old diagnostic snapshots? Entries older than {{days}} days will be removed (latest {{keep}} are kept).",
+            "snapshot_cleanup_success": "{{count}} old diagnostic snapshot(s) were deleted.",
+            "snapshot_cleanup_failed": "Old diagnostic snapshots could not be deleted:",
             "opfs_title": "Origin Private File System (OPFS)",
             "opfs_description": "The database is stored in an isolated, high-performance area of the browser. This storage is persistent but managed by the browser.",
             "analyzing_db": "Analyzing database...",
@@ -1137,5 +1147,4 @@
         }
     }
 }
-
 

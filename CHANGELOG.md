@@ -22,16 +22,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - added `priority` and `due_at` fields to `sys_worklist` (with migration support)
   - added quick capture prompts for priority and optional due date when adding records to worklist
   - added a new Worklist sidepanel (`Focus`, `Batch`, `Preview`) with quick filters, multi-select batch actions, and item preview.
+- Health diagnostics persistence for reporting:
+  - added new system table `sys_health_snapshot` (with migration to schema version `11`)
+  - DB health runs now automatically store snapshots for later SQL/report usage.
+- Added cleanup workflow for stored health diagnostics:
+  - new quick action in Health Check overview to delete old diagnostic snapshots (admin-only)
+  - configurable retention settings in `Settings > Apps > Data Management`:
+    - `health_snapshot_retention_days`
+    - `health_snapshot_keep_latest`.
 
 ### Changed
 - Report Packages area was renamed to `Reporting` / `Berichtswesen` in navigation and main view titles.
 - Reporting package settings were moved from modal dialog to a right-side panel with fixed/sticky footer actions.
 - Reporting export actions were visually grouped and icon semantics were clarified for better usability.
 - Worklist UI was refined with consistent control heights, improved dark-mode readability, and larger note input area in record details.
+- System Health checks were expanded with additional architecture consistency checks:
+  - schema version target validation (`PRAGMA user_version`)
+  - required system-column/index/constraint coverage validation
+  - orphan widget-to-SQL reference detection
+  - worklist enum consistency validation (`status`, `priority`).
+- Health Check quick-fix capabilities were extended to include:
+  - cleanup of orphan `sql_statement_id` references in widgets
+  - normalization of invalid worklist status/priority values.
+- Raw SQL safety was hardened for system tables:
+  - write access to `sys_*` via `executeRaw` is now blocked for non-admin users
+  - admin mode remains explicitly allowed.
+- Health Check overview now includes an explicit snapshot-storage hint for users.
+- Snapshot cleanup confirmation now uses configurable retention values instead of fixed thresholds.
 
 ### Fixed
 - Fixed dark-mode styling in the `Manage Categories` dialog within Reporting.
 - Fixed unstable text input behavior in report package settings sidepanel fields (characters could be dropped while typing).
+- Fixed localized system-table write-block messaging to show user-friendly DE/EN guidance instead of only technical error text.
 - Fixed mojibake in report package subtitle metadata (`â€¢`) by replacing it with a clean separator (`|`).
 
 ## [1.2.0] - 2026-02-27

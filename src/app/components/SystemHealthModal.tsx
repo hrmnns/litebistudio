@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HardDrive, Cpu, Info, RotateCw, CheckCircle, AlertTriangle, XCircle, Wrench } from 'lucide-react';
 import { useAsync } from '../../hooks/useAsync';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { Modal } from './Modal';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { appDialog } from '../../lib/appDialog';
+import { useDashboard } from '../../lib/context/DashboardContext';
 
 interface SystemHealthModalProps {
     isOpen: boolean;
@@ -50,6 +52,9 @@ interface ClientHealthReport {
 
 export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, onClose }) => {
     const { t } = useTranslation();
+    const { isAdminMode } = useDashboard();
+    const [snapshotRetentionDays] = useLocalStorage<number>('health_snapshot_retention_days', 90);
+    const [snapshotKeepLatest] = useLocalStorage<number>('health_snapshot_keep_latest', 200);
     const [activeTab, setActiveTab] = useState<'overview' | 'storage' | 'database'>('overview');
     const [databaseSubTab, setDatabaseSubTab] = useState<'health' | 'stats'>('health');
     const [storageEst, setStorageEst] = useState<{ quota?: number, usage?: number }>({});
@@ -66,7 +71,22 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
     const { data: healthReport, loading: healthLoading, refresh: refreshHealth } = useAsync<DatabaseHealthReport | null>(
         async () => {
             if (!isOpen) return null;
-            return await SystemRepository.getDatabaseHealth() as unknown as DatabaseHealthReport;
+            const report = await SystemRepository.getDatabaseHealth() as unknown as DatabaseHealthReport;
+            if (report) {
+                void SystemRepository.saveHealthSnapshot({
+                    scope: 'database',
+                    status: report.status,
+                    score: report.score,
+                    checksRun: report.checksRun,
+                    findings: report.findings,
+                    metadata: {
+                        checked_at: report.checkedAt,
+                        app_version: __APP_VERSION__,
+                        build_date: __BUILD_DATE__
+                    }
+                });
+            }
+            return report;
         },
         [isOpen]
     );
@@ -205,6 +225,29 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
 
     const openInspector = () => {
         window.location.hash = '#/inspector';
+    };
+
+    const handlePruneSnapshots = async () => {
+        if (!isAdminMode) {
+            await appDialog.warning(t('widgets.system_health.snapshot_cleanup_admin_only'));
+            return;
+        }
+        const retentionDays = Math.max(1, Math.min(3650, Number(snapshotRetentionDays) || 90));
+        const keepLatest = Math.max(0, Math.min(10000, Number(snapshotKeepLatest) || 200));
+        const shouldRun = await appDialog.confirm(t('widgets.system_health.snapshot_cleanup_confirm', {
+            days: retentionDays,
+            keep: keepLatest
+        }));
+        if (!shouldRun) return;
+        try {
+            const deleted = await SystemRepository.pruneHealthSnapshots({ olderThanDays: retentionDays, keepLatest });
+            await appDialog.info(t('widgets.system_health.snapshot_cleanup_success', { count: deleted }));
+            refreshDiag();
+            refreshHealth();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            await appDialog.error(`${t('widgets.system_health.snapshot_cleanup_failed')} ${message}`);
+        }
     };
 
     // Helper to format bytes
@@ -464,7 +507,20 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
                                     >
                                         {t('widgets.system_health.overview_action_inspector')}
                                     </button>
+                                    <button
+                                        onClick={() => { void handlePruneSnapshots(); }}
+                                        className={`px-3 py-1.5 text-xs font-bold rounded border transition-colors ${isAdminMode
+                                            ? 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                            : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'}`}
+                                        disabled={!isAdminMode}
+                                        title={!isAdminMode ? t('widgets.system_health.snapshot_cleanup_admin_only') : undefined}
+                                    >
+                                        {t('widgets.system_health.overview_action_prune_snapshots')}
+                                    </button>
                                 </div>
+                                <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+                                    {t('widgets.system_health.overview_snapshot_hint')}
+                                </p>
                             </div>
                         </div>
                     )}

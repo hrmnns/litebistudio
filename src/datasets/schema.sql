@@ -72,3 +72,16 @@ CREATE TABLE IF NOT EXISTS sys_sql_statement (
 
 CREATE INDEX IF NOT EXISTS idx_sys_sql_scope_name ON sys_sql_statement(scope, name);
 CREATE INDEX IF NOT EXISTS idx_sys_sql_last_used ON sys_sql_statement(last_used_at DESC);
+
+CREATE TABLE IF NOT EXISTS sys_health_snapshot (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL DEFAULT 'database',
+    status TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    checks_run INTEGER NOT NULL DEFAULT 0,
+    findings_json TEXT NOT NULL, -- JSON array of findings
+    metadata_json TEXT, -- Optional JSON metadata
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sys_health_snapshot_created_at ON sys_health_snapshot(created_at DESC);

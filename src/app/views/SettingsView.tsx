@@ -53,6 +53,8 @@ export const SettingsView: React.FC = () => {
     const [backupNamePattern, setBackupNamePattern] = useLocalStorage<string>('backup_file_name_pattern', 'backup_{date}_{mode}');
     const [backupUseSavedLocation, setBackupUseSavedLocation] = useLocalStorage<boolean>('backup_use_saved_location', true);
     const [backupFolderLabel, setBackupFolderLabel] = useLocalStorage<string>('backup_saved_folder_label', '');
+    const [healthSnapshotRetentionDays, setHealthSnapshotRetentionDays] = useLocalStorage<number>('health_snapshot_retention_days', 90);
+    const [healthSnapshotKeepLatest, setHealthSnapshotKeepLatest] = useLocalStorage<number>('health_snapshot_keep_latest', 200);
     const [reportsDefaultAuthor, setReportsDefaultAuthor] = useLocalStorage<string>('reports_default_author', 'LiteBI Studio');
     const [reportsDefaultThemeColor, setReportsDefaultThemeColor] = useLocalStorage<string>('reports_default_theme_color', '#1e293b');
     const [reportsDefaultShowHeader, setReportsDefaultShowHeader] = useLocalStorage<boolean>('reports_default_show_header', true);
@@ -914,6 +916,45 @@ export const SettingsView: React.FC = () => {
                                         </div>
                                     </>
                                 )}
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    {t('settings.health_snapshot_retention_title', 'Health snapshot retention')}
+                                </p>
+                                <div className="flex flex-wrap items-end gap-4">
+                                    <div className="space-y-1">
+                                        <label className="block text-xs text-slate-500">{t('settings.health_snapshot_retention_days', 'Delete older than (days)')}</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={3650}
+                                            value={healthSnapshotRetentionDays}
+                                            onChange={(e) => {
+                                                const next = Math.max(1, Math.min(3650, Number(e.target.value) || 1));
+                                                setHealthSnapshotRetentionDays(next);
+                                            }}
+                                            className="w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-xs text-slate-500">{t('settings.health_snapshot_keep_latest', 'Always keep latest')}</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={10000}
+                                            value={healthSnapshotKeepLatest}
+                                            onChange={(e) => {
+                                                const next = Math.max(0, Math.min(10000, Number(e.target.value) || 0));
+                                                setHealthSnapshotKeepLatest(next);
+                                            }}
+                                            className="w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {t('settings.health_snapshot_retention_hint', 'Used by the cleanup action in the Health Check overview.')}
+                                </p>
                             </div>
                         </div>
                     </div>

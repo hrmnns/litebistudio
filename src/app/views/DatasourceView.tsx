@@ -246,7 +246,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 if (!report.isValid) {
                     let details = '';
                     if (versionInfo) {
-                        details += `Schema: V${versionInfo.backup} â†’ V${versionInfo.current} (Update required)\n\n`;
+                        details += `Schema: V${versionInfo.backup} -> V${versionInfo.current} (Update required)\n\n`;
                     }
                     if (report.missingTables.length > 0) {
                         details += t('datasource.restore_missing_tables') + '\n- ' + report.missingTables.join('\n- ') + '\n\n';

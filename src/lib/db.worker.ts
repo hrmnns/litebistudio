@@ -85,7 +85,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 10;
+const CURRENT_SCHEMA_VERSION = 11;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -350,6 +350,30 @@ function applyMigrations(databaseInstance: DatabaseLike) {
         }
         databaseInstance.exec('PRAGMA user_version = 10');
         userVersion = 10;
+    }
+
+    // Version 11: Migration: Persisted health snapshots for reporting
+    if (userVersion < 11) {
+        log('Migration V11: Adding sys_health_snapshot...');
+        try {
+            databaseInstance.exec(`
+                CREATE TABLE IF NOT EXISTS sys_health_snapshot (
+                    id TEXT PRIMARY KEY,
+                    scope TEXT NOT NULL DEFAULT 'database',
+                    status TEXT NOT NULL,
+                    score INTEGER NOT NULL,
+                    checks_run INTEGER NOT NULL DEFAULT 0,
+                    findings_json TEXT NOT NULL,
+                    metadata_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_sys_health_snapshot_created_at ON sys_health_snapshot(created_at DESC);
+            `);
+        } catch (e) {
+            error('Migration failed for V11', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 11');
+        userVersion = 11;
     }
 
     log(`Database migrated to version ${userVersion}`);

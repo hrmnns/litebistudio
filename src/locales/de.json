@@ -23,9 +23,9 @@
         "unpinned": "Gelöst",
         "details": "Details",
         "results_count": "{{count}} Ergebnisse",
-        "apply": "Übernehmen",
+        "apply": "�Sbernehmen",
         "new": "Neu",
-        "expand": "Vergrößern",
+        "expand": "Vergrö�xern",
         "collapse": "Einklappen",
         "all": "Alle",
         "settings": "Einstellungen",
@@ -50,7 +50,7 @@
         "not_available": "Nicht verfuegbar"
     },
     "sidebar": {
-        "dashboard": "Übersicht",
+        "dashboard": "�Sbersicht",
         "worklist": "Arbeitsvorrat",
         "data_inspector": "Data Inspector",
         "sql_workspace": "SQL Workspace",
@@ -63,7 +63,7 @@
         "system_status": "System-Status",
         "records_count": "{{count}}k Datensätze",
         "reports": "Berichtswesen",
-        "about": "Über"
+        "about": "�Sber"
     },
     "dashboard": {
         "title": "Mein Dashboard",
@@ -163,7 +163,7 @@
         "export_excel": "Excel Export",
         "search_placeholder": "In sichtbaren Spalten suchen...",
         "auto_limit": "Auto-Limit: {{limit}}",
-        "page_size": "Seitengröße",
+        "page_size": "Seitengrö�xe",
         "page_size_value": "{{size}} / Seite",
         "prev_page": "Zurück",
         "next_page": "Weiter",
@@ -194,7 +194,7 @@
         "template_count": "Zeilen zählen",
         "template_nullscan": "Null-Scan",
         "template_duplicates": "Duplikate finden",
-        "template_outliers": "Ausreißer finden",
+        "template_outliers": "Ausrei�xer finden",
         "recent_queries": "Letzte Abfragen",
         "pick_recent": "Letzte Abfrage wählen...",
         "clear_history": "Verlauf löschen",
@@ -214,7 +214,7 @@
         "custom_template_prompt": "Name der Vorlage:",
         "custom_template_prompt_update": "Name der Vorlage (bestehende wird aktualisiert):",
         "rename_template_prompt": "Neuer Vorlagenname:",
-        "custom_template_overwrite_confirm": "Eine Vorlage mit dem Namen \"{{name}}\" existiert bereits. Überschreiben",
+        "custom_template_overwrite_confirm": "Eine Vorlage mit dem Namen \"{{name}}\" existiert bereits. �Sberschreiben",
         "custom_template_delete_confirm": "Ausgewählte eigene Vorlage löschen",
         "clear_templates_confirm": "Alle eigenen Vorlagen löschen",
         "sql_assist": "SQL Workspace",
@@ -453,7 +453,7 @@
         "step_source_run": "Abfrage",
         "step_run": "Ausführen",
         "step_visualize": "Visualisieren",
-        "step_finalize": "Abschließen",
+        "step_finalize": "Abschlie�xen",
         "step_help_start": "Wählen Sie, ob Sie eine neue Query erstellen oder eine gespeicherte Query weiterbearbeiten möchten.",
         "step_help_source_run": "Waehlen Sie im Tab 'Quelle' ein SQL-Statement und fuehren Sie es aus, um Daten zu laden.",
         "step_help_visualize": "Konfigurieren Sie im Tab 'Visualisierung' Diagrammtyp, Achsen und Anzeigeoptionen.",
@@ -481,8 +481,8 @@
         "next": "Weiter",
         "back": "Zurück",
         "finish": "Fertig",
-        "unsaved_changes": "Ungespeicherte Änderungen",
-        "confirm_discard_changes": "Es gibt ungespeicherte Änderungen. Verwerfen und fortfahren",
+        "unsaved_changes": "Ungespeicherte �\u001enderungen",
+        "confirm_discard_changes": "Es gibt ungespeicherte �\u001enderungen. Verwerfen und fortfahren",
         "check_start_ready": "Startoption ausgewählt",
         "check_source_ready": "Quelle ausgewählt",
         "check_run_ready": "Abfrage ausgeführt",
@@ -542,12 +542,12 @@
         "image_empty_hint": "Bitte eine Bild-URL hinterlegen.",
         "image_load_error_title": "Bild konnte nicht geladen werden.",
         "image_load_error_hint": "Bitte URL, Zugriff und CORS/Hotlink-Schutz pruefen.",
-        "text_size": "Textgröße",
+        "text_size": "Textgrö�xe",
         "text_size_sm": "Klein",
         "text_size_md": "Mittel",
-        "text_size_lg": "Groß",
-        "text_size_xl": "Sehr groß",
-        "text_size_2xl": "2x groß",
+        "text_size_lg": "Gro�x",
+        "text_size_xl": "Sehr gro�x",
+        "text_size_2xl": "2x gro�x",
         "text_align": "Ausrichtung",
         "text_align_left": "Links",
         "text_align_center": "Zentriert",
@@ -602,7 +602,7 @@
         "import_success": "Berichtspaket wurde erfolgreich importiert.",
         "import_failed": "Import fehlgeschlagen. Ungueltige Berichtspaket-JSON.",
         "panel_title": "Berichtswesen Assistent",
-        "panel_overview": "Übersicht",
+        "panel_overview": "�Sbersicht",
         "panel_metric_packs": "Pakete",
         "panel_metric_pages": "Seiten",
         "panel_metric_issues": "Probleme",
@@ -628,11 +628,11 @@
         "toc": "Inhaltsverzeichnis",
         "no_packages": "Keine Pakete",
         "general": "Allgemein",
-        "export_options": "Kopf- / Fußzeile",
+        "export_options": "Kopf- / Fu�xzeile",
         "show_header": "Kopfzeile anzeigen",
-        "show_footer": "Fußzeile anzeigen",
+        "show_footer": "Fu�xzeile anzeigen",
         "header_text": "Kopfzeilentext (optional)",
-        "footer_text": "Fußzeilentext (optional)",
+        "footer_text": "Fu�xzeilentext (optional)",
         "data_as_of": "Datenstand",
         "include_audit_appendix": "Audit-Anhang (SQL-Quellen) einfügen",
         "audit_appendix_title": "Audit-Anhang",
@@ -776,6 +776,10 @@
         "backup_folder_choose": "Ordner wählen",
         "backup_folder_not_supported": "Ihr Browser unterstützt keinen persistenten Ordnerzugriff.",
         "backup_folder_select_error": "Ordner konnte nicht ausgewählt werden.",
+        "health_snapshot_retention_title": "Health-Snapshot-Aufbewahrung",
+        "health_snapshot_retention_days": "Loeschen aelter als (Tage)",
+        "health_snapshot_keep_latest": "Neueste immer behalten",
+        "health_snapshot_retention_hint": "Wird fuer die Bereinigungsaktion in der Health-Check-Uebersicht verwendet.",
         "datatable_title": "Data Table",
         "datatable_hint": "Zentrale Darstellungseinstellungen fuer Tabellen.",
         "datatable_density": "Zeilendichte",
@@ -833,7 +837,7 @@
         "append_data_short": "Daten anfügen",
         "system_tables": "System-Tabellen (Read-Only)",
         "backup_restore": "Backup & Restore",
-        "backup_recommended": "{{count}} ungesicherte Änderungen. Backup empfohlen.",
+        "backup_recommended": "{{count}} ungesicherte �\u001enderungen. Backup empfohlen.",
         "encryption_active": "Verschlüsselung aktiviert",
         "encryption_standard": "Standard-Backup (Unverschlüsselt)",
         "encryption_active_hint": "Datei wird mit Passwort geschützt.",
@@ -860,7 +864,7 @@
         "restore_encrypted_prompt": "Diese Datei scheint verschlüsselt zu sein. Bitte Passwort eingeben:",
         "restore_failed": "Entschlüsselung fehlgeschlagen! Falsches Passwort oder beschädigte Datei.",
         "danger_zone": "Gefahrenzone",
-        "danger_zone_hint": "Destruktive Aktionen – Änderungen können nicht rückgängig gemacht werden.",
+        "danger_zone_hint": "Destruktive Aktionen �\u001c �\u001enderungen können nicht rückgängig gemacht werden.",
         "clear_reset": "Daten löschen (Reset)",
         "clear_reset_hint": "Entfernt alle Zeilen aus der gewählten Tabelle, behält aber die Struktur bei.",
         "clear_btn": "Leeren",
@@ -940,7 +944,7 @@
             "step_success": "Abgeschlossen",
             "import_success_title": "Import erfolgreich!",
             "import_success_hint": "{{count}} Tabellen wurden erfolgreich angelegt und befüllt.",
-            "finish_btn": "Abschließen"
+            "finish_btn": "Abschlie�xen"
         },
         "excel_import": {
             "processing_file": "Datei wird verarbeitet...",
@@ -952,13 +956,13 @@
             "import_failed": "Import fehlgeschlagen: {{error}}",
             "success_msg": "Erfolgreich {{count}} Datensätze importiert.",
             "append": "Hinzufügen",
-            "overwrite": "Überschreiben",
+            "overwrite": "�Sberschreiben",
             "drop_hint": "Klicken oder Datei hierher ziehen",
             "none_selected": "Keine Tabelle gewählt"
         }
     },
     "about": {
-        "title": "Über LiteBI Studio",
+        "title": "�Sber LiteBI Studio",
         "subtitle": "Informationen zum Projekt und System",
         "tagline": "Die leichtgewichtige Business Intelligence Plattform direkt im Browser.",
         "status_stable": "Stabil (Lokal)",
@@ -1019,7 +1023,7 @@
         "pattern_url": "URL",
         "pattern_date": "Datum",
         "suspicious": "Auffällig",
-        "close": "Schließen"
+        "close": "Schlie�xen"
     },
     "widgets": {
         "system_status": {
@@ -1041,7 +1045,7 @@
             "title": "Datenbank-Status",
             "description": "Speichernutzung und Statistiken",
             "last_backup": "Letztes Backup",
-            "modifications": "Änderungen",
+            "modifications": "�\u001enderungen",
             "records_since_backup": "Datensätze seit Backup",
             "data_management": "Datenverwaltung",
             "never": "Nie"
@@ -1060,7 +1064,7 @@
         },
         "system_health": {
             "title": "System Diagnose & Health",
-            "tab_overview": "Übersicht",
+            "tab_overview": "�Sbersicht",
             "tab_storage": "Speicher",
             "tab_database": "Datenbank",
             "app_environment": "Anwendungs-Umgebung",
@@ -1084,10 +1088,16 @@
             "overview_action_open_storage": "Storage oeffnen",
             "overview_action_backup": "Backup-Zentrum",
             "overview_action_inspector": "Inspector oeffnen",
+            "overview_action_prune_snapshots": "Alte Diagnosen loeschen",
+            "overview_snapshot_hint": "Bei jedem Health-Check wird ein Snapshot gespeichert und kann im Berichtswesen ausgewertet werden.",
+            "snapshot_cleanup_admin_only": "Diese Aktion ist nur im Admin-Modus verfuegbar.",
+            "snapshot_cleanup_confirm": "Alte Diagnose-Snapshots loeschen? Es werden Eintraege entfernt, die aelter als {{days}} Tage sind (die neuesten {{keep}} bleiben erhalten).",
+            "snapshot_cleanup_success": "{{count}} alte Diagnose-Snapshot(s) wurden geloescht.",
+            "snapshot_cleanup_failed": "Alte Diagnose-Snapshots konnten nicht geloescht werden:",
             "opfs_title": "Origin Private File System (OPFS)",
             "opfs_description": "Die Datenbank wird in einem isolierten, hoch-performanten Bereich des Browsers gespeichert. Dieser Speicher ist persistent, wird aber vom Browser verwaltet. Löschen von Browserdaten kann diese Datenbank entfernen.",
             "analyzing_db": "Analysiere Datenbank...",
-            "db_size": "Logische DB-Größe",
+            "db_size": "Logische DB-Grö�xe",
             "connected": "Verbunden",
             "worker_active": "SQLite Worker aktiv",
             "table_stats": "Tabellen-Statistik",
@@ -1137,7 +1147,3 @@
         }
     }
 }
-
-
-
-
