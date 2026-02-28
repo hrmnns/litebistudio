@@ -369,6 +369,12 @@ const ReportPackView: React.FC = () => {
     };
 
     const createPack = () => {
+        const defaultAuthor = localStorage.getItem('reports_default_author') || 'LiteBI Studio';
+        const defaultThemeColor = localStorage.getItem('reports_default_theme_color') || '#1e293b';
+        const defaultShowHeader = localStorage.getItem('reports_default_show_header');
+        const defaultShowFooter = localStorage.getItem('reports_default_show_footer');
+        const defaultIncludeAudit = localStorage.getItem('reports_default_include_audit_appendix');
+
         const initialCategory = currentCategory === allCategoriesTab ? defaultCategory : currentCategory;
         const newPack: ReportPack = {
             id: crypto.randomUUID(),
@@ -378,18 +384,18 @@ const ReportPackView: React.FC = () => {
             config: {
                 coverTitle: t('reports.new_pack_name'),
                 coverSubtitle: new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-                author: 'LiteBI Studio',
+                author: defaultAuthor,
                 coverLogoUrl: '',
-                themeColor: '#1e293b',
+                themeColor: defaultThemeColor,
                 showTOC: true,
                 exportOptions: {
-                    showHeader: true,
-                    showFooter: true,
+                    showHeader: defaultShowHeader === null ? true : defaultShowHeader === 'true',
+                    showFooter: defaultShowFooter === null ? true : defaultShowFooter === 'true',
                     headerText: '',
                     footerText: '',
                     footerMode: 'content_only',
                     dataAsOf: '',
-                    includeAuditAppendix: false
+                    includeAuditAppendix: defaultIncludeAudit === null ? false : defaultIncludeAudit === 'true'
                 },
                 items: []
             }

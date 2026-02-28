@@ -13,7 +13,7 @@ import { SystemHealthModal } from '../components/SystemHealthModal';
 import { clearSavedBackupDirectory, getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickAndSaveBackupDirectory } from '../../lib/utils/backupLocation';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
-type AppsSubTab = 'inspector' | 'querybuilder' | 'datamanagement';
+type AppsSubTab = 'inspector' | 'sqlworkspace' | 'querybuilder' | 'reports' | 'worklist' | 'datamanagement';
 type ControlsSubTab = 'datatable' | 'notifications';
 
 export const SettingsView: React.FC = () => {
@@ -23,7 +23,7 @@ export const SettingsView: React.FC = () => {
     const { theme, setTheme } = useThemeContext();
     const { isReadOnly, isAdminMode, setIsAdminMode } = useDashboard();
     const [activeTab, setActiveTab] = React.useState<SettingsTab>('appearance');
-    const [appsSubTab, setAppsSubTab] = React.useState<AppsSubTab>('inspector');
+    const [appsSubTab, setAppsSubTab] = React.useState<AppsSubTab>('datamanagement');
     const [controlsSubTab, setControlsSubTab] = React.useState<ControlsSubTab>('datatable');
     const [isHealthModalOpen, setIsHealthModalOpen] = React.useState(false);
 
@@ -48,13 +48,20 @@ export const SettingsView: React.FC = () => {
         'data_inspector_profiling_thresholds',
         { nullRate: 30, cardinalityRate: 95 }
     );
-    const [qbDefaultMode, setQbDefaultMode] = useLocalStorage<'sql'>('query_builder_default_mode', 'sql');
-    const [qbSqlEditorHeight, setQbSqlEditorHeight] = useLocalStorage<number>('query_builder_sql_editor_height', 384);
     const [importDefaultMode, setImportDefaultMode] = useLocalStorage<'append' | 'overwrite'>('import_default_mode', 'append');
     const [importAutoSaveMappings, setImportAutoSaveMappings] = useLocalStorage<boolean>('import_auto_save_mappings', true);
     const [backupNamePattern, setBackupNamePattern] = useLocalStorage<string>('backup_file_name_pattern', 'backup_{date}_{mode}');
     const [backupUseSavedLocation, setBackupUseSavedLocation] = useLocalStorage<boolean>('backup_use_saved_location', true);
     const [backupFolderLabel, setBackupFolderLabel] = useLocalStorage<string>('backup_saved_folder_label', '');
+    const [reportsDefaultAuthor, setReportsDefaultAuthor] = useLocalStorage<string>('reports_default_author', 'LiteBI Studio');
+    const [reportsDefaultThemeColor, setReportsDefaultThemeColor] = useLocalStorage<string>('reports_default_theme_color', '#1e293b');
+    const [reportsDefaultShowHeader, setReportsDefaultShowHeader] = useLocalStorage<boolean>('reports_default_show_header', true);
+    const [reportsDefaultShowFooter, setReportsDefaultShowFooter] = useLocalStorage<boolean>('reports_default_show_footer', true);
+    const [reportsDefaultIncludeAuditAppendix, setReportsDefaultIncludeAuditAppendix] = useLocalStorage<boolean>('reports_default_include_audit_appendix', false);
+    const [worklistDefaultView, setWorklistDefaultView] = useLocalStorage<'all' | 'open' | 'overdue' | 'today' | 'high_priority'>('worklist_default_view', 'all');
+    const [worklistHideCompleted, setWorklistHideCompleted] = useLocalStorage<boolean>('worklist_hide_completed', false);
+    const [worklistDefaultPriority, setWorklistDefaultPriority] = useLocalStorage<'low' | 'normal' | 'high' | 'critical'>('worklist_default_priority', 'normal');
+    const [worklistDefaultDueDays, setWorklistDefaultDueDays] = useLocalStorage<number>('worklist_default_due_days', 0);
     const [tableDensity, setTableDensity] = useLocalStorage<'compact' | 'normal'>('ui_table_density', 'normal');
     const [tableWrapCells, setTableWrapCells] = useLocalStorage<boolean>('ui_table_wrap_cells', false);
     const [tableDefaultShowFilters, setTableDefaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
@@ -74,18 +81,23 @@ export const SettingsView: React.FC = () => {
         localStorage.removeItem('data_inspector_saved_views');
         localStorage.removeItem('data_inspector_active_view');
         localStorage.removeItem('data_inspector_sql_editor_height');
-        localStorage.removeItem('sql_workspace_sql_editor_height');
         await appDialog.info(t('settings.inspector_reset_layout_done'));
     };
 
-    const handleClearInspectorSqlMemory = async () => {
-        if (!(await confirmAction(t('settings.inspector_reset_sql_confirm')))) return;
+    const handleResetSqlWorkspaceLayout = async () => {
+        if (!(await confirmAction(t('settings.sql_workspace_reset_layout_confirm')))) return;
+        localStorage.removeItem('sql_workspace_sql_editor_height');
+        await appDialog.info(t('settings.sql_workspace_reset_layout_done'));
+    };
+
+    const handleClearSqlWorkspaceMemory = async () => {
+        if (!(await confirmAction(t('settings.sql_workspace_reset_sql_confirm')))) return;
         localStorage.removeItem('data_inspector_sql_history');
         localStorage.removeItem('data_inspector_favorite_queries');
         localStorage.removeItem('data_inspector_custom_sql_templates');
         localStorage.removeItem('data_inspector_selected_custom_template');
         localStorage.removeItem('data_inspector_last_select_sql');
-        await appDialog.info(t('settings.inspector_reset_sql_done'));
+        await appDialog.info(t('settings.sql_workspace_reset_sql_done'));
     };
 
     const handleSavePin = async () => {
@@ -235,9 +247,12 @@ export const SettingsView: React.FC = () => {
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 -mt-2">
                         <div className="flex items-center overflow-x-auto">
                             {[
+                                { id: 'datamanagement', label: t('sidebar.datasource') },
                                 { id: 'inspector', label: t('sidebar.data_inspector') },
+                                { id: 'sqlworkspace', label: t('sidebar.sql_workspace') },
                                 { id: 'querybuilder', label: t('sidebar.query_builder') },
-                                { id: 'datamanagement', label: t('sidebar.datasource') }
+                                { id: 'reports', label: t('sidebar.reports') },
+                                { id: 'worklist', label: t('sidebar.worklist') }
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
@@ -514,18 +529,6 @@ export const SettingsView: React.FC = () => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_autocomplete')}</span>
-                                    <input type="checkbox" className="h-4 w-4" checked={inspectorAutocomplete} onChange={() => setInspectorAutocomplete(!inspectorAutocomplete)} />
-                                </label>
-                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_explain')}</span>
-                                    <input type="checkbox" className="h-4 w-4" checked={inspectorExplainMode} onChange={() => setInspectorExplainMode(!inspectorExplainMode)} />
-                                </label>
-                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_sql_assist')}</span>
-                                    <input type="checkbox" className="h-4 w-4" checked={inspectorSqlAssistOpen} onChange={() => setInspectorSqlAssistOpen(!inspectorSqlAssistOpen)} />
-                                </label>
-                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
                                     <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_profiling')}</span>
                                     <input type="checkbox" className="h-4 w-4" checked={inspectorShowProfiling} onChange={() => setInspectorShowProfiling(!inspectorShowProfiling)} />
                                 </label>
@@ -578,10 +581,52 @@ export const SettingsView: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.inspector_sql_safety')}</p>
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.inspector_reset_title')}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleResetInspectorLayout}
+                                        className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                    >
+                                        {t('settings.inspector_reset_layout')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'apps' && appsSubTab === 'sqlworkspace' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.sql_workspace_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.sql_workspace_hint')}</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.inspector_sql_confirm_without_limit')}</span>
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_autocomplete')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={inspectorAutocomplete} onChange={() => setInspectorAutocomplete(!inspectorAutocomplete)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_explain')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={inspectorExplainMode} onChange={() => setInspectorExplainMode(!inspectorExplainMode)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_assist')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={inspectorSqlAssistOpen} onChange={() => setInspectorSqlAssistOpen(!inspectorSqlAssistOpen)} />
+                                </label>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.sql_workspace_sql_safety')}</p>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_confirm_without_limit')}</span>
                                     <input
                                         type="checkbox"
                                         className="h-4 w-4"
@@ -590,7 +635,7 @@ export const SettingsView: React.FC = () => {
                                     />
                                 </label>
                                 <div className="space-y-1">
-                                    <label className="text-xs text-slate-500">{t('settings.inspector_sql_max_rows')}</label>
+                                    <label className="text-xs text-slate-500">{t('settings.sql_workspace_max_rows')}</label>
                                     <input
                                         type="number"
                                         min={100}
@@ -606,21 +651,21 @@ export const SettingsView: React.FC = () => {
                             </div>
 
                             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.inspector_reset_title')}</p>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.sql_workspace_reset_title')}</p>
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         type="button"
-                                        onClick={handleResetInspectorLayout}
+                                        onClick={handleResetSqlWorkspaceLayout}
                                         className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
                                     >
-                                        {t('settings.inspector_reset_layout')}
+                                        {t('settings.sql_workspace_reset_layout')}
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={handleClearInspectorSqlMemory}
+                                        onClick={handleClearSqlWorkspaceMemory}
                                         className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
                                     >
-                                        {t('settings.inspector_reset_sql')}
+                                        {t('settings.sql_workspace_reset_sql')}
                                     </button>
                                 </div>
                             </div>
@@ -638,31 +683,154 @@ export const SettingsView: React.FC = () => {
                         </h3>
                         <div className="space-y-5">
                             <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.querybuilder_hint')}</p>
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
+                                {t('settings.querybuilder_no_tunable_options', 'Derzeit sind keine weiteren Widgets-spezifischen Optionen erforderlich.')}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'apps' && appsSubTab === 'reports' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.reports_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.reports_hint')}</p>
 
                             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.querybuilder_default_mode')}</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.reports_default_author')}</label>
+                                <input
+                                    value={reportsDefaultAuthor}
+                                    onChange={(e) => setReportsDefaultAuthor(e.target.value)}
+                                    className="w-full sm:w-80 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                />
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.reports_default_theme_color')}</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={reportsDefaultThemeColor}
+                                        onChange={(e) => setReportsDefaultThemeColor(e.target.value)}
+                                        className="h-9 w-14 p-1 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
+                                    />
+                                    <input
+                                        value={reportsDefaultThemeColor}
+                                        onChange={(e) => setReportsDefaultThemeColor(e.target.value)}
+                                        className="w-full sm:w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.reports_default_show_header')}</span>
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={reportsDefaultShowHeader}
+                                        onChange={() => setReportsDefaultShowHeader(!reportsDefaultShowHeader)}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.reports_default_show_footer')}</span>
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={reportsDefaultShowFooter}
+                                        onChange={() => setReportsDefaultShowFooter(!reportsDefaultShowFooter)}
+                                    />
+                                </label>
+                            </div>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.reports_default_include_audit')}</span>
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={reportsDefaultIncludeAuditAppendix}
+                                    onChange={() => setReportsDefaultIncludeAuditAppendix(!reportsDefaultIncludeAuditAppendix)}
+                                />
+                            </label>
+
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                {t('settings.reports_defaults_apply_hint')}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'apps' && appsSubTab === 'worklist' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('settings.worklist_title')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.worklist_hint')}</p>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_view')}</label>
                                 <select
-                                    value={qbDefaultMode}
-                                    onChange={(e) => setQbDefaultMode(e.target.value as 'sql')}
-                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                    value={worklistDefaultView}
+                                    onChange={(e) => setWorklistDefaultView(e.target.value as 'all' | 'open' | 'overdue' | 'today' | 'high_priority')}
+                                    className="w-full sm:w-60 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
                                 >
-                                    <option value="sql">{t('querybuilder.direct_editor')}</option>
+                                    <option value="all">{t('worklist.filter_all')}</option>
+                                    <option value="open">{t('worklist.filter_open')}</option>
+                                    <option value="overdue">{t('worklist.quick_overdue')}</option>
+                                    <option value="today">{t('worklist.quick_today')}</option>
+                                    <option value="high_priority">{t('worklist.quick_high_priority')}</option>
+                                </select>
+                            </div>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.worklist_hide_completed')}</span>
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={worklistHideCompleted}
+                                    onChange={() => setWorklistHideCompleted(!worklistHideCompleted)}
+                                />
+                            </label>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_priority')}</label>
+                                <select
+                                    value={worklistDefaultPriority}
+                                    onChange={(e) => setWorklistDefaultPriority(e.target.value as 'low' | 'normal' | 'high' | 'critical')}
+                                    className="w-full sm:w-60 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                >
+                                    <option value="low">{t('worklist.priority_low')}</option>
+                                    <option value="normal">{t('worklist.priority_normal')}</option>
+                                    <option value="high">{t('worklist.priority_high')}</option>
+                                    <option value="critical">{t('worklist.priority_critical')}</option>
                                 </select>
                             </div>
 
                             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.querybuilder_sql_height')}</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_due_days')}</label>
                                 <input
                                     type="number"
-                                    min={220}
-                                    max={700}
-                                    value={qbSqlEditorHeight}
+                                    min={0}
+                                    max={365}
+                                    value={worklistDefaultDueDays}
                                     onChange={(e) => {
-                                        const next = Math.max(220, Math.min(700, Number(e.target.value) || 220));
-                                        setQbSqlEditorHeight(next);
+                                        const next = Math.max(0, Math.min(365, Number(e.target.value) || 0));
+                                        setWorklistDefaultDueDays(next);
                                     }}
-                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                    className="w-full sm:w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
                                 />
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {t('settings.worklist_default_due_days_hint')}
+                                </p>
                             </div>
                         </div>
                     </div>

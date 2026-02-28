@@ -7,11 +7,21 @@ import { RecordDetailModal } from '../components/RecordDetailModal';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { TableColumn, WorklistPriority, WorklistStatus } from '../../types';
 import { createLogger } from '../../lib/logger';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 type WorklistFilter = 'all' | WorklistStatus;
 type WorklistQuickFilter = 'none' | 'overdue' | 'today' | 'high_priority';
 type WorklistToolsTab = 'focus' | 'batch' | 'preview';
 const logger = createLogger('WorklistView');
+
+const getStoredWorklistDefaultView = (): 'all' | 'open' | 'overdue' | 'today' | 'high_priority' => {
+    if (typeof window === 'undefined') return 'all';
+    const value = localStorage.getItem('worklist_default_view');
+    if (value === 'open' || value === 'overdue' || value === 'today' || value === 'high_priority' || value === 'all') {
+        return value;
+    }
+    return 'all';
+};
 
 interface WorklistItem {
     id: number;
@@ -29,16 +39,22 @@ interface WorklistItem {
 
 export const WorklistView: React.FC = () => {
     const { t } = useTranslation();
+    const defaultWorklistView = getStoredWorklistDefaultView();
     const [items, setItems] = useState<WorklistItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<WorklistFilter>('all');
-    const [quickFilter, setQuickFilter] = useState<WorklistQuickFilter>('none');
+    const [filter, setFilter] = useState<WorklistFilter>(defaultWorklistView === 'open' ? 'open' : 'all');
+    const [quickFilter, setQuickFilter] = useState<WorklistQuickFilter>(
+        defaultWorklistView === 'overdue' || defaultWorklistView === 'today' || defaultWorklistView === 'high_priority'
+            ? defaultWorklistView
+            : 'none'
+    );
     const [search, setSearch] = useState('');
     const [showWorklistTools, setShowWorklistTools] = useState(false);
     const [worklistToolsTab, setWorklistToolsTab] = useState<WorklistToolsTab>('focus');
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [previewItemId, setPreviewItemId] = useState<number | null>(null);
     const { isReadOnly } = useDashboard();
+    const [hideCompleted] = useLocalStorage<boolean>('worklist_hide_completed', false);
 
     // Detail Modal State
     const [selectedItem, setSelectedItem] = useState<WorklistItem | null>(null);
@@ -157,6 +173,7 @@ export const WorklistView: React.FC = () => {
 
     const filteredItems = items
         .filter(item => filter === 'all' || item.status === filter)
+        .filter(item => !hideCompleted || (item.status !== 'done' && item.status !== 'closed'))
         .filter(item => {
             if (quickFilter === 'none') return true;
             if (quickFilter === 'overdue') return item.status !== 'done' && item.status !== 'closed' && isOverdue(item.due_at);

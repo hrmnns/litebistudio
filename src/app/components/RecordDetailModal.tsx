@@ -6,6 +6,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import type { DbRow, TableColumn } from '../../types';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 import { SchemaTable } from './SchemaDocumentation';
 import type { SchemaDefinition } from './SchemaDocumentation';
@@ -51,6 +52,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 
     // Prevent double clicks during worklist toggle
     const [isActionLoading, setIsActionLoading] = useState(false);
+    const [worklistDefaultPriority] = useLocalStorage<'low' | 'normal' | 'high' | 'critical'>('worklist_default_priority', 'normal');
+    const [worklistDefaultDueDays] = useLocalStorage<number>('worklist_default_due_days', 0);
 
     const modalTitle = title || t('record_detail.title');
 
@@ -207,10 +210,19 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
                     return '';
                 };
+                const getDefaultDueDate = (): string => {
+                    if (worklistDefaultDueDays <= 0) return '';
+                    const d = new Date();
+                    d.setDate(d.getDate() + worklistDefaultDueDays);
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    return `${yyyy}-${mm}-${dd}`;
+                };
 
                 const priorityPrompt = await appDialog.prompt(
                     t('worklist.add_priority_prompt', 'Prioritaet (low, normal, high, critical)'),
-                    { title: t('worklist.add_dialog_title', 'Zum Arbeitsvorrat') , defaultValue: 'normal' }
+                    { title: t('worklist.add_dialog_title', 'Zum Arbeitsvorrat') , defaultValue: worklistDefaultPriority }
                 );
                 if (priorityPrompt === null) {
                     return;
@@ -219,7 +231,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 
                 const duePrompt = await appDialog.prompt(
                     t('worklist.add_due_prompt', 'Faelligkeit optional (YYYY-MM-DD), leer lassen fuer keine'),
-                    { title: t('worklist.add_dialog_title', 'Zum Arbeitsvorrat') }
+                    { title: t('worklist.add_dialog_title', 'Zum Arbeitsvorrat'), defaultValue: getDefaultDueDate() }
                 );
                 if (duePrompt === null) {
                     return;

@@ -47,6 +47,7 @@ interface SavedWidget {
 }
 
 const normalizeSqlText = (value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase();
+const SQL_PREVIEW_HEIGHT_PX = 384;
 
 export const QueryBuilderView: React.FC = () => {
     const { t } = useTranslation();
@@ -66,7 +67,6 @@ export const QueryBuilderView: React.FC = () => {
     const [isMaximized, setIsMaximized] = useState(false);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
     const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
-    const [sqlEditorHeight] = useLocalStorage<number>('query_builder_sql_editor_height', 384);
 
     // Visualization State
     const [visType, setVisType] = useState<VisualizationType>('table');
@@ -1007,7 +1007,7 @@ export const QueryBuilderView: React.FC = () => {
                                                         value={sql}
                                                         readOnly
                                                         className="w-full font-mono text-xs p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded-lg outline-none resize-none cursor-default"
-                                                        style={{ height: `${Math.max(220, Math.min(700, sqlEditorHeight))}px` }}
+                                                        style={{ height: `${SQL_PREVIEW_HEIGHT_PX}px` }}
                                                         placeholder="SELECT * FROM..."
                                                     />
                                                 </div>
