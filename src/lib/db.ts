@@ -69,15 +69,12 @@ channel.onmessage = async (event) => {
     }
 };
 
-const readOnlyResolve: (() => void) | null = null;
-
 const lockAbortController = new AbortController();
 
 export function setReadOnlyMode(skipRedirect = false) {
     isReadOnlyMode = true;
     sessionStorage.setItem('litebistudio_accepted_readonly', 'true');
     conflictListeners.forEach(l => l(true, true));
-    if (readOnlyResolve) readOnlyResolve();
     lockAbortController.abort(); // Cancel any pending lock requests for this tab
     // Force overview page on start of read-only mode to prevent blank screens, unless auto-reloaded
     if (!skipRedirect) {

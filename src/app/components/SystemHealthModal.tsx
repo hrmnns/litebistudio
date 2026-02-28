@@ -7,6 +7,7 @@ import { Modal } from './Modal';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { appDialog } from '../../lib/appDialog';
 import { useDashboard } from '../../lib/context/DashboardContext';
+import { useNavigate } from 'react-router-dom';
 
 interface SystemHealthModalProps {
     isOpen: boolean;
@@ -53,6 +54,7 @@ interface ClientHealthReport {
 export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, onClose }) => {
     const { t } = useTranslation();
     const { isAdminMode } = useDashboard();
+    const navigate = useNavigate();
     const [snapshotRetentionDays] = useLocalStorage<number>('health_snapshot_retention_days', 90);
     const [snapshotKeepLatest] = useLocalStorage<number>('health_snapshot_keep_latest', 200);
     const [activeTab, setActiveTab] = useState<'overview' | 'storage' | 'database'>('overview');
@@ -220,11 +222,11 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
 
     const openBackupCenter = () => {
         sessionStorage.setItem('litebistudio_datasource_tab', 'system');
-        window.location.hash = '#/datasource';
+        navigate('/datasource');
     };
 
     const openInspector = () => {
-        window.location.hash = '#/inspector';
+        navigate('/inspector');
     };
 
     const handlePruneSnapshots = async () => {

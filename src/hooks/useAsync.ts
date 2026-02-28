@@ -4,7 +4,6 @@ import { queryCache } from '../lib/cache';
 interface UseAsyncOptions {
     cacheKey?: string;
     ttl?: number; // Time to live in ms
-    keepPreviousData?: boolean;
 }
 
 function serializeDependency(dep: unknown): string {

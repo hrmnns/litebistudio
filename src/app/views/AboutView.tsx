@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { Github, BookOpen, FileText, Heart, Globe, Mail, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import AppBrandIcon from '../components/ui/AppBrandIcon';
 
 const LINKS = {
@@ -15,6 +16,7 @@ const LINKS = {
 
 export const AboutView: React.FC = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const version = __APP_VERSION__;
     const buildNumber = __BUILD_NUMBER__;
 
@@ -35,10 +37,10 @@ export const AboutView: React.FC = () => {
             header={{
                 title: t('about.title', 'About LiteBI Studio'),
                 subtitle: t('about.subtitle', 'Information about the project and system'),
-                onBack: () => window.history.back(),
+                onBack: () => navigate(-1),
             }}
             breadcrumbs={[
-                { label: t('sidebar.settings', 'Settings'), onClick: () => window.location.hash = '#/settings' },
+                { label: t('sidebar.settings', 'Settings'), onClick: () => navigate('/settings') },
                 { label: t('about.title', 'About') }
             ]}
         >

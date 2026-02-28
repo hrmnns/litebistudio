@@ -8,6 +8,7 @@ import { useDashboard } from '../../lib/context/DashboardContext';
 import type { TableColumn, WorklistPriority, WorklistStatus } from '../../types';
 import { createLogger } from '../../lib/logger';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useNavigate } from 'react-router-dom';
 
 type WorklistFilter = 'all' | WorklistStatus;
 type WorklistQuickFilter = 'none' | 'overdue' | 'today' | 'high_priority';
@@ -39,6 +40,7 @@ interface WorklistItem {
 
 export const WorklistView: React.FC = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const defaultWorklistView = getStoredWorklistDefaultView();
     const [items, setItems] = useState<WorklistItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -236,7 +238,7 @@ export const WorklistView: React.FC = () => {
             header={{
                 title: t('sidebar.worklist'),
                 subtitle: t('worklist.subtitle'),
-                onBack: () => window.history.back()
+                onBack: () => navigate(-1)
             }}
             rightPanel={{
                 title: t('worklist.tools_title', 'Worklist Tools'),

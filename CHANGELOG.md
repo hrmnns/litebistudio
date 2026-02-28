@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     - `health_snapshot_keep_latest`.
 
 ### Changed
+- Internal repository architecture was modularized:
+  - `SystemRepository` now composes dedicated sub-repositories for Health, Widgets/Dashboards, Report Packs, SQL Statements, and Worklist/Record Metadata.
+  - Public repository API remains backward-compatible for existing app calls.
+- Navigation handling was further standardized on React Router navigation flows (`useNavigate`) in router and inspector-related paths.
+- Table search logic in repository methods was deduplicated via shared helper functions to reduce maintenance overhead and drift.
 - Report Packages area was renamed to `Reporting` / `Berichtswesen` in navigation and main view titles.
 - Reporting package settings were moved from modal dialog to a right-side panel with fixed/sticky footer actions.
 - Reporting export actions were visually grouped and icon semantics were clarified for better usability.
@@ -51,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Snapshot cleanup confirmation now uses configurable retention values instead of fixed thresholds.
 
 ### Fixed
+- Removed obsolete/unused legacy code paths:
+  - deprecated `Sidebar` props cleanup (`currentView`, `onNavigate`)
+  - removed unused hook file `src/hooks/useQuery.ts`
+  - removed unused `keepPreviousData` option from `useAsync`.
 - Fixed dark-mode styling in the `Manage Categories` dialog within Reporting.
 - Fixed unstable text input behavior in report package settings sidepanel fields (characters could be dropped while typing).
 - Fixed localized system-table write-block messaging to show user-friendly DE/EN guidance instead of only technical error text.

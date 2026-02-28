@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock, Code2 } from 'lucide-react';
@@ -13,11 +13,6 @@ interface SidebarProps {
     sidebarOpen: boolean;
     onToggleCollapse: () => void;
     onCloseMobile: () => void;
-    /** @deprecated kept for backwards compat — ignored when using router */
-    currentView?: string;
-    /** @deprecated kept for backwards compat — ignored when using router */
-    /** @deprecated kept for backwards compat — ignored when using router */
-    onNavigate?: (view: string) => void;
     isReadOnly?: boolean;
 }
 
@@ -228,3 +223,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </aside >
     );
 };
+

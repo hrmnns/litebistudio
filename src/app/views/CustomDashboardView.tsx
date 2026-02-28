@@ -303,7 +303,7 @@ export const CustomDashboardView: React.FC = () => {
 
     const deleteCustomWidget = async (id: string) => {
         if (await appDialog.confirm(t('dashboard.confirm_delete_report'))) {
-            await SystemRepository.executeRaw(`DELETE FROM sys_user_widgets WHERE id = '${id}'`);
+            await SystemRepository.deleteUserWidget(id);
             refreshCustomWidgets();
             removeFromDashboard(id);
         }

@@ -17,6 +17,7 @@ import { PivotTable } from './PivotTable';
 import type { SchemaDefinition } from './SchemaDocumentation';
 import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 import { MarkdownContent } from './ui/MarkdownContent';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface FilterDef {
     column: string;
@@ -37,6 +38,8 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, globalFilters, showInspectorJump = false, inspectorReturnHash }) => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
+    const location = useLocation();
     const effectiveSql = useMemo(() => {
         let nextSql = sql;
         if (!globalFilters || globalFilters.length === 0) {
@@ -76,10 +79,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
     const handleOpenInInspector = React.useCallback(() => {
         if (!canOpenInInspector) return;
         localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, effectiveSql);
-        const currentHash = window.location.hash || '#/';
+        const currentHash = `#${location.pathname}${location.search || ''}`;
         localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, inspectorReturnHash || currentHash);
-        window.location.hash = '#/sql-workspace';
-    }, [canOpenInInspector, effectiveSql, inspectorReturnHash]);
+        navigate('/sql-workspace');
+    }, [canOpenInInspector, effectiveSql, inspectorReturnHash, location.pathname, location.search, navigate]);
 
     const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {

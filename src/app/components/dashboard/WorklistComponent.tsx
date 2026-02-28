@@ -5,6 +5,7 @@ import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 import type { DbRow } from '../../../types';
 import { createLogger } from '../../../lib/logger';
+import { useNavigate } from 'react-router-dom';
 
 const logger = createLogger('WorklistComponent');
 
@@ -20,6 +21,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
     isOverlay
 }) => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [stats, setStats] = useState({ total: 0, pending: 0 });
     const [loading, setLoading] = useState(true);
 
@@ -48,7 +50,7 @@ export const WorklistComponent: React.FC<WorklistStatusComponentProps> = ({
 
     const handleNavigate = (e: React.MouseEvent) => {
         e.stopPropagation();
-        window.location.hash = '#/worklist';
+        navigate('/worklist');
     };
 
     return (

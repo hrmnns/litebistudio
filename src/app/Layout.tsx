@@ -28,10 +28,8 @@ export const Layout: React.FC = () => {
         <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
             {!isPresentationMode && (
                 <Sidebar
-                    currentView={'dashboard'}
                     isCollapsed={isSidebarCollapsed}
                     sidebarOpen={sidebarOpen}
-                    onNavigate={() => { }}
                     onToggleCollapse={() => setSidebarCollapsed(!isSidebarCollapsed)}
                     onCloseMobile={() => setSidebarOpen(false)}
                     isReadOnly={isReadOnly}

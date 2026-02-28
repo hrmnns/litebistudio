@@ -1,9 +1,39 @@
 import { runQuery, notifyDbChange } from '../db';
 import type { DbRow, TableColumn } from '../../types';
 import { isValidIdentifier } from '../utils';
+import { createHealthRepository } from './HealthRepository';
+import { createWidgetRepository } from './WidgetRepository';
+import { createReportPackRepository } from './ReportPackRepository';
+import { createSqlStatementRepository } from './SqlStatementRepository';
+import { createWorklistRepository } from './WorklistRepository';
+export type { SqlStatementRecord } from './SqlStatementRepository';
 
 const schemaCache = new Map<string, TableColumn[]>();
 type BindValue = string | number | null | undefined;
+
+function getSearchableColumns(schema: TableColumn[]): TableColumn[] {
+    return schema.filter(
+        (col) => col.type.toUpperCase().includes('TEXT')
+            || col.name.toLowerCase().includes('id')
+            || col.name.toLowerCase().includes('name')
+    );
+}
+
+function buildSearchClause(searchColumns: TableColumn[], searchTerm?: string): { clause: string; params: BindValue[] } {
+    if (!searchTerm || !searchColumns.length) return { clause: '', params: [] };
+    const clause = searchColumns.map((col) => `${col.name} LIKE '%' || ? || '%'`).join(' OR ');
+    const params: BindValue[] = Array(searchColumns.length).fill(searchTerm);
+    return { clause, params };
+}
+
+async function getTableSchemaCached(tableName: string): Promise<TableColumn[]> {
+    if (!isValidIdentifier(tableName)) return [];
+    if (schemaCache.has(tableName)) return schemaCache.get(tableName)!;
+
+    const result = await runQuery(`PRAGMA table_info("${tableName}")`) as unknown as TableColumn[];
+    schemaCache.set(tableName, result);
+    return result;
+}
 
 function isAdminModeActive(): boolean {
     if (typeof window === 'undefined') return false;
@@ -40,74 +70,9 @@ function assertNoSystemWriteForNonAdmin(sql: string): void {
     }
 }
 
-interface UserWidgetInput {
-    id: string;
-    name: string;
-    description?: string | null;
-    sql_statement_id?: string | null;
-    sql_query: string;
-    visualization_config?: unknown;
-    visual_builder_config?: unknown;
-}
-
-interface DashboardInput {
-    id: string;
-    name: string;
-    layout: unknown;
-    is_default?: boolean | number;
-}
-
-interface ReportPackInput {
-    id: string;
-    name: string;
-    category?: string | null;
-    description?: string | null;
-    config: unknown;
-}
-
-export interface SqlStatementRecord {
-    id: string;
-    name: string;
-    sql_text: string;
-    description: string;
-    scope: string;
-    tags: string;
-    is_favorite: number;
-    use_count: number;
-    last_used_at: string | null;
-    created_at: string;
-    updated_at: string;
-}
-
-interface SqlStatementInput {
-    id: string;
-    name: string;
-    sql_text: string;
-    description?: string | null;
-    scope?: string;
-    tags?: string | null;
-    is_favorite?: boolean | number;
-}
-
 export interface DataSourceEntry {
     name: string;
     type: 'table' | 'view';
-}
-
-interface RecordMetadata {
-    exists: boolean;
-    isInWorklist: boolean;
-    worklistItem: DbRow | null;
-}
-
-interface HealthSnapshotInput {
-    id?: string;
-    scope?: 'database' | 'client' | 'combined';
-    status: 'ok' | 'warning' | 'error';
-    score: number;
-    checksRun: number;
-    findings: unknown[];
-    metadata?: Record<string, unknown> | null;
 }
 
 export interface TableIndexInfo {
@@ -146,54 +111,10 @@ export const SystemRepository = {
         return await import('../db').then(m => m.getStorageStatus());
     },
 
-    async saveHealthSnapshot(input: HealthSnapshotInput): Promise<void> {
-        const id = input.id || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : `health_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
-        await runQuery(
-            `INSERT INTO sys_health_snapshot
-                (id, scope, status, score, checks_run, findings_json, metadata_json)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-                id,
-                input.scope || 'database',
-                input.status,
-                Math.max(0, Math.round(Number(input.score) || 0)),
-                Math.max(0, Math.round(Number(input.checksRun) || 0)),
-                JSON.stringify(Array.isArray(input.findings) ? input.findings : []),
-                input.metadata ? JSON.stringify(input.metadata) : null
-            ]
-        );
-        notifyDbChange();
-    },
-
-    async pruneHealthSnapshots(params?: { olderThanDays?: number; keepLatest?: number }): Promise<number> {
-        if (!isAdminModeActive()) {
-            throw new Error(getSystemTableWriteBlockedMessage());
-        }
-
-        const olderThanDays = Math.max(1, Math.floor(Number(params?.olderThanDays ?? 90)));
-        const keepLatest = Math.max(0, Math.floor(Number(params?.keepLatest ?? 200)));
-        const olderThanModifier = `-${olderThanDays} days`;
-
-        await runQuery(
-            `
-            DELETE FROM sys_health_snapshot
-            WHERE id NOT IN (
-                SELECT id
-                FROM sys_health_snapshot
-                ORDER BY datetime(created_at) DESC
-                LIMIT ?
-            )
-            AND datetime(created_at) < datetime('now', ?)
-            `,
-            [keepLatest, olderThanModifier]
-        );
-        const result = await runQuery('SELECT changes() AS count');
-        const count = Number(result[0]?.count || 0);
-        notifyDbChange(count, 'clear');
-        return count;
-    },
+    ...createHealthRepository({
+        isAdminModeActive,
+        getSystemTableWriteBlockedMessage
+    }),
 
     async getTables(): Promise<string[]> {
         const result = await runQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
@@ -231,12 +152,7 @@ export const SystemRepository = {
     },
 
     async getTableSchema(tableName: string): Promise<TableColumn[]> {
-        if (!isValidIdentifier(tableName)) return [];
-        if (schemaCache.has(tableName)) return schemaCache.get(tableName)!;
-
-        const result = await runQuery(`PRAGMA table_info("${tableName}")`) as unknown as TableColumn[];
-        schemaCache.set(tableName, result);
-        return result;
+        return await getTableSchemaCached(tableName);
     },
 
     async getTableIndexes(tableName: string): Promise<TableIndexInfo[]> {
@@ -308,14 +224,12 @@ export const SystemRepository = {
 
         if (searchTerm) {
             const schema = await this.getTableSchema(tableName);
-            const searchFilter = schema
-                .filter(col => col.type.toUpperCase().includes('TEXT') || col.name.toLowerCase().includes('id') || col.name.toLowerCase().includes('name'))
-                .map(col => `${col.name} LIKE '%' || ? || '%'`)
-                .join(' OR ');
+            const searchableColumns = getSearchableColumns(schema);
+            const { clause: searchFilter, params: searchParams } = buildSearchClause(searchableColumns, searchTerm);
 
             if (searchFilter) {
                 sql += ` WHERE ${searchFilter}`;
-                params.push(...Array(schema.filter(col => col.type.toUpperCase().includes('TEXT') || col.name.toLowerCase().includes('id') || col.name.toLowerCase().includes('name')).length).fill(searchTerm));
+                params.push(...searchParams);
             }
         }
 
@@ -338,14 +252,12 @@ export const SystemRepository = {
 
         if (searchTerm) {
             const schema = await this.getTableSchema(tableName);
-            const searchColumns = schema.filter(
-                col => col.type.toUpperCase().includes('TEXT') || col.name.toLowerCase().includes('id') || col.name.toLowerCase().includes('name')
-            );
-            const searchFilter = searchColumns.map(col => `${col.name} LIKE '%' || ? || '%'`).join(' OR ');
+            const searchableColumns = getSearchableColumns(schema);
+            const { clause: searchFilter, params: searchParams } = buildSearchClause(searchableColumns, searchTerm);
 
             if (searchFilter) {
                 sql += ` WHERE ${searchFilter}`;
-                params.push(...Array(searchColumns.length).fill(searchTerm));
+                params.push(...searchParams);
             }
         }
 
@@ -382,255 +294,10 @@ export const SystemRepository = {
         return count;
     },
 
-    // User Widgets (Generic BI)
-    async getUserWidgets(): Promise<DbRow[]> {
-        return await runQuery('SELECT * FROM sys_user_widgets ORDER BY created_at DESC');
-    },
-
-    async saveUserWidget(widget: UserWidgetInput): Promise<void> {
-        const existing = await runQuery('SELECT id FROM sys_user_widgets WHERE id = ?', [widget.id]);
-        if (existing.length > 0) {
-            await runQuery(
-                'UPDATE sys_user_widgets SET name = ?, description = ?, sql_statement_id = ?, sql_query = ?, visualization_config = ?, visual_builder_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config), widget.id]
-            );
-        } else {
-            await runQuery(
-                'INSERT INTO sys_user_widgets (id, name, description, sql_statement_id, sql_query, visualization_config, visual_builder_config) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [widget.id, widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config)]
-            );
-        }
-        notifyDbChange();
-    },
-
-    async deleteUserWidget(id: string): Promise<void> {
-        await runQuery('DELETE FROM sys_user_widgets WHERE id = ?', [id]);
-        notifyDbChange();
-    },
-
-    // Dashboards (Multi-Dashboard Support)
-    async getDashboards(): Promise<DbRow[]> {
-        const result = await runQuery('SELECT * FROM sys_dashboards ORDER BY created_at ASC');
-        return result.map(r => ({
-            ...r,
-            layout: typeof r.layout === 'string' ? JSON.parse(r.layout) : r.layout
-        }));
-    },
-
-    async saveDashboard(dashboard: DashboardInput, silent: boolean = false): Promise<void> {
-        const existing = await runQuery('SELECT id FROM sys_dashboards WHERE id = ?', [dashboard.id]);
-        if (existing.length > 0) {
-            await runQuery(
-                'UPDATE sys_dashboards SET name = ?, layout = ?, is_default = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0, dashboard.id]
-            );
-        } else {
-            await runQuery(
-                'INSERT INTO sys_dashboards (id, name, layout, is_default) VALUES (?, ?, ?, ?)',
-                [dashboard.id, dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0]
-            );
-        }
-        if (!silent) notifyDbChange();
-    },
-
-    async deleteDashboard(id: string): Promise<void> {
-        await runQuery('DELETE FROM sys_dashboards WHERE id = ?', [id]);
-        notifyDbChange();
-    },
-
-    // Report Packages
-    async getReportPacks(): Promise<DbRow[]> {
-        const result = await runQuery('SELECT * FROM sys_report_packs ORDER BY created_at DESC');
-        return result.map(r => ({
-            ...r,
-            category: typeof r.category === 'string' && r.category.trim().length > 0 ? r.category : 'General',
-            config: typeof r.config === 'string' ? JSON.parse(r.config) : r.config
-        }));
-    },
-
-    async saveReportPack(pack: ReportPackInput): Promise<void> {
-        const existing = await runQuery('SELECT id FROM sys_report_packs WHERE id = ?', [pack.id]);
-        if (existing.length > 0) {
-            await runQuery(
-                'UPDATE sys_report_packs SET name = ?, category = ?, description = ?, config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config), pack.id]
-            );
-        } else {
-            await runQuery(
-                'INSERT INTO sys_report_packs (id, name, category, description, config) VALUES (?, ?, ?, ?, ?)',
-                [pack.id, pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config)]
-            );
-        }
-        notifyDbChange();
-    },
-
-    async deleteReportPack(id: string): Promise<void> {
-        await runQuery('DELETE FROM sys_report_packs WHERE id = ?', [id]);
-        notifyDbChange();
-    },
-
-    // Reusable SQL statements
-    async listSqlStatements(scope: string = 'global'): Promise<SqlStatementRecord[]> {
-        const rows = await runQuery(
-            `SELECT id, name, sql_text, description, scope, tags, is_favorite, use_count, last_used_at, created_at, updated_at
-             FROM sys_sql_statement
-             WHERE scope = ?
-             ORDER BY is_favorite DESC, COALESCE(last_used_at, updated_at, created_at) DESC, name ASC`,
-            [scope]
-        );
-        return rows as unknown as SqlStatementRecord[];
-    },
-
-    async saveSqlStatement(statement: SqlStatementInput): Promise<void> {
-        const scope = (statement.scope || 'global').trim() || 'global';
-        const existing = await runQuery('SELECT id FROM sys_sql_statement WHERE id = ?', [statement.id]);
-        if (existing.length > 0) {
-            await runQuery(
-                `UPDATE sys_sql_statement
-                 SET name = ?, sql_text = ?, description = ?, scope = ?, tags = ?, is_favorite = ?, updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?`,
-                [
-                    statement.name,
-                    statement.sql_text,
-                    statement.description || '',
-                    scope,
-                    statement.tags || '',
-                    statement.is_favorite ? 1 : 0,
-                    statement.id
-                ]
-            );
-        } else {
-            await runQuery(
-                `INSERT INTO sys_sql_statement (id, name, sql_text, description, scope, tags, is_favorite)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    statement.id,
-                    statement.name,
-                    statement.sql_text,
-                    statement.description || '',
-                    scope,
-                    statement.tags || '',
-                    statement.is_favorite ? 1 : 0
-                ]
-            );
-        }
-        notifyDbChange();
-    },
-
-    async deleteSqlStatement(id: string): Promise<void> {
-        await runQuery('DELETE FROM sys_sql_statement WHERE id = ?', [id]);
-        notifyDbChange();
-    },
-
-    async setSqlStatementFavorite(id: string, isFavorite: boolean): Promise<void> {
-        await runQuery(
-            'UPDATE sys_sql_statement SET is_favorite = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [isFavorite ? 1 : 0, id]
-        );
-        notifyDbChange();
-    },
-
-    async markSqlStatementUsed(id: string): Promise<void> {
-        await runQuery(
-            `UPDATE sys_sql_statement
-             SET use_count = COALESCE(use_count, 0) + 1,
-                 last_used_at = CURRENT_TIMESTAMP
-             WHERE id = ?`,
-            [id]
-        );
-        notifyDbChange();
-    },
-
-    // Worklist Management
-    async getWorklist(): Promise<DbRow[]> {
-        return await runQuery('SELECT * FROM sys_worklist ORDER BY created_at DESC');
-    },
-
-    async updateWorklistItem(id: number | string, data: { status?: string; comment?: string; priority?: string; due_at?: string | null }): Promise<void> {
-        const fields: string[] = [];
-        const params: BindValue[] = [];
-
-        if (data.status !== undefined) {
-            fields.push('status = ?');
-            params.push(data.status);
-        }
-        if (data.comment !== undefined) {
-            fields.push('comment = ?');
-            params.push(data.comment);
-        }
-        if (data.priority !== undefined) {
-            fields.push('priority = ?');
-            params.push(data.priority);
-        }
-        if (data.due_at !== undefined) {
-            fields.push('due_at = ?');
-            params.push(data.due_at);
-        }
-
-        if (fields.length === 0) return;
-
-        fields.push('updated_at = CURRENT_TIMESTAMP');
-        params.push(Number(id)); // Force number for ID consistency
-
-        const sql = `UPDATE sys_worklist SET ${fields.join(', ')} WHERE id = ?`;
-        await runQuery(sql, params);
-        notifyDbChange();
-    },
-
-    async checkRecordExists(tableName: string, id: string | number): Promise<boolean> {
-        if (!isValidIdentifier(tableName)) return false;
-        try {
-            // First try standard "id" column
-            const result = await runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ? LIMIT 1`, [id]);
-            return result.length > 0;
-        } catch {
-            // Fallback: try to find the actual primary key name or use rowid
-            try {
-                const columns = await this.getTableSchema(tableName);
-                const pk = columns.find((c: TableColumn) => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
-                if (pk && pk.toLowerCase() !== 'id') {
-                    const pkResult = await runQuery(`SELECT 1 FROM "${tableName}" WHERE "${pk}" = ? LIMIT 1`, [id]);
-                    return pkResult.length > 0;
-                }
-
-                // Try rowid if no PK found
-                const rowidResult = await runQuery(`SELECT 1 FROM "${tableName}" WHERE rowid = ? LIMIT 1`, [id]);
-                return rowidResult.length > 0;
-            } catch {
-                return false;
-            }
-        }
-    },
-
-    async getRecordMetadata(tableName: string, id: string | number): Promise<RecordMetadata> {
-        if (!isValidIdentifier(tableName)) return { exists: false, isInWorklist: false, worklistItem: null };
-        if (id === undefined || id === null) return { exists: false, isInWorklist: false, worklistItem: null };
-
-        // Execute queries with individual catch blocks to prevent a failure in one (e.g., missing ID column)
-        // from crashing the entire metadata fetch array.
-        // Note: SQLite column names are generally case-insensitive in queries, but we use "id" as standard.
-        const [existsResult, worklistResult] = await Promise.all([
-            runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ? LIMIT 1`, [id]).catch(async () => {
-                // Fallback 1: try to find the actual primary key name if standard "id" fails
-                try {
-                    const columns = await this.getTableSchema(tableName);
-                    const pk = columns.find(c => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
-                    if (pk && pk.toLowerCase() !== 'id') {
-                        return await runQuery(`SELECT 1 FROM "${tableName}" WHERE "${pk}" = ? LIMIT 1`, [id]);
-                    }
-
-                    // Fallback 2: try rowid if no PK found or if the id looks like a rowid
-                    return await runQuery(`SELECT 1 FROM "${tableName}" WHERE rowid = ? LIMIT 1`, [id]);
-                } catch { /* ignore */ }
-                return [];
-            }),
-            runQuery('SELECT * FROM sys_worklist WHERE source_table = ? AND source_id = ?', [tableName, id]).catch(() => [])
-        ]);
-
-        return {
-            exists: existsResult.length > 0,
-            isInWorklist: worklistResult.length > 0,
-            worklistItem: worklistResult[0] || null
-        };
-    }
+    ...createWidgetRepository(),
+    ...createReportPackRepository(),
+    ...createSqlStatementRepository(),
+    ...createWorklistRepository({
+        getTableSchema: getTableSchemaCached
+    })
 };

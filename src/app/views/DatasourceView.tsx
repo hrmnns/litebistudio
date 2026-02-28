@@ -21,6 +21,7 @@ import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
+import { useNavigate } from 'react-router-dom';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -122,6 +123,7 @@ const resetEnvironmentSettings = (): void => {
 
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
     const { t, i18n } = useTranslation();
+    const navigate = useNavigate();
     const now = new Date();
     const footerText = t('settings.last_update', {
         date: now.toLocaleDateString(i18n.language === 'de' ? 'de-DE' : 'en-US'),
@@ -589,7 +591,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             header={{
                 title: t('sidebar.datasource'),
                 subtitle: t('datasource.subtitle'),
-                onBack: () => window.history.back()
+                onBack: () => navigate(-1)
             }}
             footer={footerText}
         >
@@ -1128,7 +1130,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                 await appDialog.info(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));
                                                                 markBackupComplete();
                                                                 sessionStorage.removeItem('litebistudio_datasource_tab');
-                                                                window.location.hash = '#/';
+                                                                navigate('/');
                                                                 window.location.reload();
                                                             } catch (err: unknown) {
                                                                 setIsResetting(false);

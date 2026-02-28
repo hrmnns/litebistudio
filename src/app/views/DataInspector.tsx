@@ -15,6 +15,7 @@ import { Modal } from '../components/Modal';
 import type { DataSourceEntry, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
 import { INSPECTOR_LAST_SELECT_SQL_KEY, INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 import { appDialog } from '../../lib/appDialog';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface DataInspectorProps {
     onBack: () => void;
@@ -70,6 +71,8 @@ const SQL_KEYWORDS = [
 
 export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode, titleKey, breadcrumbKey }) => {
     const { t, i18n } = useTranslation();
+    const navigate = useNavigate();
+    const location = useLocation();
     const { isAdminMode } = useDashboard();
     const SQL_LIBRARY_SCOPE = 'global';
     const SQL_LIBRARY_MIGRATION_KEY = 'data_inspector_sql_library_migrated_v1';
@@ -196,9 +199,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         const trimmed = sql.trim();
         if (!trimmed) return;
         localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, trimmed);
-        localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, window.location.hash || '#/inspector');
-        window.location.hash = '#/sql-workspace';
-    }, []);
+        localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, `#${location.pathname}${location.search || ''}`);
+        navigate('/sql-workspace');
+    }, [location.pathname, location.search, navigate]);
 
     useEffect(() => {
         setShowTableFilters(defaultShowFilters);
@@ -1571,7 +1574,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                     <>
                         {inspectorReturnHash && (
                             <button
-                                onClick={() => { window.location.hash = inspectorReturnHash; }}
+                                onClick={() => { navigate(inspectorReturnHash.replace(/^#/, '')); }}
                                 className="h-10 flex items-center gap-2 px-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                                 title={t('datainspector.back_to_dashboard')}
                             >

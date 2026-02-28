@@ -5,9 +5,11 @@ import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 import { Skeleton } from '../ui/Skeleton';
 import { useAsync } from '../../../hooks/useAsync';
+import { useNavigate } from 'react-router-dom';
 
 export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const { data: stats, loading, error } = useAsync<{ tables: number; records: number }>(
         () => SystemRepository.getDatabaseStats(),
         [],
@@ -24,7 +26,7 @@ export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove,
 
     const handleClick = () => {
         if (onClick) onClick();
-        window.location.hash = '#/inspector';
+        navigate('/inspector');
     };
 
     return (
@@ -42,7 +44,7 @@ export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove,
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-                        window.location.hash = '#/inspector';
+                        navigate('/inspector');
                     }}
                     className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors group/footer"
                 >

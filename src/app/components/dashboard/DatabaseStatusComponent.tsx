@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Database, Save, AlertCircle, Settings } from 'lucide-react';
 import { DashboardComponent, type DashboardTileProps } from '../ui/DashboardComponent';
 import { useBackupStatus } from '../../../hooks/useBackupStatus';
+import { useNavigate } from 'react-router-dom';
 
 interface DatabaseStatusComponentProps extends DashboardTileProps {
     isOverlay?: boolean;
@@ -16,6 +17,7 @@ export const DatabaseStatusComponent: React.FC<DatabaseStatusComponentProps> = (
     isOverlay
 }) => {
     const { t, i18n } = useTranslation();
+    const navigate = useNavigate();
     const { lastBackup, changeCount, isBackupRecommended } = useBackupStatus();
 
     const formatDate = (date: Date | null) => {
@@ -31,7 +33,7 @@ export const DatabaseStatusComponent: React.FC<DatabaseStatusComponentProps> = (
 
     const handleNavigate = (e: React.MouseEvent) => {
         e.stopPropagation();
-        window.location.hash = '#/datasource';
+        navigate('/datasource');
     };
 
     return (
