@@ -6,6 +6,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import type { DbRow } from '../../types';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 interface TablePreview {
     sheetName: string;
@@ -19,12 +20,32 @@ interface TablePreview {
 export const SmartImport: React.FC = () => {
     const { t } = useTranslation();
     const logger = createLogger('SmartImport');
+    const [importTablePrefix] = useLocalStorage<string>('import_table_prefix', 'usr_');
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
     const [previews, setPreviews] = useState<TablePreview[]>([]);
     const [importedStats, setImportedStats] = useState<{ tables: number; records: number }>({ tables: 0, records: 0 });
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const normalizePrefix = (prefix: string): string => {
+        return prefix.trim();
+    };
+
+    const isReservedPrefix = (prefix: string): boolean => {
+        return normalizePrefix(prefix).toLowerCase().startsWith('sys');
+    };
+
+    const effectiveImportPrefix = isReservedPrefix(importTablePrefix) ? 'usr_' : normalizePrefix(importTablePrefix);
+    const hasInvalidConfiguredPrefix = isReservedPrefix(importTablePrefix);
+
+    const applyConfiguredPrefix = (tableName: string): string => {
+        const trimmedName = tableName.trim();
+        const prefix = effectiveImportPrefix;
+        if (!prefix) return trimmedName;
+        if (trimmedName.toLowerCase().startsWith(prefix.toLowerCase())) return trimmedName;
+        return `${prefix}${trimmedName}`;
+    };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -35,7 +56,7 @@ export const SmartImport: React.FC = () => {
             const results = await analyzeExcelFile(file);
             const initialPreviews: TablePreview[] = results.map(res => ({
                 sheetName: res.sheetName,
-                tableName: res.suggestedTableName.startsWith('usr_') ? res.suggestedTableName : `usr_${res.suggestedTableName}`,
+                tableName: applyConfiguredPrefix(res.suggestedTableName),
                 columns: res.columns,
                 rows: res.data,
                 isValid: res.isValid,
@@ -149,6 +170,16 @@ export const SmartImport: React.FC = () => {
                             <div>
                                 <h4 className="text-sm font-bold text-slate-700">{t('datasource.smart_import.found_tables')}</h4>
                                 <p className="text-[10px] text-slate-400">{t('datasource.smart_import.found_tables_hint')}</p>
+                                <p className="text-[10px] text-blue-600 mt-1">
+                                    {t('datasource.smart_import.prefix_hint', {
+                                        prefix: effectiveImportPrefix || t('datasource.smart_import.no_prefix')
+                                    })}
+                                </p>
+                                {hasInvalidConfiguredPrefix && (
+                                    <p className="text-[10px] text-red-600 mt-1">
+                                        {t('datasource.smart_import.prefix_invalid_config_reset')}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -167,7 +198,8 @@ export const SmartImport: React.FC = () => {
                                                             onChange={(e) => {
                                                                 const newPreviews = [...previews];
                                                                 newPreviews[idx].tableName = e.target.value;
-                                                                newPreviews[idx].isValid = e.target.value.length > 0 && !e.target.value.startsWith('sys_');
+                                                                newPreviews[idx].isValid = e.target.value.trim().length > 0
+                                                                    && !e.target.value.trim().toLowerCase().startsWith('sys');
                                                                 setPreviews(newPreviews);
                                                             }}
                                                             className={`text-sm font-bold bg-transparent border-b-2 outline-none w-full ${preview.isValid ? 'border-blue-100 focus:border-blue-500' : 'border-red-300'}`}

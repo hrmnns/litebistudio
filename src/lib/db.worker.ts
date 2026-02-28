@@ -2,6 +2,7 @@ import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import schemaSql from '../datasets/schema.sql?raw';
 import viewsSql from '../datasets/views.sql?raw';
 import { DEFAULT_LOG_LEVEL, normalizeLogLevel, shouldLog, type AppLogLevel } from './logging';
+import { resetDatabaseObjectsInPlace } from './dbFactoryReset';
 
 type SqliteRow = Record<string, unknown>;
 
@@ -616,22 +617,21 @@ async function handleMessage(e: MessageEvent) {
             }
 
             case 'FACTORY_RESET':
-                if (db) {
-                    log('Closing database for factory reset...');
-                    db.close();
-                    db = null;
-                }
-                if (sqlite3 && sqlite3.oo1.OpfsDb) {
+                if (!db) await initDB();
+                {
+                    const database = requireDb();
+                    log('Running in-place factory reset (drop views/tables/triggers + reinitialize schema)...');
+                    resetDatabaseObjectsInPlace(database);
+
+                    // Rebuild core schema and migration state.
+                    database.exec(schemaSql);
                     try {
-                        const root = await navigator.storage.getDirectory();
-                        await root.removeEntry('litebistudio.sqlite3');
-                        log('OPFS file deleted for factory reset.');
+                        database.exec(viewsSql);
                     } catch (e) {
-                        log('No OPFS file to delete or error:', e);
+                        warn('views.sql execution partially failed during factory reset rebuild:', e);
                     }
+                    applyMigrations(database);
                 }
-                initPromise = null; // Reset init promise
-                await initDB();
                 result = true;
                 break;
 

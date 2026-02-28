@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - configurable retention settings in `Settings > Apps > Data Management`:
     - `health_snapshot_retention_days`
     - `health_snapshot_keep_latest`.
+- Multi-tab conflict modal now includes:
+  - `Master-Tab finden` (master responds with session details and visual tab-title attention signal)
+  - clearer user guidance for hidden/background browser-process lock scenarios.
+- Import settings now include a configurable default table-prefix (`import_table_prefix`, default `usr_`) for Smart Import table creation.
+- Smart Import now shows an explicit prefix hint so users can see whether and which prefix is currently applied.
+- Import table-prefix validation now blocks reserved `sys...` prefixes in settings and ignores invalid configured values at runtime for Smart Import safety.
+- Invalid `sys...` import prefixes are now automatically reset to `usr_` instead of persisting partial intermediate values.
 
 ### Changed
 - Stability and resilience of DB communication were improved:
@@ -90,6 +97,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed a Health Check refresh loop where persisted health snapshots triggered repeated automatic DB health runs.
 - Hardened Datasource SQL object handling by validating/quoting dynamic table/view/column identifiers in destructive/DDL actions.
 - Fixed Markdown link rendering hardening by escaping sanitized `href` values before HTML insertion.
+- Fixed false-positive "second instance detected" alerts by validating `MASTER_PONG` conflicts against active Web Lock ownership before switching to conflict mode.
+- Fixed lifecycle lock release handling so stale in-tab lock holders (for example after hot-reload/lifecycle transitions) no longer keep later app instances in permanent conflict state.
+- Fixed factory-reset behavior to reliably remove existing custom views (and other user/system objects) even when OPFS file deletion is not possible; reset now performs an in-place schema rebuild.
 
 ## [1.2.0] - 2026-02-27
 

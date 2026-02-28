@@ -766,6 +766,9 @@
         "import_hint": "Standardverhalten fuer Excel-Importe.",
         "backup_hint": "Standardverhalten fuer Backup und Wiederherstellung.",
         "import_default_mode": "Standard Importmodus",
+        "import_table_prefix": "Tabellen-Praefix fuer neue Importe",
+        "import_table_prefix_hint": "Wird beim Smart Import vor neue Tabellennamen gestellt. Leer lassen = kein Praefix.",
+        "import_table_prefix_invalid": "Reserviertes Praefix: Darf nicht mit 'sys' beginnen.",
         "import_auto_save_mappings": "Mappings automatisch speichern",
         "backup_name_pattern": "Backup-Dateinamenmuster",
         "backup_name_pattern_hint": "Platzhalter: {date}, {time}, {datetime}, {mode}.",
@@ -931,6 +934,10 @@
             "upload_hint": "Wir analysieren die Struktur automatisch.",
             "found_tables": "Gefundene Tabellen",
             "found_tables_hint": "Wählen Sie aus, welche Blätter importiert werden sollen und prüfen Sie die Namen.",
+            "prefix_hint": "Aktives Tabellen-Praefix: {{prefix}}",
+            "no_prefix": "kein Praefix",
+            "prefix_invalid_config": "Eingestelltes Praefix beginnt mit 'sys' und wird aus Sicherheitsgruenden ignoriert.",
+            "prefix_invalid_config_reset": "Ungueltiges Praefix (sys...) erkannt. Es wird automatisch auf 'usr_' zurueckgesetzt.",
             "sheet_label": "Blatt:",
             "table_label": "Tabelle:",
             "invalid_prefix": "Reserviertes Präfix 'sys_' nicht erlaubt.",
@@ -1149,3 +1156,4 @@
         }
     }
 }
+

@@ -16,16 +16,30 @@ type PendingRequest = {
 type ImportReport = {
     isValid?: boolean;
 } & Record<string, unknown>;
+type MasterTabInfo = {
+    instanceId: string;
+    startedAt: number;
+    hash: string;
+    visibility: DocumentVisibilityState;
+};
 
 const pending = new Map<number, PendingRequest>();
 
 const supportsBroadcastChannel = typeof BroadcastChannel !== 'undefined';
 const channel = supportsBroadcastChannel ? new BroadcastChannel('litebistudio_db_v1') : null;
 const conflictListeners = new Set<(hasConflict: boolean, isReadOnly: boolean) => void>();
+const lifecycleLockName = 'litebistudio_db_lifecycle';
+const instanceStartedAt = Number(sessionStorage.getItem('litebistudio_started_at') || Date.now());
+sessionStorage.setItem('litebistudio_started_at', String(instanceStartedAt));
 
 let hasConflict = false;
 let isMaster = false;
 let isReadOnlyMode = false;
+let releaseLifecycleLock: (() => void) | null = null;
+const pendingMasterLocate = new Map<string, {
+    resolve: (value: MasterTabInfo | null) => void;
+    timeoutHandle: ReturnType<typeof setTimeout>;
+}>();
 
 const instanceId = sessionStorage.getItem('litebistudio_instance_id') || crypto.randomUUID();
 sessionStorage.setItem('litebistudio_instance_id', instanceId);
@@ -101,6 +115,68 @@ function isExecPayload(payload: unknown): payload is { sql: string } {
         && typeof (payload as { sql?: unknown }).sql === 'string';
 }
 
+async function hasExternalLifecycleLockHolder(): Promise<boolean> {
+    if (typeof navigator === 'undefined' || !('locks' in navigator)) {
+        // Without LockManager support we cannot verify ownership, so we keep strict conflict behavior.
+        return true;
+    }
+
+    try {
+        let acquiredLocally = false;
+        await navigator.locks.request(lifecycleLockName, { ifAvailable: true }, async (lock) => {
+            acquiredLocally = !!lock;
+        });
+        return !acquiredLocally;
+    } catch (err) {
+        logger.warn('Could not verify lifecycle lock holder after MASTER_PONG. Falling back to conflict mode.', err);
+        return true;
+    }
+}
+
+function holdLifecycleLockUntilReleased(): Promise<void> {
+    return new Promise((resolve) => {
+        releaseLifecycleLock = () => {
+            const release = releaseLifecycleLock;
+            releaseLifecycleLock = null;
+            if (release) {
+                resolve();
+            }
+        };
+    });
+}
+
+function relinquishLifecycleLock(reason: string): void {
+    if (!releaseLifecycleLock) return;
+    logger.info(`Releasing lifecycle lock (${reason}).`);
+    const release = releaseLifecycleLock;
+    releaseLifecycleLock = null;
+    release();
+}
+
+function getLocalMasterInfo(): MasterTabInfo {
+    return {
+        instanceId,
+        startedAt: instanceStartedAt,
+        hash: window.location.hash || '#/',
+        visibility: document.visibilityState
+    };
+}
+
+function flashMasterAttention(): void {
+    const originalTitle = document.title;
+    let ticks = 0;
+    const interval = setInterval(() => {
+        document.title = ticks % 2 === 0
+            ? '[MASTER] LiteBI Studio - bitte hier weiterarbeiten'
+            : originalTitle;
+        ticks += 1;
+        if (ticks >= 8) {
+            clearInterval(interval);
+            document.title = originalTitle;
+        }
+    }, 700);
+}
+
 if (channel) {
     channel.onmessage = async (event) => {
         if (event.data && event.data.type === 'PING') {
@@ -109,7 +185,35 @@ if (channel) {
             }
         } else if (event.data && event.data.type === 'MASTER_PONG') {
             if (event.data.instanceId === instanceId) {
-                processTabConflict();
+                // Guard against stale channel responders (e.g., after browser/session recovery):
+                // only treat as conflict when another tab still holds the lifecycle lock.
+                const hasExternalHolder = await hasExternalLifecycleLockHolder();
+                if (hasExternalHolder) {
+                    processTabConflict();
+                } else {
+                    logger.info('Ignored stale MASTER_PONG without active lifecycle lock holder.');
+                }
+            }
+        } else if (event.data && event.data.type === 'LOCATE_MASTER' && isMaster) {
+            const requesterId = String(event.data.requesterId || '');
+            const requestId = String(event.data.requestId || '');
+            if (requesterId && requestId && requesterId !== instanceId) {
+                channel.postMessage({
+                    type: 'MASTER_LOCATED',
+                    requesterId,
+                    requestId,
+                    info: getLocalMasterInfo()
+                });
+                flashMasterAttention();
+            }
+        } else if (event.data && event.data.type === 'MASTER_LOCATED') {
+            const requesterId = String(event.data.requesterId || '');
+            const requestId = String(event.data.requestId || '');
+            if (requesterId === instanceId && pendingMasterLocate.has(requestId)) {
+                const pendingLocate = pendingMasterLocate.get(requestId)!;
+                pendingMasterLocate.delete(requestId);
+                clearTimeout(pendingLocate.timeoutHandle);
+                pendingLocate.resolve((event.data.info || null) as MasterTabInfo | null);
             }
         } else if (event.data && event.data.type === 'RPC_REQ' && isMaster) {
             const { id, actionType, payload } = event.data;
@@ -140,6 +244,7 @@ export function setReadOnlyMode(skipRedirect = false) {
     sessionStorage.setItem('litebistudio_accepted_readonly', 'true');
     conflictListeners.forEach(l => l(true, true));
     lockAbortController.abort(); // Cancel any pending lock requests for this tab
+    relinquishLifecycleLock('switch-to-readonly');
     // Force overview page on start of read-only mode to prevent blank screens, unless auto-reloaded
     if (!skipRedirect) {
         window.location.hash = '#/';
@@ -169,6 +274,33 @@ export function onTabConflict(callback: (hasConflict: boolean, isReadOnly: boole
 }
 
 channel?.postMessage({ type: 'PING', instanceId });
+
+export function locateMasterTab(timeoutMs: number = 2000): Promise<MasterTabInfo | null> {
+    if (!channel) {
+        return Promise.resolve(null);
+    }
+    if (isMaster) {
+        flashMasterAttention();
+        return Promise.resolve(getLocalMasterInfo());
+    }
+
+    return new Promise<MasterTabInfo | null>((resolve) => {
+        const requestId = `${instanceId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const timeoutHandle = setTimeout(() => {
+            const locateRequest = pendingMasterLocate.get(requestId);
+            if (!locateRequest) return;
+            pendingMasterLocate.delete(requestId);
+            locateRequest.resolve(null);
+        }, timeoutMs);
+
+        pendingMasterLocate.set(requestId, { resolve, timeoutHandle });
+        channel.postMessage({
+            type: 'LOCATE_MASTER',
+            requesterId: instanceId,
+            requestId
+        });
+    });
+}
 
 let lifecycleInitPromise: Promise<void> | null = null;
 
@@ -218,7 +350,7 @@ function getWorker(): Promise<Worker | 'SLAVE'> {
         lifecycleInitPromise = new Promise((resolveLifecycle) => {
             // Check if we can become master. 
             // Note: 'ifAvailable' and 'signal' cannot be used together.
-            navigator.locks.request('litebistudio_db_lifecycle', { ifAvailable: true }, async (lock) => {
+            navigator.locks.request(lifecycleLockName, { ifAvailable: true }, async (lock) => {
                 if (!lock) {
                     // Lock is already held by another tab. We are a slave.
                     isMaster = false;
@@ -228,7 +360,7 @@ function getWorker(): Promise<Worker | 'SLAVE'> {
                     // so we take over if the current master tab is closed.
                     // Here we CAN use the signal to cancel if this tab enters explicit Read-Only mode.
                     try {
-                        await navigator.locks.request('litebistudio_db_lifecycle', { signal: lockAbortController.signal }, async () => {
+                        await navigator.locks.request(lifecycleLockName, { signal: lockAbortController.signal }, async () => {
                             logger.info('Previous master tab closed. Reloading to take over...');
                             window.location.reload();
                         });
@@ -253,8 +385,8 @@ function getWorker(): Promise<Worker | 'SLAVE'> {
                 worker = createAndConfigureWorker();
                 resolveLifecycle();
 
-                // Hold the lock forever
-                await new Promise(() => { });
+                // Hold the lock until app lifecycle explicitly releases it.
+                await holdLifecycleLockUntilReleased();
             }).catch(err => {
                 if (err.name !== 'AbortError') {
                     logger.error('Failed to acquire DB lock:', err);
@@ -269,6 +401,7 @@ function getWorker(): Promise<Worker | 'SLAVE'> {
 }
 
 window.addEventListener('beforeunload', () => {
+    relinquishLifecycleLock('beforeunload');
     if (worker) {
         worker.postMessage({ type: 'CLOSE' });
     }
@@ -276,6 +409,7 @@ window.addEventListener('beforeunload', () => {
 
 if (import.meta.hot) {
     import.meta.hot.dispose(() => {
+        relinquishLifecycleLock('hmr-dispose');
         if (worker) {
             worker.postMessage({ type: 'CLOSE' });
         }

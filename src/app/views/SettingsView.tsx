@@ -50,6 +50,8 @@ export const SettingsView: React.FC = () => {
     );
     const [importDefaultMode, setImportDefaultMode] = useLocalStorage<'append' | 'overwrite'>('import_default_mode', 'append');
     const [importAutoSaveMappings, setImportAutoSaveMappings] = useLocalStorage<boolean>('import_auto_save_mappings', true);
+    const [importTablePrefix, setImportTablePrefix] = useLocalStorage<string>('import_table_prefix', 'usr_');
+    const [importTablePrefixInput, setImportTablePrefixInput] = React.useState(importTablePrefix);
     const [backupNamePattern, setBackupNamePattern] = useLocalStorage<string>('backup_file_name_pattern', 'backup_{date}_{mode}');
     const [backupUseSavedLocation, setBackupUseSavedLocation] = useLocalStorage<boolean>('backup_use_saved_location', true);
     const [backupFolderLabel, setBackupFolderLabel] = useLocalStorage<string>('backup_saved_folder_label', '');
@@ -71,6 +73,9 @@ export const SettingsView: React.FC = () => {
     const [appLogLevel, setAppLogLevel] = useLocalStorage<AppLogLevel>(LOG_LEVEL_STORAGE_KEY, 'error');
     const [showSidebarLanguageSwitch, setShowSidebarLanguageSwitch] = useLocalStorage<boolean>('ui_sidebar_show_language_switch', true);
     const [showSidebarSystemStatus, setShowSidebarSystemStatus] = useLocalStorage<boolean>('ui_sidebar_show_system_status', true);
+    React.useEffect(() => {
+        setImportTablePrefixInput(importTablePrefix);
+    }, [importTablePrefix]);
 
     const confirmAction = async (message: string): Promise<boolean> => {
         if (!confirmDestructive) return true;
@@ -854,6 +859,30 @@ export const SettingsView: React.FC = () => {
                                     <option value="append">{t('datasource.excel_import.append')}</option>
                                     <option value="overwrite">{t('datasource.excel_import.overwrite')}</option>
                                 </select>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    {t('settings.import_table_prefix')}
+                                </label>
+                                <input
+                                    value={importTablePrefixInput}
+                                    onChange={(e) => {
+                                        const next = e.target.value;
+                                        if (next.trim().toLowerCase().startsWith('sys')) {
+                                            setImportTablePrefixInput('usr_');
+                                            setImportTablePrefix('usr_');
+                                            return;
+                                        }
+                                        setImportTablePrefixInput(next);
+                                        setImportTablePrefix(next);
+                                    }}
+                                    placeholder="usr_"
+                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                />
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {t('settings.import_table_prefix_hint')}
+                                </p>
                             </div>
 
                             <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
