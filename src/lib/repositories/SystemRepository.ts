@@ -5,6 +5,41 @@ import { isValidIdentifier } from '../utils';
 const schemaCache = new Map<string, TableColumn[]>();
 type BindValue = string | number | null | undefined;
 
+function isAdminModeActive(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('litebistudio_admin_mode') === 'true';
+}
+
+function getSystemTableWriteBlockedMessage(): string {
+    if (typeof window === 'undefined') {
+        return 'Write access to system tables (sys_*) is only allowed in admin mode.';
+    }
+    const language = String(window.localStorage.getItem('i18nextLng') || 'en').toLowerCase();
+    if (language.startsWith('de')) {
+        return 'Schreibzugriffe auf Systemtabellen (sys_*) sind nur im Admin-Modus erlaubt.';
+    }
+    return 'Write access to system tables (sys_*) is only allowed in admin mode.';
+}
+
+function assertNoSystemWriteForNonAdmin(sql: string): void {
+    if (isAdminModeActive()) return;
+
+    // Guard raw SQL execution: system tables can only be modified in admin mode.
+    const statements = sql
+        .split(';')
+        .map((statement) => statement.trim())
+        .filter((statement) => statement.length > 0);
+
+    const writeStatementPattern = /^(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE)\b/i;
+    const systemTablePattern = /\bsys_[a-z0-9_]+\b/i;
+
+    for (const statement of statements) {
+        if (!writeStatementPattern.test(statement)) continue;
+        if (!systemTablePattern.test(statement)) continue;
+        throw new Error(getSystemTableWriteBlockedMessage());
+    }
+}
+
 interface UserWidgetInput {
     id: string;
     name: string;
@@ -260,6 +295,7 @@ export const SystemRepository = {
     },
 
     async executeRaw(sql: string, bind?: BindValue[]): Promise<DbRow[]> {
+        assertNoSystemWriteForNonAdmin(sql);
         const result = await runQuery(sql, bind);
 
         // Simple heuristic to detect write operations
