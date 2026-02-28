@@ -11,6 +11,7 @@ export type { SqlStatementRecord } from './SqlStatementRepository';
 const schemaCache = new Map<string, TableColumn[]>();
 type BindValue = string | number | null | undefined;
 let dbStatsCache: { at: number; value: { tables: number; records: number } } | null = null;
+let dbStatsInFlight: Promise<{ tables: number; records: number }> | null = null;
 const DB_STATS_TTL_MS = 10_000;
 
 function getSearchableColumns(schema: TableColumn[]): TableColumn[] {
@@ -91,19 +92,29 @@ export const SystemRepository = {
         if (dbStatsCache && now - dbStatsCache.at < DB_STATS_TTL_MS) {
             return dbStatsCache.value;
         }
-        const tables = await this.getTables();
-        const counts = await Promise.all(
-            tables.map(async (table) => {
-                const countResult = await runQuery(`SELECT count(*) as count FROM "${table}"`);
-                return Number(countResult[0]?.count || 0);
-            })
-        );
-        const value = {
-            tables: tables.length,
-            records: counts.reduce((sum, count) => sum + count, 0)
-        };
-        dbStatsCache = { at: now, value };
-        return value;
+        if (dbStatsInFlight) return await dbStatsInFlight;
+
+        dbStatsInFlight = (async () => {
+            const tables = await this.getTables();
+            const counts = await Promise.all(
+                tables.map(async (table) => {
+                    const countResult = await runQuery(`SELECT count(*) as count FROM "${table}"`);
+                    return Number(countResult[0]?.count || 0);
+                })
+            );
+            const value = {
+                tables: tables.length,
+                records: counts.reduce((sum, count) => sum + count, 0)
+            };
+            dbStatsCache = { at: Date.now(), value };
+            return value;
+        })();
+
+        try {
+            return await dbStatsInFlight;
+        } finally {
+            dbStatsInFlight = null;
+        }
     },
 
     async getTotalRecordCount(): Promise<number> {

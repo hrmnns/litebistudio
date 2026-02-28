@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - timeout protection now also applies to master-worker requests
   - pending request cleanup now clears timeout handles reliably
   - worker runtime/message errors now trigger controlled pending-request rejection and worker recovery.
+  - added BroadcastChannel fallback mode to keep database operations functional in environments without inter-tab channel support.
 - App routing now uses lazy-loaded major views to reduce initial bundle pressure and speed up first render.
 - Build chunking strategy was refined for heavy export dependencies:
   - separated PDF and canvas export dependencies into dedicated vendor chunks
@@ -80,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed dark-mode styling in the `Manage Categories` dialog within Reporting.
 - Fixed unstable text input behavior in report package settings sidepanel fields (characters could be dropped while typing).
 - Fixed localized system-table write-block messaging to show user-friendly DE/EN guidance instead of only technical error text.
-- Fixed mojibake in report package subtitle metadata (`â€¢`) by replacing it with a clean separator (`|`).
+- Fixed mojibake in report package subtitle metadata (`Ã¢â‚¬Â¢`) by replacing it with a clean separator (`|`).
 
 ## [1.2.0] - 2026-02-27
 

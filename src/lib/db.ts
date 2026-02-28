@@ -19,7 +19,8 @@ type ImportReport = {
 
 const pending = new Map<number, PendingRequest>();
 
-const channel = new BroadcastChannel('litebistudio_db_v1');
+const supportsBroadcastChannel = typeof BroadcastChannel !== 'undefined';
+const channel = supportsBroadcastChannel ? new BroadcastChannel('litebistudio_db_v1') : null;
 const conflictListeners = new Set<(hasConflict: boolean, isReadOnly: boolean) => void>();
 
 let hasConflict = false;
@@ -100,35 +101,37 @@ function isExecPayload(payload: unknown): payload is { sql: string } {
         && typeof (payload as { sql?: unknown }).sql === 'string';
 }
 
-channel.onmessage = async (event) => {
-    if (event.data && event.data.type === 'PING') {
-        if (isMaster && event.data.instanceId !== instanceId) {
-            channel.postMessage({ type: 'MASTER_PONG', instanceId: event.data.instanceId });
+if (channel) {
+    channel.onmessage = async (event) => {
+        if (event.data && event.data.type === 'PING') {
+            if (isMaster && event.data.instanceId !== instanceId) {
+                channel.postMessage({ type: 'MASTER_PONG', instanceId: event.data.instanceId });
+            }
+        } else if (event.data && event.data.type === 'MASTER_PONG') {
+            if (event.data.instanceId === instanceId) {
+                processTabConflict();
+            }
+        } else if (event.data && event.data.type === 'RPC_REQ' && isMaster) {
+            const { id, actionType, payload } = event.data;
+            // Proxy the request as if it were called on the master tab
+            try {
+                const result = await send(actionType, payload);
+                channel.postMessage({ type: 'RPC_RES', id, result: result });
+            } catch (e: unknown) {
+                channel.postMessage({ type: 'RPC_RES', id, error: getErrorMessage(e) });
+            }
+        } else if (event.data && event.data.type === 'RPC_RES' && !isMaster) {
+            const { id, result, error } = event.data;
+            if (pending.has(id)) {
+                const { resolve, reject, timeoutHandle } = pending.get(id)!;
+                pending.delete(id);
+                clearTimeout(timeoutHandle);
+                if (error) reject(new Error(error));
+                else resolve(result);
+            }
         }
-    } else if (event.data && event.data.type === 'MASTER_PONG') {
-        if (event.data.instanceId === instanceId) {
-            processTabConflict();
-        }
-    } else if (event.data && event.data.type === 'RPC_REQ' && isMaster) {
-        const { id, actionType, payload } = event.data;
-        // Proxy the request as if it were called on the master tab
-        try {
-            const result = await send(actionType, payload);
-            channel.postMessage({ type: 'RPC_RES', id, result: result });
-        } catch (e: unknown) {
-            channel.postMessage({ type: 'RPC_RES', id, error: getErrorMessage(e) });
-        }
-    } else if (event.data && event.data.type === 'RPC_RES' && !isMaster) {
-        const { id, result, error } = event.data;
-        if (pending.has(id)) {
-            const { resolve, reject, timeoutHandle } = pending.get(id)!;
-            pending.delete(id);
-            clearTimeout(timeoutHandle);
-            if (error) reject(new Error(error));
-            else resolve(result);
-        }
-    }
-};
+    };
+}
 
 const lockAbortController = new AbortController();
 
@@ -165,7 +168,7 @@ export function onTabConflict(callback: (hasConflict: boolean, isReadOnly: boole
     };
 }
 
-channel.postMessage({ type: 'PING', instanceId });
+channel?.postMessage({ type: 'PING', instanceId });
 
 let lifecycleInitPromise: Promise<void> | null = null;
 
@@ -204,6 +207,13 @@ function createAndConfigureWorker() {
 }
 
 function getWorker(): Promise<Worker | 'SLAVE'> {
+    if (!supportsBroadcastChannel) {
+        // Degraded mode for browsers/environments without BroadcastChannel support.
+        // We keep a local worker per tab instead of master/slave orchestration.
+        if (!worker) worker = createAndConfigureWorker();
+        isMaster = true;
+        return Promise.resolve(worker);
+    }
     if (!lifecycleInitPromise) {
         lifecycleInitPromise = new Promise((resolveLifecycle) => {
             // Check if we can become master. 
@@ -269,7 +279,7 @@ if (import.meta.hot) {
         if (worker) {
             worker.postMessage({ type: 'CLOSE' });
         }
-        channel.close();
+        channel?.close();
     });
 }
 
@@ -304,6 +314,10 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
 
         // Send request to master tab via BroadcastChannel
         return new Promise<T>((resolve, reject) => {
+            if (!channel) {
+                reject(new Error('Inter-tab database RPC is unavailable in this environment.'));
+                return;
+            }
             const id = ++msgId;
             registerPendingRequest(
                 id,

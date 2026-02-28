@@ -98,18 +98,24 @@ export function useAsync<T>(
         // For now, simpler SWR: always fetch to revalidate
         execute();
 
+        let dbUpdateTimer: ReturnType<typeof setTimeout> | null = null;
         const handleDbUpdate = () => {
-            // Invalidate cache on massive DB updates to force UI refresh
-            if (cacheKey) {
-                queryCache.invalidate(cacheKey);
-            }
-            execute();
+            if (dbUpdateTimer) window.clearTimeout(dbUpdateTimer);
+            dbUpdateTimer = window.setTimeout(() => {
+                dbUpdateTimer = null;
+                // Invalidate cache on massive DB updates to force UI refresh
+                if (cacheKey) {
+                    queryCache.invalidate(cacheKey);
+                }
+                execute();
+            }, 150);
         };
         window.addEventListener('db-updated', handleDbUpdate);
         window.addEventListener('db-changed', handleDbUpdate);
 
         return () => {
             mounted = false;
+            if (dbUpdateTimer) window.clearTimeout(dbUpdateTimer);
             window.removeEventListener('db-updated', handleDbUpdate);
             window.removeEventListener('db-changed', handleDbUpdate);
         };
