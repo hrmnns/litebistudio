@@ -1,4 +1,4 @@
-﻿{
+{
     "common": {
         "loading": "Loading...",
         "save": "Save",
@@ -67,7 +67,7 @@
     },
     "dashboard": {
         "title": "My Dashboard",
-        "subtitle": "Categorized evaluations and tiles.",
+        "subtitle": "{{count}} Results | {{mode}}",
         "add_widget": "Add Widget",
         "manage_dashboards": "Manage Dashboards",
         "presentation_mode": "Presentation Mode",
@@ -109,7 +109,7 @@
         "add_dialog_title": "Add to worklist",
         "add_priority_prompt": "Priority (low, normal, high, critical)",
         "add_due_prompt": "Due date optional (YYYY-MM-DD), leave empty for none",
-        "subtitle": "Bookmarked records and verification results",
+        "subtitle": "{{count}} Results | {{mode}}",
         "filter_all": "All",
         "filter_open": "New / Open",
         "filter_in_progress": "In Progress",
@@ -150,7 +150,7 @@
         "tools_selected_count": "{{count}} selected"
     },
     "datainspector": {
-        "subtitle": "{{count}} Results ï¿½\u001aï¿½ {{mode}}",
+        "subtitle": "{{count}} Results | {{mode}}",
         "table_mode": "Table",
         "sql_mode": "SQL",
         "output_results": "Results",
@@ -333,7 +333,7 @@
         "index_suggestion_reason_cardinality": "High cardinality column"
     },
     "querybuilder": {
-        "subtitle": "Build widgets based on saved SQL statements.",
+        "subtitle": "{{count}} Results | {{mode}}",
         "visual_builder": "Visual Builder",
         "direct_editor": "SQL View",
         "sql_query": "Selected SQL statement",
@@ -559,7 +559,7 @@
         "finalize_mode": "Mode",
         "finalize_source": "Source",
         "finalize_chart": "Visualization",
-        "finalize_axes": "X: {{x}} ï¿½\u001aï¿½ Y series: {{count}}",
+        "finalize_axes": "X: {{x}} | Y series: {{count}}",
         "finalize_text_length": "Characters: {{count}}",
         "finalize_status_level": "Status: {{level}}",
         "finalize_section_style": "Divider: {{style}}",
@@ -571,7 +571,7 @@
     },
     "reports": {
         "title": "Reporting",
-        "subtitle": "Build and export multi-page management reports.",
+        "subtitle": "{{count}} Results | {{mode}}",
         "new_pack_name": "New Report Package",
         "default_category": "General",
         "category": "Category",
@@ -681,7 +681,7 @@
     },
     "settings": {
         "title": "Settings",
-        "subtitle": "Dashboard configuration and notifications",
+        "subtitle": "{{count}} Results | {{mode}}",
         "tab_appearance": "General",
         "tab_security": "Security",
         "tab_apps": "Apps",
@@ -815,7 +815,7 @@
         "last_update": "Last update: {{date}}, {{time}}"
     },
     "datasource": {
-        "subtitle": "Central management for imports, structures and system maintenance.",
+        "subtitle": "{{count}} Results | {{mode}}",
         "tab_import": "Data Import",
         "tab_structure": "Structure & Schema",
         "tab_system": "Maintenance & Backup",
@@ -963,7 +963,7 @@
     },
     "about": {
         "title": "About LiteBI Studio",
-        "subtitle": "Information about the project and system",
+        "subtitle": "{{count}} Results | {{mode}}",
         "tagline": "The lightweight business intelligence platform directly in your browser.",
         "status_stable": "Stable (Local)",
         "philosophy_title": "Our Philosophy",
@@ -993,7 +993,7 @@
         "support_title": "Support",
         "support_text": "Do you have questions or feedback We look forward to your message.",
         "contact_cta": "Contact us",
-        "copyright_prefix": "ï¿½\u001aï¿½ {{year}} LiteBI Studio Project. Released under ",
+        "copyright_prefix": "(c) {{year}} LiteBI Studio Project. Released under ",
         "settings_hint": "Learn more about the project, the version and the vision behind LiteBI Studio.",
         "view_info": "Project Information"
     },

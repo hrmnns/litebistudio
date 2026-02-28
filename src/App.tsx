@@ -3,6 +3,7 @@ import { AppRouter } from './router';
 import { AppDialogHost } from './app/components/ui/AppDialogHost';
 import { SystemRepository } from './lib/repositories/SystemRepository';
 import AppBrandIcon from './app/components/ui/AppBrandIcon';
+import { ErrorBoundary } from './app/components/ErrorBoundary';
 
 const APP_READY_EVENT = 'litebi:app-ready';
 const MIN_SPLASH_MS = 3000;
@@ -85,11 +86,11 @@ const StartupSplash: React.FC = () => {
 
 function App() {
   return (
-    <>
+    <ErrorBoundary>
       <AppRouter />
       <AppDialogHost />
       <StartupSplash />
-    </>
+    </ErrorBoundary>
   );
 }
 

@@ -10,6 +10,7 @@ type PendingRequest = {
     resolve: (val: unknown) => void;
     reject: (err: unknown) => void;
     actionType: string;
+    timeoutHandle: ReturnType<typeof setTimeout>;
 };
 
 type ImportReport = {
@@ -27,6 +28,65 @@ let isReadOnlyMode = false;
 
 const instanceId = sessionStorage.getItem('litebistudio_instance_id') || crypto.randomUUID();
 sessionStorage.setItem('litebistudio_instance_id', instanceId);
+
+function getActionTimeoutMs(actionType: string): number {
+    switch (actionType) {
+        case 'EXEC':
+            return 120_000;
+        case 'IMPORT':
+        case 'EXPORT':
+        case 'LOAD_DEMO':
+        case 'EXPORT_DEMO_DATA':
+        case 'GENERIC_BULK_INSERT':
+            return 180_000;
+        case 'INIT':
+        case 'INIT_SCHEMA':
+            return 30_000;
+        case 'GET_DIAGNOSTICS':
+        case 'GET_DATABASE_HEALTH':
+        case 'GET_STORAGE_STATUS':
+            return 20_000;
+        default:
+            return 45_000;
+    }
+}
+
+function registerPendingRequest<T>(
+    id: number,
+    actionType: string,
+    resolve: (val: T) => void,
+    reject: (err: unknown) => void,
+    timeoutMessage: string
+): void {
+    const timeoutMs = getActionTimeoutMs(actionType);
+    const timeoutHandle = setTimeout(() => {
+        const request = pending.get(id);
+        if (!request) return;
+        pending.delete(id);
+        request.reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    pending.set(id, {
+        actionType,
+        timeoutHandle,
+        resolve: (val) => {
+            clearTimeout(timeoutHandle);
+            resolve(val as T);
+        },
+        reject: (err) => {
+            clearTimeout(timeoutHandle);
+            reject(err);
+        }
+    });
+}
+
+function rejectPendingRequests(message: string): void {
+    for (const [id, request] of Array.from(pending.entries())) {
+        pending.delete(id);
+        clearTimeout(request.timeoutHandle);
+        request.reject(new Error(message));
+    }
+}
 
 function getErrorMessage(error: unknown): string {
     if (error instanceof Error) return error.message;
@@ -61,8 +121,9 @@ channel.onmessage = async (event) => {
     } else if (event.data && event.data.type === 'RPC_RES' && !isMaster) {
         const { id, result, error } = event.data;
         if (pending.has(id)) {
-            const { resolve, reject } = pending.get(id)!;
+            const { resolve, reject, timeoutHandle } = pending.get(id)!;
             pending.delete(id);
+            clearTimeout(timeoutHandle);
             if (error) reject(new Error(error));
             else resolve(result);
         }
@@ -115,9 +176,28 @@ function createAndConfigureWorker() {
         if (pending.has(id)) {
             const request = pending.get(id)!;
             pending.delete(id);
+            clearTimeout(request.timeoutHandle);
             if (error) request.reject(new Error(error));
             else request.resolve(result);
         }
+    };
+    w.onerror = (error) => {
+        logger.error('DB worker error', error);
+        rejectPendingRequests('Database worker failed unexpectedly. Please retry the operation.');
+        try {
+            w.terminate();
+        } catch {
+            // Ignore terminate errors here.
+        }
+        if (isMaster) {
+            worker = createAndConfigureWorker();
+        } else {
+            worker = null;
+        }
+    };
+    w.onmessageerror = (error) => {
+        logger.error('DB worker message error', error);
+        rejectPendingRequests('Database worker message handling failed. Please retry the operation.');
     };
     w.postMessage({ id: ++msgId, type: 'SET_LOG_LEVEL', payload: { level: getActiveLogLevel() } });
     return w;
@@ -225,19 +305,13 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
         // Send request to master tab via BroadcastChannel
         return new Promise<T>((resolve, reject) => {
             const id = ++msgId;
-            const timeout = setTimeout(() => {
-                if (pending.has(id)) {
-                    pending.delete(id);
-                    logger.error(`RPC Timeout for action: ${type} (Master tab unresponsive)`);
-                    reject(new Error(`Database Master unresponsive (Timeout after 5s). Please focus the first tab or refresh.`));
-                }
-            }, 5000);
-
-            pending.set(id, {
-                actionType: type,
-                resolve: (val) => { clearTimeout(timeout); resolve(val as T); },
-                reject: (err) => { clearTimeout(timeout); reject(err); }
-            });
+            registerPendingRequest(
+                id,
+                type,
+                resolve,
+                reject,
+                `Database master tab is unresponsive for action ${type} (timeout ${getActionTimeoutMs(type)} ms). Please focus the primary tab or refresh.`
+            );
             channel.postMessage({ type: 'RPC_REQ', id, actionType: type, payload });
         });
     };
@@ -254,7 +328,13 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
             const w = result as Worker;
             return new Promise<T>((resolve, reject) => {
                 const id = ++msgId;
-                pending.set(id, { actionType: type, resolve: (val) => resolve(val as T), reject });
+                registerPendingRequest(
+                    id,
+                    type,
+                    resolve,
+                    reject,
+                    `Database worker did not respond for action ${type} (timeout ${getActionTimeoutMs(type)} ms).`
+                );
                 w.postMessage({ id, type, payload });
             });
         });
@@ -283,6 +363,7 @@ export async function abortActiveQueries(): Promise<boolean> {
 
     for (const [id, request] of Array.from(pending.entries())) {
         pending.delete(id);
+        clearTimeout(request.timeoutHandle);
         if (request.actionType === 'EXEC') {
             request.reject(new Error('Query cancelled by user.'));
         } else {

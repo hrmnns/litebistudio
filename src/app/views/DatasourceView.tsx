@@ -22,6 +22,7 @@ import { appDialog } from '../../lib/appDialog';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
 import { useNavigate } from 'react-router-dom';
+import { importDatabase, exportDatabase, factoryResetDatabase } from '../../lib/db';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -219,8 +220,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             });
 
             try {
-                logger.debug(`[Restore][${logTime()}] Importing db module...`);
-                const { importDatabase } = await import('../../lib/db');
                 logger.debug(`[Restore][${logTime()}] Calling worker importDatabase...`);
                 const report = await importDatabase(finalBuffer) as unknown as RestoreReport;
                 logger.debug(`[Restore][${logTime()}] Worker report received:`, report);
@@ -934,7 +933,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     return;
                                                 }
 
-                                                const { exportDatabase } = await import('../../lib/db');
                                                 const bytes = await exportDatabase();
                                                 const plainBuffer = new Uint8Array(bytes).buffer;
                                                 let outputBuffer: ArrayBuffer = plainBuffer;
@@ -1124,7 +1122,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                         if (promptText === 'RESET') {
                                                             try {
                                                                 setIsResetting(true);
-                                                                const { factoryResetDatabase } = await import('../../lib/db');
                                                                 await factoryResetDatabase();
                                                                 resetEnvironmentSettings();
                                                                 await appDialog.info(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));

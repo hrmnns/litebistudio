@@ -49,7 +49,7 @@ export function useAsync<T>(
     const depsKey = deps.map(serializeDependency).join('|');
 
     // Always keep the latest asyncFunction to prevent stale closures
-    // when triggered by global events (like db-updated)
+    // when triggered by global DB events.
     const asyncFuncRef = useRef(asyncFunction);
     useEffect(() => {
         asyncFuncRef.current = asyncFunction;
@@ -106,10 +106,12 @@ export function useAsync<T>(
             execute();
         };
         window.addEventListener('db-updated', handleDbUpdate);
+        window.addEventListener('db-changed', handleDbUpdate);
 
         return () => {
             mounted = false;
             window.removeEventListener('db-updated', handleDbUpdate);
+            window.removeEventListener('db-changed', handleDbUpdate);
         };
     }, [depsKey, version, cacheKey, ttl]);
 

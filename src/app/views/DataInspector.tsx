@@ -154,6 +154,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [autocompleteOpen, setAutocompleteOpen] = useState(false);
     const [autocompleteIndex, setAutocompleteIndex] = useState(0);
     const [autocompletePosition, setAutocompletePosition] = useState({ top: 12, left: 12, width: 320 });
+    const indexSuggestionCacheRef = useRef<Map<string, IndexSuggestion[]>>(new Map());
+    const indexSuggestionRunRef = useRef(0);
 
     type SuggestionType = 'keyword' | 'table' | 'column';
     interface SqlSuggestion {
@@ -660,27 +662,47 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
     const generateIndexSuggestions = useCallback(async () => {
         if (!selectedTable || selectedSourceType !== 'table') return;
+        const cacheKey = JSON.stringify({
+            table: selectedTable,
+            filters: tableFilters,
+            sortKey: tableSortConfig?.key ? String(tableSortConfig.key) : '',
+            sortDir: tableSortConfig?.direction || '',
+            schema: (selectedTableSchema || []).map((col) => col.name)
+        });
+        const cached = indexSuggestionCacheRef.current.get(cacheKey);
+        if (cached) {
+            setIndexSuggestions(cached);
+            return;
+        }
+        const runId = ++indexSuggestionRunRef.current;
         setIsGeneratingIndexSuggestions(true);
         try {
             const schemaColumns = (selectedTableSchema || []).map(col => col.name);
+            if (runId !== indexSuggestionRunRef.current) return;
             if (schemaColumns.length === 0) {
                 setIndexSuggestions([]);
                 return;
             }
 
             const existingIndexes = await getExistingIndexColumns(selectedTable);
+            if (runId !== indexSuggestionRunRef.current) return;
             const totalRowResult = await SystemRepository.executeRaw(`SELECT COUNT(*) AS total_rows FROM ${quoteIdentifier(selectedTable)};`);
+            if (runId !== indexSuggestionRunRef.current) return;
             const totalRows = Number(totalRowResult[0]?.total_rows ?? 0);
             const sampleColumns = schemaColumns.slice(0, 14);
+            const sampleSize = Math.max(1, Math.min(totalRows || 1, 5000));
 
             const cardinalityStats = await Promise.all(sampleColumns.map(async (col) => {
                 const stats = await SystemRepository.executeRaw(
-                    `SELECT COUNT(DISTINCT ${quoteIdentifier(col)}) AS distinct_count FROM ${quoteIdentifier(selectedTable)};`
+                    `SELECT COUNT(DISTINCT ${quoteIdentifier(col)}) AS distinct_count
+                     FROM (SELECT ${quoteIdentifier(col)} FROM ${quoteIdentifier(selectedTable)} LIMIT ${sampleSize});`
                 );
                 const distinctCount = Number(stats[0]?.distinct_count ?? 0);
-                const ratio = totalRows > 0 ? distinctCount / totalRows : 0;
+                const ratioBase = sampleSize > 0 ? sampleSize : totalRows;
+                const ratio = ratioBase > 0 ? distinctCount / ratioBase : 0;
                 return { column: col, distinctCount, ratio };
             }));
+            if (runId !== indexSuggestionRunRef.current) return;
 
             const candidates: Array<{ columns: string[]; reason: string; score: number }> = [];
             const seen = new Set<string>();
@@ -756,12 +778,20 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 });
 
             setIndexSuggestions(suggestions);
+            indexSuggestionCacheRef.current.set(cacheKey, suggestions);
         } catch (err) {
+            if (runId !== indexSuggestionRunRef.current) return;
             await appDialog.error(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
         } finally {
-            setIsGeneratingIndexSuggestions(false);
+            if (runId === indexSuggestionRunRef.current) {
+                setIsGeneratingIndexSuggestions(false);
+            }
         }
     }, [buildSuggestedIndexName, getExistingIndexColumns, quoteIdentifier, selectedSourceType, selectedTable, selectedTableSchema, tableFilters, tableSortConfig, t]);
+
+    useEffect(() => {
+        indexSuggestionRunRef.current += 1;
+    }, [selectedTable, tableFilters, tableSortConfig]);
 
     const applyIndexSuggestion = useCallback(async (suggestion: IndexSuggestion) => {
         setApplyingIndexSuggestionId(suggestion.id);

@@ -1,4 +1,4 @@
-import { runQuery, notifyDbChange } from '../db';
+import { runQuery, notifyDbChange, getDiagnostics as fetchDiagnostics, getDatabaseHealth as fetchDatabaseHealth, getStorageStatus as fetchStorageStatus, abortActiveQueries as abortQueries, genericBulkInsert } from '../db';
 import type { DbRow, TableColumn } from '../../types';
 import { isValidIdentifier } from '../utils';
 import { createHealthRepository } from './HealthRepository';
@@ -10,6 +10,8 @@ export type { SqlStatementRecord } from './SqlStatementRepository';
 
 const schemaCache = new Map<string, TableColumn[]>();
 type BindValue = string | number | null | undefined;
+let dbStatsCache: { at: number; value: { tables: number; records: number } } | null = null;
+const DB_STATS_TTL_MS = 10_000;
 
 function getSearchableColumns(schema: TableColumn[]): TableColumn[] {
     return schema.filter(
@@ -85,13 +87,23 @@ export interface TableIndexInfo {
 
 export const SystemRepository = {
     async getDatabaseStats(): Promise<{ tables: number; records: number }> {
-        const tables = await this.getTables();
-        let totalRecords = 0;
-        for (const table of tables) {
-            const countResult = await runQuery(`SELECT count(*) as count FROM "${table}"`);
-            totalRecords += (countResult[0]?.count as number) || 0;
+        const now = Date.now();
+        if (dbStatsCache && now - dbStatsCache.at < DB_STATS_TTL_MS) {
+            return dbStatsCache.value;
         }
-        return { tables: tables.length, records: totalRecords };
+        const tables = await this.getTables();
+        const counts = await Promise.all(
+            tables.map(async (table) => {
+                const countResult = await runQuery(`SELECT count(*) as count FROM "${table}"`);
+                return Number(countResult[0]?.count || 0);
+            })
+        );
+        const value = {
+            tables: tables.length,
+            records: counts.reduce((sum, count) => sum + count, 0)
+        };
+        dbStatsCache = { at: now, value };
+        return value;
     },
 
     async getTotalRecordCount(): Promise<number> {
@@ -100,15 +112,15 @@ export const SystemRepository = {
     },
 
     async getDiagnostics(): Promise<Record<string, unknown>> {
-        return await import('../db').then(m => m.getDiagnostics());
+        return await fetchDiagnostics();
     },
 
     async getDatabaseHealth(): Promise<Record<string, unknown>> {
-        return await import('../db').then(m => m.getDatabaseHealth());
+        return await fetchDatabaseHealth();
     },
 
     async getStorageStatus(): Promise<{ mode: 'opfs' | 'memory'; reason: string | null }> {
-        return await import('../db').then(m => m.getStorageStatus());
+        return await fetchStorageStatus();
     },
 
     ...createHealthRepository({
@@ -284,11 +296,10 @@ export const SystemRepository = {
     },
 
     async abortActiveQueries(): Promise<boolean> {
-        return await import('../db').then(m => m.abortActiveQueries());
+        return await abortQueries();
     },
 
     async bulkInsert(tableName: string, records: DbRow[]): Promise<number> {
-        const { genericBulkInsert } = await import('../db');
         const count = await genericBulkInsert(tableName, records);
         notifyDbChange(count);
         return count;

@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:encoding": "node scripts/check-encoding.mjs",
+    "hooks:install": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

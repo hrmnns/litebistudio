@@ -32,6 +32,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     - `health_snapshot_keep_latest`.
 
 ### Changed
+- Stability and resilience of DB communication were improved:
+  - request timeouts are now action-aware (instead of a fixed short RPC timeout)
+  - timeout protection now also applies to master-worker requests
+  - pending request cleanup now clears timeout handles reliably
+  - worker runtime/message errors now trigger controlled pending-request rejection and worker recovery.
+- App routing now uses lazy-loaded major views to reduce initial bundle pressure and speed up first render.
+- Build chunking strategy was refined for heavy export dependencies:
+  - separated PDF and canvas export dependencies into dedicated vendor chunks
+  - removed obsolete empty `vendor-db` manual chunk.
+- Data Inspector index-suggestion generation was optimized for large tables:
+  - sampling-based distinct analysis (instead of full scans)
+  - stale-run cancellation guard during async suggestion generation
+  - in-session suggestion caching by table/filter/sort/schema state.
+- Database stats aggregation now runs in parallel with short-lived caching to reduce repeated load.
+- `useAsync` now listens to both `db-updated` and `db-changed` events for more consistent UI refresh behavior.
 - Internal repository architecture was modularized:
   - `SystemRepository` now composes dedicated sub-repositories for Health, Widgets/Dashboards, Report Packs, SQL Statements, and Worklist/Record Metadata.
   - Public repository API remains backward-compatible for existing app calls.
@@ -56,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Snapshot cleanup confirmation now uses configurable retention values instead of fixed thresholds.
 
 ### Fixed
+- Added a global UI error boundary to prevent full-app blank states on component render failures and provide a safe reload fallback.
+- Removed mixed dynamic/static DB import usage in key paths to avoid ineffective chunking and bundler split warnings.
 - Removed obsolete/unused legacy code paths:
   - deprecated `Sidebar` props cleanup (`currentView`, `onNavigate`)
   - removed unused hook file `src/hooks/useQuery.ts`

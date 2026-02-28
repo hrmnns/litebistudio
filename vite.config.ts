@@ -45,7 +45,8 @@ export default defineConfig({
           'vendor-charts': ['recharts'],
           'vendor-icons': ['lucide-react'],
           'vendor-ui': ['clsx', 'tailwind-merge'],
-          'vendor-db': ['@sqlite.org/sqlite-wasm'],
+          'vendor-pdf': ['jspdf'],
+          'vendor-canvas': ['html2canvas'],
         }
       }
     }
