@@ -40,6 +40,24 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
+    const isDarkTheme = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+    const chartTooltipContentStyle: React.CSSProperties = {
+        borderRadius: '12px',
+        border: isDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0',
+        backgroundColor: isDarkTheme ? '#0f172a' : '#ffffff',
+        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.18)'
+    };
+    const chartTooltipLabelStyle: React.CSSProperties = {
+        color: isDarkTheme ? '#e2e8f0' : '#0f172a',
+        fontWeight: 700,
+        fontSize: '12px'
+    };
+    const chartTooltipItemStyle: React.CSSProperties = {
+        color: isDarkTheme ? '#cbd5e1' : '#334155',
+        fontWeight: 600,
+        fontSize: '12px'
+    };
+    const chartTooltipCursor = { fill: isDarkTheme ? 'rgba(148, 163, 184, 0.14)' : '#f1f5f9' };
     const effectiveSql = useMemo(() => {
         let nextSql = sql;
         if (!globalFilters || globalFilters.length === 0) {
@@ -601,8 +619,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                                 <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
                                 <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                    cursor={{ fill: '#f1f5f9' }}
+                                    contentStyle={chartTooltipContentStyle}
+                                    labelStyle={chartTooltipLabelStyle}
+                                    itemStyle={chartTooltipItemStyle}
+                                    cursor={chartTooltipCursor}
                                     formatter={(val, name) => [formatValue(val, name as string), name]}
                                 />
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
@@ -618,7 +638,9 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                                 <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
                                 <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    contentStyle={chartTooltipContentStyle}
+                                    labelStyle={chartTooltipLabelStyle}
+                                    itemStyle={chartTooltipItemStyle}
                                     formatter={(val, name) => [formatValue(val, name as string), name]}
                                 />
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
@@ -642,7 +664,9 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    contentStyle={chartTooltipContentStyle}
+                                    labelStyle={chartTooltipLabelStyle}
+                                    itemStyle={chartTooltipItemStyle}
                                     formatter={(val, name) => [formatValue(val, name as string), name]}
                                 />
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
@@ -670,7 +694,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="white" strokeWidth={2} />
                                     ))}
                                 </Pie>
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} />
                                 <Legend verticalAlign="bottom" height={36} iconSize={8} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                             </PieChart>
                         ) : config.type === 'composed' ? (
@@ -679,7 +703,9 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                                 <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
                                 <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none' }}
+                                    contentStyle={chartTooltipContentStyle}
+                                    labelStyle={chartTooltipLabelStyle}
+                                    itemStyle={chartTooltipItemStyle}
                                     formatter={(val, name) => [formatValue(val, name as string), name]}
                                 />
                                 <Legend verticalAlign="top" height={36} iconType="circle" />
@@ -704,14 +730,14 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                                     <Radar key={y} name={y} dataKey={y} stroke={COLORS[idx % COLORS.length]} fill={COLORS[idx % COLORS.length]} fillOpacity={0.6} />
                                 ))}
                                 <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-                                <Tooltip />
+                                <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} />
                             </RadarChart>
                         ) : config.type === 'scatter' ? (
                             <ScatterChart>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis type="number" dataKey={config.xAxis} name={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
                                 <YAxis type="number" dataKey={(config.yAxes || [])[0]} name={(config.yAxes || [])[0]} axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
-                                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                                <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} cursor={{ strokeDasharray: '3 3' }} />
                                 <Legend verticalAlign="top" height={36} />
                                 <Scatter name={title} data={results} fill={config.color || COLORS[0]} />
                             </ScatterChart>

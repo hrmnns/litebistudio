@@ -1,5 +1,11 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import CodeMirror from '@uiw/react-codemirror';
+import { sql as sqlLang } from '@codemirror/lang-sql';
+import { EditorView } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
+import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
@@ -107,6 +113,16 @@ export const QueryBuilderView: React.FC = () => {
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [activeSchema, setActiveSchema] = useState<SchemaDefinition | null>(null);
+    const [sqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
+    const [sqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
+    const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
+    const [sqlEditorFontSize] = useLocalStorage<number>('sql_editor_font_size', 14);
+    const [sqlEditorTabSize] = useLocalStorage<number>('sql_editor_tab_size', 4);
+    const [sqlEditorThemeIntensity] = useLocalStorage<'subtle' | 'normal' | 'high'>('sql_editor_theme_intensity', 'normal');
+    const [sqlEditorPreviewHighlight] = useLocalStorage<boolean>('sql_editor_preview_highlighting', true);
+    const [isDarkSqlPreview, setIsDarkSqlPreview] = useState<boolean>(
+        typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    );
     const { isExporting, exportToPdf } = useReportExport();
     const { togglePresentationMode, isReadOnly } = useDashboard();
 
@@ -127,6 +143,104 @@ export const QueryBuilderView: React.FC = () => {
     useEffect(() => {
         setImagePreviewFailed(false);
     }, [visConfig.imageUrl]);
+    useEffect(() => {
+        const root = document.documentElement;
+        const syncTheme = () => setIsDarkSqlPreview(root.classList.contains('dark'));
+        syncTheme();
+        const observer = new MutationObserver(syncTheme);
+        observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+
+    const sqlPreviewHighlightStyle = useMemo(() => {
+        if (isDarkSqlPreview) {
+            return HighlightStyle.define([
+                { tag: tags.keyword, color: '#60a5fa', fontWeight: '700' },
+                { tag: [tags.string, tags.special(tags.string)], color: '#fbbf24' },
+                { tag: [tags.number, tags.float], color: '#34d399' },
+                { tag: [tags.comment, tags.lineComment, tags.blockComment], color: '#94a3b8', fontStyle: 'italic' },
+                { tag: [tags.propertyName, tags.attributeName], color: '#7dd3fc' },
+                { tag: tags.operator, color: '#c084fc' }
+            ]);
+        }
+        return HighlightStyle.define([
+            { tag: tags.keyword, color: '#1d4ed8', fontWeight: '700' },
+            { tag: [tags.string, tags.special(tags.string)], color: '#b45309' },
+            { tag: [tags.number, tags.float], color: '#059669' },
+            { tag: [tags.comment, tags.lineComment, tags.blockComment], color: '#64748b', fontStyle: 'italic' },
+            { tag: [tags.propertyName, tags.attributeName], color: '#0284c7' },
+            { tag: tags.operator, color: '#7c3aed' }
+        ]);
+    }, [isDarkSqlPreview]);
+
+    const sqlPreviewTheme = useMemo(
+        () => {
+            const activeLineDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.08)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.18)' : 'rgba(96, 165, 250, 0.12)';
+            const activeLineLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.05)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(59, 130, 246, 0.08)';
+            return EditorView.theme({
+                '&': {
+                    height: '100%',
+                    fontSize: `${Math.max(12, Math.min(15, sqlEditorFontSize))}px`,
+                    borderRadius: '0.5rem'
+                },
+                '.cm-editor': {
+                    backgroundColor: isDarkSqlPreview ? '#0b1220' : '#f8fafc',
+                    color: isDarkSqlPreview ? '#e2e8f0' : '#0f172a'
+                },
+                '.cm-scroller': {
+                    overflow: 'auto',
+                    backgroundColor: isDarkSqlPreview ? '#0b1220' : '#f8fafc',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+                },
+                '.cm-content': {
+                    padding: '0.75rem'
+                },
+                '.cm-activeLine': {
+                    backgroundColor: isDarkSqlPreview ? activeLineDark : activeLineLight
+                },
+                '.cm-focused': {
+                    outline: 'none'
+                },
+                '.cm-gutters': {
+                    backgroundColor: 'transparent',
+                    border: 'none'
+                },
+                '.cm-cursor, .cm-dropCursor': {
+                    borderLeftColor: 'transparent'
+                }
+            }, { dark: isDarkSqlPreview });
+        },
+        [isDarkSqlPreview, sqlEditorFontSize, sqlEditorThemeIntensity]
+    );
+
+    const sqlPreviewExtensions = useMemo(() => {
+        const exts = [sqlLang(), sqlPreviewTheme, EditorState.tabSize.of(Math.max(2, Math.min(4, sqlEditorTabSize)))];
+        if (sqlEditorPreviewHighlight && sqlEditorSyntaxHighlight) {
+            exts.push(syntaxHighlighting(sqlPreviewHighlightStyle));
+        }
+        if (sqlEditorLineWrap) {
+            exts.push(EditorView.lineWrapping);
+        }
+        return exts;
+    }, [sqlEditorLineWrap, sqlEditorPreviewHighlight, sqlEditorSyntaxHighlight, sqlEditorTabSize, sqlPreviewHighlightStyle, sqlPreviewTheme]);
+
+    const buildSnapshot = useCallback((overrides?: {
+        currentSql?: string;
+        currentBuilderMode?: 'sql' | 'visual';
+        currentQueryConfig?: QueryConfig | undefined;
+        currentVisType?: VisualizationType;
+        currentVisConfig?: WidgetConfig;
+        currentWidgetName?: string;
+        currentActiveWidgetId?: string | null;
+    }) => JSON.stringify({
+        sql: (overrides?.currentSql ?? sql).trim(),
+        builderMode: overrides?.currentBuilderMode ?? builderMode,
+        queryConfig: overrides?.currentQueryConfig ?? queryConfig ?? null,
+        visType: overrides?.currentVisType ?? visType,
+        visConfig: overrides?.currentVisConfig ?? visConfig,
+        widgetName: (overrides?.currentWidgetName ?? widgetName).trim(),
+        activeWidgetId: overrides?.currentActiveWidgetId ?? activeWidgetId
+    }), [sql, builderMode, queryConfig, visType, visConfig, widgetName, activeWidgetId]);
 
     const handleRun = useCallback(async (overrideSql?: string): Promise<boolean> => {
         setLoading(true);
@@ -244,6 +358,7 @@ export const QueryBuilderView: React.FC = () => {
 
     const handleSaveWidget = useCallback(async (mode: 'update' | 'new' = 'update') => {
         if (isReadOnly) return;
+        const saveAsContentWidget = CONTENT_VIS_TYPES.has(visType);
         const shouldCreateNew = mode === 'new';
         let targetId = shouldCreateNew ? crypto.randomUUID() : (activeWidgetId || crypto.randomUUID());
         const existingTarget = (savedWidgets || []).find((w) => w.id === targetId);
@@ -276,9 +391,9 @@ export const QueryBuilderView: React.FC = () => {
         }
         try {
             const linkedStatement = (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId);
-            const sqlText = isContentWidget ? '' : sql.trim();
+            const sqlText = saveAsContentWidget ? '' : sql.trim();
             const linkedStatementId =
-                !isContentWidget && linkedStatement && normalizeSqlText(linkedStatement.sql_text) === normalizeSqlText(sqlText)
+                !saveAsContentWidget && linkedStatement && normalizeSqlText(linkedStatement.sql_text) === normalizeSqlText(sqlText)
                     ? linkedStatement.id
                     : null;
             const widget = {
@@ -318,7 +433,6 @@ export const QueryBuilderView: React.FC = () => {
         activeWidgetId,
         builderMode,
         buildSnapshot,
-        isContentWidget,
         isReadOnly,
         refreshWidgets,
         savedWidgets,
@@ -574,23 +688,6 @@ export const QueryBuilderView: React.FC = () => {
     const showGuidedFooter = true;
     const canOpenVisualTab = suggestedGuidedStep >= 3;
     const canOpenWidgetTab = suggestedGuidedStep >= 4;
-    const buildSnapshot = useCallback((overrides?: {
-        currentSql?: string;
-        currentBuilderMode?: 'sql' | 'visual';
-        currentQueryConfig?: QueryConfig | undefined;
-        currentVisType?: VisualizationType;
-        currentVisConfig?: WidgetConfig;
-        currentWidgetName?: string;
-        currentActiveWidgetId?: string | null;
-    }) => JSON.stringify({
-        sql: (overrides?.currentSql ?? sql).trim(),
-        builderMode: overrides?.currentBuilderMode ?? builderMode,
-        queryConfig: overrides?.currentQueryConfig ?? queryConfig ?? null,
-        visType: overrides?.currentVisType ?? visType,
-        visConfig: overrides?.currentVisConfig ?? visConfig,
-        widgetName: (overrides?.currentWidgetName ?? widgetName).trim(),
-        activeWidgetId: overrides?.currentActiveWidgetId ?? activeWidgetId
-    }), [sql, builderMode, queryConfig, visType, visConfig, widgetName, activeWidgetId]);
     const currentSnapshot = useMemo(
         () => buildSnapshot(),
         [buildSnapshot]
@@ -638,6 +735,23 @@ export const QueryBuilderView: React.FC = () => {
     const previewHeaderTitle = activeWidgetId
         ? (widgetName.trim() || t('querybuilder.new_report'))
         : t('querybuilder.preview_new_widget_title', 'Neues Widget ...');
+    const previewTooltipContentStyle: React.CSSProperties = {
+        borderRadius: '12px',
+        border: isDarkSqlPreview ? '1px solid #334155' : '1px solid #e2e8f0',
+        backgroundColor: isDarkSqlPreview ? '#0f172a' : '#ffffff',
+        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.18)'
+    };
+    const previewTooltipLabelStyle: React.CSSProperties = {
+        color: isDarkSqlPreview ? '#e2e8f0' : '#0f172a',
+        fontWeight: 700,
+        fontSize: '12px'
+    };
+    const previewTooltipItemStyle: React.CSSProperties = {
+        color: isDarkSqlPreview ? '#cbd5e1' : '#334155',
+        fontWeight: 600,
+        fontSize: '12px'
+    };
+    const previewTooltipCursor = { fill: isDarkSqlPreview ? 'rgba(148, 163, 184, 0.14)' : '#f8fafc' };
     const previewWidgetDescription = (visConfig.widgetDescription || '').trim();
     const previewWidgetDescriptionPosition: 'top' | 'bottom' = visConfig.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
 
@@ -1827,7 +1941,7 @@ export const QueryBuilderView: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-auto p-4 min-h-0 container-scrollbar">
+                        <div className={`flex-1 min-h-0 flex flex-col ${previewTab === 'sql' ? 'overflow-hidden p-0' : 'overflow-auto p-4 container-scrollbar'}`}>
                             {previewTab === 'graphic' ? (
                                 <div className="h-full min-h-[260px] flex flex-col">
                                     {previewWidgetDescription && previewWidgetDescriptionPosition === 'top' && (
@@ -2063,15 +2177,15 @@ export const QueryBuilderView: React.FC = () => {
                                     <div key={`${previewVisType}-${previewRenderVersion}`} className="h-full min-h-[260px] w-full flex flex-col">
                                     {previewVisualizationInvalid ? (
                                         <div className="flex-1 flex items-center justify-center p-6">
-                                            <div className="max-w-md w-full rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-4">
+                                            <div className="max-w-md w-full rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 px-4 py-4">
                                                 <div className="flex items-start gap-3">
-                                                    <div className="mt-0.5 text-amber-600">{previewTypeMeta.icon}</div>
+                                                    <div className="mt-0.5 text-amber-600 dark:text-amber-300">{previewTypeMeta.icon}</div>
                                                     <div className="min-w-0">
-                                                        <div className="text-xs font-black uppercase tracking-wide text-amber-700">
+                                                        <div className="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
                                                             {previewTypeMeta.label}
                                                         </div>
                                                         <p className="text-sm font-bold mt-1">{t('querybuilder.preview_not_renderable_title')}</p>
-                                                        <p className="text-xs text-amber-800/90 mt-1">{t('querybuilder.preview_not_renderable_hint')}</p>
+                                                        <p className="text-xs text-amber-800/90 dark:text-amber-200/90 mt-1">{t('querybuilder.preview_not_renderable_hint')}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2142,7 +2256,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
-                                                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} cursor={{ fill: '#f8fafc' }} formatter={(val, name) => [formatValue(val, name as string), name]} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} cursor={previewTooltipCursor} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Bar key={y} dataKey={y} fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
@@ -2155,7 +2269,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
-                                                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} formatter={(val, name) => [formatValue(val, name as string), name]} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Line key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }}>
@@ -2168,7 +2282,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
-                                                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} formatter={(val, name) => [formatValue(val, name as string), name]} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Area key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} fillOpacity={0.2} strokeWidth={2}>
@@ -2191,7 +2305,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     >
                                                         {results.map((_e, i) => <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
                                                     </Pie>
-                                                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} />
                                                     <Legend layout="vertical" align="right" verticalAlign="middle" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                 </PieChart>
                                             ) : previewVisType === 'composed' ? (
@@ -2199,7 +2313,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
-                                                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} formatter={(val, name) => [formatValue(val, name as string), name]} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         idx === 0 ? (
@@ -2222,14 +2336,14 @@ export const QueryBuilderView: React.FC = () => {
                                                         <Radar key={y} name={y} dataKey={y} stroke={COLORS[idx % COLORS.length]} fill={COLORS[idx % COLORS.length]} fillOpacity={0.6} />
                                                     ))}
                                                     <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
-                                                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} />
                                                 </RadarChart>
                                             ) : previewVisType === 'scatter' ? (
                                                 <ScatterChart>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis type="number" dataKey={visConfig.xAxis} name={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <YAxis type="number" dataKey={(visConfig.yAxes || [])[0]} name={(visConfig.yAxes || [])[0]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} cursor={{ strokeDasharray: '3 3' }} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     <Scatter name={widgetName || 'Scatter'} data={scatterData} fill={visConfig.color || COLORS[0]} />
                                                 </ScatterChart>
@@ -2268,12 +2382,22 @@ export const QueryBuilderView: React.FC = () => {
                                         <p className="text-xs font-bold text-center">{t('querybuilder.preview_no_data_source', 'Keine Datenquelle ausgewaehlt.')}</p>
                                     </div>
                                 ) : (
-                                    <div className="h-full">
-                                        <textarea
-                                            value={sql}
-                                            readOnly
-                                            className="w-full h-full min-h-[260px] font-mono text-xs p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded-lg outline-none resize-none"
-                                        />
+                                    <div className="flex-1 min-h-0 flex flex-col">
+                                        <div className="flex-1 min-h-0 w-full border-t border-slate-200 dark:border-slate-700 overflow-hidden">
+                                            <CodeMirror
+                                                value={sql}
+                                                height="100%"
+                                                readOnly
+                                                editable={false}
+                                                basicSetup={{
+                                                    lineNumbers: sqlEditorLineNumbers,
+                                                    foldGutter: false,
+                                                    highlightActiveLine: sqlEditorPreviewHighlight,
+                                                    highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorPreviewHighlight
+                                                }}
+                                                extensions={sqlPreviewExtensions}
+                                            />
+                                        </div>
                                     </div>
                                 )
                             )}

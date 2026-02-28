@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.0] - 2026-02-28
 
 ### Added
 - Reporting now supports extended package export/import workflows:
@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Smart Import now shows an explicit prefix hint so users can see whether and which prefix is currently applied.
 - Import table-prefix validation now blocks reserved `sys...` prefixes in settings and ignores invalid configured values at runtime for Smart Import safety.
 - Invalid `sys...` import prefixes are now automatically reset to `usr_` instead of persisting partial intermediate values.
+- Added CodeMirror-based SQL editor in SQL Workspace with syntax highlighting and improved editing UX.
+- Added centralized SQL editor configuration in `Settings > Controls > SQL Editor` (highlighting, line numbers, wrapping, indentation/tab behavior, and autocomplete behavior).
+- Added schema-aware SQL assistance in CodeMirror (table/column-oriented completion support).
+- Added CodeMirror-based read-only SQL preview in widget preview (`SQL` tab), aligned with SQL Workspace editor behavior.
+- Added a direct SQL Workspace settings panel/link to jump to `Controls > SQL Editor`.
 
 ### Changed
 - Stability and resilience of DB communication were improved:
@@ -81,6 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - empty backup passwords are still blocked
   - weak passwords now show a warning/confirmation instead of hard blocking, allowing explicit user override.
 - Admin mode is now session-scoped for runtime authorization checks (no persisted `localStorage` trust for `sys_*` write protection decisions).
+- SQL editor option ownership was consolidated: SQL editor behavior is now configured centrally in `Controls > SQL Editor` (legacy duplicated workspace toggles removed).
+- SQL Workspace splitter/gripper behavior was refined with dynamic resize limits and better drag range across viewport sizes.
+- Sidebar collapsed-footer layout was visually tightened with consistent icon sizing/alignment for language/settings/lock/system-status actions.
 
 ### Fixed
 - Added a global UI error boundary to prevent full-app blank states on component render failures and provide a safe reload fallback.
@@ -102,6 +110,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed factory-reset behavior to reliably remove existing custom views (and other user/system objects) even when OPFS file deletion is not possible; reset now performs an in-place schema rebuild.
 - Fixed Datasource view listing to treat bundled core views (`kpi_history`, `latest_kpis`, `data_summary_view`, `view_anomalies`) as system views, so they are not shown as user-created views after factory reset.
 - Removed legacy bundled demo views from `views.sql` (old data model remnants) and added DB migration `V12` to drop these views in existing installations.
+- Fixed Query Builder runtime crashes caused by temporal dead-zone access (`buildSnapshot` / `isContentWidget` before initialization).
+- Fixed SQL Workspace splitter edge case where the lower results pane could be resized to effectively disappear; a minimum visible height is now enforced.
+- Fixed dark-mode styling gaps in chart/widget contexts, including tooltip contrast in bar charts and invalid-preview notice cards in widget preview.
+- Fixed SQL editor visual consistency in dark mode by aligning CodeMirror theme integration with app theme usage.
 
 ## [1.2.0] - 2026-02-27
 

@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import CodeMirror from '@uiw/react-codemirror';
+import { sql as sqlLang } from '@codemirror/lang-sql';
+import { autocompletion, type Completion, type CompletionContext } from '@codemirror/autocomplete';
+import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { EditorView, keymap } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
+import { indentWithTab } from '@codemirror/commands';
+import { tags } from '@lezer/highlight';
 import { useAsync } from '../../hooks/useAsync';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -83,8 +91,20 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [inputSql, setInputSql] = useState(''); // Textarea content
     const [sqlHistory, setSqlHistory] = useLocalStorage<string[]>('data_inspector_sql_history', []);
     const [explainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
-    const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', true);
-    const [autocompleteEnabled, setAutocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
+    const [autocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [sqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
+    const [sqlEditorAutocompleteTyping] = useLocalStorage<boolean>('sql_editor_autocomplete_on_typing', true);
+    const [sqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
+    const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
+    const [sqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', true);
+    const [sqlEditorFontSize] = useLocalStorage<number>('sql_editor_font_size', 14);
+    const [sqlEditorTabSize] = useLocalStorage<number>('sql_editor_tab_size', 4);
+    const [sqlEditorIndentWithTab] = useLocalStorage<boolean>('sql_editor_indent_with_tab', true);
+    const [sqlEditorThemeIntensity] = useLocalStorage<'subtle' | 'normal' | 'high'>('sql_editor_theme_intensity', 'normal');
+    const [sqlEditorUppercaseKeywords] = useLocalStorage<boolean>('sql_editor_uppercase_keywords', false);
+    const [sqlEditorSchemaHints] = useLocalStorage<boolean>('sql_editor_schema_hints', true);
+    const [sqlEditorRememberHeight] = useLocalStorage<boolean>('sql_editor_remember_height', true);
     const [sqlRequireLimitConfirm] = useLocalStorage<boolean>('data_inspector_sql_require_limit_confirm', true);
     const [sqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
@@ -150,22 +170,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [isGeneratingIndexSuggestions, setIsGeneratingIndexSuggestions] = useState(false);
     const [applyingIndexSuggestionId, setApplyingIndexSuggestionId] = useState('');
     const [storedSqlEditorHeight, setStoredSqlEditorHeight] = useLocalStorage<number>(sqlEditorHeightStorageKey, 160);
-    const [sqlEditorHeight, setSqlEditorHeight] = useState(storedSqlEditorHeight);
-    const sqlInputRef = useRef<HTMLTextAreaElement | null>(null);
-    const [sqlCursor, setSqlCursor] = useState(0);
-    const [autocompleteOpen, setAutocompleteOpen] = useState(false);
-    const [autocompleteIndex, setAutocompleteIndex] = useState(0);
-    const [autocompletePosition, setAutocompletePosition] = useState({ top: 12, left: 12, width: 320 });
+    const [sqlEditorHeight, setSqlEditorHeight] = useState(sqlEditorRememberHeight ? storedSqlEditorHeight : 160);
     const indexSuggestionCacheRef = useRef<Map<string, IndexSuggestion[]>>(new Map());
     const indexSuggestionRunRef = useRef(0);
     const hasAutoRestoredLastSelectRef = useRef(false);
-
-    type SuggestionType = 'keyword' | 'table' | 'column';
-    interface SqlSuggestion {
-        label: string;
-        insert: string;
-        type: SuggestionType;
-    }
 
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
@@ -195,10 +203,15 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const sqlPaneResizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
     const sqlPaneLiveHeightRef = useRef<number>(sqlEditorHeight);
     const sqlPaneCommitTimestampRef = useRef<number>(0);
+    const sqlEditorPaneRef = useRef<HTMLDivElement | null>(null);
+    const SQL_RESULTS_MIN_HEIGHT = 180;
     const [inspectorReturnHash, setInspectorReturnHash] = useState<string | null>(null);
     const modeLocked = Boolean(fixedMode);
     const pageTitle = t(titleKey || 'sidebar.data_inspector');
     const pageBreadcrumb = t(breadcrumbKey || titleKey || 'sidebar.data_inspector');
+    const [isDarkEditor, setIsDarkEditor] = useState<boolean>(
+        typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    );
 
     const forwardSqlToWorkspace = useCallback((sql: string) => {
         const trimmed = sql.trim();
@@ -247,9 +260,18 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         const lastSelectSql = localStorage.getItem(INSPECTOR_LAST_SELECT_SQL_KEY);
         if (!lastSelectSql || !/^\s*SELECT\b/i.test(lastSelectSql)) return;
         setInputSql(lastSelectSql);
-        setSqlCursor(lastSelectSql.length);
         setSqlOutputView('result');
     }, [fixedMode, inputSql]);
+
+    useEffect(() => {
+        const root = document.documentElement;
+        const syncTheme = () => setIsDarkEditor(root.classList.contains('dark'));
+        syncTheme();
+
+        const observer = new MutationObserver(syncTheme);
+        observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
 
     const normalizeSql = useCallback((value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase(), []);
 
@@ -465,7 +487,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     };
     const handleClearSqlWorkspace = useCallback(() => {
         setInputSql('');
-        setSqlCursor(0);
         setSqlExecutionSql('');
         setSqlLimitNotice('');
         setSqlOutputView('result');
@@ -1123,7 +1144,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(sql);
-        setSqlCursor(sql.length);
         setSqlOutputView('result');
         setShowSqlAssist(false);
         if (mode === 'run') {
@@ -1164,7 +1184,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(statement.sql_text);
-        setSqlCursor(statement.sql_text.length);
         setLoadedSqlTemplateMeta({
             name: statement.name,
             description: (statement.description || '').trim()
@@ -1185,7 +1204,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(sql);
-        setSqlCursor(sql.length);
         setLoadedSqlTemplateMeta({
             name: (templateName || '').trim(),
             description: (templateDescription || '').trim()
@@ -1296,7 +1314,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(sql);
-        setSqlCursor(sql.length);
         setSqlOutputView('result');
         setShowTableTools(false);
     }, [fixedMode, forwardSqlToWorkspace, selectedTable, setShowTableTools]);
@@ -1325,7 +1342,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(sql);
-        setSqlCursor(sql.length);
         setSqlOutputView('result');
         setShowTableTools(false);
         if (runImmediately) {
@@ -1343,177 +1359,213 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setShowTableTools(false);
     }, [setShowTableTools, tableSelectedColumns, t]);
 
-    const getTokenAtCursor = useCallback((sql: string, cursor: number) => {
-        let start = cursor;
-        let end = cursor;
-        const isTokenChar = (ch: string) => /[A-Za-z0-9_."]/i.test(ch);
-
-        while (start > 0 && isTokenChar(sql[start - 1])) start -= 1;
-        while (end < sql.length && isTokenChar(sql[end])) end += 1;
-
-        const token = sql.slice(start, cursor);
-        return { start, end, token };
-    }, []);
-
-    const suggestions = React.useMemo<SqlSuggestion[]>(() => {
-        if (mode !== 'sql' || !autocompleteEnabled) return [];
-
-        const schemaColumns = (selectedTableSchema || []).map(col => col.name);
-        const { token } = getTokenAtCursor(inputSql, sqlCursor);
-        const prefix = token.trim().toLowerCase();
-        const beforeCursor = inputSql.slice(0, sqlCursor).toUpperCase();
-
-        const tableContext = /\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+["A-Z0-9_]*$/i.test(beforeCursor);
-        const columnContext = /\b(SELECT|WHERE|AND|OR|ON|HAVING|BY|ORDER BY|GROUP BY)\s+["A-Z0-9_.,]*$/i.test(beforeCursor);
-
-        const keywordSuggestions: SqlSuggestion[] = SQL_KEYWORDS
-            .filter(k => prefix.length === 0 || k.toLowerCase().startsWith(prefix))
-            .map(k => ({ label: k, insert: k, type: 'keyword' }));
-
-        const tableSuggestions: SqlSuggestion[] = (tables || [])
-            .filter(t => prefix.length === 0 || t.toLowerCase().startsWith(prefix))
-            .map(t => ({ label: t, insert: t, type: 'table' }));
-
-        const columnSuggestions: SqlSuggestion[] = schemaColumns
-            .filter(c => prefix.length === 0 || c.toLowerCase().startsWith(prefix))
-            .map(c => ({ label: c, insert: c, type: 'column' }));
-
-        let merged: SqlSuggestion[] = [];
-        if (tableContext) {
-            merged = [...tableSuggestions, ...keywordSuggestions];
-        } else if (columnContext || token.includes('.')) {
-            merged = [...columnSuggestions, ...keywordSuggestions, ...tableSuggestions];
-        } else {
-            merged = [...keywordSuggestions, ...tableSuggestions, ...columnSuggestions];
+    const sqlHighlightStyle = React.useMemo(() => {
+        if (isDarkEditor) {
+            return HighlightStyle.define([
+                { tag: tags.keyword, color: '#60a5fa', fontWeight: '700' },
+                { tag: [tags.string, tags.special(tags.string)], color: '#fbbf24' },
+                { tag: [tags.number, tags.float], color: '#34d399' },
+                { tag: [tags.comment, tags.lineComment, tags.blockComment], color: '#94a3b8', fontStyle: 'italic' },
+                { tag: [tags.propertyName, tags.attributeName], color: '#7dd3fc' },
+                { tag: tags.operator, color: '#c084fc' }
+            ]);
         }
+        return HighlightStyle.define([
+            { tag: tags.keyword, color: '#1d4ed8', fontWeight: '700' },
+            { tag: [tags.string, tags.special(tags.string)], color: '#b45309' },
+            { tag: [tags.number, tags.float], color: '#059669' },
+            { tag: [tags.comment, tags.lineComment, tags.blockComment], color: '#64748b', fontStyle: 'italic' },
+            { tag: [tags.propertyName, tags.attributeName], color: '#0284c7' },
+            { tag: tags.operator, color: '#7c3aed' }
+        ]);
+    }, [isDarkEditor]);
 
-        const deduped = merged.filter((item, idx, arr) => arr.findIndex(i => i.label === item.label && i.type === item.type) === idx);
-        return deduped.slice(0, 16);
-    }, [mode, autocompleteEnabled, selectedTableSchema, getTokenAtCursor, inputSql, sqlCursor, tables]);
+    const sqlEditorTheme = React.useMemo(
+        () => {
+            const activeLineDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.08)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.18)' : 'rgba(96, 165, 250, 0.12)';
+            const activeLineLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.05)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(59, 130, 246, 0.08)';
+            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.34)' : 'rgba(96, 165, 250, 0.24)';
+            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.34)' : 'rgba(59, 130, 246, 0.25)';
+            return EditorView.theme({
+                '&': {
+                    height: '100%',
+                    fontSize: `${Math.max(12, Math.min(15, sqlEditorFontSize))}px`,
+                    borderRadius: '0.5rem'
+                },
+                '.cm-editor': {
+                    backgroundColor: isDarkEditor ? '#0b1220' : '#f8fafc',
+                    color: isDarkEditor ? '#e2e8f0' : '#0f172a'
+                },
+                '.cm-scroller': {
+                    overflow: 'auto',
+                    backgroundColor: isDarkEditor ? '#0b1220' : '#f8fafc',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+                },
+                '.cm-content': {
+                    padding: '1rem',
+                    color: isDarkEditor ? '#e2e8f0' : '#0f172a',
+                    caretColor: isDarkEditor ? '#60a5fa' : '#2563eb'
+                },
+                '.cm-focused': {
+                    outline: 'none'
+                },
+                '.cm-activeLine': {
+                    backgroundColor: sqlEditorHighlightActiveLine ? (isDarkEditor ? activeLineDark : activeLineLight) : 'transparent'
+                },
+                '.cm-selectionBackground, ::selection': {
+                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
+                },
+                '.cm-gutters': {
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: isDarkEditor ? '#94a3b8' : '#64748b'
+                },
+                '.cm-cursor, .cm-dropCursor': {
+                    borderLeftColor: isDarkEditor ? '#60a5fa' : '#2563eb'
+                },
+                '.cm-tooltip': {
+                    borderRadius: '0.5rem',
+                    border: `1px solid ${isDarkEditor ? '#334155' : '#cbd5e1'}`,
+                    backgroundColor: isDarkEditor ? '#0f172a' : '#ffffff',
+                    color: isDarkEditor ? '#e2e8f0' : '#0f172a',
+                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.25)'
+                },
+                '.cm-tooltip-autocomplete > ul > li': {
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontSize: '12px'
+                },
+                '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+                    backgroundColor: isDarkEditor ? 'rgba(37, 99, 235, 0.35)' : 'rgba(59, 130, 246, 0.16)',
+                    color: isDarkEditor ? '#dbeafe' : '#1e3a8a'
+                }
+            }, { dark: isDarkEditor });
+        },
+        [isDarkEditor, sqlEditorFontSize, sqlEditorHighlightActiveLine, sqlEditorThemeIntensity]
+    );
 
-    useEffect(() => {
-        setAutocompleteIndex(0);
-        setAutocompleteOpen(mode === 'sql' && autocompleteEnabled && suggestions.length > 0);
-    }, [mode, autocompleteEnabled, suggestions]);
+    const sqlCompletionSource = useCallback(
+        (context: CompletionContext) => {
+            if (mode !== 'sql' || !autocompleteEnabled) return null;
 
-    useEffect(() => {
-        if (!autocompleteEnabled) {
-            setAutocompleteOpen(false);
-        }
-    }, [autocompleteEnabled]);
+            const tokenMatch = context.matchBefore(/["A-Za-z_][A-Za-z0-9_."-]*/);
+            if (!tokenMatch && !context.explicit) return null;
 
-    const insertSuggestion = useCallback((suggestion: SqlSuggestion) => {
-        const { start, end } = getTokenAtCursor(inputSql, sqlCursor);
-        const nextSql = `${inputSql.slice(0, start)}${suggestion.insert}${inputSql.slice(end)}`;
-        const nextCursor = start + suggestion.insert.length;
-        setInputSql(nextSql);
-        setSqlCursor(nextCursor);
-        setAutocompleteOpen(false);
-        setAutocompleteIndex(0);
-        window.setTimeout(() => {
-            sqlInputRef.current?.focus();
-            sqlInputRef.current?.setSelectionRange(nextCursor, nextCursor);
-        }, 0);
-    }, [getTokenAtCursor, inputSql, sqlCursor]);
+            const from = tokenMatch ? tokenMatch.from : context.pos;
+            const typedRaw = tokenMatch ? tokenMatch.text : '';
+            const prefix = typedRaw.replace(/"/g, '').toLowerCase();
+            const beforeCursor = context.state.doc
+                .sliceString(Math.max(0, context.pos - 120), context.pos)
+                .toUpperCase();
 
-    const handleSqlEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (!autocompleteEnabled) return;
-        if (!autocompleteOpen || suggestions.length === 0) {
-            if (e.key === ' ' && e.ctrlKey) {
-                e.preventDefault();
-                setAutocompleteOpen(true);
+            const tableContext = /\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+["A-Z0-9_]*$/.test(beforeCursor);
+            const columnContext =
+                /\b(SELECT|WHERE|AND|OR|ON|HAVING|BY|ORDER BY|GROUP BY)\s+["A-Z0-9_.,\s]*$/.test(beforeCursor) ||
+                /\.\s*["A-Z0-9_]*$/.test(beforeCursor);
+
+            const schemaTables = sqlEditorSchemaHints ? tables : [];
+            const schemaColumns = sqlEditorSchemaHints ? (selectedTableSchema || []).map(col => col.name) : [];
+            const options: Completion[] = [];
+            const seen = new Set<string>();
+            const addOption = (label: string, type: Completion['type'], boost = 0, applyValue?: string) => {
+                const key = `${type}:${label.toLowerCase()}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                options.push({ label, type, boost, apply: applyValue || label });
+            };
+
+            if (tableContext) {
+                for (const name of schemaTables) {
+                    if (!prefix || name.toLowerCase().startsWith(prefix)) addOption(name, 'variable', 99);
+                }
+                for (const keyword of SQL_KEYWORDS) {
+                    if (!prefix || keyword.toLowerCase().startsWith(prefix)) {
+                        const apply = sqlEditorUppercaseKeywords ? keyword.toUpperCase() : keyword.toLowerCase();
+                        addOption(keyword, 'keyword', 80, apply);
+                    }
+                }
+            } else if (columnContext) {
+                for (const col of schemaColumns) {
+                    if (!prefix || col.toLowerCase().startsWith(prefix)) addOption(col, 'property', 99);
+                }
+                for (const keyword of SQL_KEYWORDS) {
+                    if (!prefix || keyword.toLowerCase().startsWith(prefix)) {
+                        const apply = sqlEditorUppercaseKeywords ? keyword.toUpperCase() : keyword.toLowerCase();
+                        addOption(keyword, 'keyword', 80, apply);
+                    }
+                }
+                for (const name of schemaTables) {
+                    if (!prefix || name.toLowerCase().startsWith(prefix)) addOption(name, 'variable', 70);
+                }
+            } else {
+                for (const keyword of SQL_KEYWORDS) {
+                    if (!prefix || keyword.toLowerCase().startsWith(prefix)) {
+                        const apply = sqlEditorUppercaseKeywords ? keyword.toUpperCase() : keyword.toLowerCase();
+                        addOption(keyword, 'keyword', 90, apply);
+                    }
+                }
+                for (const name of schemaTables) {
+                    if (!prefix || name.toLowerCase().startsWith(prefix)) addOption(name, 'variable', 80);
+                }
+                for (const col of schemaColumns) {
+                    if (!prefix || col.toLowerCase().startsWith(prefix)) addOption(col, 'property', 70);
+                }
             }
-            return;
+
+            if (options.length === 0 && !context.explicit) return null;
+            return {
+                from,
+                options: options.slice(0, 40),
+                validFor: /^[A-Za-z0-9_."-]*$/
+            };
+        },
+        [autocompleteEnabled, mode, selectedTableSchema, sqlEditorSchemaHints, sqlEditorUppercaseKeywords, tables]
+    );
+
+    const sqlEditorExtensions = React.useMemo(() => {
+        const extensions = [sqlLang(), sqlEditorTheme, EditorState.tabSize.of(Math.max(2, Math.min(4, sqlEditorTabSize)))];
+        if (sqlEditorSyntaxHighlight) {
+            extensions.push(syntaxHighlighting(sqlHighlightStyle));
         }
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setAutocompleteIndex(prev => (prev + 1) % suggestions.length);
-            return;
+        if (sqlEditorLineWrap) {
+            extensions.push(EditorView.lineWrapping);
         }
-        if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setAutocompleteIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
-            return;
+        if (sqlEditorIndentWithTab) {
+            extensions.push(keymap.of([indentWithTab]));
         }
-        if (e.key === 'Enter' || e.key === 'Tab') {
-            e.preventDefault();
-            insertSuggestion(suggestions[autocompleteIndex]);
-            return;
+        if (autocompleteEnabled) {
+            extensions.push(
+                autocompletion({
+                    override: [sqlCompletionSource],
+                    activateOnTyping: sqlEditorAutocompleteTyping,
+                    maxRenderedOptions: 12
+                })
+            );
         }
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            setAutocompleteOpen(false);
-        }
-    }, [autocompleteEnabled, autocompleteOpen, autocompleteIndex, insertSuggestion, suggestions]);
-
-    const updateAutocompletePosition = useCallback(() => {
-        const textarea = sqlInputRef.current;
-        if (!textarea) return;
-
-        const caret = textarea.selectionStart ?? sqlCursor;
-        const style = window.getComputedStyle(textarea);
-        const mirror = document.createElement('div');
-        const copiedStyles = [
-            'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
-            'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-            'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize', 'fontFamily',
-            'lineHeight', 'textAlign', 'textTransform', 'textIndent', 'letterSpacing', 'wordSpacing'
-        ] as const;
-
-        mirror.style.position = 'absolute';
-        mirror.style.visibility = 'hidden';
-        mirror.style.whiteSpace = 'pre-wrap';
-        mirror.style.wordWrap = 'break-word';
-        mirror.style.top = '0';
-        mirror.style.left = '-9999px';
-
-        for (const key of copiedStyles) {
-            mirror.style[key] = style[key];
-        }
-
-        mirror.style.width = `${textarea.clientWidth}px`;
-        mirror.textContent = textarea.value.slice(0, caret);
-
-        const marker = document.createElement('span');
-        marker.textContent = textarea.value.slice(caret) || '.';
-        mirror.appendChild(marker);
-        document.body.appendChild(mirror);
-
-        const lineHeightRaw = Number.parseFloat(style.lineHeight);
-        const lineHeight = Number.isFinite(lineHeightRaw) ? lineHeightRaw : 18;
-        const desiredTop = marker.offsetTop - textarea.scrollTop + lineHeight + 6;
-        const desiredLeft = marker.offsetLeft - textarea.scrollLeft + 8;
-
-        document.body.removeChild(mirror);
-
-        const clampedTop = Math.max(8, Math.min(desiredTop, textarea.clientHeight - 44));
-        const clampedLeft = Math.max(8, Math.min(desiredLeft, textarea.clientWidth - 180));
-        const availableWidth = Math.max(180, textarea.clientWidth - clampedLeft - 10);
-        setAutocompletePosition({
-            top: clampedTop,
-            left: clampedLeft,
-            width: Math.min(420, availableWidth)
-        });
-    }, [sqlCursor]);
+        return extensions;
+    }, [
+        autocompleteEnabled,
+        sqlCompletionSource,
+        sqlEditorAutocompleteTyping,
+        sqlEditorIndentWithTab,
+        sqlEditorLineWrap,
+        sqlEditorSyntaxHighlight,
+        sqlEditorTabSize,
+        sqlEditorTheme,
+        sqlHighlightStyle
+    ]);
 
     useEffect(() => {
-        if (!autocompleteOpen || suggestions.length === 0) return;
-        updateAutocompletePosition();
-    }, [autocompleteOpen, suggestions.length, sqlCursor, inputSql, updateAutocompletePosition]);
+        setSqlEditorHeight(sqlEditorRememberHeight ? storedSqlEditorHeight : 160);
+    }, [sqlEditorRememberHeight, storedSqlEditorHeight]);
 
     useEffect(() => {
-        setSqlEditorHeight(storedSqlEditorHeight);
-    }, [storedSqlEditorHeight]);
-
-    useEffect(() => {
+        if (!sqlEditorRememberHeight) return;
         if (sqlEditorHeight === storedSqlEditorHeight) return;
         const persistTimer = window.setTimeout(() => {
             setStoredSqlEditorHeight(sqlEditorHeight);
         }, 180);
         return () => window.clearTimeout(persistTimer);
-    }, [sqlEditorHeight, storedSqlEditorHeight, setStoredSqlEditorHeight]);
+    }, [sqlEditorHeight, sqlEditorRememberHeight, storedSqlEditorHeight, setStoredSqlEditorHeight]);
 
     const profiling = React.useMemo(() => {
         if (mode !== 'table' || !items || items.length === 0) return [];
@@ -1621,12 +1673,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             if (!state) return;
             const delta = event.clientY - state.startY;
             const minHeight = 120;
-            const maxHeight = Math.max(260, Math.floor(window.innerHeight * 0.62));
+            const fallbackMaxHeight = Math.max(260, Math.floor(window.innerHeight * 0.62));
+            const editorTop = sqlEditorPaneRef.current?.getBoundingClientRect().top ?? 0;
+            const viewportBottomPadding = 24;
+            const dynamicMaxHeightRaw = Math.floor(window.innerHeight - editorTop - SQL_RESULTS_MIN_HEIGHT - viewportBottomPadding);
+            const maxHeight = Math.max(minHeight, dynamicMaxHeightRaw > 0 ? dynamicMaxHeightRaw : fallbackMaxHeight);
             const nextHeight = Math.max(minHeight, Math.min(maxHeight, state.startHeight + delta));
             sqlPaneLiveHeightRef.current = nextHeight;
-            if (sqlInputRef.current) {
-                sqlInputRef.current.style.height = `${nextHeight}px`;
-            }
+            setSqlEditorHeight(nextHeight);
         };
 
         const handleMouseUp = () => {
@@ -2773,53 +2827,29 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                     </div>
                 </div>
             ) : (
-                <div className="flex flex-col gap-2 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm ring-1 ring-slate-900/5 flex-shrink-0">
+                <div ref={sqlEditorPaneRef} className="flex flex-col gap-2 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm ring-1 ring-slate-900/5 flex-shrink-0">
                     <div className="relative">
-                        <textarea
-                            ref={sqlInputRef}
-                            value={inputSql}
-                            onChange={(e) => {
-                                setInputSql(e.target.value);
-                                setSqlOutputView('explain');
-                                setSqlCursor(e.target.selectionStart ?? e.target.value.length);
-                            }}
-                            onClick={(e) => setSqlCursor(e.currentTarget.selectionStart ?? 0)}
-                            onKeyUp={(e) => setSqlCursor(e.currentTarget.selectionStart ?? 0)}
-                            onSelect={(e) => setSqlCursor(e.currentTarget.selectionStart ?? 0)}
-                            onScroll={() => {
-                                if (autocompleteEnabled && autocompleteOpen) updateAutocompletePosition();
-                            }}
-                            onKeyDown={handleSqlEditorKeyDown}
-                            placeholder={t('datainspector.sql_placeholder')}
-                            className="w-full p-4 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-slate-800 dark:text-slate-200 min-h-[120px] max-h-[520px]"
+                        <div
+                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden text-slate-800 dark:text-slate-200 min-h-[120px]"
                             style={{ height: `${sqlEditorHeight}px` }}
-                        />
-                        {autocompleteEnabled && autocompleteOpen && suggestions.length > 0 && (
-                            <div
-                                className="absolute z-20 border border-slate-200 dark:border-slate-700 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-lg max-h-40 overflow-auto"
-                                style={{
-                                    top: autocompletePosition.top,
-                                    left: autocompletePosition.left,
-                                    width: autocompletePosition.width
+                        >
+                            <CodeMirror
+                                value={inputSql}
+                                height={`${sqlEditorHeight}px`}
+                                basicSetup={{
+                                    lineNumbers: sqlEditorLineNumbers,
+                                    foldGutter: false,
+                                    highlightActiveLine: sqlEditorHighlightActiveLine,
+                                    highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorHighlightActiveLine
                                 }}
-                            >
-                                {suggestions.slice(0, 10).map((s, idx) => (
-                                    <button
-                                        key={`${s.type}-${s.label}`}
-                                        type="button"
-                                        onClick={() => insertSuggestion(s)}
-                                        className={`w-full text-left px-3 py-1.5 text-xs font-mono border-b last:border-b-0 border-slate-100 dark:border-slate-800 transition-colors ${
-                                            idx === autocompleteIndex
-                                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                                        }`}
-                                    >
-                                        <span className="font-bold">{s.label}</span>
-                                        <span className="ml-2 hidden sm:inline text-[10px] uppercase tracking-wide text-slate-400">{s.type}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                                extensions={sqlEditorExtensions}
+                                placeholder={t('datainspector.sql_placeholder')}
+                                onChange={(value) => {
+                                    setInputSql(value);
+                                    setSqlOutputView('explain');
+                                }}
+                            />
+                        </div>
                         <div className="absolute bottom-4 right-4 flex gap-2">
                             <button
                                 onClick={handleClearSqlWorkspace}
@@ -2842,19 +2872,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                     {t('datainspector.stop_sql', 'Stop')}
                                 </button>
                             )}
-                            <button
-                                onClick={() => setAutocompleteEnabled(!autocompleteEnabled)}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                                    autocompleteEnabled
-                                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
-                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                }`}
-                                title={t('datainspector.autocomplete_toggle_title', 'Toggle SQL autocomplete')}
-                            >
-                                {autocompleteEnabled
-                                    ? t('datainspector.autocomplete_on', 'Autocomplete on')
-                                    : t('datainspector.autocomplete_off', 'Autocomplete off')}
-                            </button>
                             <button
                                 onClick={() => setShowSqlAssist(true)}
                                 className="h-9 w-9 flex items-center justify-center rounded-md border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
@@ -2886,8 +2903,17 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                         </div>
                     </div>
                     {sqlLimitNotice && (
-                        <div className="mt-2 px-3 py-2 text-xs rounded-md border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200">
-                            {sqlLimitNotice}
+                        <div className="mt-2 px-3 py-2 text-xs rounded-md border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3">
+                            <span>{sqlLimitNotice}</span>
+                            <button
+                                type="button"
+                                onClick={() => setSqlLimitNotice('')}
+                                className="shrink-0 text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 font-bold leading-none"
+                                aria-label={t('common.close', 'Close')}
+                                title={t('common.close', 'Close')}
+                            >
+                                x
+                            </button>
                         </div>
                     )}
                     <div className="px-3 py-2 text-[11px] rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 flex items-center justify-between gap-3 flex-wrap">
@@ -2936,7 +2962,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 </div>
             )}
 
-            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative">
+            <div
+                className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative"
+                style={mode === 'sql' ? { minHeight: `${SQL_RESULTS_MIN_HEIGHT}px` } : undefined}
+            >
                 {/* Opaque loading overlay when refreshing results */}
                 {loading && items && items.length > 0 && !(mode === 'sql' && sqlOutputView === 'explain') && (
                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-800/40 z-10 flex items-center justify-center backdrop-blur-[1px]">

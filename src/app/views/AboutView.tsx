@@ -22,14 +22,17 @@ export const AboutView: React.FC = () => {
 
     const techStack = [
         { name: 'React', description: t('about.tech_ui_framework') },
+        { name: 'React Router', description: 'Client-side routing and navigation' },
         { name: 'TypeScript', description: t('about.tech_language') },
         { name: 'Vite', description: t('about.tech_build_tool') },
         { name: 'Tailwind CSS', description: t('about.tech_styling') },
         { name: 'SQLite (WASM) + OPFS', description: t('about.tech_local_database') },
+        { name: 'CodeMirror 6', description: 'SQL editor with syntax highlighting and autocomplete' },
         { name: 'Recharts', description: t('about.tech_visualization') },
+        { name: 'dnd-kit', description: 'Drag-and-drop layout and widget interactions' },
         { name: 'i18next + react-i18next', description: t('about.tech_i18n') },
         { name: 'html2canvas + jsPDF', description: t('about.tech_pdf_export') },
-        { name: 'Lucide', description: t('about.tech_icon_system') },
+        { name: 'Lucide React', description: t('about.tech_icon_system') },
     ];
 
     return (

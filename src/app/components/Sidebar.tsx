@@ -124,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
         `}>
             <div className={`p-6 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between ${isCollapsed ? 'md:p-4 md:justify-center' : ''}`}>
-                <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className={`flex items-center overflow-hidden ${isCollapsed ? 'md:gap-0' : 'gap-2.5'}`}>
                     <AppBrandIcon size={32} className="flex-shrink-0" />
                     <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100 flex flex-col'}`}>
                         <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 end={to === '/'}
                                 onClick={onCloseMobile}
                                 className={({ isActive }) =>
-                                    `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`
+                                    `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0 md:gap-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`
                                 }
                                 title={isCollapsed ? label : ''}
                             >
@@ -177,11 +177,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </nav>
                 </div>
 
-                <div className={`p-4 border-t border-slate-300 dark:border-slate-700 transition-all space-y-1 ${isCollapsed ? 'md:p-2 md:py-4' : ''}`}>
+                <div className={`p-4 border-t border-slate-300 dark:border-slate-700 transition-all space-y-1 ${isCollapsed ? 'md:px-0 md:py-3 md:flex md:flex-col md:items-center md:gap-2 md:space-y-0' : ''}`}>
                     {showLanguageSwitch && (
                         <button
                             onClick={toggleLanguage}
-                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:w-11 md:h-11 md:mx-auto md:justify-center md:px-0 md:py-0 md:gap-0' : ''}`}
                             title={i18n.language.startsWith('de') ? 'Switch to English' : 'Auf Deutsch umstellen'}
                         >
                             <Globe className="w-5 h-5 flex-shrink-0" />
@@ -194,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         to="/settings"
                         onClick={onCloseMobile}
                         className={({ isActive }) =>
-                            `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                            `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:w-11 md:h-11 md:mx-auto md:justify-center md:px-0 md:py-0 md:gap-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                         }
                         title={isCollapsed ? t('sidebar.settings') : ''}
                     >
@@ -207,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {isPinActive && (
                         <button
                             onClick={lockApp}
-                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all ${isCollapsed ? 'md:w-11 md:h-11 md:mx-auto md:justify-center md:px-0 md:py-0 md:gap-0' : ''}`}
                             title={i18n.language.startsWith('de') ? 'Lock screen' : 'Sperrbildschirm aktivieren'}
                         >
                             <Lock className="w-5 h-5 flex-shrink-0" />

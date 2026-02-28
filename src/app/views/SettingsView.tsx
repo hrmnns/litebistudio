@@ -14,7 +14,7 @@ import { clearSavedBackupDirectory, getSavedBackupDirectoryLabel, isBackupDirect
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
 type AppsSubTab = 'inspector' | 'sqlworkspace' | 'querybuilder' | 'reports' | 'worklist' | 'datamanagement';
-type ControlsSubTab = 'datatable' | 'notifications';
+type ControlsSubTab = 'datatable' | 'notifications' | 'sqleditor';
 
 export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -41,7 +41,6 @@ export const SettingsView: React.FC = () => {
     const [inspectorShowProfiling, setInspectorShowProfiling] = useLocalStorage<boolean>('data_inspector_show_profiling', true);
     const [inspectorExplainMode, setInspectorExplainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
     const [inspectorSqlAssistOpen, setInspectorSqlAssistOpen] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
-    const [inspectorAutocomplete, setInspectorAutocomplete] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
     const [inspectorSqlRequireLimitConfirm, setInspectorSqlRequireLimitConfirm] = useLocalStorage<boolean>('data_inspector_sql_require_limit_confirm', true);
     const [inspectorSqlMaxRows, setInspectorSqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
     const [inspectorThresholds, setInspectorThresholds] = useLocalStorage<{ nullRate: number; cardinalityRate: number }>(
@@ -71,6 +70,20 @@ export const SettingsView: React.FC = () => {
     const [tableDefaultShowFilters, setTableDefaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
     const [confirmDestructive, setConfirmDestructive] = useLocalStorage<boolean>('notifications_confirm_destructive', true);
     const [appLogLevel, setAppLogLevel] = useLocalStorage<AppLogLevel>(LOG_LEVEL_STORAGE_KEY, 'error');
+    const [sqlEditorSyntaxHighlight, setSqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
+    const [sqlEditorAutocomplete, setSqlEditorAutocomplete] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [sqlEditorAutocompleteOnTyping, setSqlEditorAutocompleteOnTyping] = useLocalStorage<boolean>('sql_editor_autocomplete_on_typing', true);
+    const [sqlEditorLineWrap, setSqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
+    const [sqlEditorLineNumbers, setSqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
+    const [sqlEditorHighlightActiveLine, setSqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', true);
+    const [sqlEditorFontSize, setSqlEditorFontSize] = useLocalStorage<number>('sql_editor_font_size', 14);
+    const [sqlEditorTabSize, setSqlEditorTabSize] = useLocalStorage<number>('sql_editor_tab_size', 4);
+    const [sqlEditorIndentWithTab, setSqlEditorIndentWithTab] = useLocalStorage<boolean>('sql_editor_indent_with_tab', true);
+    const [sqlEditorThemeIntensity, setSqlEditorThemeIntensity] = useLocalStorage<'subtle' | 'normal' | 'high'>('sql_editor_theme_intensity', 'normal');
+    const [sqlEditorUppercaseKeywords, setSqlEditorUppercaseKeywords] = useLocalStorage<boolean>('sql_editor_uppercase_keywords', false);
+    const [sqlEditorSchemaHints, setSqlEditorSchemaHints] = useLocalStorage<boolean>('sql_editor_schema_hints', true);
+    const [sqlEditorPreviewHighlighting, setSqlEditorPreviewHighlighting] = useLocalStorage<boolean>('sql_editor_preview_highlighting', true);
+    const [sqlEditorRememberHeight, setSqlEditorRememberHeight] = useLocalStorage<boolean>('sql_editor_remember_height', true);
     const [showSidebarLanguageSwitch, setShowSidebarLanguageSwitch] = useLocalStorage<boolean>('ui_sidebar_show_language_switch', true);
     const [showSidebarSystemStatus, setShowSidebarSystemStatus] = useLocalStorage<boolean>('ui_sidebar_show_system_status', true);
     React.useEffect(() => {
@@ -282,6 +295,7 @@ export const SettingsView: React.FC = () => {
                         <div className="flex items-center overflow-x-auto">
                             {[
                                 { id: 'datatable', label: t('settings.tab_datatable') },
+                                { id: 'sqleditor', label: t('settings.tab_sql_editor', 'SQL Editor') },
                                 { id: 'notifications', label: t('settings.tab_notifications') }
                             ].map((tab) => (
                                 <button
@@ -617,15 +631,11 @@ export const SettingsView: React.FC = () => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_autocomplete')}</span>
-                                    <input type="checkbox" className="h-4 w-4" checked={inspectorAutocomplete} onChange={() => setInspectorAutocomplete(!inspectorAutocomplete)} />
-                                </label>
-                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
                                     <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_explain')}</span>
                                     <input type="checkbox" className="h-4 w-4" checked={inspectorExplainMode} onChange={() => setInspectorExplainMode(!inspectorExplainMode)} />
                                 </label>
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_assist')}</span>
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_workspace_panel_default_open', 'SQL Workspace Panel standardmaessig oeffnen')}</span>
                                     <input type="checkbox" className="h-4 w-4" checked={inspectorSqlAssistOpen} onChange={() => setInspectorSqlAssistOpen(!inspectorSqlAssistOpen)} />
                                 </label>
                             </div>
@@ -655,6 +665,23 @@ export const SettingsView: React.FC = () => {
                                         className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.sql_editor_title', 'SQL Editor')}</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    {t('settings.sql_workspace_sql_editor_link_hint', 'Weitere Editor-Optionen wie Zeilenumbruch, Zeilennummern, Theme-Intensitaet und Vorschau-Highlighting findest du unter Controls > SQL Editor.')}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveTab('controls');
+                                        setControlsSubTab('sqleditor');
+                                    }}
+                                    className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                >
+                                    {t('settings.sql_workspace_open_sql_editor_controls', 'SQL Editor Einstellungen oeffnen')}
+                                </button>
                             </div>
 
                             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
@@ -1021,6 +1048,108 @@ export const SettingsView: React.FC = () => {
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.datatable_default_filters')}</span>
                                 <input type="checkbox" className="h-4 w-4" checked={tableDefaultShowFilters} onChange={() => setTableDefaultShowFilters(!tableDefaultShowFilters)} />
                             </label>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'controls' && controlsSubTab === 'sqleditor' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">{t('settings.sql_editor_title', 'SQL Editor')}</h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.sql_editor_hint', 'Global settings for CodeMirror in SQL Workspace and SQL preview panels.')}</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_syntax', 'Syntax highlighting')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorSyntaxHighlight} onChange={() => setSqlEditorSyntaxHighlight(!sqlEditorSyntaxHighlight)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_autocomplete', 'Autocomplete')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorAutocomplete} onChange={() => setSqlEditorAutocomplete(!sqlEditorAutocomplete)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_autocomplete_typing', 'Autocomplete while typing')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorAutocompleteOnTyping} onChange={() => setSqlEditorAutocompleteOnTyping(!sqlEditorAutocompleteOnTyping)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_schema_hints', 'Schema hints (tables/columns)')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorSchemaHints} onChange={() => setSqlEditorSchemaHints(!sqlEditorSchemaHints)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_wrap', 'Line wrap')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorLineWrap} onChange={() => setSqlEditorLineWrap(!sqlEditorLineWrap)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_line_numbers', 'Line numbers')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorLineNumbers} onChange={() => setSqlEditorLineNumbers(!sqlEditorLineNumbers)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_active_line', 'Highlight active line')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorHighlightActiveLine} onChange={() => setSqlEditorHighlightActiveLine(!sqlEditorHighlightActiveLine)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_indent_tab', 'Indent with TAB')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorIndentWithTab} onChange={() => setSqlEditorIndentWithTab(!sqlEditorIndentWithTab)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_uppercase_keywords', 'Uppercase keywords on completion')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorUppercaseKeywords} onChange={() => setSqlEditorUppercaseKeywords(!sqlEditorUppercaseKeywords)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_preview_highlighting', 'Highlighting in read-only previews')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorPreviewHighlighting} onChange={() => setSqlEditorPreviewHighlighting(!sqlEditorPreviewHighlighting)} />
+                                </label>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.sql_editor_remember_height', 'Remember editor height')}</span>
+                                    <input type="checkbox" className="h-4 w-4" checked={sqlEditorRememberHeight} onChange={() => setSqlEditorRememberHeight(!sqlEditorRememberHeight)} />
+                                </label>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <label className="space-y-1">
+                                    <span className="text-xs text-slate-500">{t('settings.sql_editor_font_size', 'Font size')}</span>
+                                    <select
+                                        value={String(sqlEditorFontSize)}
+                                        onChange={(e) => setSqlEditorFontSize(Math.max(12, Math.min(15, Number(e.target.value) || 14)))}
+                                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                    >
+                                        {[12, 13, 14, 15].map(size => <option key={size} value={size}>{size}px</option>)}
+                                    </select>
+                                </label>
+                                <label className="space-y-1">
+                                    <span className="text-xs text-slate-500">{t('settings.sql_editor_tab_size', 'Tab width')}</span>
+                                    <select
+                                        value={String(sqlEditorTabSize)}
+                                        onChange={(e) => setSqlEditorTabSize([2, 4].includes(Number(e.target.value)) ? Number(e.target.value) : 4)}
+                                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                    >
+                                        {[2, 4].map(size => <option key={size} value={size}>{size}</option>)}
+                                    </select>
+                                </label>
+                                <label className="space-y-1">
+                                    <span className="text-xs text-slate-500">{t('settings.sql_editor_theme_intensity', 'Theme intensity')}</span>
+                                    <select
+                                        value={sqlEditorThemeIntensity}
+                                        onChange={(e) => setSqlEditorThemeIntensity((e.target.value as 'subtle' | 'normal' | 'high') || 'normal')}
+                                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                    >
+                                        <option value="subtle">{t('settings.sql_editor_theme_subtle', 'Subtle')}</option>
+                                        <option value="normal">{t('settings.sql_editor_theme_normal', 'Normal')}</option>
+                                        <option value="high">{t('settings.sql_editor_theme_high', 'High contrast')}</option>
+                                    </select>
+                                </label>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.sql_editor_layout', 'Layout')}</p>
+                                <button
+                                    type="button"
+                                    onClick={handleResetSqlWorkspaceLayout}
+                                    className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                >
+                                    {t('settings.sql_workspace_reset_layout')}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
