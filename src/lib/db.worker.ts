@@ -85,7 +85,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 9;
+const CURRENT_SCHEMA_VERSION = 10;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -724,6 +724,104 @@ function getDatabaseHealth(): DatabaseHealthReport {
         findings.push({ severity, code, title, details, recommendation });
     };
 
+    const getTableColumns = (tableName: string): string[] => {
+        const columns: string[] = [];
+        database.exec({
+            sql: `PRAGMA table_info("${escapeIdentifier(tableName)}")`,
+            rowMode: 'object',
+            callback: (row: SqliteRow) => {
+                const name = getRowString(row, 'name');
+                if (name) columns.push(name);
+            }
+        });
+        return columns;
+    };
+
+    const hasNamedIndex = (indexName: string): boolean =>
+        Number(
+            database.selectValue(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name = ?",
+                [indexName]
+            ) || 0
+        ) > 0;
+
+    const hasIndexForColumns = (tableName: string, expectedColumns: string[], requireUnique: boolean): boolean => {
+        const indexNames: Array<{ name: string; unique: boolean }> = [];
+        database.exec({
+            sql: `PRAGMA index_list("${escapeIdentifier(tableName)}")`,
+            rowMode: 'object',
+            callback: (row: SqliteRow) => {
+                const name = getRowString(row, 'name');
+                if (!name || name.startsWith('sqlite_')) return;
+                indexNames.push({
+                    name,
+                    unique: Number(row.unique || 0) === 1
+                });
+            }
+        });
+
+        for (const idx of indexNames) {
+            if (requireUnique && !idx.unique) continue;
+            const columns: Array<{ seqno: number; name: string }> = [];
+            database.exec({
+                sql: `PRAGMA index_info("${escapeIdentifier(idx.name)}")`,
+                rowMode: 'object',
+                callback: (row: SqliteRow) => {
+                    const name = getRowString(row, 'name');
+                    if (!name) return;
+                    columns.push({
+                        seqno: Number(row.seqno || 0),
+                        name
+                    });
+                }
+            });
+            const orderedColumns = columns.sort((a, b) => a.seqno - b.seqno).map((c) => c.name);
+            if (
+                orderedColumns.length === expectedColumns.length &&
+                orderedColumns.every((columnName, index) => columnName === expectedColumns[index])
+            ) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    checksRun += 1;
+    try {
+        const schemaVersion = Number(database.selectValue('PRAGMA user_version') || 0);
+        if (schemaVersion < CURRENT_SCHEMA_VERSION) {
+            addFinding(
+                'error',
+                'schema_version_outdated',
+                'Database schema version is outdated',
+                `Current: ${schemaVersion}, expected: ${CURRENT_SCHEMA_VERSION}.`,
+                'Run migrations by reopening the app or executing maintenance routines to upgrade the schema.'
+            );
+        } else if (schemaVersion > CURRENT_SCHEMA_VERSION) {
+            addFinding(
+                'warning',
+                'schema_version_ahead',
+                'Database schema version is newer than expected',
+                `Current: ${schemaVersion}, expected: ${CURRENT_SCHEMA_VERSION}.`,
+                'Verify application and database compatibility before continuing.'
+            );
+        } else {
+            addFinding(
+                'info',
+                'schema_version_ok',
+                'Database schema version matches expected target',
+                `Schema version ${schemaVersion} is up to date.`
+            );
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'schema_version_check_error',
+            'Database schema version could not be checked',
+            getErrorMessage(err)
+        );
+    }
+
     checksRun += 1;
     try {
         const integrity = String(database.selectValue('PRAGMA integrity_check') ?? '');
@@ -813,6 +911,179 @@ function getDatabaseHealth(): DatabaseHealthReport {
             'warning',
             'system_table_check_error',
             'System table consistency could not be fully checked',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const requiredColumnsByTable: Record<string, string[]> = {
+            sys_worklist: ['priority', 'due_at'],
+            sys_user_widgets: ['sql_statement_id'],
+            sys_report_packs: ['category'],
+            sys_sql_statement: ['description', 'scope', 'tags', 'is_favorite', 'use_count', 'last_used_at']
+        };
+
+        const missingColumns: string[] = [];
+        for (const [tableName, requiredColumns] of Object.entries(requiredColumnsByTable)) {
+            const existingColumns = new Set(getTableColumns(tableName));
+            for (const requiredColumn of requiredColumns) {
+                if (!existingColumns.has(requiredColumn)) {
+                    missingColumns.push(`${tableName}.${requiredColumn}`);
+                }
+            }
+        }
+
+        const missingIndexes: string[] = [];
+        if (!hasNamedIndex('idx_sys_user_widgets_sql_statement')) {
+            missingIndexes.push('idx_sys_user_widgets_sql_statement');
+        }
+        if (!hasNamedIndex('idx_sys_sql_scope_name')) {
+            missingIndexes.push('idx_sys_sql_scope_name');
+        }
+        if (!hasNamedIndex('idx_sys_sql_last_used')) {
+            missingIndexes.push('idx_sys_sql_last_used');
+        }
+        if (!hasIndexForColumns('sys_sql_statement', ['name', 'scope'], true)) {
+            missingIndexes.push('UNIQUE sys_sql_statement(name, scope)');
+        }
+
+        if (missingColumns.length > 0 || missingIndexes.length > 0) {
+            const detailsParts: string[] = [];
+            if (missingColumns.length > 0) detailsParts.push(`Missing columns: ${missingColumns.join(', ')}`);
+            if (missingIndexes.length > 0) detailsParts.push(`Missing indexes/constraints: ${missingIndexes.join(', ')}`);
+            addFinding(
+                'error',
+                'system_schema_incomplete',
+                'System schema is incomplete for current feature set',
+                detailsParts.join(' | '),
+                'Run migrations/repair routines to restore required system columns and indexes.'
+            );
+        } else {
+            addFinding(
+                'info',
+                'system_schema_complete',
+                'System schema includes required columns and indexes',
+                'Verified key columns and index/constraint coverage for system tables.'
+            );
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'system_schema_check_error',
+            'System schema details could not be fully validated',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const orphanCount = Number(
+            database.selectValue(`
+                SELECT COUNT(*)
+                FROM sys_user_widgets w
+                LEFT JOIN sys_sql_statement s ON s.id = w.sql_statement_id
+                WHERE COALESCE(TRIM(w.sql_statement_id), '') <> ''
+                  AND s.id IS NULL
+            `) || 0
+        );
+
+        if (orphanCount > 0) {
+            const orphanSamples: string[] = [];
+            database.exec({
+                sql: `
+                    SELECT w.id AS widget_id, w.name AS widget_name, w.sql_statement_id AS statement_id
+                    FROM sys_user_widgets w
+                    LEFT JOIN sys_sql_statement s ON s.id = w.sql_statement_id
+                    WHERE COALESCE(TRIM(w.sql_statement_id), '') <> ''
+                      AND s.id IS NULL
+                    LIMIT 10
+                `,
+                rowMode: 'object',
+                callback: (row: SqliteRow) => {
+                    const widgetName = getRowString(row, 'widget_name') || getRowString(row, 'widget_id');
+                    const statementId = getRowString(row, 'statement_id');
+                    orphanSamples.push(`${widgetName} -> ${statementId}`);
+                }
+            });
+            addFinding(
+                'warning',
+                'orphan_widget_sql_references',
+                'Widgets with orphan SQL statement references detected',
+                `${orphanCount} orphan reference(s). ${orphanSamples.join(', ')}${orphanCount > orphanSamples.length ? ' ...' : ''}`,
+                'Reassign affected widgets to existing SQL statements or clear invalid sql_statement_id values.'
+            );
+        } else {
+            addFinding(
+                'info',
+                'widget_sql_references_ok',
+                'No orphan SQL statement references in widgets',
+                'All non-empty sys_user_widgets.sql_statement_id values resolve to sys_sql_statement.'
+            );
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'widget_sql_reference_check_error',
+            'Widget-to-SQL reference check could not be completed',
+            getErrorMessage(err)
+        );
+    }
+
+    checksRun += 1;
+    try {
+        const invalidStatusRows: string[] = [];
+        database.exec({
+            sql: `
+                SELECT status, COUNT(*) AS cnt
+                FROM sys_worklist
+                WHERE COALESCE(TRIM(status), '') NOT IN ('open', 'in_progress', 'done', 'closed')
+                GROUP BY status
+            `,
+            rowMode: 'object',
+            callback: (row: SqliteRow) => {
+                invalidStatusRows.push(`${String(row.status ?? '(null)')}: ${Number(row.cnt || 0)}`);
+            }
+        });
+
+        const invalidPriorityRows: string[] = [];
+        database.exec({
+            sql: `
+                SELECT priority, COUNT(*) AS cnt
+                FROM sys_worklist
+                WHERE COALESCE(TRIM(priority), '') NOT IN ('low', 'normal', 'high', 'critical')
+                GROUP BY priority
+            `,
+            rowMode: 'object',
+            callback: (row: SqliteRow) => {
+                invalidPriorityRows.push(`${String(row.priority ?? '(null)')}: ${Number(row.cnt || 0)}`);
+            }
+        });
+
+        if (invalidStatusRows.length > 0 || invalidPriorityRows.length > 0) {
+            const details: string[] = [];
+            if (invalidStatusRows.length > 0) details.push(`Invalid status values: ${invalidStatusRows.join(', ')}`);
+            if (invalidPriorityRows.length > 0) details.push(`Invalid priority values: ${invalidPriorityRows.join(', ')}`);
+            addFinding(
+                'warning',
+                'worklist_enum_inconsistencies',
+                'Worklist contains values outside expected status/priority sets',
+                details.join(' | '),
+                'Normalize sys_worklist values to known enums used by the UI.'
+            );
+        } else {
+            addFinding(
+                'info',
+                'worklist_enum_ok',
+                'Worklist status and priority values are consistent',
+                'All records match expected enum values.'
+            );
+        }
+    } catch (err: unknown) {
+        addFinding(
+            'warning',
+            'worklist_enum_check_error',
+            'Worklist status/priority validation could not be completed',
             getErrorMessage(err)
         );
     }

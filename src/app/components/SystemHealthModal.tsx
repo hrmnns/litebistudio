@@ -232,6 +232,32 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
     };
 
     const buildQuickFixSql = async (finding: HealthFinding): Promise<string[]> => {
+        if (finding.code === 'orphan_widget_sql_references') {
+            return [
+                `
+                UPDATE sys_user_widgets
+                SET sql_statement_id = NULL
+                WHERE COALESCE(TRIM(sql_statement_id), '') <> ''
+                  AND sql_statement_id NOT IN (SELECT id FROM sys_sql_statement)
+                `.trim()
+            ];
+        }
+
+        if (finding.code === 'worklist_enum_inconsistencies') {
+            return [
+                `
+                UPDATE sys_worklist
+                SET status = 'open'
+                WHERE COALESCE(TRIM(status), '') NOT IN ('open', 'in_progress', 'done', 'closed')
+                `.trim(),
+                `
+                UPDATE sys_worklist
+                SET priority = 'normal'
+                WHERE COALESCE(TRIM(priority), '') NOT IN ('low', 'normal', 'high', 'critical')
+                `.trim()
+            ];
+        }
+
         const candidates = parseQuickFixCandidates(finding);
         const statements: string[] = [];
         for (const candidate of candidates) {
@@ -252,7 +278,10 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
     };
 
     const supportsQuickFix = (finding: HealthFinding): boolean =>
-        finding.code === 'query_plan_full_scan_risk' || finding.code === 'large_unindexed_tables';
+        finding.code === 'query_plan_full_scan_risk'
+        || finding.code === 'large_unindexed_tables'
+        || finding.code === 'orphan_widget_sql_references'
+        || finding.code === 'worklist_enum_inconsistencies';
 
     const handleApplyQuickFix = async (finding: HealthFinding, key: string) => {
         try {
