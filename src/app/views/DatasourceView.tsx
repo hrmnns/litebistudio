@@ -334,9 +334,10 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
     // Filter Tables
     const isSystemTable = (name: string) => name.startsWith('sys_') || name === 'sqlite_sequence';
+    const isSystemView = (name: string) => name.startsWith('sys_');
     const userTables = tables?.filter((t: string) => !isSystemTable(t)) || [];
     const systemTables = tables?.filter((t: string) => isSystemTable(t)) || [];
-    const userViews = (dataSources || []).filter((s) => s.type === 'view' && !isSystemTable(s.name));
+    const userViews = (dataSources || []).filter((s) => s.type === 'view' && !isSystemView(s.name));
     const { data: tableMetaStats } = useAsync<Record<string, TableMetaStats>>(
         async () => {
             if (activeTab !== 'structure' || userTables.length === 0) return {};

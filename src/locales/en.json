@@ -32,6 +32,10 @@
         "done": "Done",
         "default": "Default",
         "rename": "Rename",
+        "rename_report_prompt": "New report name:",
+        "rename_report_title": "Rename report",
+        "rename_report_name_label": "Report name",
+        "rename_report_conflict_confirm": "A report named \"{{name}}\" already exists. Rename anyway?",
         "confirm_delete": "Delete this item",
         "read_only": "Read-Only",
         "open_details": "Open details",
@@ -80,6 +84,8 @@
         "new_dashboard_title": "Create new dashboard",
         "new_dashboard_placeholder": "Dashboard name (e.g., Costs for Customer X)",
         "rename": "Rename",
+        "rename_report_prompt": "New report name:",
+        "rename_report_conflict_confirm": "A report named \"{{name}}\" already exists. Rename anyway?",
         "delete_confirm": "Delete dashboard",
         "empty_msg": "\"{{name}}\" is still empty",
         "empty_hint": "Add tiles to customize this dashboard.",
@@ -195,6 +201,11 @@
         "template_nullscan": "Null Scan",
         "template_duplicates": "Find Duplicates",
         "template_outliers": "Find Outliers",
+        "template_top10_description": "Loads up to 10 sample rows from the selected source.",
+        "template_count_description": "Counts all rows in the selected source.",
+        "template_nullscan_description": "Scans the selected source for potential null-related issues.",
+        "template_duplicates_description": "Shows duplicate candidates grouped by a key column.",
+        "template_outliers_description": "Shows highest values to quickly spot outliers.",
         "recent_queries": "Recent Queries",
         "pick_recent": "Select recent query...",
         "clear_history": "Clear History",
@@ -213,6 +224,8 @@
         "clear_templates": "Clear Templates",
         "custom_template_prompt": "Template name:",
         "custom_template_prompt_update": "Template name (updates existing):",
+        "custom_template_description_prompt": "Template description (optional):",
+        "custom_template_description_prompt_update": "Template description (updates existing):",
         "rename_template_prompt": "New template name:",
         "custom_template_overwrite_confirm": "A template named \"{{name}}\" already exists. Overwrite",
         "custom_template_delete_confirm": "Delete selected custom template",
@@ -222,6 +235,8 @@
         "assistant_tab": "SQL Builder",
         "sql_manager_search_placeholder": "Search patterns...",
         "sql_manager_no_results": "No matches",
+        "active_template": "Template",
+        "no_template_description": "No description",
         "assistant_hint": "Build SQL by selecting table, columns and optional aggregation.",
         "assistant_table": "Table",
         "assistant_columns": "Columns",
@@ -393,7 +408,15 @@
         "new_with_query_hint": "Select an SQL statement from SQL Manager to create a query-based widget.",
         "new_without_query_hint": "Without a selection, clicking Next creates a new text widget without a data query.",
         "search_saved_reports": "Search saved widgets...",
+        "saved_reports_query_based": "Query-based widgets",
+        "saved_reports_non_data": "Non-data widgets",
         "no_saved_reports_filtered": "No matching widgets found.",
+        "widget_description": "Widget description",
+        "widget_description_placeholder": "Short context or note (optional)",
+        "widget_description_position": "Position",
+        "widget_description_position_top": "Top",
+        "widget_description_position_bottom": "Bottom",
+        "widget_description_hint": "The description is shown above or below the widget content.",
         "editing": "Editing: {{name}}",
         "query": "Query",
         "focus": "Focus",
@@ -1156,4 +1179,7 @@
         }
     }
 }
+
+
+
 

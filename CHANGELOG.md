@@ -100,6 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed false-positive "second instance detected" alerts by validating `MASTER_PONG` conflicts against active Web Lock ownership before switching to conflict mode.
 - Fixed lifecycle lock release handling so stale in-tab lock holders (for example after hot-reload/lifecycle transitions) no longer keep later app instances in permanent conflict state.
 - Fixed factory-reset behavior to reliably remove existing custom views (and other user/system objects) even when OPFS file deletion is not possible; reset now performs an in-place schema rebuild.
+- Fixed Datasource view listing to treat bundled core views (`kpi_history`, `latest_kpis`, `data_summary_view`, `view_anomalies`) as system views, so they are not shown as user-created views after factory reset.
+- Removed legacy bundled demo views from `views.sql` (old data model remnants) and added DB migration `V12` to drop these views in existing installations.
 
 ## [1.2.0] - 2026-02-27
 

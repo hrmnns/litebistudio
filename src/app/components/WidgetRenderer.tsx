@@ -132,6 +132,16 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
             render: (item: DbRow) => formatValue(item[key], key)
         }));
     }, [results]);
+    const widgetDescription = (config.widgetDescription || '').trim();
+    const widgetDescriptionPosition: 'top' | 'bottom' = config.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
+    const renderWidgetDescription = (position: 'top' | 'bottom') => {
+        if (!widgetDescription || widgetDescriptionPosition !== position) return null;
+        return (
+            <div className="px-5 py-2.5 text-[11px] text-slate-600 dark:text-slate-300 bg-slate-50/70 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-800/60">
+                {widgetDescription}
+            </div>
+        );
+    };
 
     const textSizeClass = {
         sm: 'text-sm',
@@ -155,6 +165,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         </div>
                     </div>
                 </div>
+                {renderWidgetDescription('top')}
                 <div
                     className={`flex-1 p-4 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 ${
                         textSizeClass[config.textSize || 'md']
@@ -164,6 +175,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                 >
                     {(config.textContent || '').trim() || t('querybuilder.text_placeholder')}
                 </div>
+                {renderWidgetDescription('bottom')}
             </div>
         );
     }
@@ -182,6 +194,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         </div>
                     </div>
                 </div>
+                {renderWidgetDescription('top')}
                 <div className="flex-1 p-4 overflow-auto text-slate-800 dark:text-slate-100">
                     <MarkdownContent
                         markdown={(config.markdownContent || '').trim()}
@@ -189,6 +202,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         className="text-sm leading-6"
                     />
                 </div>
+                {renderWidgetDescription('bottom')}
             </div>
         );
     }
@@ -215,6 +229,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         </div>
                     </div>
                 </div>
+                {renderWidgetDescription('top')}
                 <div className="flex-1 p-4 flex items-center justify-center">
                     <div className={`w-full rounded-xl ring-1 ${styles.ring} p-5`}>
                         <div className="flex items-center gap-3">
@@ -233,6 +248,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         </p>
                     </div>
                 </div>
+                {renderWidgetDescription('bottom')}
             </div>
         );
     }
@@ -254,6 +270,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         </div>
                     </div>
                 </div>
+                {renderWidgetDescription('top')}
                 <div className="flex-1 p-5 flex flex-col justify-center">
                     <div className={`w-full ${alignClass}`}>
                         <h2 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">
@@ -275,6 +292,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         )}
                     </div>
                 </div>
+                {renderWidgetDescription('bottom')}
             </div>
         );
     }
@@ -332,6 +350,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         </div>
                     </div>
                 </div>
+                {renderWidgetDescription('top')}
                 <div className="flex-1 p-5 flex items-center justify-center">
                     <div className={`w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 ${alignTextClass}`}>
                         <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -369,6 +388,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         )}
                     </div>
                 </div>
+                {renderWidgetDescription('bottom')}
             </div>
         );
     }
@@ -390,6 +410,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         </div>
                     </div>
                 </div>
+                {renderWidgetDescription('top')}
                 <div className="flex-1 p-5">
                     <div className={`h-full w-full flex flex-col ${alignClass} justify-center`}>
                         {imageUrl && !imageLoadFailed ? (
@@ -425,6 +446,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         )}
                     </div>
                 </div>
+                {renderWidgetDescription('bottom')}
             </div>
         );
     }
@@ -480,6 +502,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                     </button>
                 )}
             </div>
+            {renderWidgetDescription('top')}
             <div className="flex-1 min-h-0 p-2">
                 {config.type === 'table' ? (
                     <div className="h-full overflow-auto">
@@ -503,11 +526,34 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                 ) : config.type === 'kpi' ? (
                     <div className="h-full flex flex-col items-center justify-center p-4">
                         {results && results.length > 0 ? (() => {
-                            const val = results[0][Object.keys(results[0])[0]];
-                            const numVal = Number(val);
+                            const firstRow = results[0];
+                            const rowKeys = Object.keys(firstRow);
+                            const preferredMetricKey = (config.yAxes || [])[0] || config.yAxis || '';
+                            const metricKey = rowKeys.includes(preferredMetricKey)
+                                ? preferredMetricKey
+                                : (rowKeys.find((key) => {
+                                    const raw = firstRow[key];
+                                    if (typeof raw === 'number') return Number.isFinite(raw);
+                                    if (typeof raw === 'string') {
+                                        const normalized = raw.replace(/\s+/g, '').replace(',', '.');
+                                        return Number.isFinite(Number(normalized));
+                                    }
+                                    return false;
+                                }) || rowKeys[0]);
+                            const val = firstRow[metricKey];
+                            const parseNumericValue = (raw: unknown): number => {
+                                if (typeof raw === 'number') return raw;
+                                if (typeof raw === 'string') {
+                                    const normalized = raw.replace(/\s+/g, '').replace(',', '.');
+                                    return Number(normalized);
+                                }
+                                return Number.NaN;
+                            };
+                            const numVal = parseNumericValue(val);
 
                             // Evaluate rules
                             let displayColor = 'text-slate-900 dark:text-white';
+                            let displayStyle: React.CSSProperties | undefined;
                             if (config.rules && !isNaN(numVal)) {
                                 for (const rule of config.rules) {
                                     let match = false;
@@ -524,7 +570,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                                         else if (rule.color === 'red') displayColor = 'text-rose-500';
                                         else if (rule.color === 'yellow') displayColor = 'text-amber-500';
                                         else if (rule.color === 'blue') displayColor = 'text-blue-500';
-                                        else displayColor = `text-[${rule.color}]`; // Fallback for HEX if supported by tailwind or via style
+                                        else displayStyle = { color: rule.color };
                                         break;
                                     }
                                 }
@@ -532,10 +578,15 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
 
                             return (
                                 <div className="flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
-                                    <div className={`text-4xl md:text-5xl lg:text-6xl font-black tracking-widest break-all transition-colors duration-300 ${displayColor}`}>
-                                        {formatValue(val, Object.keys(results[0])[0])}
+                                    <div className="flex items-end gap-2">
+                                        <div className={`text-4xl md:text-5xl lg:text-6xl font-black tracking-widest break-all transition-colors duration-300 ${displayColor}`} style={displayStyle}>
+                                            {formatValue(val, metricKey)}
+                                        </div>
+                                        {(config.kpiUnit || '').trim() && (
+                                            <div className="pb-1 text-base md:text-lg font-bold text-slate-500 dark:text-slate-400">{config.kpiUnit}</div>
+                                        )}
                                     </div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-3">{Object.keys(results[0])[0]}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-3">{metricKey}</div>
                                 </div>
                             );
                         })() : (
@@ -675,6 +726,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                     </ResponsiveContainer>
                 )}
             </div>
+            {renderWidgetDescription('bottom')}
 
             {results && results.length > 0 && (
                 <RecordDetailModal
@@ -684,7 +736,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                     initialIndex={selectedItemIndex}
                     title={title}
                     schema={dynamicSchema || undefined}
-                    tableName={sql.match(/FROM\s+([a-zA-Z0-9_]+)/i)?.[1]}
+                    tableName={undefined}
                 />
             )}
         </div>

@@ -90,6 +90,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
     const [sqlLibrarySearch, setSqlLibrarySearch] = useState('');
     const [lastSavedSqlTemplateName, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
+    const [lastSavedSqlTemplateDescription, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('data_inspector_last_saved_sql_template_description', '');
+    const [loadedSqlTemplateMeta, setLoadedSqlTemplateMeta] = useState<{ name: string; description: string }>({ name: '', description: '' });
     const [sqlAssistTab, setSqlAssistTab] = useState<'manager' | 'assistant'>('manager');
     const [showTableTools, setShowTableTools] = useLocalStorage<boolean>('data_inspector_table_tools_open', false);
     const [tableToolsTab, setTableToolsTab] = useLocalStorage<'columns' | 'filters' | 'actions'>(
@@ -156,6 +158,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [autocompletePosition, setAutocompletePosition] = useState({ top: 12, left: 12, width: 320 });
     const indexSuggestionCacheRef = useRef<Map<string, IndexSuggestion[]>>(new Map());
     const indexSuggestionRunRef = useRef(0);
+    const hasAutoRestoredLastSelectRef = useRef(false);
 
     type SuggestionType = 'keyword' | 'table' | 'column';
     interface SqlSuggestion {
@@ -235,7 +238,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
     useEffect(() => {
         if (fixedMode !== 'sql') return;
-        if (inputSql.trim()) return;
+        if (hasAutoRestoredLastSelectRef.current) return;
+        if (inputSql.trim()) {
+            hasAutoRestoredLastSelectRef.current = true;
+            return;
+        }
+        hasAutoRestoredLastSelectRef.current = true;
         const lastSelectSql = localStorage.getItem(INSPECTOR_LAST_SELECT_SQL_KEY);
         if (!lastSelectSql || !/^\s*SELECT\b/i.test(lastSelectSql)) return;
         setInputSql(lastSelectSql);
@@ -455,6 +463,18 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const handleRunSql = async () => {
         await executeSqlText(inputSql);
     };
+    const handleClearSqlWorkspace = useCallback(() => {
+        setInputSql('');
+        setSqlCursor(0);
+        setSqlExecutionSql('');
+        setSqlLimitNotice('');
+        setSqlOutputView('result');
+        setExplainRows([]);
+        setExplainError('');
+        setExplainLoading(false);
+        setLoadedSqlTemplateMeta({ name: '', description: '' });
+        localStorage.removeItem(INSPECTOR_LAST_SELECT_SQL_KEY);
+    }, []);
 
     const handleCancelSql = async () => {
         const cancelled = await SystemRepository.abortActiveQueries();
@@ -512,12 +532,25 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         const matchingStatement = sqlStatements.find(
             stmt => stmt.scope === SQL_LIBRARY_SCOPE && normalizeSql(stmt.sql_text) === normalized
         );
-        const suggestedName = matchingStatement?.name || lastSavedSqlTemplateName || `${selectedTable || 'Query'} Template`;
+        const suggestedName = matchingStatement?.name || loadedSqlTemplateMeta.name || lastSavedSqlTemplateName || `${selectedTable || 'Query'} Template`;
+        const suggestedDescription = matchingStatement?.description || loadedSqlTemplateMeta.description || lastSavedSqlTemplateDescription || '';
         const promptLabel = matchingStatement
             ? t('datainspector.custom_template_prompt_update', 'Template name (updates existing):')
             : t('datainspector.custom_template_prompt');
-        const name = (await appDialog.prompt(promptLabel, { defaultValue: suggestedName }))?.trim();
+        const descriptionPromptLabel = matchingStatement
+            ? t('datainspector.custom_template_description_prompt_update', 'Template description (updates existing):')
+            : t('datainspector.custom_template_description_prompt', 'Template description (optional):');
+        const prompted = await appDialog.prompt2(promptLabel, descriptionPromptLabel, {
+            title: matchingStatement
+                ? t('datainspector.rename_template', 'Rename Template')
+                : t('datainspector.save_template', 'Save Template'),
+            defaultValue: suggestedName,
+            secondDefaultValue: suggestedDescription
+        });
+        if (!prompted) return;
+        const name = prompted.value.trim();
         if (!name) return;
+        const description = prompted.secondValue.trim();
 
         const existingByName = sqlStatements.find(
             tpl => tpl.name.toLowerCase() === name.toLowerCase() && tpl.scope === SQL_LIBRARY_SCOPE
@@ -536,10 +569,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             id: targetId,
             name,
             sql_text: trimmedSql,
+            description,
             scope: SQL_LIBRARY_SCOPE,
             is_favorite: targetFavorite
         });
         setLastSavedSqlTemplateName(name);
+        setLastSavedSqlTemplateDescription(description);
         await loadSqlStatements();
     };
 
@@ -1112,6 +1147,15 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         () => sqlStatements.filter(stmt => Number(stmt.is_favorite) === 1).length,
         [sqlStatements]
     );
+    const activeSqlTemplateMeta = React.useMemo(() => {
+        if (currentSqlStatement) {
+            return {
+                name: currentSqlStatement.name,
+                description: (currentSqlStatement.description || '').trim()
+            };
+        }
+        return loadedSqlTemplateMeta;
+    }, [currentSqlStatement, loadedSqlTemplateMeta]);
 
     const applySqlStatement = useCallback(async (statement: SqlStatementRecord, runImmediately: boolean) => {
         if (fixedMode === 'table') {
@@ -1121,6 +1165,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setMode('sql');
         setInputSql(statement.sql_text);
         setSqlCursor(statement.sql_text.length);
+        setLoadedSqlTemplateMeta({
+            name: statement.name,
+            description: (statement.description || '').trim()
+        });
         setSqlOutputView('result');
         setShowSqlAssist(false);
         await SystemRepository.markSqlStatementUsed(statement.id);
@@ -1130,7 +1178,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         await loadSqlStatements();
     }, [executeSqlText, fixedMode, forwardSqlToWorkspace, loadSqlStatements, setShowSqlAssist]);
 
-    const applySqlTemplate = useCallback(async (sql: string, runImmediately: boolean) => {
+    const applySqlTemplate = useCallback(async (sql: string, runImmediately: boolean, templateName?: string, templateDescription?: string) => {
         if (fixedMode === 'table') {
             forwardSqlToWorkspace(sql);
             return;
@@ -1138,6 +1186,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setMode('sql');
         setInputSql(sql);
         setSqlCursor(sql.length);
+        setLoadedSqlTemplateMeta({
+            name: (templateName || '').trim(),
+            description: (templateDescription || '').trim()
+        });
         setSqlOutputView('result');
         setShowSqlAssist(false);
         if (runImmediately) {
@@ -1165,8 +1217,21 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     }, [loadSqlStatements, t]);
 
     const handleRenameSqlStatement = useCallback(async (statement: SqlStatementRecord) => {
-        const nextName = (await appDialog.prompt(t('datainspector.rename_template_prompt'), { defaultValue: statement.name }))?.trim();
-        if (!nextName || nextName === statement.name) return;
+        const prompted = await appDialog.prompt2(
+            t('datainspector.rename_template_prompt'),
+            t('common.description', 'Description'),
+            {
+                title: t('datainspector.rename_template'),
+                defaultValue: statement.name,
+                secondDefaultValue: statement.description || '',
+                secondPlaceholder: t('datainspector.custom_template_description_prompt', 'Template description (optional):')
+            }
+        );
+        if (!prompted) return;
+        const nextName = prompted.value.trim();
+        const nextDescription = prompted.secondValue.trim();
+        if (!nextName) return;
+        if (nextName === statement.name && nextDescription === (statement.description || '').trim()) return;
         const conflicting = sqlStatements.find(
             stmt => stmt.id !== statement.id && stmt.name.toLowerCase() === nextName.toLowerCase() && stmt.scope === statement.scope
         );
@@ -1178,7 +1243,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             id: statement.id,
             name: nextName,
             sql_text: statement.sql_text,
-            description: statement.description,
+            description: nextDescription,
             scope: statement.scope,
             tags: statement.tags,
             is_favorite: Number(statement.is_favorite) === 1
@@ -2037,7 +2102,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         <div className="flex flex-wrap gap-1">
                                             <button
                                                 type="button"
-                                                onClick={() => { void applySqlTemplate(template.sql, false); }}
+                                                onClick={() => { void applySqlTemplate(template.sql, false, t(`datainspector.template_${template.key}`), t(`datainspector.template_${template.key}_description`, '')); }}
                                                 className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                                 title={t('common.open', 'Open')}
                                                 aria-label={t('common.open', 'Open')}
@@ -2046,7 +2111,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { void applySqlTemplate(template.sql, true); }}
+                                                onClick={() => { void applySqlTemplate(template.sql, true, t(`datainspector.template_${template.key}`), t(`datainspector.template_${template.key}_description`, '')); }}
                                                 className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                                                 title={t('datainspector.run_sql')}
                                                 aria-label={t('datainspector.run_sql')}
@@ -2757,7 +2822,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                         )}
                         <div className="absolute bottom-4 right-4 flex gap-2">
                             <button
-                                onClick={() => setInputSql('')}
+                                onClick={handleClearSqlWorkspace}
                                 className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                             >
                                 {t('datainspector.clear_sql')}
@@ -2825,24 +2890,38 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             {sqlLimitNotice}
                         </div>
                     )}
-                    <div className="px-3 py-2 text-[11px] rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400">
-                        {t('datainspector.sql_assist', 'SQL Workspace')}:
-                        {' '}
-                        {sqlTemplates.length}
-                        {' '}
-                        {t('datainspector.templates')}
-                        {' '}
-                        |
-                        {' '}
-                        {favoriteSqlStatementCount}
-                        {' '}
-                        {t('datainspector.favorite_queries')}
-                        {' '}
-                        |
-                        {' '}
-                        {sqlStatements.length}
-                        {' '}
-                        {t('datainspector.custom_templates')}
+                    <div className="px-3 py-2 text-[11px] rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="min-w-0 inline-flex items-center gap-1 text-left">
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">
+                                {t('datainspector.active_template', 'Template')}
+                                :
+                            </span>
+                            {activeSqlTemplateMeta.name ? (
+                                <>
+                                    <span className="font-medium text-slate-700 dark:text-slate-200">
+                                        {activeSqlTemplateMeta.name}
+                                    </span>
+                                    <span
+                                        className="truncate max-w-[22rem] text-slate-500 dark:text-slate-400"
+                                        title={activeSqlTemplateMeta.description || t('datainspector.no_template_description', 'No description')}
+                                    >
+                                        {activeSqlTemplateMeta.description
+                                            ? `(${activeSqlTemplateMeta.description})`
+                                            : `(${t('datainspector.no_template_description', 'No description')})`}
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="text-slate-400 dark:text-slate-500">-</span>
+                            )}
+                        </div>
+                        <div className="inline-flex items-center gap-1 whitespace-nowrap ml-auto text-right">
+                            <span>{t('datainspector.sql_assist', 'SQL Workspace')}:</span>
+                            <span>{sqlTemplates.length} {t('datainspector.templates')}</span>
+                            <span>|</span>
+                            <span>{favoriteSqlStatementCount} {t('datainspector.favorite_queries')}</span>
+                            <span>|</span>
+                            <span>{sqlStatements.length} {t('datainspector.custom_templates')}</span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -3266,7 +3345,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 items={items || []}
                 initialIndex={items && selectedItem ? Math.max(0, items.indexOf(selectedItem)) : 0}
                 title={t('common.details')}
-                tableName={selectedTable}
+                tableName={mode === 'table' ? selectedTable : undefined}
                 schema={undefined}
             />
 

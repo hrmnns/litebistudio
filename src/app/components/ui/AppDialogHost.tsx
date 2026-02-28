@@ -12,18 +12,21 @@ export const AppDialogHost: React.FC = () => {
     const { t } = useTranslation();
     const [active, setActive] = React.useState<ActiveDialog | null>(null);
     const [inputValue, setInputValue] = React.useState('');
+    const [inputValueSecond, setInputValueSecond] = React.useState('');
 
     React.useEffect(() => {
         return registerDialogPresenter((request) => new Promise<AppDialogResponse>((resolve) => {
             setInputValue(request.defaultValue || '');
+            setInputValueSecond(request.secondDefaultValue || '');
             setActive({ ...request, resolve });
         }));
     }, []);
 
     if (!active) return null;
+    const isPrompt2 = active.kind === 'prompt2';
 
     const onCancel = () => {
-        if (active.kind === 'prompt') {
+        if (active.kind === 'prompt' || active.kind === 'prompt2') {
             active.resolve({ confirmed: false, value: undefined });
         } else if (active.kind === 'confirm') {
             active.resolve({ confirmed: false });
@@ -36,6 +39,8 @@ export const AppDialogHost: React.FC = () => {
     const onConfirm = () => {
         if (active.kind === 'prompt') {
             active.resolve({ confirmed: true, value: inputValue });
+        } else if (active.kind === 'prompt2') {
+            active.resolve({ confirmed: true, value: inputValue, secondValue: inputValueSecond });
         } else {
             active.resolve({ confirmed: true });
         }
@@ -51,6 +56,8 @@ export const AppDialogHost: React.FC = () => {
                 : active.kind === 'confirm'
                     ? t('common.confirm_title')
                     : active.kind === 'prompt'
+                        ? t('common.input', 'Input')
+                        : active.kind === 'prompt2'
                         ? t('common.input', 'Input')
                         : t('common.info', 'Information'));
 
@@ -70,44 +77,76 @@ export const AppDialogHost: React.FC = () => {
 
     return (
         <Modal isOpen={true} onClose={onCancel} title={title} variant="dialog" noScroll>
-            <div className="flex h-full min-h-[170px] flex-col">
-                <div className="flex-1 p-5">
-                    <div className="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-y-4">
-                        <div className="flex justify-center pt-0.5">
-                            <span className={`inline-flex h-12 w-12 items-center justify-center rounded-full ring-1 ${iconColors}`}>
-                                <Icon className="w-6 h-6" />
-                            </span>
-                        </div>
+            <div className={`flex h-full ${isPrompt2 ? 'min-h-[120px]' : 'min-h-[170px]'} flex-col`}>
+                <div className={`flex-1 ${isPrompt2 ? 'p-4' : 'p-5'}`}>
+                    {!isPrompt2 ? (
+                        <div className="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-y-4">
+                            <div className="flex justify-center pt-0.5">
+                                <span className={`inline-flex h-12 w-12 items-center justify-center rounded-full ring-1 ${iconColors}`}>
+                                    <Icon className="w-6 h-6" />
+                                </span>
+                            </div>
 
-                        <div className="pt-0.5 pl-[5px]">
-                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</div>
-                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{active.message}</p>
-                        </div>
+                            <div className="pt-0.5 pl-[5px]">
+                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</div>
+                                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{active.message}</p>
+                            </div>
 
-                        {active.kind === 'prompt' && (
-                            <>
-                                <div />
-                                <div className="pl-[5px]">
-                                    <input
-                                        autoFocus
-                                        value={inputValue}
-                                        onChange={(e) => setInputValue(e.target.value)}
-                                        placeholder={active.placeholder}
-                                        className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-300"
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') onConfirm();
-                                            if (e.key === 'Escape') onCancel();
-                                        }}
-                                    />
-                                </div>
-                            </>
-                        )}
-                    </div>
+                            {active.kind === 'prompt' && (
+                                <>
+                                    <div />
+                                    <div className="pl-[5px] space-y-2">
+                                        <input
+                                            autoFocus
+                                            value={inputValue}
+                                            onChange={(e) => setInputValue(e.target.value)}
+                                            placeholder={active.placeholder}
+                                            className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-300"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') onConfirm();
+                                                if (e.key === 'Escape') onCancel();
+                                            }}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                {active.message}
+                            </div>
+                            <input
+                                autoFocus
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                placeholder={active.placeholder}
+                                className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-300"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') onConfirm();
+                                    if (e.key === 'Escape') onCancel();
+                                }}
+                            />
+                            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                {active.secondMessage || ''}
+                            </div>
+                            <input
+                                value={inputValueSecond}
+                                onChange={(e) => setInputValueSecond(e.target.value)}
+                                placeholder={active.secondPlaceholder}
+                                className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-300"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') onConfirm();
+                                    if (e.key === 'Escape') onCancel();
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-auto border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-3">
                     <div className="flex justify-end gap-2">
-                        {(active.kind === 'confirm' || active.kind === 'prompt') && (
+                        {(active.kind === 'confirm' || active.kind === 'prompt' || active.kind === 'prompt2') && (
                             <button
                                 type="button"
                                 onClick={onCancel}

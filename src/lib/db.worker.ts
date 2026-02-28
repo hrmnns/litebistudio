@@ -86,7 +86,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 11;
+const CURRENT_SCHEMA_VERSION = 12;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -375,6 +375,23 @@ function applyMigrations(databaseInstance: DatabaseLike) {
         }
         databaseInstance.exec('PRAGMA user_version = 11');
         userVersion = 11;
+    }
+
+    // Version 12: Migration: Remove legacy KPI/demo views from old data model
+    if (userVersion < 12) {
+        log('Migration V12: Removing legacy views from old data model...');
+        try {
+            databaseInstance.exec(`
+                DROP VIEW IF EXISTS kpi_history;
+                DROP VIEW IF EXISTS latest_kpis;
+                DROP VIEW IF EXISTS data_summary_view;
+                DROP VIEW IF EXISTS view_anomalies;
+            `);
+        } catch (e) {
+            error('Migration failed for V12', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 12');
+        userVersion = 12;
     }
 
     log(`Database migrated to version ${userVersion}`);

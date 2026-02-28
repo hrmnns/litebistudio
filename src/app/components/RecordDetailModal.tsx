@@ -59,6 +59,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
 
     // Get table name context
     const activeTable = tableName || 'unknown';
+    const canResolveSourceRecord = Boolean(tableName && tableName !== 'unknown');
 
     const initializedRef = React.useRef(false);
 
@@ -159,7 +160,19 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         const checkStatus = async () => {
             const currentItem = items[currentIndex];
             if (currentItem) {
+                if (!canResolveSourceRecord) {
+                    setRecordExists(null);
+                    setIsInWorklist(false);
+                    setWorklistItem(null);
+                    return;
+                }
                 const recordId = await getRecordIdValueAsync(currentItem);
+                if (recordId === null) {
+                    setRecordExists(null);
+                    setIsInWorklist(false);
+                    setWorklistItem(null);
+                    return;
+                }
                 const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId ?? '');
                 setIsInWorklist(metadata.isInWorklist);
                 setWorklistItem(metadata.worklistItem as WorklistItemState | null);
@@ -173,10 +186,11 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         if (isOpen) {
             void checkStatus();
         }
-    }, [isOpen, currentIndex, items, activeTable, getRecordIdValueAsync]);
+    }, [isOpen, currentIndex, items, activeTable, canResolveSourceRecord, getRecordIdValueAsync]);
 
     const handleToggleWorklist = async () => {
         if (isActionLoading) return;
+        if (!canResolveSourceRecord) return;
         const currentItem = items[currentIndex];
         const recordId = await getRecordIdValueAsync(currentItem);
 
@@ -375,23 +389,27 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                     <Info className="w-4 h-4" />
                                 </button>
                             )}
-                            <button
-                                onClick={handleToggleWorklist}
-                                disabled={isActionLoading}
-                                className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${isActionLoading ? 'opacity-50 cursor-not-allowed' : ''} ${isInWorklist
-                                    ? 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
-                                    : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
-                                    }`}
-                                title={isInWorklist ? t('record_detail.remove_worklist') : t('record_detail.add_worklist')}
-                            >
-                                {isActionLoading ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Bookmark className={`w-4 h-4 ${isInWorklist ? 'fill-current' : ''}`} />
-                                )}
-                            </button>
+                            {canResolveSourceRecord && (
+                                <>
+                                    <button
+                                        onClick={handleToggleWorklist}
+                                        disabled={isActionLoading}
+                                        className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${isActionLoading ? 'opacity-50 cursor-not-allowed' : ''} ${isInWorklist
+                                            ? 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
+                                            : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
+                                            }`}
+                                        title={isInWorklist ? t('record_detail.remove_worklist') : t('record_detail.add_worklist')}
+                                    >
+                                        {isActionLoading ? (
+                                            <RefreshCw className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Bookmark className={`w-4 h-4 ${isInWorklist ? 'fill-current' : ''}`} />
+                                        )}
+                                    </button>
 
-                            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
+                                    <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
+                                </>
+                            )}
 
                             <button
                                 onClick={handleToggleReference}

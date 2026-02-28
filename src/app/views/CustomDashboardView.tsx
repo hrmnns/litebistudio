@@ -54,8 +54,11 @@ interface DashboardDef {
 interface CustomWidgetRecord extends DbRow {
     id: string;
     name: string;
+    description?: string | null;
+    sql_statement_id?: string | null;
     sql_query: string;
     visualization_config: string;
+    visual_builder_config?: string | null;
 }
 
 interface DashboardSortableItemProps {
@@ -307,6 +310,62 @@ export const CustomDashboardView: React.FC = () => {
             refreshCustomWidgets();
             removeFromDashboard(id);
         }
+    };
+    const renameCustomWidget = async (widget: CustomWidgetRecord) => {
+        const currentName = (widget.name || '').trim();
+        const parsedConfigForDescription = (() => {
+            if (typeof widget.visualization_config !== 'string') return null;
+            try {
+                return JSON.parse(widget.visualization_config) as { widgetDescription?: string };
+            } catch {
+                return null;
+            }
+        })();
+        const currentDescription = (widget.description || '').trim()
+            || (parsedConfigForDescription?.widgetDescription || '').trim();
+        const prompted = await appDialog.prompt2(
+            t('dashboard.rename_report_name_label', 'Name des Berichts'),
+            t('common.description', 'Description'),
+            {
+                title: t('dashboard.rename_report_title', 'Bericht umbenennen'),
+                defaultValue: currentName,
+                secondDefaultValue: currentDescription,
+                secondPlaceholder: t('querybuilder.widget_description_placeholder', 'Kurze Einordnung oder Kontext (optional)')
+            }
+        );
+        if (!prompted) return;
+        const nextName = prompted.value.trim();
+        const nextDescription = prompted.secondValue.trim();
+        if (!nextName || nextName === currentName) return;
+        const conflicting = (customWidgets || []).find((entry) =>
+            entry.id !== widget.id && (entry.name || '').trim().toLowerCase() === nextName.toLowerCase()
+        );
+        if (conflicting) {
+            const overwrite = await appDialog.confirm(
+                t('dashboard.rename_report_conflict_confirm', 'Ein Bericht mit dem Namen "{{name}}" existiert bereits. Trotzdem umbenennen?', { name: nextName })
+            );
+            if (!overwrite) return;
+        }
+
+        const parseJsonMaybe = (raw: unknown, fallback: unknown) => {
+            if (typeof raw !== 'string') return raw ?? fallback;
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return fallback;
+            }
+        };
+
+        await SystemRepository.saveUserWidget({
+            id: widget.id,
+            name: nextName,
+            description: nextDescription,
+            sql_statement_id: widget.sql_statement_id || null,
+            sql_query: widget.sql_query || '',
+            visualization_config: parseJsonMaybe(widget.visualization_config, {}),
+            visual_builder_config: parseJsonMaybe(widget.visual_builder_config, null)
+        });
+        refreshCustomWidgets();
     };
 
     const createDashboard = async () => {
@@ -897,6 +956,17 @@ export const CustomDashboardView: React.FC = () => {
                         <div className="grid grid-cols-1 gap-2">
                             {customWidgets && customWidgets.length > 0 ? customWidgets.map(w => {
                                 const isAdded = activeDashboard?.layout.some(dw => dw.id === w.id);
+                                const widgetDescription = (() => {
+                                    const direct = (typeof w.description === 'string' ? w.description : '').trim();
+                                    if (direct) return direct;
+                                    if (typeof w.visualization_config !== 'string') return '';
+                                    try {
+                                        const parsed = JSON.parse(w.visualization_config) as { widgetDescription?: string };
+                                        return (parsed.widgetDescription || '').trim();
+                                    } catch {
+                                        return '';
+                                    }
+                                })();
                                 return (
                                     <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                         <div className="flex items-center gap-3">
@@ -905,10 +975,22 @@ export const CustomDashboardView: React.FC = () => {
                                             </div>
                                             <div>
                                                 <div className="font-bold text-slate-700 dark:text-slate-100">{w.name}</div>
-                                                <div className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[200px]">{w.sql_query}</div>
+                                                <div
+                                                    className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[260px]"
+                                                    title={widgetDescription || w.sql_query}
+                                                >
+                                                    {widgetDescription || w.sql_query}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
+                                            <button
+                                                onClick={() => { void renameCustomWidget(w); }}
+                                                className="p-2 text-slate-400 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-300"
+                                                title={t('common.rename')}
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
                                             <button
                                                 onClick={() => deleteCustomWidget(w.id)}
                                                 className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300"

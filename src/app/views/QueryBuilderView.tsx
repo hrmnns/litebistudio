@@ -5,11 +5,10 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
     Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
     Layout, Maximize2, Minimize2, Folder, Trash2, Gauge, Image as ImageIcon,
-    Edit3, X, Download, Check, Search, FileCode2
+    Edit3, X, Download, Search, FileCode2
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { DataTable } from '../../components/ui/DataTable';
-import { Modal } from '../components/Modal';
 import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -36,10 +35,32 @@ const DEFAULT_SQL = '';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const logger = createLogger('QueryBuilderView');
+const CONTENT_VIS_TYPES = new Set<VisualizationType>(['text', 'markdown', 'status', 'section', 'kpi_manual', 'image']);
+const QUERY_VIS_OPTIONS: Array<{ id: VisualizationType; icon: React.ComponentType<{ className?: string }>; labelKey: string; fallback: string }> = [
+    { id: 'table', icon: TableIcon, labelKey: 'querybuilder.table', fallback: 'Table' },
+    { id: 'bar', icon: BarChart2, labelKey: 'querybuilder.bar', fallback: 'Bar' },
+    { id: 'line', icon: TrendingUp, labelKey: 'querybuilder.line', fallback: 'Line' },
+    { id: 'area', icon: Layout, labelKey: 'querybuilder.area', fallback: 'Area' },
+    { id: 'pie', icon: Layout, labelKey: 'querybuilder.pie', fallback: 'Pie' },
+    { id: 'kpi', icon: Layout, labelKey: 'querybuilder.kpi', fallback: 'KPI' },
+    { id: 'composed', icon: Layout, labelKey: 'querybuilder.composed', fallback: 'Composed' },
+    { id: 'radar', icon: Layout, labelKey: 'querybuilder.radar', fallback: 'Radar' },
+    { id: 'scatter', icon: Layout, labelKey: 'querybuilder.scatter', fallback: 'Scatter' },
+    { id: 'pivot', icon: Layout, labelKey: 'querybuilder.pivot', fallback: 'Pivot' }
+];
+const CONTENT_VIS_OPTIONS: Array<{ id: VisualizationType; icon: React.ComponentType<{ className?: string }>; labelKey: string; fallback: string }> = [
+    { id: 'text', icon: Edit3, labelKey: 'querybuilder.text', fallback: 'Text' },
+    { id: 'markdown', icon: FileCode2, labelKey: 'querybuilder.markdown', fallback: 'Markdown' },
+    { id: 'status', icon: AlertCircle, labelKey: 'querybuilder.status', fallback: 'Status' },
+    { id: 'section', icon: Layout, labelKey: 'querybuilder.section', fallback: 'Section' },
+    { id: 'kpi_manual', icon: Gauge, labelKey: 'querybuilder.kpi_manual', fallback: 'KPI Manual' },
+    { id: 'image', icon: ImageIcon, labelKey: 'querybuilder.image', fallback: 'Image' }
+];
 
 interface SavedWidget {
     id: string;
     name: string;
+    description?: string | null;
     sql_statement_id?: string | null;
     sql_query: string;
     visualization_config: string;
@@ -76,7 +97,6 @@ export const QueryBuilderView: React.FC = () => {
     const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
 
     // Save Widget State
-    const [saveModalOpen, setSaveModalOpen] = useState(false);
     const [widgetName, setWidgetName] = useState('');
     const [widgetSearchTerm, setWidgetSearchTerm] = useState('');
     const [sqlStatementSearchTerm, setSqlStatementSearchTerm] = useState('');
@@ -222,11 +242,26 @@ export const QueryBuilderView: React.FC = () => {
         }));
     };
 
-    const handleSaveWidget = async (mode: 'update' | 'new' = 'update') => {
-        if (!widgetName || isReadOnly) return;
+    const handleSaveWidget = useCallback(async (mode: 'update' | 'new' = 'update') => {
+        if (isReadOnly) return;
         const shouldCreateNew = mode === 'new';
         let targetId = shouldCreateNew ? crypto.randomUUID() : (activeWidgetId || crypto.randomUUID());
-        const trimmedName = widgetName.trim();
+        const existingTarget = (savedWidgets || []).find((w) => w.id === targetId);
+        const prompted = await appDialog.prompt2(
+            t('querybuilder.archive_name'),
+            t('common.description', 'Description'),
+            {
+                title: activeWidgetId ? t('querybuilder.update_title') : t('querybuilder.save_title'),
+                defaultValue: (widgetName || existingTarget?.name || '').trim(),
+                secondDefaultValue: (existingTarget?.description || '').trim(),
+                placeholder: t('querybuilder.archive_placeholder'),
+                secondPlaceholder: t('querybuilder.widget_description_placeholder', 'Short context or note (optional)')
+            }
+        );
+        if (!prompted) return;
+        const trimmedName = prompted.value.trim();
+        if (!trimmedName) return;
+        const trimmedDescription = prompted.secondValue.trim();
         const normalizedName = trimmedName.toLowerCase();
         const conflictingWidget = (savedWidgets || []).find((w) =>
             w.id !== targetId && w.name.trim().toLowerCase() === normalizedName
@@ -249,7 +284,7 @@ export const QueryBuilderView: React.FC = () => {
             const widget = {
                 id: targetId,
                 name: trimmedName,
-                description: '',
+                description: trimmedDescription,
                 sql_statement_id: linkedStatementId,
                 sql_query: sqlText,
                 visualization_config: { ...visConfig, type: visType },
@@ -258,9 +293,9 @@ export const QueryBuilderView: React.FC = () => {
 
             await SystemRepository.saveUserWidget(widget);
 
-            setSaveModalOpen(false);
             refreshWidgets();
             setActiveWidgetId(widget.id);
+            setWidgetName(widget.name);
             setSavedSnapshot(buildSnapshot({
                 currentSql: widget.sql_query,
                 currentBuilderMode: builderMode,
@@ -279,7 +314,22 @@ export const QueryBuilderView: React.FC = () => {
             return;
         }
         await appDialog.info(shouldCreateNew ? t('querybuilder.success_save') : t('querybuilder.success_update'));
-    };
+    }, [
+        activeWidgetId,
+        builderMode,
+        buildSnapshot,
+        isContentWidget,
+        isReadOnly,
+        refreshWidgets,
+        savedWidgets,
+        selectedSqlStatementId,
+        sql,
+        sqlStatements,
+        t,
+        visConfig,
+        visType,
+        widgetName
+    ]);
 
     const deleteWidget = async (id: string) => {
         if (isReadOnly) return;
@@ -302,15 +352,26 @@ export const QueryBuilderView: React.FC = () => {
             render: (item: DbRow) => formatValue(item[key], key)
         }));
     }, [results]);
-    const filteredSavedWidgets = useMemo(() => {
+    const getSavedWidgetVisType = useCallback((widget: SavedWidget): VisualizationType => {
+        try {
+            const parsed = JSON.parse(widget.visualization_config) as { type?: string };
+            const raw = (parsed.type || 'table') as VisualizationType | 'kpu_manual';
+            return raw === 'kpu_manual' ? 'kpi_manual' : raw;
+        } catch {
+            return 'table';
+        }
+    }, []);
+    const filteredSavedWidgetsByType = useMemo(() => {
         const all = savedWidgets || [];
         const term = widgetSearchTerm.trim().toLowerCase();
-        if (!term) return all;
-        return all.filter((widget) =>
+        const searched = !term ? all : all.filter((widget) =>
             widget.name.toLowerCase().includes(term) ||
             (widget.sql_query || '').toLowerCase().includes(term)
         );
-    }, [savedWidgets, widgetSearchTerm]);
+        const queryBased = searched.filter((widget) => !CONTENT_VIS_TYPES.has(getSavedWidgetVisType(widget)));
+        const nonData = searched.filter((widget) => CONTENT_VIS_TYPES.has(getSavedWidgetVisType(widget)));
+        return { queryBased, nonData };
+    }, [savedWidgets, widgetSearchTerm, getSavedWidgetVisType]);
     const filteredSqlStatements = useMemo(() => {
         const all = sqlStatements || [];
         const term = sqlStatementSearchTerm.trim().toLowerCase();
@@ -577,6 +638,8 @@ export const QueryBuilderView: React.FC = () => {
     const previewHeaderTitle = activeWidgetId
         ? (widgetName.trim() || t('querybuilder.new_report'))
         : t('querybuilder.preview_new_widget_title', 'Neues Widget ...');
+    const previewWidgetDescription = (visConfig.widgetDescription || '').trim();
+    const previewWidgetDescriptionPosition: 'top' | 'bottom' = visConfig.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
 
     const gotoStep = (step: GuidedStep) => {
         if (!canGoToStep(step)) return;
@@ -635,7 +698,7 @@ export const QueryBuilderView: React.FC = () => {
             return;
         }
         if (guidedStep === 4 && !saveDisabled) {
-            setSaveModalOpen(true);
+            await handleSaveWidget('update');
         }
     };
 
@@ -707,14 +770,14 @@ export const QueryBuilderView: React.FC = () => {
             if (key === 's') {
                 event.preventDefault();
                 if (!saveDisabled) {
-                    setSaveModalOpen(true);
+                    void handleSaveWidget('update');
                 }
             }
         };
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [loading, saveDisabled, handleRun]);
+    }, [loading, saveDisabled, handleRun, handleSaveWidget]);
 
     return (
         <PageLayout
@@ -919,7 +982,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     <h3 className="text-[10px] font-black uppercase text-slate-400 px-2 py-1 flex items-center justify-between">
                                                         {t('querybuilder.saved_reports')}
                                                         <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px]">
-                                                            {filteredSavedWidgets.length}/{savedWidgets?.length || 0}
+                                                            {(filteredSavedWidgetsByType.queryBased.length + filteredSavedWidgetsByType.nonData.length)}/{savedWidgets?.length || 0}
                                                         </span>
                                                     </h3>
                                                     <div className="relative">
@@ -932,10 +995,15 @@ export const QueryBuilderView: React.FC = () => {
                                                         />
                                                     </div>
                                                     <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                                                        {filteredSavedWidgets.map(w => (
+                                                        {filteredSavedWidgetsByType.queryBased.length > 0 && (
+                                                            <div className="px-1 pt-1 pb-0.5 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                                                {t('querybuilder.saved_reports_query_based', 'Abfragebasierte Widgets')}
+                                                            </div>
+                                                        )}
+                                                        {filteredSavedWidgetsByType.queryBased.map(w => (
                                                             <div
                                                                 key={w.id}
-                                                                className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200'}`}
+                                                                className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 dark:bg-blue-900/20 dark:border-blue-700 dark:ring-blue-800/60' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'}`}
                                                                 onClick={() => {
                                                                     if (activeWidgetId === w.id) {
                                                                         setActiveWidgetId(null);
@@ -962,19 +1030,52 @@ export const QueryBuilderView: React.FC = () => {
                                                                 <div className="flex items-center gap-2 text-[9px]">
                                                                     <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query || '-'}</span>
                                                                     <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
-                                                                        {(() => {
-                                                                            try {
-                                                                                const parsed = JSON.parse(w.visualization_config) as { type?: string };
-                                                                                return (parsed.type || 'table').toUpperCase();
-                                                                            } catch {
-                                                                                return 'TABLE';
-                                                                            }
-                                                                        })()}
+                                                                        {getSavedWidgetVisType(w).toUpperCase()}
                                                                     </span>
                                                                 </div>
                                                             </div>
                                                         ))}
-                                                        {filteredSavedWidgets.length === 0 && (
+                                                        {filteredSavedWidgetsByType.nonData.length > 0 && (
+                                                            <div className="px-1 pt-2 pb-0.5 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                                                {t('querybuilder.saved_reports_non_data', 'Nicht-datenbasierte Widgets')}
+                                                            </div>
+                                                        )}
+                                                        {filteredSavedWidgetsByType.nonData.map(w => (
+                                                            <div
+                                                                key={w.id}
+                                                                className={`group p-2.5 rounded-lg border flex flex-col gap-1 transition-all cursor-pointer ${activeWidgetId === w.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100 dark:bg-blue-900/20 dark:border-blue-700 dark:ring-blue-800/60' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'}`}
+                                                                onClick={() => {
+                                                                    if (activeWidgetId === w.id) {
+                                                                        setActiveWidgetId(null);
+                                                                        setWidgetName('');
+                                                                        setSelectedSqlStatementId('');
+                                                                        setSql('');
+                                                                        setLastRunSql('');
+                                                                        setResults([]);
+                                                                        setError('');
+                                                                        setVisType('table');
+                                                                        setSidebarTab('source');
+                                                                        setGuidedStep(1);
+                                                                        return;
+                                                                    }
+                                                                    loadWidget(w, false);
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="font-bold text-slate-700 dark:text-slate-200 text-xs truncate">{w.name}</span>
+                                                                    {!isReadOnly && (
+                                                                        <button onClick={(e) => { e.stopPropagation(); deleteWidget(w.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-[9px]">
+                                                                    <span className="text-slate-400 truncate max-w-[150px] font-mono">{w.sql_query || '-'}</span>
+                                                                    <span className="ml-auto text-blue-400 flex items-center gap-1 font-bold italic">
+                                                                        {getSavedWidgetVisType(w).toUpperCase()}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {filteredSavedWidgetsByType.queryBased.length === 0 && filteredSavedWidgetsByType.nonData.length === 0 && (
                                                             <div className="p-3 rounded-lg border border-dashed border-slate-200 text-[11px] text-slate-400 text-center">
                                                                 {t('querybuilder.no_saved_reports_filtered', 'No matching widgets found.')}
                                                             </div>
@@ -1020,36 +1121,10 @@ export const QueryBuilderView: React.FC = () => {
                                 <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-4 animate-in slide-in-from-right-4 duration-300">
                                     <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><Layout className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.graph_type')}</h3>
                                     <div className="grid grid-cols-3 gap-2">
-                                            {(!sqlMatchesSelectedStatement
-                                                ? [
-                                                    { id: 'text', icon: Edit3, label: t('querybuilder.text') },
-                                                    { id: 'markdown', icon: FileCode2, label: t('querybuilder.markdown', 'Markdown') },
-                                                    { id: 'status', icon: AlertCircle, label: t('querybuilder.status', 'Status') },
-                                                    { id: 'section', icon: Layout, label: t('querybuilder.section', 'Section') },
-                                                    { id: 'kpi_manual', icon: Gauge, label: t('querybuilder.kpi_manual', 'KPI Manual') },
-                                                    { id: 'image', icon: ImageIcon, label: t('querybuilder.image', 'Image') }
-                                                ]
-                                                : [
-                                                    { id: 'table', icon: TableIcon, label: t('querybuilder.table') },
-                                                    { id: 'bar', icon: BarChart2, label: t('querybuilder.bar') },
-                                                    { id: 'line', icon: TrendingUp, label: t('querybuilder.line') },
-                                                    { id: 'area', icon: Layout, label: t('querybuilder.area') },
-                                                    { id: 'pie', icon: Layout, label: t('querybuilder.pie') },
-                                                    { id: 'kpi', icon: Layout, label: t('querybuilder.kpi') },
-                                                    { id: 'composed', icon: Layout, label: t('querybuilder.composed') },
-                                                    { id: 'radar', icon: Layout, label: t('querybuilder.radar') },
-                                                    { id: 'scatter', icon: Layout, label: t('querybuilder.scatter') },
-                                                    { id: 'pivot', icon: Layout, label: t('querybuilder.pivot') },
-                                                    { id: 'text', icon: Edit3, label: t('querybuilder.text') },
-                                                    { id: 'markdown', icon: FileCode2, label: t('querybuilder.markdown', 'Markdown') },
-                                                    { id: 'status', icon: AlertCircle, label: t('querybuilder.status', 'Status') },
-                                                    { id: 'section', icon: Layout, label: t('querybuilder.section', 'Section') },
-                                                    { id: 'kpi_manual', icon: Gauge, label: t('querybuilder.kpi_manual', 'KPI Manual') },
-                                                    { id: 'image', icon: ImageIcon, label: t('querybuilder.image', 'Image') }
-                                                ]).map(type => (
-                                            <button key={type.id} onClick={() => setVisType(type.id as VisualizationType)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
+                                            {(sqlMatchesSelectedStatement ? QUERY_VIS_OPTIONS : CONTENT_VIS_OPTIONS).map(type => (
+                                            <button key={type.id} onClick={() => setVisType(type.id)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
                                                 <type.icon className="w-4 h-4" />
-                                                <span className="text-[9px] uppercase font-black">{type.label}</span>
+                                                <span className="text-[9px] uppercase font-black">{t(type.labelKey, type.fallback)}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -1059,9 +1134,9 @@ export const QueryBuilderView: React.FC = () => {
                                         </p>
                                     )}
                                     {(visType !== 'table' && visType !== 'pivot' && visType !== 'text' && visType !== 'markdown' && visType !== 'status' && visType !== 'section' && visType !== 'kpi_manual' && visType !== 'image') && (
-                                        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('querybuilder.labels')}:</span>
-                                            <button onClick={() => setVisConfig({ ...visConfig, showLabels: !visConfig.showLabels })} className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.showLabels ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"}`}>
+                                            <button onClick={() => setVisConfig({ ...visConfig, showLabels: !visConfig.showLabels })} className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.showLabels ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-200"}`}>
                                                 {visConfig.showLabels ? t('querybuilder.label_on') : t('querybuilder.label_off')}
                                             </button>
                                         </div>
@@ -1080,9 +1155,14 @@ export const QueryBuilderView: React.FC = () => {
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.y_axes')}</label>
                                                 <div className="flex flex-wrap gap-1 mb-2">
                                                     {(visConfig.yAxes || []).map(y => (
-                                                        <span key={y} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold flex items-center gap-1">
+                                                        <span key={y} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 rounded text-[10px] font-bold flex items-center gap-1 border border-blue-200 dark:border-blue-700/60">
                                                             {y}
-                                                            <button onClick={() => setVisConfig({ ...visConfig, yAxes: (visConfig.yAxes || []).filter(axis => axis !== y) })}><X className="w-2.5 h-2.5" /></button>
+                                                            <button
+                                                                onClick={() => setVisConfig({ ...visConfig, yAxes: (visConfig.yAxes || []).filter(axis => axis !== y) })}
+                                                                className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100"
+                                                            >
+                                                                <X className="w-2.5 h-2.5" />
+                                                            </button>
                                                         </span>
                                                     ))}
                                                 </div>
@@ -1463,11 +1543,20 @@ export const QueryBuilderView: React.FC = () => {
 
                                     {(visType === 'kpi' && results.length > 0) && (
                                         <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                            <div>
+                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.kpi_unit', 'Einheit')}</label>
+                                                <input
+                                                    value={visConfig.kpiUnit || ''}
+                                                    onChange={e => setVisConfig({ ...visConfig, kpiUnit: e.target.value })}
+                                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
+                                                    placeholder={t('querybuilder.kpi_placeholder_unit', '%')}
+                                                />
+                                            </div>
                                             <div className="flex items-center justify-between">
                                                 <h4 className="text-[10px] font-black uppercase text-slate-400">{t('querybuilder.kpi_rules')}</h4>
                                                 <button
                                                     onClick={() => setVisConfig({ ...visConfig, rules: [...(visConfig.rules || []), { operator: '>', value: 0, color: 'green' }] })}
-                                                    className="p-1 px-2 bg-blue-50 text-blue-600 rounded text-[9px] font-bold hover:bg-blue-100 transition-colors"
+                                                    className="p-1 px-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 rounded text-[9px] font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700/60 transition-colors"
                                                 >
                                                     + {t('querybuilder.add_rule')}
                                                 </button>
@@ -1526,6 +1615,35 @@ export const QueryBuilderView: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
+                                    <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                        <div>
+                                            <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">
+                                                {t('querybuilder.widget_description', 'Widget-Beschreibung')}
+                                            </label>
+                                            <textarea
+                                                value={visConfig.widgetDescription || ''}
+                                                onChange={e => setVisConfig({ ...visConfig, widgetDescription: e.target.value })}
+                                                className="w-full h-20 p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none resize-y"
+                                                placeholder={t('querybuilder.widget_description_placeholder', 'Kurze Einordnung oder Kontext (optional)')}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">
+                                                {t('querybuilder.widget_description_position', 'Position')}
+                                            </label>
+                                            <select
+                                                value={visConfig.widgetDescriptionPosition || 'bottom'}
+                                                onChange={e => setVisConfig({ ...visConfig, widgetDescriptionPosition: e.target.value as NonNullable<WidgetConfig['widgetDescriptionPosition']> })}
+                                                className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
+                                            >
+                                                <option value="top">{t('querybuilder.widget_description_position_top', 'Oben')}</option>
+                                                <option value="bottom">{t('querybuilder.widget_description_position_bottom', 'Unten')}</option>
+                                            </select>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500">
+                                            {t('querybuilder.widget_description_hint', 'Die Beschreibung wird im Widget oberhalb oder unterhalb des Inhalts angezeigt.')}
+                                        </p>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/60 dark:bg-blue-950/20 space-y-3 animate-in slide-in-from-right-4 duration-300">
@@ -1711,7 +1829,14 @@ export const QueryBuilderView: React.FC = () => {
 
                         <div className="flex-1 overflow-auto p-4 min-h-0 container-scrollbar">
                             {previewTab === 'graphic' ? (
-                                isTextWidget ? (
+                                <div className="h-full min-h-[260px] flex flex-col">
+                                    {previewWidgetDescription && previewWidgetDescriptionPosition === 'top' && (
+                                        <div className="px-4 py-2 text-[11px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-md mb-3">
+                                            {previewWidgetDescription}
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-h-0">
+                                {isTextWidget ? (
                                     <div
                                         className={`h-full min-h-[260px] p-6 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 ${
                                             visConfig.textSize === 'sm' ? 'text-sm' :
@@ -1952,9 +2077,32 @@ export const QueryBuilderView: React.FC = () => {
                                             </div>
                                         </div>
                                     ) : previewVisType === 'kpi' ? (() => {
-                                        const val = results[0][Object.keys(results[0])[0]];
-                                        const numVal = Number(val);
+                                        const firstRow = results[0];
+                                        const rowKeys = Object.keys(firstRow);
+                                        const preferredMetricKey = (visConfig.yAxes || [])[0] || visConfig.yAxis || '';
+                                        const metricKey = rowKeys.includes(preferredMetricKey)
+                                            ? preferredMetricKey
+                                            : (rowKeys.find((key) => {
+                                                const raw = firstRow[key];
+                                                if (typeof raw === 'number') return Number.isFinite(raw);
+                                                if (typeof raw === 'string') {
+                                                    const normalized = raw.replace(/\s+/g, '').replace(',', '.');
+                                                    return Number.isFinite(Number(normalized));
+                                                }
+                                                return false;
+                                            }) || rowKeys[0]);
+                                        const val = firstRow[metricKey];
+                                        const parseNumericValue = (raw: unknown): number => {
+                                            if (typeof raw === 'number') return raw;
+                                            if (typeof raw === 'string') {
+                                                const normalized = raw.replace(/\s+/g, '').replace(',', '.');
+                                                return Number(normalized);
+                                            }
+                                            return Number.NaN;
+                                        };
+                                        const numVal = parseNumericValue(val);
                                         let displayColor = 'text-slate-900 dark:text-white';
+                                        let displayStyle: React.CSSProperties | undefined;
                                         if (visConfig.rules && !isNaN(numVal)) {
                                             for (const rule of visConfig.rules) {
                                                 let match = false;
@@ -1970,14 +2118,20 @@ export const QueryBuilderView: React.FC = () => {
                                                     else if (rule.color === 'red') displayColor = 'text-rose-500';
                                                     else if (rule.color === 'yellow') displayColor = 'text-amber-500';
                                                     else if (rule.color === 'blue') displayColor = 'text-blue-500';
+                                                    else displayStyle = { color: rule.color };
                                                     break;
                                                 }
                                             }
                                         }
                                         return (
                                             <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in zoom-in-95 duration-500">
-                                                <div className={`text-6xl lg:text-8xl font-black tracking-widest break-all transition-colors duration-300 ${displayColor}`}>{formatValue(val, Object.keys(results[0])[0])}</div>
-                                                <div className="text-xs font-bold text-slate-400 mt-6 uppercase tracking-[0.4em] font-mono">{(visConfig.yAxes || [])[0] || Object.keys(results[0])[0]}</div>
+                                                <div className="flex items-end gap-2">
+                                                    <div className={`text-6xl lg:text-8xl font-black tracking-widest break-all transition-colors duration-300 ${displayColor}`} style={displayStyle}>{formatValue(val, metricKey)}</div>
+                                                    {(visConfig.kpiUnit || '').trim() && (
+                                                        <div className="pb-1 text-xl lg:text-2xl font-bold text-slate-500 dark:text-slate-400">{visConfig.kpiUnit}</div>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs font-bold text-slate-400 mt-6 uppercase tracking-[0.4em] font-mono">{metricKey}</div>
                                             </div>
                                         );
                                     })() : (
@@ -2085,6 +2239,14 @@ export const QueryBuilderView: React.FC = () => {
                                     )}
                                 </div>
                                 )
+                                    }
+                                    </div>
+                                    {previewWidgetDescription && previewWidgetDescriptionPosition === 'bottom' && (
+                                        <div className="px-4 py-2 text-[11px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-md mt-3">
+                                            {previewWidgetDescription}
+                                        </div>
+                                    )}
+                                </div>
                             ) : previewTab === 'table' ? (
                                 !hasQueryPreviewTabs ? (
                                     <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400">
@@ -2119,23 +2281,6 @@ export const QueryBuilderView: React.FC = () => {
                     </div>
                 </div>
             </div>
-
-            <Modal isOpen={saveModalOpen} onClose={() => setSaveModalOpen(false)} title={activeWidgetId ? t('querybuilder.update_title') : t('querybuilder.save_title')}>
-                <div className="space-y-4">
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-3">
-                        <Folder className="w-8 h-8 text-blue-500" />
-                        <div>
-                            <p className="text-[10px] font-black uppercase text-blue-400">{t('querybuilder.archive_name')}</p>
-                            <input autoFocus value={widgetName} onChange={e => setWidgetName(e.target.value)} placeholder={t('querybuilder.archive_placeholder')} className="w-full bg-transparent border-none outline-none font-bold text-blue-900 placeholder:text-blue-200" />
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button onClick={() => { void handleSaveWidget('update'); }} disabled={!widgetName} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs shadow-lg flex items-center gap-2">
-                            <Check className="w-4 h-4" /> {t('common.save')}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
 
             <RecordDetailModal
                 isOpen={detailModalOpen}

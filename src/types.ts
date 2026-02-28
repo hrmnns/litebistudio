@@ -140,6 +140,8 @@ export interface WidgetConfig {
     imageCaption?: string;
     imageFit?: 'contain' | 'cover';
     imageAlign?: 'left' | 'center' | 'right';
+    widgetDescription?: string;
+    widgetDescriptionPosition?: 'top' | 'bottom';
     // Legacy compatibility for previously saved widgets
     kpuTitle?: string;
     kpuValue?: string;
