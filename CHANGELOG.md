@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - admin mode remains explicitly allowed.
 - Health Check overview now includes an explicit snapshot-storage hint for users.
 - Snapshot cleanup confirmation now uses configurable retention values instead of fixed thresholds.
+- Backup encryption UX was adjusted for self-service usage:
+  - empty backup passwords are still blocked
+  - weak passwords now show a warning/confirmation instead of hard blocking, allowing explicit user override.
+- Admin mode is now session-scoped for runtime authorization checks (no persisted `localStorage` trust for `sys_*` write protection decisions).
 
 ### Fixed
 - Added a global UI error boundary to prevent full-app blank states on component render failures and provide a safe reload fallback.
@@ -82,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed unstable text input behavior in report package settings sidepanel fields (characters could be dropped while typing).
 - Fixed localized system-table write-block messaging to show user-friendly DE/EN guidance instead of only technical error text.
 - Fixed mojibake in report package subtitle metadata (`Ã¢â‚¬Â¢`) by replacing it with a clean separator (`|`).
+
+- Fixed a Health Check refresh loop where persisted health snapshots triggered repeated automatic DB health runs.
+- Hardened Datasource SQL object handling by validating/quoting dynamic table/view/column identifiers in destructive/DDL actions.
+- Fixed Markdown link rendering hardening by escaping sanitized `href` values before HTML insertion.
 
 ## [1.2.0] - 2026-02-27
 

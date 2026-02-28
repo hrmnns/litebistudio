@@ -4,6 +4,7 @@ import { queryCache } from '../lib/cache';
 interface UseAsyncOptions {
     cacheKey?: string;
     ttl?: number; // Time to live in ms
+    listenToDbChanges?: boolean;
 }
 
 function serializeDependency(dep: unknown): string {
@@ -26,7 +27,7 @@ export function useAsync<T>(
     deps: React.DependencyList = [],
     options: UseAsyncOptions = {}
 ) {
-    const { cacheKey, ttl } = options;
+    const { cacheKey, ttl, listenToDbChanges = true } = options;
 
     // Initialize state from cache if available
     const [data, setData] = useState<T | null>(() => {
@@ -110,16 +111,20 @@ export function useAsync<T>(
                 execute();
             }, 150);
         };
-        window.addEventListener('db-updated', handleDbUpdate);
-        window.addEventListener('db-changed', handleDbUpdate);
+        if (listenToDbChanges) {
+            window.addEventListener('db-updated', handleDbUpdate);
+            window.addEventListener('db-changed', handleDbUpdate);
+        }
 
         return () => {
             mounted = false;
             if (dbUpdateTimer) window.clearTimeout(dbUpdateTimer);
-            window.removeEventListener('db-updated', handleDbUpdate);
-            window.removeEventListener('db-changed', handleDbUpdate);
+            if (listenToDbChanges) {
+                window.removeEventListener('db-updated', handleDbUpdate);
+                window.removeEventListener('db-changed', handleDbUpdate);
+            }
         };
-    }, [depsKey, version, cacheKey, ttl]);
+    }, [depsKey, version, cacheKey, ttl, listenToDbChanges]);
 
     return { data, loading, error, refresh };
 }

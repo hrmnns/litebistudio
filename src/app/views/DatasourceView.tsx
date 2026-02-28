@@ -23,6 +23,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
 import { useNavigate } from 'react-router-dom';
 import { importDatabase, exportDatabase, factoryResetDatabase } from '../../lib/db';
+import { isValidIdentifier } from '../../lib/utils';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -101,6 +102,17 @@ const buildBackupFileName = (pattern: string, secure: boolean): string => {
         .join('');
     const sanitized = withoutControlChars.trim() || `backup_${date}_${mode}`;
     return sanitized.toLowerCase().endsWith('.sqlite3') ? sanitized : `${sanitized}.sqlite3`;
+};
+
+const isWeakBackupPassword = (password: string): boolean => {
+    const trimmed = password.trim();
+    if (trimmed.length < 8) return true;
+    const hasLower = /[a-z]/.test(trimmed);
+    const hasUpper = /[A-Z]/.test(trimmed);
+    const hasDigit = /\d/.test(trimmed);
+    const hasSymbol = /[^A-Za-z0-9]/.test(trimmed);
+    const score = Number(hasLower) + Number(hasUpper) + Number(hasDigit) + Number(hasSymbol);
+    return score < 3;
 };
 
 const resetEnvironmentSettings = (): void => {
@@ -330,7 +342,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             if (activeTab !== 'structure' || userTables.length === 0) return {};
             const entries = await Promise.all(userTables.map(async (tableName) => {
                 const [rowsResult, indexResult] = await Promise.all([
-                    SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM "${tableName}"`),
+                    SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(tableName)}`),
                     SystemRepository.executeRaw(
                         "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='index' AND LOWER(tbl_name) = LOWER(?) AND name NOT LIKE 'sqlite_%'",
                         [tableName]
@@ -354,7 +366,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             if (activeTab !== 'structure' || userViews.length === 0) return {};
             const entries = await Promise.all(userViews.map(async (view) => {
                 try {
-                    const rowsResult = await SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM "${view.name}"`);
+                    const rowsResult = await SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(view.name)}`);
                     return [
                         view.name,
                         {
@@ -420,6 +432,9 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         loadSchema();
     }, [selectedTable, tables, isSchemaOpen, t]); // Reload schema when selection/table list changes and whenever schema dialog is opened
 
+    const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
+    const isSafeColumnType = (type: string): boolean => /^[A-Za-z0-9_ (),]+$/.test(type.trim());
+
     // Build Import Config
     const getImportConfig = (): ImportConfig | undefined => {
         if (!selectedTable || !tableSchema) return undefined;
@@ -437,7 +452,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 }
             },
             clearFn: async () => {
-                await SystemRepository.executeRaw(`DELETE FROM ${selectedTable}`);
+                await SystemRepository.executeRaw(`DELETE FROM ${quoteIdentifier(selectedTable)}`);
             }
         };
     };
@@ -450,8 +465,25 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             if (sqlMode) {
                 await SystemRepository.executeRaw(customSql);
             } else {
-                const cols = createColumns.map(c => `${c.name} ${c.type}`).join(', ');
-                const sql = `CREATE TABLE ${newTableName} (${cols})`;
+                const normalizedTableName = newTableName.trim();
+                if (!isValidIdentifier(normalizedTableName)) {
+                    await appDialog.warning(t('datasource.invalid_table_name', 'Ungueltiger Tabellenname. Bitte nur Buchstaben, Zahlen und Unterstrich verwenden.'));
+                    return;
+                }
+                if (!createColumns.length) {
+                    await appDialog.warning(t('datasource.invalid_columns', 'Bitte mindestens eine gueltige Spalte angeben.'));
+                    return;
+                }
+                for (const col of createColumns) {
+                    const colName = col.name.trim();
+                    const colType = col.type.trim();
+                    if (!isValidIdentifier(colName) || !colType || !isSafeColumnType(colType)) {
+                        await appDialog.warning(t('datasource.invalid_columns', 'Bitte mindestens eine gueltige Spalte angeben.'));
+                        return;
+                    }
+                }
+                const cols = createColumns.map(c => `${quoteIdentifier(c.name.trim())} ${c.type.trim()}`).join(', ');
+                const sql = `CREATE TABLE ${quoteIdentifier(normalizedTableName)} (${cols})`;
                 await SystemRepository.executeRaw(sql);
             }
             setIsCreateModalOpen(false);
@@ -468,7 +500,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
         if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_confirm', { name: tableName })))) return;
         try {
-            await SystemRepository.executeRaw(`DROP TABLE ${tableName}`);
+            await SystemRepository.executeRaw(`DROP TABLE ${quoteIdentifier(tableName)}`);
             refreshTables();
             refreshDataSources();
             if (selectedTable === tableName) setSelectedTable('');
@@ -481,7 +513,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
         if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName })))) return;
         try {
-            await SystemRepository.executeRaw(`DROP VIEW ${viewName}`);
+            await SystemRepository.executeRaw(`DROP VIEW ${quoteIdentifier(viewName)}`);
             refreshTables();
             refreshDataSources();
             if (selectedTable === viewName) setSelectedTable('');
@@ -494,7 +526,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
         if (shouldConfirm && !(await appDialog.confirm(t('datasource.clear_confirm', { name: tableName })))) return;
         try {
-            await SystemRepository.executeRaw(`DELETE FROM ${tableName}`);
+            await SystemRepository.executeRaw(`DELETE FROM ${quoteIdentifier(tableName)}`);
             refreshTables();
             await appDialog.info(t('datasource.cleared_success'));
         } catch (error: unknown) {
@@ -522,8 +554,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             setIsResettingSqlManager(false);
         }
     };
-
-    const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
 
     const openCreateIndexModal = async (tableName: string) => {
         try {
@@ -928,9 +958,16 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                     <button
                                         onClick={async () => {
                                             try {
-                                                if (useEncryption && backupPassword.length < 4) {
-                                                    await appDialog.warning(t('datasource.backup_password_error'));
-                                                    return;
+                                                if (useEncryption) {
+                                                    const password = backupPassword.trim();
+                                                    if (!password) {
+                                                        await appDialog.warning(t('datasource.backup_password_required'));
+                                                        return;
+                                                    }
+                                                    if (isWeakBackupPassword(password)) {
+                                                        const proceed = await appDialog.confirm(t('datasource.backup_password_weak_confirm'));
+                                                        if (!proceed) return;
+                                                    }
                                                 }
 
                                                 const bytes = await exportDatabase();
@@ -938,7 +975,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 let outputBuffer: ArrayBuffer = plainBuffer;
 
                                                 if (useEncryption) {
-                                                    outputBuffer = await encryptBuffer(plainBuffer, backupPassword);
+                                                    outputBuffer = await encryptBuffer(plainBuffer, backupPassword.trim());
                                                 }
 
                                                 const fileName = buildBackupFileName(backupNamePattern, useEncryption);

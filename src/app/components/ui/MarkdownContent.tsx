@@ -29,7 +29,7 @@ const renderInline = (input: string) => {
     safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
     safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, url: string) => {
         const href = sanitizeUrl(url);
-        return `<a class="text-blue-600 dark:text-blue-400 underline underline-offset-2" href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+        return `<a class="text-blue-600 dark:text-blue-400 underline underline-offset-2" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
     });
 
     return safe;
@@ -128,4 +128,3 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ markdown, clas
         />
     );
 };
-

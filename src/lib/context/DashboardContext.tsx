@@ -3,6 +3,7 @@ import React, { createContext, useContext, type ReactNode } from 'react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { COMPONENTS } from '../../config/components';
 import { createLogger } from '../logger';
+import { setAdminModeRuntimeActive } from '../security/runtimeFlags';
 
 const logger = createLogger('DashboardContext');
 
@@ -118,8 +119,12 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     // Read-Only Mode
     const [isReadOnly, setIsReadOnly] = React.useState(false);
 
-    // Admin Mode
-    const [isAdminMode, setIsAdminMode] = useLocalStorage<boolean>('litebistudio_admin_mode', false);
+    // Admin Mode (session-only, not persisted in localStorage)
+    const [isAdminMode, setIsAdminMode] = React.useState(false);
+
+    React.useEffect(() => {
+        setAdminModeRuntimeActive(isAdminMode);
+    }, [isAdminMode]);
 
     return (
         <DashboardContext.Provider value={{

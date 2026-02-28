@@ -844,6 +844,8 @@
         "encryption_standard_hint": "Datei ist für jeden lesbar.",
         "backup_password_placeholder": "Passwort für Backup setzen...",
         "backup_password_error": "Bitte ein sicheres Passwort angeben (min. 4 Zeichen).",
+        "backup_password_required": "Bitte ein Passwort angeben.",
+        "backup_password_weak_confirm": "Das Passwort wirkt unsicher. Das Backup kann damit leichter entschluesselt werden. Trotzdem fortfahren?",
         "save_backup_secure": "Geschützt speichern",
         "save_backup_standard": "Backup speichern",
         "backup_saved_success": "Backup wurde erfolgreich erstellt.",

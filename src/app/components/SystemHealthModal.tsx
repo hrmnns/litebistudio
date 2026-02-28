@@ -68,7 +68,8 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
     // Fetch Diagnostics on modal open
     const { data: diagnostics, loading: diagLoading, refresh: refreshDiag } = useAsync<DiagnosticsInfo>(
         () => SystemRepository.getDiagnostics(),
-        [isOpen]
+        [isOpen],
+        { listenToDbChanges: false }
     );
     const { data: healthReport, loading: healthLoading, refresh: refreshHealth } = useAsync<DatabaseHealthReport | null>(
         async () => {
@@ -90,7 +91,8 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
             }
             return report;
         },
-        [isOpen]
+        [isOpen],
+        { listenToDbChanges: false }
     );
 
     const version = __APP_VERSION__;

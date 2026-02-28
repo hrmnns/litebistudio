@@ -6,6 +6,7 @@ import { createWidgetRepository } from './WidgetRepository';
 import { createReportPackRepository } from './ReportPackRepository';
 import { createSqlStatementRepository } from './SqlStatementRepository';
 import { createWorklistRepository } from './WorklistRepository';
+import { isAdminModeRuntimeActive } from '../security/runtimeFlags';
 export type { SqlStatementRecord } from './SqlStatementRepository';
 
 const schemaCache = new Map<string, TableColumn[]>();
@@ -39,8 +40,7 @@ async function getTableSchemaCached(tableName: string): Promise<TableColumn[]> {
 }
 
 function isAdminModeActive(): boolean {
-    if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem('litebistudio_admin_mode') === 'true';
+    return isAdminModeRuntimeActive();
 }
 
 function getSystemTableWriteBlockedMessage(): string {
