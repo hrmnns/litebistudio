@@ -62,7 +62,7 @@
         "query_builder": "Widgets",
         "datasource": "Datenverwaltung",
         "settings": "Einstellungen",
-        "analytics_platform": "Analyse-Plattform",
+        "analytics_platform": "Self-Service BI",
         "clock": "Status & Uhr",
         "database_status": "Datenbank-Status",
         "system_status": "System-Status",

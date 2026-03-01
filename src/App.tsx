@@ -6,7 +6,7 @@ import AppBrandIcon from './app/components/ui/AppBrandIcon';
 import { ErrorBoundary } from './app/components/ErrorBoundary';
 
 const APP_READY_EVENT = 'litebi:app-ready';
-const MIN_SPLASH_MS = 3000;
+const MIN_SPLASH_MS = 2000;
 
 const StartupSplash: React.FC = () => {
   const [visible, setVisible] = React.useState(true);
