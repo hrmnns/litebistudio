@@ -93,7 +93,10 @@ const ReportPackView: React.FC = () => {
             }
         }
         setPacks(data);
-        if (data.length > 0 && !activePackId) setActivePackId(data[0].id);
+        setActivePackId((prev) => {
+            if (prev && data.some(pack => pack.id === prev)) return prev;
+            return data.length > 0 ? data[0].id : null;
+        });
         setExpandedPacks(() => {
             const next: Record<string, boolean> = {};
             data.forEach(pack => {
@@ -101,7 +104,7 @@ const ReportPackView: React.FC = () => {
             });
             return next;
         });
-    }, [activePackId, defaultCategory, expandedStateSettingsKey]);
+    }, [defaultCategory, expandedStateSettingsKey]);
 
     const loadCustomCategories = useCallback(async () => {
         const raw = await SettingsRepository.get(categorySettingsKey);
@@ -368,7 +371,7 @@ const ReportPackView: React.FC = () => {
         await SettingsRepository.set(expandedStateSettingsKey, JSON.stringify(nextState));
     };
 
-    const createPack = () => {
+    const createPack = async () => {
         const defaultAuthor = localStorage.getItem('reports_default_author') || 'LiteBI Studio';
         const defaultThemeColor = localStorage.getItem('reports_default_theme_color') || '#1e293b';
         const defaultShowHeader = localStorage.getItem('reports_default_show_header');
@@ -400,7 +403,7 @@ const ReportPackView: React.FC = () => {
                 items: []
             }
         };
-        handleSave(newPack);
+        await handleSave(newPack);
         setActivePackId(newPack.id);
         setActiveCategory(initialCategory);
     };
@@ -745,7 +748,7 @@ const ReportPackView: React.FC = () => {
                 actions: (
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={createPack}
+                            onClick={() => { void createPack(); }}
                             disabled={isReadOnly}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -787,7 +790,7 @@ const ReportPackView: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        createPack();
+                                        void createPack();
                                         setIsReportingPanelOpen(false);
                                     }}
                                     disabled={isReadOnly}

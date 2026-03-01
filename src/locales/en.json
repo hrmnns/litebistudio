@@ -1,4 +1,4 @@
-{
+﻿{
     "common": {
         "loading": "Loading...",
         "save": "Save",
@@ -124,7 +124,7 @@
         "add_dialog_title": "Add to worklist",
         "add_priority_prompt": "Priority (low, normal, high, critical)",
         "add_due_prompt": "Due date optional (YYYY-MM-DD), leave empty for none",
-        "subtitle": "{{count}} Results | {{mode}}",
+        "subtitle": "Saved records and review results",
         "filter_all": "All",
         "filter_open": "New / Open",
         "filter_in_progress": "In Progress",
@@ -367,7 +367,7 @@
         "index_preview_sql": "SQL Preview"
     },
     "querybuilder": {
-        "subtitle": "{{count}} Results | {{mode}}",
+        "subtitle": "Create widgets from saved SQL statements.",
         "visual_builder": "Visual Builder",
         "direct_editor": "SQL View",
         "sql_query": "Selected SQL statement",
@@ -613,7 +613,7 @@
     },
     "reports": {
         "title": "Reporting",
-        "subtitle": "{{count}} Results | {{mode}}",
+        "subtitle": "Create and export multi-page management reports.",
         "new_pack_name": "New Report Package",
         "default_category": "General",
         "category": "Category",
@@ -860,7 +860,7 @@
         "last_update": "Last update: {{date}}, {{time}}"
     },
     "datasource": {
-        "subtitle": "{{count}} Results | {{mode}}",
+        "subtitle": "Central hub for imports, structures, and system maintenance.",
         "tab_import": "Data Import",
         "tab_structure": "Structure & Schema",
         "tab_system": "Maintenance & Backup",
@@ -1015,7 +1015,7 @@
     },
     "about": {
         "title": "About LiteBI Studio",
-        "subtitle": "{{count}} Results | {{mode}}",
+        "subtitle": "Project and system information",
         "tagline": "The lightweight business intelligence platform directly in your browser.",
         "status_stable": "Stable (Local)",
         "philosophy_title": "Our Philosophy",
@@ -1199,6 +1199,8 @@
         }
     }
 }
+
+
 
 
 
