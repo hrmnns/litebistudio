@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -47,6 +47,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `Gauge` (semi-circle KPI-like gauge with automatic value-range normalization)
   - `Stacked Bar` (stacked series per category)
   - `100% Stacked Bar` (percentage-normalized stacked series to 100% per category).
+
+- Widget workspace was redesigned into a two-tab workflow:
+  - `Widgets verwalten` for inventory/operations
+  - `Widget erstellen` as the main editor surface.
+- Added widget workspace command bar actions:
+  - `Neu` (reset to clean draft with unsaved-change safeguard)
+  - `Widget laden`
+  - `Widget speichern`
+  - `Speichern unter`
+  - `SQL-Statement auswählen`
+  - `Konfiguration` (opens right-side widget config panel).
+- Added widget manage capabilities:
+  - search
+  - sort (last changed/name/usage)
+  - edit/open in editor
+  - rename (name + description)
+  - duplicate
+  - delete.
+- Added widget usage visibility in manage list:
+  - explicit usage badge (`in X dashboards`)
+  - dashboard-name tooltip for placement context.
+- Added widget editor footer metadata:
+  - widget DB ID
+  - SQL statement DB ID
+  - active chart type.
 
 ### Changed
 - Dashboard Tools tab order was reorganized to: `Dashboards` -> `Widgets` -> `Filters`.
@@ -170,7 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed dark-mode styling in the `Manage Categories` dialog within Reporting.
 - Fixed unstable text input behavior in report package settings sidepanel fields (characters could be dropped while typing).
 - Fixed localized system-table write-block messaging to show user-friendly DE/EN guidance instead of only technical error text.
-- Fixed mojibake in report package subtitle metadata (`Ã¢â‚¬Â¢`) by replacing it with a clean separator (`|`).
+- Fixed mojibake in report package subtitle metadata (`ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢`) by replacing it with a clean separator (`|`).
 
 - Fixed a Health Check refresh loop where persisted health snapshots triggered repeated automatic DB health runs.
 - Hardened Datasource SQL object handling by validating/quoting dynamic table/view/column identifiers in destructive/DDL actions.
