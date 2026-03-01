@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS sys_dashboards (
 CREATE TABLE IF NOT EXISTS sys_report_packs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    category TEXT,
     description TEXT,
     config TEXT, -- JSON string of ReportPackConfig
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

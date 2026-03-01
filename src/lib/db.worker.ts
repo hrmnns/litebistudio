@@ -86,7 +86,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 12;
+const CURRENT_SCHEMA_VERSION = 13;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -392,6 +392,27 @@ function applyMigrations(databaseInstance: DatabaseLike) {
         }
         databaseInstance.exec('PRAGMA user_version = 12');
         userVersion = 12;
+    }
+
+    // Version 13: Migration: Ensure sys_report_packs.category exists (self-heal for older backups)
+    if (userVersion < 13) {
+        log('Migration V13: Ensuring category in sys_report_packs...');
+        try {
+            const columns: string[] = [];
+            databaseInstance.exec({
+                sql: "PRAGMA table_info(sys_report_packs)",
+                rowMode: 'object',
+                callback: (row: SqliteRow) => columns.push(getRowString(row, 'name'))
+            });
+            if (columns.length > 0 && !columns.includes('category')) {
+                databaseInstance.exec("ALTER TABLE sys_report_packs ADD COLUMN category TEXT");
+            }
+            databaseInstance.exec("UPDATE sys_report_packs SET category = 'General' WHERE category IS NULL OR TRIM(category) = ''");
+        } catch (e) {
+            error('Migration failed for V13', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 13');
+        userVersion = 13;
     }
 
     log(`Database migrated to version ${userVersion}`);

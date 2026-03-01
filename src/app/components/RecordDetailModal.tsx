@@ -202,10 +202,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         setIsActionLoading(true);
         try {
             if (isInWorklist) {
-                await SystemRepository.executeRaw(
-                    'DELETE FROM sys_worklist WHERE source_table = ? AND source_id = ?',
-                    [activeTable, recordId]
-                );
+                await SystemRepository.removeWorklistItem(activeTable, recordId);
                 setIsInWorklist(false);
                 setWorklistItem(null);
             } else {
@@ -277,10 +274,14 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     }
                 }
 
-                await SystemRepository.executeRaw(
-                    'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context, priority, due_at) VALUES (?, ?, ?, ?, ?, ?)',
-                    [activeTable, recordId, label, context, priority, dueAt]
-                );
+                await SystemRepository.addWorklistItem({
+                    source_table: activeTable,
+                    source_id: recordId,
+                    display_label: label,
+                    display_context: context,
+                    priority,
+                    due_at: dueAt
+                });
 
                 // Fetch the newly created item once
                 const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId);
@@ -288,8 +289,6 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                 setWorklistItem(metadata.worklistItem as WorklistItemState | null);
             }
 
-            // Explicity dispatch db-changed so widgets update since executeRaw bypasses it
-            window.dispatchEvent(new Event('db-changed'));
         } catch (err) {
             logger.error('Failed to toggle worklist status', err);
         } finally {

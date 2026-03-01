@@ -18,6 +18,36 @@ export function createWorklistRepository(deps: WorklistRepositoryDeps) {
             return await runQuery('SELECT * FROM sys_worklist ORDER BY created_at DESC');
         },
 
+        async addWorklistItem(data: {
+            source_table: string;
+            source_id: string | number;
+            display_label: string;
+            display_context: string;
+            priority?: string;
+            due_at?: string | null;
+        }): Promise<void> {
+            await runQuery(
+                'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context, priority, due_at) VALUES (?, ?, ?, ?, ?, ?)',
+                [
+                    data.source_table,
+                    data.source_id,
+                    data.display_label,
+                    data.display_context,
+                    data.priority ?? 'normal',
+                    data.due_at ?? null
+                ]
+            );
+            notifyDbChange();
+        },
+
+        async removeWorklistItem(sourceTable: string, sourceId: string | number): Promise<void> {
+            await runQuery(
+                'DELETE FROM sys_worklist WHERE source_table = ? AND source_id = ?',
+                [sourceTable, sourceId]
+            );
+            notifyDbChange();
+        },
+
         async updateWorklistItem(id: number | string, data: { status?: string; comment?: string; priority?: string; due_at?: string | null }): Promise<void> {
             const fields: string[] = [];
             const params: Array<string | number | null | undefined> = [];
