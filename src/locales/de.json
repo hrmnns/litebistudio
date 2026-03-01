@@ -70,7 +70,7 @@
         "about": "Über"
     },
     "dashboard": {
-        "title": "Mein Dashboard",
+        "title": "Meine Dashboards",
         "subtitle": "Kategorisierte Auswertungen und Kacheln.",
         "add_widget": "Widget hinzufügen",
         "manage_dashboards": "Dashboards verwalten",
@@ -82,6 +82,7 @@
         "manage_title": "Dashboards verwalten",
         "new_dashboard": "Neues Dashboard",
         "new_dashboard_title": "Neues Dashboard erstellen",
+        "new_short": "Neu",
         "new_dashboard_placeholder": "Dashboard Name (z.B. Kosten für Kunde X)",
         "rename": "Umbenennen",
         "rename_report_prompt": "Neuer Name fuer den Bericht:",
@@ -103,13 +104,21 @@
         "active": "Aktiv",
         "no_reports": "Keine gespeicherten Berichte gefunden.",
         "tools_title": "Dashboard Tools",
-        "tools_tab_layout": "Layout",
+        "tools_tab_layout": "Widgets",
         "tools_tab_filters": "Filter",
+        "tools_tab_dashboards": "Dashboards",
         "tools_layout_hint": "Widgets umsortieren und entfernen, ohne die Übersicht zu verlassen.",
         "tools_filters_hint": "Globale Dashboard-Filter zentral verwalten.",
+        "tools_filters_no_common_columns": "Keine gemeinsamen Filterfelder ueber die aktuellen Widgets verfuegbar.",
+        "tools_dashboards_hint": "Dashboards erstellen, umbenennen und löschen.",
         "tools_move_up": "Nach oben",
         "tools_move_down": "Nach unten",
-        "tools_clear_filters": "Filter leeren"
+        "tools_clear_filters": "Filter leeren",
+        "tools_rename_unavailable": "System-Widgets koennen nicht umbenannt werden",
+        "tools_open": "Öffnen",
+        "default_badge": "Standard",
+        "rename_dashboard_prompt": "Name für Dashboard:",
+        "default_not_deletable": "Standard-Dashboard kann nicht gelöscht werden"
     },
     "worklist": {
         "add_dialog_title": "Zum Arbeitsvorrat",

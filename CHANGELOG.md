@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Dashboard Tools were expanded for end-to-end dashboard management in the right sidepanel:
+  - new `Dashboards` tab (switch/open, rename, delete, create)
+  - dashboard order controls (move up/down) with persisted order state
+  - explicit protection for default dashboard (non-deletable) while keeping minimum-one-dashboard rule.
+- Widget management in `Dashboard Tools > Widgets` was extended:
+  - move widgets between dashboards via per-widget quick target picker
+  - add-widget action directly in widgets tab (reusing existing add dialog)
+  - rename action is now always visible; for system widgets it is shown disabled for clarity.
+- Global dashboard filter workflow was enhanced:
+  - filtering is now managed exclusively via sidepanel (`Filters` tab)
+  - filter columns are restricted to fields compatible across active widgets
+  - value suggestions for filters now derive from actual distinct DB values
+    - categorical/time-like fields: show full value set
+    - free-text-like fields: show first sample values.
+
+### Changed
+- Dashboard Tools tab order was reorganized to: `Dashboards` -> `Widgets` -> `Filters`.
+- Dashboard management UX was moved from modal dialog to sidepanel tab for consistent in-context editing.
+- Dashboard title wording was normalized to plural form (`Meine Dashboards` / `My Dashboards`).
+- Header filter button now opens the sidepanel filter tab directly instead of toggling an inline filter section.
+
+### Fixed
+- Fixed dashboard header subtitle in English locale (removed unresolved `{{count}}` / `{{mode}}` placeholders).
+- Localized newly added dashboard-management labels and hints for DE/EN to avoid fallback-only strings.
+
 ## [1.3.0] - 2026-02-28
 
 ### Added
