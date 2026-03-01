@@ -7,7 +7,7 @@ import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
     ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-    ScatterChart, Scatter, LabelList
+    ScatterChart, Scatter, LabelList, RadialBarChart, RadialBar
 } from 'recharts';
 import { Loader2, AlertCircle, BarChart3, ExternalLink, FileText, Layout, Gauge, Image as ImageIcon } from 'lucide-react';
 import { RecordDetailModal } from './RecordDetailModal';
@@ -159,6 +159,29 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
             render: (item: DbRow) => formatValue(item[key], key)
         }));
     }, [results]);
+    const stackedBar100Data = useMemo(() => {
+        if (!results || results.length === 0) return [] as DbRow[];
+        const yAxes = config.yAxes || (config.yAxis ? [config.yAxis] : []);
+        if (yAxes.length === 0) return results;
+        return results.map((row) => {
+            let total = 0;
+            for (const y of yAxes) {
+                const num = Number(row[y]);
+                if (Number.isFinite(num)) total += num;
+            }
+            if (!Number.isFinite(total) || total === 0) {
+                const zeroRow: DbRow = { ...row };
+                for (const y of yAxes) zeroRow[y] = 0;
+                return zeroRow;
+            }
+            const normalized: DbRow = { ...row };
+            for (const y of yAxes) {
+                const num = Number(row[y]);
+                normalized[y] = Number.isFinite(num) ? (num / total) * 100 : 0;
+            }
+            return normalized;
+        });
+    }, [config.yAxes, config.yAxis, results]);
     const widgetDescription = (config.widgetDescription || '').trim();
     const widgetDescriptionPosition: 'top' | 'bottom' = config.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
     const renderWidgetDescription = (position: 'top' | 'bottom') => {
@@ -622,6 +645,78 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
                             <div className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">{t('common.no_data')}</div>
                         )}
                     </div>
+                ) : config.type === 'gauge' ? (
+                    <div className="h-full flex flex-col items-center justify-center p-4">
+                        {results && results.length > 0 ? (() => {
+                            const firstRow = results[0];
+                            const rowKeys = Object.keys(firstRow);
+                            const preferredMetricKey = (config.yAxes || [])[0] || config.yAxis || '';
+                            const metricKey = rowKeys.includes(preferredMetricKey)
+                                ? preferredMetricKey
+                                : (rowKeys.find((key) => {
+                                    const raw = firstRow[key];
+                                    if (typeof raw === 'number') return Number.isFinite(raw);
+                                    if (typeof raw === 'string') {
+                                        const normalized = raw.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.+-]/g, '');
+                                        return Number.isFinite(Number(normalized));
+                                    }
+                                    return false;
+                                }) || rowKeys[0]);
+                            const parseNumericValue = (raw: unknown): number => {
+                                if (typeof raw === 'number') return raw;
+                                if (typeof raw === 'string') {
+                                    const normalized = raw.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.+-]/g, '');
+                                    return Number(normalized);
+                                }
+                                return Number.NaN;
+                            };
+                            const value = parseNumericValue(firstRow[metricKey]);
+                            const metricValues = results
+                                .map((row) => parseNumericValue(row[metricKey]))
+                                .filter((num) => Number.isFinite(num));
+                            const minValue = Math.min(0, ...(metricValues.length ? metricValues : [0]));
+                            const maxBase = Math.max(...(metricValues.length ? metricValues : [100]), 100);
+                            const maxValue = maxBase <= minValue ? minValue + 1 : maxBase;
+                            const clamped = Math.min(maxValue, Math.max(minValue, Number.isFinite(value) ? value : minValue));
+                            const percent = ((clamped - minValue) / (maxValue - minValue)) * 100;
+
+                            return (
+                                <>
+                                    <div className="w-full h-full max-w-[420px] min-h-[220px]">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={220} minHeight={220}>
+                                            <RadialBarChart
+                                                cx="50%"
+                                                cy="72%"
+                                                innerRadius="62%"
+                                                outerRadius="100%"
+                                                barSize={20}
+                                                data={[{ value: Number.isFinite(percent) ? percent : 0, fill: config.color || COLORS[0] }]}
+                                                startAngle={180}
+                                                endAngle={0}
+                                            >
+                                                <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                                                <RadialBar dataKey="value" cornerRadius={12} background />
+                                            </RadialBarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="mt-[-4rem] flex flex-col items-center text-center">
+                                        <div className="text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
+                                            {Number.isFinite(value) ? formatValue(value, metricKey) : '-'}
+                                        </div>
+                                        {(config.kpiUnit || '').trim() && (
+                                            <div className="text-sm font-bold text-slate-500 dark:text-slate-400">{config.kpiUnit}</div>
+                                        )}
+                                        <div className="mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">{metricKey}</div>
+                                        <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                            {formatValue(minValue, metricKey)} - {formatValue(maxValue, metricKey)}
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })() : (
+                            <div className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">{t('common.no_data')}</div>
+                        )}
+                    </div>
                 ) : (
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         {config.type === 'bar' ? (
@@ -640,6 +735,44 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Bar key={y} dataKey={y} fill={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
                                         {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                    </Bar>
+                                ))}
+                            </BarChart>
+                        ) : config.type === 'stacked_bar' ? (
+                            <BarChart data={results}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                <Tooltip
+                                    contentStyle={chartTooltipContentStyle}
+                                    labelStyle={chartTooltipLabelStyle}
+                                    itemStyle={chartTooltipItemStyle}
+                                    cursor={chartTooltipCursor}
+                                    formatter={(val, name) => [formatValue(val, name as string), name]}
+                                />
+                                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                                {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
+                                    <Bar key={y} dataKey={y} stackId="stacked" fill={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
+                                        {config.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                    </Bar>
+                                ))}
+                            </BarChart>
+                        ) : config.type === 'stacked_bar_100' ? (
+                            <BarChart data={stackedBar100Data}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} domain={[0, 100]} tickFormatter={(val) => `${Number(val).toFixed(0)}%`} />
+                                <Tooltip
+                                    contentStyle={chartTooltipContentStyle}
+                                    labelStyle={chartTooltipLabelStyle}
+                                    itemStyle={chartTooltipItemStyle}
+                                    cursor={chartTooltipCursor}
+                                    formatter={(val, name) => [`${Number(val).toFixed(2)}%`, name]}
+                                />
+                                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                                {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
+                                    <Bar key={y} dataKey={y} stackId="stacked100" fill={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
+                                        {config.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => `${Number(val).toFixed(0)}%`} />}
                                     </Bar>
                                 ))}
                             </BarChart>

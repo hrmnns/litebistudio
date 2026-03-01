@@ -101,7 +101,7 @@ export interface AlertRule {
 }
 
 export interface WidgetConfig {
-    type: 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'kpu_manual' | 'image';
+    type: 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'kpu_manual' | 'image';
     xAxis?: string;
     yAxes?: string[];
     yAxis?: string;

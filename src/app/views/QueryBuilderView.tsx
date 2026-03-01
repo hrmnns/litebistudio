@@ -19,7 +19,7 @@ import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
     ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-    ScatterChart, Scatter, LabelList
+    ScatterChart, Scatter, LabelList, RadialBarChart, RadialBar
 } from 'recharts';
 import { formatValue } from '../utils/formatUtils';
 import type { DbRow, WidgetConfig } from '../../types';
@@ -35,7 +35,7 @@ import { appDialog } from '../../lib/appDialog';
 import type { SqlStatementRecord } from '../../lib/repositories/SystemRepository';
 import { MarkdownContent } from '../components/ui/MarkdownContent';
 
-type VisualizationType = 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
+type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
 const DEFAULT_SQL = '';
 
@@ -45,10 +45,13 @@ const CONTENT_VIS_TYPES = new Set<VisualizationType>(['text', 'markdown', 'statu
 const QUERY_VIS_OPTIONS: Array<{ id: VisualizationType; icon: React.ComponentType<{ className?: string }>; labelKey: string; fallback: string }> = [
     { id: 'table', icon: TableIcon, labelKey: 'querybuilder.table', fallback: 'Table' },
     { id: 'bar', icon: BarChart2, labelKey: 'querybuilder.bar', fallback: 'Bar' },
+    { id: 'stacked_bar', icon: BarChart2, labelKey: 'querybuilder.stacked_bar', fallback: 'Stacked Bar' },
+    { id: 'stacked_bar_100', icon: BarChart2, labelKey: 'querybuilder.stacked_bar_100', fallback: '100% Stacked Bar' },
     { id: 'line', icon: TrendingUp, labelKey: 'querybuilder.line', fallback: 'Line' },
     { id: 'area', icon: Layout, labelKey: 'querybuilder.area', fallback: 'Area' },
     { id: 'pie', icon: Layout, labelKey: 'querybuilder.pie', fallback: 'Pie' },
     { id: 'kpi', icon: Layout, labelKey: 'querybuilder.kpi', fallback: 'KPI' },
+    { id: 'gauge', icon: Gauge, labelKey: 'querybuilder.gauge', fallback: 'Gauge' },
     { id: 'composed', icon: Layout, labelKey: 'querybuilder.composed', fallback: 'Composed' },
     { id: 'radar', icon: Layout, labelKey: 'querybuilder.radar', fallback: 'Radar' },
     { id: 'scatter', icon: Layout, labelKey: 'querybuilder.scatter', fallback: 'Scatter' },
@@ -534,6 +537,28 @@ export const QueryBuilderView: React.FC = () => {
             })
             .filter((row) => Number.isFinite(row[scatterXKey] as number) && Number.isFinite(row[scatterYKey] as number));
     }, [results, scatterXKey, scatterYKey, visType]);
+    const stackedBar100Data = useMemo(() => {
+        const yAxes = visConfig.yAxes || [];
+        if (yAxes.length === 0) return [] as DbRow[];
+        return results.map((row) => {
+            let total = 0;
+            for (const y of yAxes) {
+                const num = Number(row[y]);
+                if (Number.isFinite(num)) total += num;
+            }
+            if (!Number.isFinite(total) || total === 0) {
+                const zeroRow: DbRow = { ...row };
+                for (const y of yAxes) zeroRow[y] = 0;
+                return zeroRow;
+            }
+            const normalized: DbRow = { ...row };
+            for (const y of yAxes) {
+                const num = Number(row[y]);
+                normalized[y] = Number.isFinite(num) ? (num / total) * 100 : 0;
+            }
+            return normalized;
+        });
+    }, [results, visConfig.yAxes]);
     const previewVisType: VisualizationType = (guidedStep === 2 && !isContentWidget) ? 'table' : visType;
     const hasQueryPreviewTabs = !isContentWidget && sql.trim().length > 0;
     const isGraphicCapableType = previewVisType !== 'table' && previewVisType !== 'pivot' && previewVisType !== 'text' && previewVisType !== 'markdown' && previewVisType !== 'status' && previewVisType !== 'section' && previewVisType !== 'kpi_manual' && previewVisType !== 'image';
@@ -587,7 +612,7 @@ export const QueryBuilderView: React.FC = () => {
         if (visType === 'table' || visType === 'pivot') {
             return true;
         }
-        const hasXAxis = Boolean(visConfig.xAxis);
+        const hasXAxis = visType === 'gauge' ? true : Boolean(visConfig.xAxis);
         const hasYAxis = Boolean(visConfig.yAxes && visConfig.yAxes.length > 0);
         if (!hasXAxis || !hasYAxis) {
             return false;
@@ -714,6 +739,10 @@ export const QueryBuilderView: React.FC = () => {
                 return { icon: <TableIcon className={iconClass} />, label: t('querybuilder.table') };
             case 'bar':
                 return { icon: <BarChart2 className={iconClass} />, label: t('querybuilder.bar') };
+            case 'stacked_bar':
+                return { icon: <BarChart2 className={iconClass} />, label: t('querybuilder.stacked_bar', 'Stacked Bar') };
+            case 'stacked_bar_100':
+                return { icon: <BarChart2 className={iconClass} />, label: t('querybuilder.stacked_bar_100', '100% Stacked Bar') };
             case 'line':
                 return { icon: <TrendingUp className={iconClass} />, label: t('querybuilder.line') };
             case 'text':
@@ -726,6 +755,8 @@ export const QueryBuilderView: React.FC = () => {
                 return { icon: <Layout className={iconClass} />, label: t('querybuilder.section', 'Section') };
             case 'kpi_manual':
                 return { icon: <Gauge className={iconClass} />, label: t('querybuilder.kpi_manual', 'KPI Manual') };
+            case 'gauge':
+                return { icon: <Gauge className={iconClass} />, label: t('querybuilder.gauge', 'Gauge') };
             case 'image':
                 return { icon: <ImageIcon className={iconClass} />, label: t('querybuilder.image', 'Image') };
             default:
@@ -1258,15 +1289,17 @@ export const QueryBuilderView: React.FC = () => {
 
                                     {(isGraphicCapableType && results.length > 0) && (
                                         <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                            {visType !== 'gauge' && (
+                                                <div>
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.x_axis')}</label>
+                                                    <select value={visConfig.xAxis || ''} onChange={e => setVisConfig({ ...visConfig, xAxis: e.target.value })} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
+                                                        <option value="">{t('querybuilder.select_column')}</option>
+                                                        {(visType === 'scatter' ? numericColumns : resultColumns).map(col => <option key={col} value={col}>{col}</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
                                             <div>
-                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.x_axis')}</label>
-                                                <select value={visConfig.xAxis || ''} onChange={e => setVisConfig({ ...visConfig, xAxis: e.target.value })} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
-                                                    <option value="">{t('querybuilder.select_column')}</option>
-                                                    {(visType === 'scatter' ? numericColumns : resultColumns).map(col => <option key={col} value={col}>{col}</option>)}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.y_axes')}</label>
+                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{visType === 'gauge' ? t('querybuilder.value', 'Wert') : t('querybuilder.y_axes')}</label>
                                                 <div className="flex flex-wrap gap-1 mb-2">
                                                     {(visConfig.yAxes || []).map(y => (
                                                         <span key={y} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 rounded text-[10px] font-bold flex items-center gap-1 border border-blue-200 dark:border-blue-700/60">
@@ -1280,9 +1313,9 @@ export const QueryBuilderView: React.FC = () => {
                                                         </span>
                                                     ))}
                                                 </div>
-                                                <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, yAxes: [...(visConfig.yAxes || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
-                                                    <option value="">{t('querybuilder.add_y_axis')}</option>
-                                                    {(visType === 'scatter' ? numericColumns : resultColumns).filter(c => !(visConfig.yAxes || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
+                                                <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, yAxes: visType === 'gauge' ? [e.target.value] : [...(visConfig.yAxes || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
+                                                    <option value="">{visType === 'gauge' ? t('querybuilder.select_column') : t('querybuilder.add_y_axis')}</option>
+                                                    {(visType === 'scatter' || visType === 'gauge' ? numericColumns : resultColumns).filter(c => (visType === 'gauge' ? true : !(visConfig.yAxes || []).includes(c))).map(col => <option key={col} value={col}>{col}</option>)}
                                                 </select>
                                             </div>
                                         </div>
@@ -2248,6 +2281,71 @@ export const QueryBuilderView: React.FC = () => {
                                                 <div className="text-xs font-bold text-slate-400 mt-6 uppercase tracking-[0.4em] font-mono">{metricKey}</div>
                                             </div>
                                         );
+                                    })() : previewVisType === 'gauge' ? (() => {
+                                        const firstRow = results[0];
+                                        const rowKeys = Object.keys(firstRow);
+                                        const preferredMetricKey = (visConfig.yAxes || [])[0] || visConfig.yAxis || '';
+                                        const metricKey = rowKeys.includes(preferredMetricKey)
+                                            ? preferredMetricKey
+                                            : (rowKeys.find((key) => {
+                                                const raw = firstRow[key];
+                                                if (typeof raw === 'number') return Number.isFinite(raw);
+                                                if (typeof raw === 'string') {
+                                                    const normalized = raw.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.+-]/g, '');
+                                                    return Number.isFinite(Number(normalized));
+                                                }
+                                                return false;
+                                            }) || rowKeys[0]);
+                                        const parseNumericValue = (raw: unknown): number => {
+                                            if (typeof raw === 'number') return raw;
+                                            if (typeof raw === 'string') {
+                                                const normalized = raw.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.+-]/g, '');
+                                                return Number(normalized);
+                                            }
+                                            return Number.NaN;
+                                        };
+                                        const value = parseNumericValue(firstRow[metricKey]);
+                                        const metricValues = results
+                                            .map((row) => parseNumericValue(row[metricKey]))
+                                            .filter((num) => Number.isFinite(num));
+                                        const minValue = Math.min(0, ...(metricValues.length ? metricValues : [0]));
+                                        const maxBase = Math.max(...(metricValues.length ? metricValues : [100]), 100);
+                                        const maxValue = maxBase <= minValue ? minValue + 1 : maxBase;
+                                        const clamped = Math.min(maxValue, Math.max(minValue, Number.isFinite(value) ? value : minValue));
+                                        const percent = ((clamped - minValue) / (maxValue - minValue)) * 100;
+                                        return (
+                                            <div className="flex-1 flex flex-col items-center justify-center p-4">
+                                                <div className="w-full h-full max-w-[420px] min-h-[280px]">
+                                                    <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={260}>
+                                                        <RadialBarChart
+                                                            cx="50%"
+                                                            cy="72%"
+                                                            innerRadius="62%"
+                                                            outerRadius="100%"
+                                                            barSize={22}
+                                                            data={[{ value: Number.isFinite(percent) ? percent : 0, fill: visConfig.color || COLORS[0] }]}
+                                                            startAngle={180}
+                                                            endAngle={0}
+                                                        >
+                                                            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                                                            <RadialBar dataKey="value" cornerRadius={12} background />
+                                                        </RadialBarChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                                <div className="mt-[-4.5rem] flex flex-col items-center">
+                                                    <div className="text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
+                                                        {Number.isFinite(value) ? formatValue(value, metricKey) : '-'}
+                                                    </div>
+                                                    {(visConfig.kpiUnit || '').trim() && (
+                                                        <div className="text-sm font-bold text-slate-500 dark:text-slate-400">{visConfig.kpiUnit}</div>
+                                                    )}
+                                                    <div className="mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">{metricKey}</div>
+                                                    <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                                        {formatValue(minValue, metricKey)} - {formatValue(maxValue, metricKey)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
                                     })() : (
                                         <div className="flex-1 min-h-[280px] min-w-0">
                                         <ResponsiveContainer width="100%" height="100%" minWidth={320} minHeight={280}>
@@ -2261,6 +2359,38 @@ export const QueryBuilderView: React.FC = () => {
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Bar key={y} dataKey={y} fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
                                                             {visConfig.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatValue(val, y)} />}
+                                                        </Bar>
+                                                    ))}
+                                                </BarChart>
+                                            ) : previewVisType === 'stacked_bar' ? (
+                                                <BarChart data={results}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} cursor={previewTooltipCursor} formatter={(val, name) => [formatValue(val, name as string), name]} />
+                                                    <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
+                                                    {(visConfig.yAxes || []).map((y, idx) => (
+                                                        <Bar key={y} dataKey={y} stackId="stacked" fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
+                                                            {visConfig.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={val => formatValue(val, y)} />}
+                                                        </Bar>
+                                                    ))}
+                                                </BarChart>
+                                            ) : previewVisType === 'stacked_bar_100' ? (
+                                                <BarChart data={stackedBar100Data}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} domain={[0, 100]} tickFormatter={(val) => `${Number(val).toFixed(0)}%`} />
+                                                    <Tooltip
+                                                        contentStyle={previewTooltipContentStyle}
+                                                        labelStyle={previewTooltipLabelStyle}
+                                                        itemStyle={previewTooltipItemStyle}
+                                                        cursor={previewTooltipCursor}
+                                                        formatter={(val, name) => [`${Number(val).toFixed(2)}%`, name]}
+                                                    />
+                                                    <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
+                                                    {(visConfig.yAxes || []).map((y, idx) => (
+                                                        <Bar key={y} dataKey={y} stackId="stacked100" fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
+                                                            {visConfig.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => `${Number(val).toFixed(0)}%`} />}
                                                         </Bar>
                                                     ))}
                                                 </BarChart>

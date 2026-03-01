@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Dashboard widget presentation was extended with:
   - per-widget temporary zoom/focus overlay (full-area preview, closable via button, backdrop click, or `ESC`)
   - persisted widget tile sizes aligned to dashboard grid slots (`1x1`, `1x2`, `2x1`, `2x2`).
+- Added new dashboard/widget chart types in Query Builder and renderer:
+  - `Gauge` (semi-circle KPI-like gauge with automatic value-range normalization)
+  - `Stacked Bar` (stacked series per category)
+  - `100% Stacked Bar` (percentage-normalized stacked series to 100% per category).
 
 ### Changed
 - Dashboard Tools tab order was reorganized to: `Dashboards` -> `Widgets` -> `Filters`.
