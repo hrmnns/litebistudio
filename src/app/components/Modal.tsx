@@ -7,12 +7,13 @@ interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     title: React.ReactNode;
+    headerActions?: React.ReactNode;
     children: React.ReactNode;
     noScroll?: boolean;
     variant?: 'default' | 'dialog';
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, noScroll, variant = 'default' }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, headerActions, children, noScroll, variant = 'default' }) => {
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -54,17 +55,20 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
                     )}>
                         {title}
                     </h3>
-                    <button
-                        onClick={onClose}
-                        className={cn(
-                            "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
-                            variant === 'dialog'
-                                ? "p-1 rounded-md hover:bg-slate-200/70 dark:hover:bg-slate-700"
-                                : "p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-                        )}
-                    >
-                        <X className={cn(variant === 'dialog' ? "w-4 h-4" : "w-5 h-5")} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {headerActions}
+                        <button
+                            onClick={onClose}
+                            className={cn(
+                                "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
+                                variant === 'dialog'
+                                    ? "p-1 rounded-md hover:bg-slate-200/70 dark:hover:bg-slate-700"
+                                    : "p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                            )}
+                        >
+                            <X className={cn(variant === 'dialog' ? "w-4 h-4" : "w-5 h-5")} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className={cn(

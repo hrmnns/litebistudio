@@ -14,12 +14,14 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { DataTable, type Column, type DataTableSortConfig } from '../../components/ui/DataTable';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
-import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Pencil, Trash2, FolderOpen, ChevronDown, ListChecks, Eraser, Table2, Filter, SlidersHorizontal, Plus } from 'lucide-react';
+import { isValidIdentifier } from '../../lib/utils';
+import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Pencil, Trash2, FolderOpen, ChevronDown, ListChecks, Eraser, Table2, Filter, Plus } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow } from '../../types';
 import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
+import { CreateTableModal } from '../components/CreateTableModal';
 import type { DataSourceEntry, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
 import { INSPECTOR_LAST_SELECT_SQL_KEY, INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 import { appDialog } from '../../lib/appDialog';
@@ -112,19 +114,28 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [lastSavedSqlTemplateName, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
     const [lastSavedSqlTemplateDescription, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('data_inspector_last_saved_sql_template_description', '');
     const [loadedSqlTemplateMeta, setLoadedSqlTemplateMeta] = useState<{ name: string; description: string }>({ name: '', description: '' });
-    const [sqlAssistTab, setSqlAssistTab] = useState<'manager' | 'assistant'>('manager');
+    const [sqlAssistTab, setSqlAssistTab] = useState<'manager' | 'assistant' | 'actions'>('manager');
     const [showTableTools, setShowTableTools] = useLocalStorage<boolean>('data_inspector_table_tools_open', false);
-    const [tableToolsTab, setTableToolsTab] = useLocalStorage<'columns' | 'filters' | 'actions'>(
+    const [tableToolsTab, setTableToolsTab] = useLocalStorage<'tables' | 'columns' | 'filters'>(
         'data_inspector_table_tools_tab_v1',
-        'columns'
+        'tables'
     );
+    const [isCreateTableOpen, setIsCreateTableOpen] = useState(false);
+    const [newTableName, setNewTableName] = useState('');
+    const [createColumns, setCreateColumns] = useState<Array<{ name: string; type: string }>>([
+        { name: 'id', type: 'INTEGER PRIMARY KEY' }
+    ]);
     const [tableSelectedColumns, setTableSelectedColumns] = useState<string[]>([]);
     const [tableVisibleColumns, setTableVisibleColumns] = useState<string[]>([]);
     const [tableFilterColumn, setTableFilterColumn] = useState('');
     const [tableFilterValue, setTableFilterValue] = useState('');
-    const [managerPanels, setManagerPanels] = useLocalStorage<{ templates: boolean; manager: boolean; recent: boolean }>(
+    const [managerPanels, setManagerPanels] = useLocalStorage<{ manager: boolean; recent: boolean }>(
         'data_inspector_sql_manager_panels_v1',
-        { templates: true, manager: true, recent: true }
+        { manager: true, recent: true }
+    );
+    const [sqlActionsPanels, setSqlActionsPanels] = useLocalStorage<{ general: boolean; source: boolean }>(
+        'data_inspector_sql_actions_panels_v1',
+        { general: true, source: true }
     );
     const [assistantPanels, setAssistantPanels] = useLocalStorage<{
         table: boolean;
@@ -160,7 +171,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [sqlOutputView, setSqlOutputView] = useState<'result' | 'explain'>(explainMode ? 'explain' : 'result');
     const [sqlExecutionSql, setSqlExecutionSql] = useState('');
     const [sqlLimitNotice, setSqlLimitNotice] = useState('');
+    const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('data_inspector_sql_limit_notice_dismissed', false);
     const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
+    const [indexModalTab, setIndexModalTab] = useState<'manual' | 'suggestions'>('manual');
     const [indexName, setIndexName] = useState('');
     const [indexColumns, setIndexColumns] = useState<string[]>([]);
     const [indexUnique, setIndexUnique] = useState(false);
@@ -337,7 +350,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     }, [SQL_LIBRARY_MIGRATION_KEY, SQL_LIBRARY_SCOPE, loadSqlStatements, normalizeSql, t]);
 
     // Fetch available data sources (tables + views)
-    const { data: dataSources } = useAsync<DataSourceEntry[]>(
+    const { data: dataSources, refresh: refreshDataSources } = useAsync<DataSourceEntry[]>(
         async () => {
             const allSources = await SystemRepository.getDataSources();
             const filteredSources = isAdminMode ? allSources : allSources.filter(s => !s.name.startsWith('sys_'));
@@ -351,6 +364,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     );
 
     const tables = React.useMemo(() => (dataSources || []).map(s => s.name), [dataSources]);
+    const physicalTables = React.useMemo(
+        () => (dataSources || []).filter(source => source.type === 'table'),
+        [dataSources]
+    );
     const selectedSourceType = React.useMemo<'table' | 'view'>(
         () => (dataSources?.find(s => s.name === selectedTable)?.type ?? 'table'),
         [dataSources, selectedTable]
@@ -468,7 +485,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         if (isSelect) {
             const cappedLimit = Math.max(1, Math.floor(sqlMaxRows || 1));
             executionSql = `SELECT * FROM (${executionSql}) AS __litebi_guard LIMIT ${cappedLimit}`;
-            setSqlLimitNotice(t('datainspector.limit_applied_notice', { limit: cappedLimit }));
+            setSqlLimitNotice(sqlLimitNoticeDismissed ? '' : t('datainspector.limit_applied_notice', { limit: cappedLimit }));
         } else {
             setSqlLimitNotice('');
         }
@@ -480,7 +497,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         if (isSelect) {
             localStorage.setItem(INSPECTOR_LAST_SELECT_SQL_KEY, trimmed);
         }
-    }, [execute, setSqlHistory, sqlMaxRows, sqlRequireLimitConfirm, t]);
+    }, [execute, setSqlHistory, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, t]);
 
     const handleRunSql = async () => {
         await executeSqlText(inputSql);
@@ -638,15 +655,99 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     };
 
     const quoteIdentifier = useCallback((identifier: string) => `"${identifier.replace(/"/g, '""')}"`, []);
+    const isSafeColumnType = useCallback((type: string): boolean => /^[A-Za-z0-9_ (),]+$/.test(type.trim()), []);
 
-    const openCreateIndexModal = () => {
-        if (!selectedTable || selectedSourceType !== 'table') return;
-        setIndexName(`idx_${selectedTable}_`);
+    const openCreateIndexModal = (targetTable?: string) => {
+        const resolvedTable = targetTable || selectedTable;
+        if (!resolvedTable) return;
+        const resolvedType = dataSources?.find(source => source.name === resolvedTable)?.type;
+        if (resolvedType !== 'table') return;
+        if (targetTable && targetTable !== selectedTable) {
+            setSelectedTable(targetTable);
+        }
+        setIndexName(`idx_${resolvedTable}_`);
         setIndexColumns([]);
         setIndexUnique(false);
         setIndexWhere('');
+        setIndexModalTab('manual');
         setIsCreateIndexOpen(true);
     };
+
+    const activateTableFromTools = useCallback((tableName: string) => {
+        if (!tableName) return;
+        setSelectedTable(tableName);
+        setCurrentPage(1);
+    }, []);
+
+    const handleClearTableFromTools = useCallback(async (tableName: string) => {
+        if (!tableName) return;
+        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        if (shouldConfirm && !(await appDialog.confirm(t('datasource.clear_confirm', { name: tableName })))) return;
+        try {
+            await SystemRepository.executeRaw(`DELETE FROM ${quoteIdentifier(tableName)}`);
+            setSelectedTable(tableName);
+            setCurrentPage(1);
+            await Promise.all([refreshDataSources(), execute()]);
+            await appDialog.info(t('datasource.cleared_success'));
+        } catch (err) {
+            await appDialog.error(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
+        }
+    }, [execute, quoteIdentifier, refreshDataSources, t]);
+
+    const handleDropTableFromTools = useCallback(async (tableName: string) => {
+        if (!tableName) return;
+        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_confirm', { name: tableName })))) return;
+        try {
+            await SystemRepository.executeRaw(`DROP TABLE ${quoteIdentifier(tableName)}`);
+            await refreshDataSources();
+            const nextTable = (physicalTables.find(source => source.name !== tableName)?.name) || '';
+            setSelectedTable(nextTable);
+            setCurrentPage(1);
+            await execute();
+        } catch (err) {
+            await appDialog.error(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
+        }
+    }, [execute, physicalTables, quoteIdentifier, refreshDataSources, t]);
+
+    const openCreateTableModal = useCallback(() => {
+        setNewTableName('');
+        setCreateColumns([{ name: 'id', type: 'INTEGER PRIMARY KEY' }]);
+        setIsCreateTableOpen(true);
+    }, []);
+
+    const handleCreateTableFromTools = useCallback(async () => {
+        const normalizedTableName = newTableName.trim();
+        if (!isValidIdentifier(normalizedTableName)) {
+            await appDialog.warning(t('datasource.invalid_table_name', 'Invalid table name. Use letters, numbers and underscore only.'));
+            return;
+        }
+        if (!createColumns.length) {
+            await appDialog.warning(t('datasource.invalid_columns', 'Please provide at least one valid column.'));
+            return;
+        }
+        for (const col of createColumns) {
+            const colName = col.name.trim();
+            const colType = col.type.trim();
+            if (!isValidIdentifier(colName) || !colType || !isSafeColumnType(colType)) {
+                await appDialog.warning(t('datasource.invalid_columns', 'Please provide at least one valid column.'));
+                return;
+            }
+        }
+        try {
+            const cols = createColumns.map(c => `${quoteIdentifier(c.name.trim())} ${c.type.trim()}`).join(', ');
+            const sql = `CREATE TABLE ${quoteIdentifier(normalizedTableName)} (${cols})`;
+            await SystemRepository.executeRaw(sql);
+            setIsCreateTableOpen(false);
+            await refreshDataSources();
+            setSelectedTable(normalizedTableName);
+            setCurrentPage(1);
+            await execute();
+            await appDialog.info(t('datasource.table_created'));
+        } catch (err) {
+            await appDialog.error(t('common.error') + ': ' + (err instanceof Error ? err.message : String(err)));
+        }
+    }, [createColumns, execute, isSafeColumnType, newTableName, quoteIdentifier, refreshDataSources, t]);
 
     const toggleIndexColumn = (column: string) => {
         setIndexColumns(prev => (
@@ -862,6 +963,19 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             setApplyingIndexSuggestionId('');
         }
     }, [execute, t]);
+
+    const manualIndexPreviewSql = React.useMemo(() => {
+        if (!selectedTable) return '--';
+        const trimmedName = indexName.trim();
+        const uniqueSql = indexUnique ? 'UNIQUE ' : '';
+        const hasColumns = indexColumns.length > 0;
+        const quotedColumns = hasColumns ? indexColumns.map(quoteIdentifier).join(', ') : '<select_columns>';
+        const whereSql = indexWhere.trim() ? ` WHERE ${indexWhere.trim()}` : '';
+        if (!trimmedName) {
+            return `-- ${t('datasource.index_create_name_required', 'Please provide an index name.')}`;
+        }
+        return `CREATE ${uniqueSql}INDEX ${quoteIdentifier(trimmedName)} ON ${quoteIdentifier(selectedTable)} (${quotedColumns})${whereSql};`;
+    }, [indexColumns, indexName, indexUnique, indexWhere, quoteIdentifier, selectedTable, t]);
 
     // Generate Columns dynamically
     const columns: Column<DbRow>[] = React.useMemo(() => {
@@ -1215,12 +1329,18 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
     }, [executeSqlText, fixedMode, forwardSqlToWorkspace, setShowSqlAssist]);
 
-    const toggleManagerPanel = useCallback((panel: 'templates' | 'manager' | 'recent') => {
+    const toggleManagerPanel = useCallback((panel: 'manager' | 'recent') => {
         setManagerPanels(prev => ({
             ...prev,
             [panel]: !prev[panel]
         }));
     }, [setManagerPanels]);
+    const toggleSqlActionsPanel = useCallback((panel: 'general' | 'source') => {
+        setSqlActionsPanels(prev => ({
+            ...prev,
+            [panel]: !prev[panel]
+        }));
+    }, [setSqlActionsPanels]);
     const toggleAssistantPanel = useCallback((panel: 'table' | 'columns' | 'aggregation' | 'grouping' | 'filter' | 'sorting' | 'preview') => {
         setAssistantPanels(prev => ({
             ...prev,
@@ -1305,23 +1425,23 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setTableFilterValue('');
     }, [setShowTableFilters]);
 
-    const openSelectedTableInSql = useCallback(() => {
-        const safeTable = selectedTable.replace(/"/g, '""');
-        const sql = `SELECT * FROM "${safeTable}" LIMIT 100`;
-        if (fixedMode === 'table') {
-            forwardSqlToWorkspace(sql);
-            return;
-        }
-        setMode('sql');
-        setInputSql(sql);
-        setSqlOutputView('result');
-        setShowTableTools(false);
-    }, [fixedMode, forwardSqlToWorkspace, selectedTable, setShowTableTools]);
-
-    const openTableToolsTab = useCallback((tab: 'columns' | 'filters' | 'actions') => {
+    const openTableToolsTab = useCallback((tab: 'tables' | 'columns' | 'filters') => {
         setTableToolsTab(tab);
         setShowTableTools(true);
     }, [setShowTableTools, setTableToolsTab]);
+
+    const loadSelectedSourceIntoSql = useCallback(async (runImmediately: boolean, explicitColumns: boolean) => {
+        if (!selectedTable) return;
+        const safeTable = selectedTable.replace(/"/g, '""');
+        const quotedColumns = (selectedTableSchema || []).map((col) => `"${String(col.name).replace(/"/g, '""')}"`);
+        const selectList = explicitColumns && quotedColumns.length > 0 ? quotedColumns.join(',\n    ') : '*';
+        const sql = `SELECT ${selectList === '*' ? '*' : `\n    ${selectList}`}\nFROM "${safeTable}"\nLIMIT 100`;
+        setInputSql(sql);
+        setSqlOutputView('result');
+        if (runImmediately) {
+            await executeSqlText(sql);
+        }
+    }, [executeSqlText, selectedTable, selectedTableSchema]);
 
     const buildFieldPickerSql = useCallback((columns: string[]) => {
         const safeTable = selectedTable.replace(/"/g, '""');
@@ -1794,6 +1914,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                         <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 flex-shrink-0">
                             <button
                                 type="button"
+                                onClick={() => setTableToolsTab('tables')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'tables' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                            >
+                                {t('datainspector.table_tools_tab_tables', 'Tables')}
+                            </button>
+                            <button
+                                type="button"
                                 onClick={() => setTableToolsTab('columns')}
                                 className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'columns' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
@@ -1806,14 +1933,80 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             >
                                 {t('datainspector.table_tools_tab_filters', 'Filters')}
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setTableToolsTab('actions')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableToolsTab === 'actions' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                            >
-                                {t('datainspector.table_tools_tab_actions', 'Actions')}
-                            </button>
                         </div>
+
+                        {tableToolsTab === 'tables' && (
+                            <div className="flex-1 min-h-0 flex flex-col gap-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        {t('datainspector.table_tools_tables_hint', 'Activate and manage physical tables.')}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={openCreateTableModal}
+                                        className="h-8 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30 inline-flex items-center gap-1.5"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        {t('querybuilder.start_new', 'Neu')}
+                                    </button>
+                                </div>
+                                <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
+                                    {physicalTables.length === 0 ? (
+                                        <div className="p-3 text-xs text-slate-400 dark:text-slate-500">{t('common.no_data')}</div>
+                                    ) : (
+                                        physicalTables.map((table) => {
+                                            const isActive = selectedTable === table.name;
+                                            return (
+                                                <div key={table.name} className={`p-3 flex items-center justify-between gap-3 ${isActive ? 'bg-blue-50/40 dark:bg-blue-900/15' : ''}`}>
+                                                    <div className="min-w-0">
+                                                        <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{table.name}</div>
+                                                        <div className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">{table.type}</div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => activateTableFromTools(table.name)}
+                                                            className={`h-7 w-7 inline-flex items-center justify-center rounded border ${isActive ? 'border-blue-300 dark:border-blue-700 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                                            title={t('datainspector.table_tools_activate_table', 'Activate table')}
+                                                            aria-label={t('datainspector.table_tools_activate_table', 'Activate table')}
+                                                        >
+                                                            <FolderOpen className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void handleClearTableFromTools(table.name); }}
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                                            title={t('datainspector.table_tools_clear_table', 'Clear table')}
+                                                            aria-label={t('datainspector.table_tools_clear_table', 'Clear table')}
+                                                        >
+                                                            <Eraser className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openCreateIndexModal(table.name)}
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                                            title={t('datasource.create_index_title', 'Create index')}
+                                                            aria-label={t('datasource.create_index_title', 'Create index')}
+                                                        >
+                                                            <ListPlus className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void handleDropTableFromTools(table.name); }}
+                                                            className="h-7 w-7 inline-flex items-center justify-center rounded border border-rose-300/80 dark:border-rose-800/80 bg-rose-50/40 dark:bg-rose-900/20 hover:bg-rose-100/60 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-300"
+                                                            title={t('datainspector.table_tools_delete_table', 'Delete table')}
+                                                            aria-label={t('datainspector.table_tools_delete_table', 'Delete table')}
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {tableToolsTab === 'columns' && (
                             <div className="flex-1 min-h-0 flex flex-col gap-2">
@@ -1876,51 +2069,48 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                             return (
                                             <div
                                                 key={col.name}
-                                                className={`p-3 space-y-2 ${isSortedColumn ? 'bg-blue-50/60 dark:bg-blue-900/20' : ''} ${isSelectedColumn ? 'ring-1 ring-inset ring-blue-200 dark:ring-blue-700/60' : ''}`}
+                                                className={`p-3 flex items-center justify-between gap-2 ${isSortedColumn ? 'bg-blue-50/40 dark:bg-blue-900/15' : ''}`}
                                             >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="min-w-0">
-                                                        <label className="flex items-center gap-2 min-w-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isSelectedColumn}
-                                                                onChange={() => {
-                                                                    setTableSelectedColumns(prev => (
-                                                                        prev.includes(col.name)
-                                                                            ? prev.filter(name => name !== col.name)
-                                                                            : [...prev, col.name]
-                                                                    ));
-                                                                }}
-                                                            />
-                                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex items-center gap-2">
-                                                            <span className="truncate">{col.name}</span>
-                                                            {isSortedColumn && (
-                                                                <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
-                                                                    {sortDirection === 'asc' ? 'ASC' : 'DESC'}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        </label>
-                                                        <div className="text-[10px] text-slate-400 dark:text-slate-500">{col.type || '-'}</div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setTableSortConfig({ key: col.name, direction: 'asc' })}
-                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'asc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
-                                                            title={t('datainspector.table_tools_sort_asc', 'Sort ascending')}
-                                                        >
-                                                            ASC
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setTableSortConfig({ key: col.name, direction: 'desc' })}
-                                                            className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'desc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
-                                                            title={t('datainspector.table_tools_sort_desc', 'Sort descending')}
-                                                        >
-                                                            DESC
-                                                        </button>
-                                                    </div>
+                                                <div className="min-w-0 flex items-center gap-2">
+                                                    <label className="inline-flex items-center gap-2 min-w-0 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelectedColumn}
+                                                            onChange={() => {
+                                                                setTableSelectedColumns(prev => (
+                                                                    prev.includes(col.name)
+                                                                        ? prev.filter(name => name !== col.name)
+                                                                        : [...prev, col.name]
+                                                                ));
+                                                            }}
+                                                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
+                                                        />
+                                                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{col.name}</span>
+                                                    </label>
+                                                    {isSortedColumn && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
+                                                            {sortDirection === 'asc' ? 'ASC' : 'DESC'}
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">{col.type || '-'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTableSortConfig({ key: col.name, direction: 'asc' })}
+                                                        className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'asc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                                        title={t('datainspector.table_tools_sort_asc', 'Sort ascending')}
+                                                    >
+                                                        ASC
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTableSortConfig({ key: col.name, direction: 'desc' })}
+                                                        className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'desc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                                        title={t('datainspector.table_tools_sort_desc', 'Sort descending')}
+                                                    >
+                                                        DESC
+                                                    </button>
                                                 </div>
                                             </div>
                                         );
@@ -2012,106 +2202,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             </div>
                         )}
 
-                        {tableToolsTab === 'actions' && (
-                            <div className="flex-1 min-h-0 flex flex-col gap-3">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_actions_hint', 'Quick actions for current table context.')}</p>
-                                <button
-                                    type="button"
-                                    onClick={() => execute()}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
-                                >
-                                    {t('common.refresh', 'Refresh')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleExportCurrentRows}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
-                                >
-                                    {t('datainspector.table_tools_export_rows', 'Export current rows')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={openSelectedTableInSql}
-                                    className="h-9 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30 text-left"
-                                >
-                                    {t('datainspector.table_tools_open_sql', 'Open as SQL')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveCurrentView}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
-                                >
-                                    {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { void handleDeleteCurrentView(); }}
-                                    disabled={!activeViewId}
-                                    className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left disabled:opacity-40"
-                                >
-                                    {t('datainspector.delete_view')}
-                                </button>
-                                {selectedSourceType === 'table' && (
-                                    <button
-                                        type="button"
-                                        onClick={openCreateIndexModal}
-                                        className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
-                                    >
-                                        {t('datainspector.table_tools_create_index', 'Create index')}
-                                    </button>
-                                )}
-                                {selectedSourceType === 'table' && (
-                                    <div className="mt-1 pt-3 border-t border-slate-200 dark:border-slate-700 min-h-0 flex-1 flex flex-col gap-2">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
-                                                {t('datainspector.index_suggestions_title', 'Index Suggestions')}
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => { void generateIndexSuggestions(); }}
-                                                disabled={isGeneratingIndexSuggestions}
-                                                className="h-7 px-2 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] disabled:opacity-40"
-                                            >
-                                                {isGeneratingIndexSuggestions
-                                                    ? t('common.loading', 'Loading...')
-                                                    : t('datainspector.index_suggestions_generate', 'Generate')}
-                                            </button>
-                                        </div>
-                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                            {t('datainspector.index_suggestions_hint', 'Based on active filters, sorting, cardinality and existing indexes.')}
-                                        </div>
-                                        <div className="min-h-0 flex-1 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
-                                            {indexSuggestions.length === 0 ? (
-                                                <div className="p-3 text-xs text-slate-400 dark:text-slate-500">
-                                                    {t('datainspector.index_suggestions_empty', 'No suggestions yet. Generate to analyze this table.')}
-                                                </div>
-                                            ) : (
-                                                indexSuggestions.map((suggestion) => (
-                                                    <div key={suggestion.id} className="p-3 space-y-2">
-                                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">{suggestion.indexName}</div>
-                                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{suggestion.reason}</div>
-                                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                                            {t('datainspector.index_suggestions_columns', 'Columns')}: <span className="font-mono">{suggestion.columns.join(', ')}</span>
-                                                        </div>
-                                                        <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 break-all">{suggestion.sql}</div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => { void applyIndexSuggestion(suggestion); }}
-                                                            disabled={applyingIndexSuggestionId === suggestion.id}
-                                                            className="h-7 px-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[11px] disabled:opacity-40"
-                                                        >
-                                                            {applyingIndexSuggestionId === suggestion.id
-                                                                ? t('common.saving', 'Saving...')
-                                                                : t('datainspector.index_suggestions_apply', 'Create')}
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                     ) : (
                     <div className="h-full min-h-0 flex flex-col gap-4">
@@ -2130,56 +2220,17 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             >
                                 {t('datainspector.assistant_tab', 'SQL Builder')}
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setSqlAssistTab('actions')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlAssistTab === 'actions' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                            >
+                                {t('datainspector.actions_tab', 'Actions')}
+                            </button>
                         </div>
                         {sqlAssistTab === 'manager' ? (
                         <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
-                        <div className={managerPanels.templates ? 'min-h-0 flex-[0.9] flex flex-col gap-2' : 'flex-shrink-0'}>
-                            <button
-                                type="button"
-                                onClick={() => toggleManagerPanel('templates')}
-                                className="flex items-center justify-between text-left"
-                            >
-                                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.templates')}</span>
-                                <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${managerPanels.templates ? 'rotate-180' : ''}`} />
-                            </button>
-                            {managerPanels.templates && (
-                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
-                                {sqlTemplates.map(template => (
-                                    <div
-                                        key={template.key}
-                                        className="p-3 space-y-2"
-                                    >
-                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                            {t(`datainspector.template_${template.key}`)}
-                                        </div>
-                                        <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate">{template.sql}</div>
-                                        <div className="flex flex-wrap gap-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => { void applySqlTemplate(template.sql, false, t(`datainspector.template_${template.key}`), t(`datainspector.template_${template.key}_description`, '')); }}
-                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
-                                                title={t('common.open', 'Open')}
-                                                aria-label={t('common.open', 'Open')}
-                                            >
-                                                <FolderOpen className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { void applySqlTemplate(template.sql, true, t(`datainspector.template_${template.key}`), t(`datainspector.template_${template.key}_description`, '')); }}
-                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                                                title={t('datainspector.run_sql')}
-                                                aria-label={t('datainspector.run_sql')}
-                                            >
-                                                <Play className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            )}
-                        </div>
-
-                            <div className={managerPanels.manager ? 'min-h-0 flex-[1.3] flex flex-col gap-2' : 'flex-shrink-0'}>
+                            <div className={managerPanels.manager ? 'min-h-0 flex-[1.7] flex flex-col gap-2' : 'flex-shrink-0'}>
                                 <button
                                     type="button"
                                     onClick={() => toggleManagerPanel('manager')}
@@ -2307,7 +2358,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             )}
                         </div>
                         </div>
-                    ) : (
+                    ) : sqlAssistTab === 'assistant' ? (
                         <div className="h-full min-h-0 flex flex-col">
                             <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-3">
                             <div className="flex items-center justify-between gap-2">
@@ -2725,11 +2776,20 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.preview ? 'rotate-180' : ''}`} />
                                     </button>
                                     {assistantPanels.preview && (
-                                    <textarea
-                                        readOnly
-                                        value={assistantSqlPreview}
-                                        className="w-full h-32 p-2 font-mono text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200"
-                                    />
+                                    <div className="h-32 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                                        <CodeMirror
+                                            value={assistantSqlPreview}
+                                            height="128px"
+                                            editable={false}
+                                            basicSetup={{
+                                                lineNumbers: false,
+                                                foldGutter: false,
+                                                highlightActiveLine: false,
+                                                highlightActiveLineGutter: false
+                                            }}
+                                            extensions={sqlEditorExtensions}
+                                        />
+                                    </div>
                                     )}
                                 </div>
 
@@ -2752,6 +2812,150 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                     {t('datainspector.run_sql')}
                                 </button>
                             </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="h-full min-h-0 flex flex-col gap-3">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {t('datainspector.sql_actions_hint', 'Quick shortcuts for SQL workspace and schema operations.')}
+                            </p>
+                            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 p-2 space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleSqlActionsPanel('general')}
+                                    className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                >
+                                    <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
+                                        {t('datainspector.sql_actions_group_general', 'General')}
+                                    </span>
+                                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${sqlActionsPanels.general ? 'rotate-180' : ''}`} />
+                                </button>
+                                {sqlActionsPanels.general && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={openCreateTableModal}
+                                            className="h-9 w-full px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
+                                        >
+                                            {t('datasource.create_table_title', 'New Table')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveCustomTemplate}
+                                            className="h-9 w-full px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
+                                        >
+                                            {t('common.save', 'Save')}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 p-2 space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleSqlActionsPanel('source')}
+                                    className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                >
+                                    <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
+                                        {t('datainspector.sql_actions_group_source', 'Source-dependent')}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                                            {selectedSourceType === 'table' ? 'TABLE' : 'VIEW'}
+                                        </span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${sqlActionsPanels.source ? 'rotate-180' : ''}`} />
+                                    </div>
+                                </button>
+                                {sqlActionsPanels.source && (
+                                    <>
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
+                                                {t('datainspector.sql_actions_source', 'Source')}
+                                            </label>
+                                            <select
+                                                value={selectedTable}
+                                                onChange={(e) => setSelectedTable(e.target.value)}
+                                                className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
+                                            >
+                                                {(dataSources || []).map(source => (
+                                                    <option key={source.name} value={source.name}>
+                                                        {source.type === 'view' ? `${source.name} (view)` : source.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
+                                                {t('datainspector.templates', 'Templates')}
+                                            </label>
+                                            <div className="max-h-36 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-900">
+                                                {sqlTemplates.map(template => (
+                                                    <div key={`actions-template-${template.key}`} className="p-2 space-y-1.5">
+                                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                                            {t(`datainspector.template_${template.key}`)}
+                                                        </div>
+                                                        <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                                            {template.sql}
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { void applySqlTemplate(template.sql, false, t(`datainspector.template_${template.key}`), t(`datainspector.template_${template.key}_description`, '')); }}
+                                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                                                title={t('common.open', 'Open')}
+                                                                aria-label={t('common.open', 'Open')}
+                                                            >
+                                                                <FolderOpen className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { void applySqlTemplate(template.sql, true, t(`datainspector.template_${template.key}`), t(`datainspector.template_${template.key}_description`, '')); }}
+                                                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                                                                title={t('datainspector.run_sql')}
+                                                                aria-label={t('datainspector.run_sql')}
+                                                            >
+                                                                <Play className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => openCreateIndexModal()}
+                                                disabled={selectedSourceType !== 'table'}
+                                                className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left disabled:opacity-40"
+                                                title={selectedSourceType !== 'table'
+                                                    ? t('datasource.view_type', 'VIEW')
+                                                    : t('datasource.create_index_title', 'Create index')}
+                                            >
+                                                {t('datasource.create_index_title', 'Create index')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { void loadSelectedSourceIntoSql(false, false); }}
+                                                className="h-9 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30 text-left"
+                                            >
+                                                {t('datainspector.sql_actions_insert_select', 'Load SELECT template')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { void loadSelectedSourceIntoSql(false, true); }}
+                                                className="h-9 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30 text-left"
+                                            >
+                                                {t('datainspector.sql_actions_insert_select_columns', 'Load SELECT with columns')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { void handleRunSql(); }}
+                                                className="h-9 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30 text-left"
+                                            >
+                                                {t('datainspector.run_sql', 'Run')}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
@@ -2907,7 +3111,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             <span>{sqlLimitNotice}</span>
                             <button
                                 type="button"
-                                onClick={() => setSqlLimitNotice('')}
+                                onClick={() => {
+                                    setSqlLimitNotice('');
+                                    setSqlLimitNoticeDismissed(true);
+                                }}
                                 className="shrink-0 text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 font-bold leading-none"
                                 aria-label={t('common.close', 'Close')}
                                 title={t('common.close', 'Close')}
@@ -3085,6 +3292,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                     <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between gap-3 text-[11px]">
                         <div className="flex items-center gap-1.5">
                             <button
+                                onClick={() => openTableToolsTab('tables')}
+                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                title={t('datainspector.table_tools_tab_tables', 'Tables')}
+                                aria-label={t('datainspector.table_tools_tab_tables', 'Tables')}
+                            >
+                                <Database className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                                 onClick={() => openTableToolsTab('columns')}
                                 className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                 title={t('datainspector.table_tools_tab_columns', 'Columns')}
@@ -3101,15 +3316,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                 <Filter className="w-3.5 h-3.5" />
                             </button>
                             <button
-                                onClick={() => openTableToolsTab('actions')}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
-                                title={t('datainspector.table_tools_tab_actions', 'Actions')}
-                                aria-label={t('datainspector.table_tools_tab_actions', 'Actions')}
-                            >
-                                <SlidersHorizontal className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                                onClick={openCreateIndexModal}
+                                onClick={() => openCreateIndexModal()}
                                 disabled={selectedSourceType !== 'table'}
                                 className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 flex items-center gap-1"
                                 title={selectedSourceType !== 'table'
@@ -3378,118 +3585,219 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 schema={undefined}
             />
 
+            <CreateTableModal
+                isOpen={isCreateTableOpen}
+                onClose={() => setIsCreateTableOpen(false)}
+                tableName={newTableName}
+                onTableNameChange={setNewTableName}
+                columns={createColumns}
+                onColumnsChange={setCreateColumns}
+                onSubmit={() => { void handleCreateTableFromTools(); }}
+            />
+
             <Modal
                 isOpen={isCreateIndexOpen}
                 onClose={() => {
                     if (isCreatingIndex) return;
                     setIsCreateIndexOpen(false);
                 }}
-                title={t('datasource.create_index_title', 'Create index')}
+                title={t('datasource.create_index_title_for_table', 'Create index for table {{name}}', { name: selectedTable })}
+                headerActions={(
+                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
+                        <button
+                            type="button"
+                            onClick={() => setIndexModalTab('manual')}
+                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${indexModalTab === 'manual' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                        >
+                            {t('datainspector.index_modal_tab_manual', 'Manual')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIndexModalTab('suggestions')}
+                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${indexModalTab === 'suggestions' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                        >
+                            {t('datainspector.index_modal_tab_suggestions', 'Suggestions')}
+                        </button>
+                    </div>
+                )}
             >
-                <div className="space-y-4">
-                    <div className="text-xs text-slate-500">
-                        {t('datasource.index_create_for_table', 'Table')}: <span className="font-mono font-semibold text-slate-700">{selectedTable}</span>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                            {t('datasource.index_name', 'Index name')}
-                        </label>
-                        <input
-                            type="text"
-                            value={indexName}
-                            onChange={(e) => setIndexName(e.target.value)}
-                            className="w-full p-2 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            placeholder={`idx_${selectedTable}_...`}
-                        />
-                    </div>
-
-                    <label className="flex items-center gap-2 text-sm text-slate-600">
-                        <input
-                            type="checkbox"
-                            checked={indexUnique}
-                            onChange={() => setIndexUnique(!indexUnique)}
-                            className="h-4 w-4"
-                        />
-                        {t('datasource.index_unique', 'Unique index')}
-                    </label>
-
-                    <div className="space-y-2">
-                        <label className="block text-xs font-bold text-slate-500 uppercase">
-                            {t('datasource.index_columns', 'Columns')}
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-auto border border-slate-200 rounded p-2 bg-slate-50">
-                            {(selectedTableSchema || []).map((col) => (
-                                <label key={col.name} className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input
-                                        type="checkbox"
-                                        checked={indexColumns.includes(col.name)}
-                                        onChange={() => toggleIndexColumn(col.name)}
-                                        className="h-4 w-4"
-                                    />
-                                    <span className="font-mono">{col.name}</span>
+                <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col gap-4">
+                    <div className="flex-1 min-h-0 overflow-auto pr-1">
+                        {indexModalTab === 'manual' && (
+                            <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                                    {t('datasource.index_name', 'Index name')}
                                 </label>
-                            ))}
-                        </div>
-                    </div>
+                                <input
+                                    type="text"
+                                    value={indexName}
+                                    onChange={(e) => setIndexName(e.target.value)}
+                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    placeholder={`idx_${selectedTable}_...`}
+                                />
+                            </div>
 
-                    {indexColumns.length > 0 && (
-                        <div className="space-y-2">
-                            <label className="block text-xs font-bold text-slate-500 uppercase">
-                                {t('datasource.index_order', 'Column order')}
+                            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                <input
+                                    type="checkbox"
+                                    checked={indexUnique}
+                                    onChange={() => setIndexUnique(!indexUnique)}
+                                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 focus:ring-blue-500"
+                                />
+                                {t('datasource.index_unique', 'Unique index')}
                             </label>
-                            <div className="space-y-1 border border-slate-200 rounded p-2 bg-white">
-                                {indexColumns.map((col, idx) => (
-                                    <div key={col} className="flex items-center justify-between text-sm">
-                                        <span className="font-mono text-slate-700">{idx + 1}. {col}</span>
-                                        <div className="flex items-center gap-1">
+
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                    {t('datasource.index_columns', 'Columns')}
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-auto border border-slate-200 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-900">
+                                    {(selectedTableSchema || []).map((col) => (
+                                        <label key={col.name} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                                            <input
+                                                type="checkbox"
+                                                checked={indexColumns.includes(col.name)}
+                                                onChange={() => toggleIndexColumn(col.name)}
+                                                className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="font-mono">{col.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {indexColumns.length > 0 && (
+                                <div className="space-y-2">
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                        {t('datasource.index_order', 'Column order')}
+                                    </label>
+                                    <div className="space-y-1 border border-slate-200 dark:border-slate-700 rounded p-2 bg-white dark:bg-slate-900">
+                                        {indexColumns.map((col, idx) => (
+                                            <div key={col} className="flex items-center justify-between text-sm">
+                                                <span className="font-mono text-slate-700 dark:text-slate-200">{idx + 1}. {col}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveIndexColumn(col, 'up')}
+                                                        disabled={idx === 0}
+                                                        className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                    >
+                                                        <ArrowUp className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveIndexColumn(col, 'down')}
+                                                        disabled={idx === indexColumns.length - 1}
+                                                        className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                    >
+                                                        <ArrowDown className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                                    {t('datasource.index_where_optional', 'WHERE (optional)')}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={indexWhere}
+                                    onChange={(e) => setIndexWhere(e.target.value)}
+                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                                    placeholder="status = 'open'"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                    {t('datainspector.index_preview_sql', 'SQL Preview')}
+                                </label>
+                                <div className="h-28 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                                    <CodeMirror
+                                        value={manualIndexPreviewSql}
+                                        height="112px"
+                                        editable={false}
+                                        basicSetup={{
+                                            lineNumbers: false,
+                                            foldGutter: false,
+                                            highlightActiveLine: false,
+                                            highlightActiveLineGutter: false
+                                        }}
+                                        extensions={sqlEditorExtensions}
+                                    />
+                                </div>
+                            </div>
+                            </div>
+                        )}
+
+                        {indexModalTab === 'suggestions' && (
+                            <div className="space-y-2 h-full min-h-0 flex flex-col">
+                            <div className="flex items-center justify-between gap-2">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                    {t('datainspector.index_suggestions_title', 'Index Suggestions')}
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => { void generateIndexSuggestions(); }}
+                                    disabled={isGeneratingIndexSuggestions}
+                                    className="h-7 px-2 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] disabled:opacity-40"
+                                >
+                                    {isGeneratingIndexSuggestions
+                                        ? t('common.loading', 'Loading...')
+                                        : t('datainspector.index_suggestions_generate', 'Generate')}
+                                </button>
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                {t('datainspector.index_suggestions_hint', 'Based on active filters, sorting, cardinality and existing indexes.')}
+                            </div>
+                            <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
+                                {indexSuggestions.length === 0 ? (
+                                    <div className="p-3 text-xs text-slate-400 dark:text-slate-500">
+                                        {t('datainspector.index_suggestions_empty', 'No suggestions yet. Generate to analyze this table.')}
+                                    </div>
+                                ) : (
+                                    indexSuggestions.map((suggestion) => (
+                                        <div key={suggestion.id} className="p-3 space-y-2">
+                                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">{suggestion.indexName}</div>
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400">{suggestion.reason}</div>
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                {t('datainspector.index_suggestions_columns', 'Columns')}: <span className="font-mono">{suggestion.columns.join(', ')}</span>
+                                            </div>
+                                            <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 break-all">{suggestion.sql}</div>
                                             <button
                                                 type="button"
-                                                onClick={() => moveIndexColumn(col, 'up')}
-                                                disabled={idx === 0}
-                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
+                                                onClick={() => { void applyIndexSuggestion(suggestion); }}
+                                                disabled={applyingIndexSuggestionId === suggestion.id}
+                                                className="h-7 px-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[11px] disabled:opacity-40"
                                             >
-                                                ↑
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => moveIndexColumn(col, 'down')}
-                                                disabled={idx === indexColumns.length - 1}
-                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
-                                            >
-                                                ↓
+                                                {applyingIndexSuggestionId === suggestion.id
+                                                    ? t('common.saving', 'Saving...')
+                                                    : t('datainspector.index_suggestions_apply', 'Create')}
                                             </button>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
                         </div>
-                    )}
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                            {t('datasource.index_where_optional', 'WHERE (optional)')}
-                        </label>
-                        <input
-                            type="text"
-                            value={indexWhere}
-                            onChange={(e) => setIndexWhere(e.target.value)}
-                            className="w-full p-2 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-                            placeholder="status = 'open'"
-                        />
+                        )}
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2">
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 shrink-0">
                         <button
                             onClick={() => setIsCreateIndexOpen(false)}
                             disabled={isCreatingIndex}
-                            className="px-3 py-1.5 rounded border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 disabled:opacity-40"
+                            className="px-3 py-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
                         >
                             {t('common.cancel', 'Cancel')}
                         </button>
                         <button
                             onClick={() => { void handleCreateIndex(); }}
-                            disabled={isCreatingIndex}
+                            disabled={isCreatingIndex || indexModalTab !== 'manual'}
                             className="px-4 py-1.5 rounded bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40"
                         >
                             {isCreatingIndex ? t('common.saving', 'Saving...') : t('datasource.create_index_btn', 'Create index')}

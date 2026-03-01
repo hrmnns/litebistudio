@@ -8,6 +8,7 @@ import type { SchemaDefinition } from '../components/SchemaDocumentation';
 import { InlineAlert } from '../components/ui/InlineAlert';
 import type { AlertType } from '../components/ui/InlineAlert';
 import { Modal } from '../components/Modal';
+import { CreateTableModal } from '../components/CreateTableModal';
 import { PageLayout } from '../components/ui/PageLayout';
 import { MappingManager } from '../components/MappingManager';
 import { useBackupStatus } from '../../hooks/useBackupStatus';
@@ -173,8 +174,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     // Schema Manager State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newTableName, setNewTableName] = useState('');
-    const [sqlMode, setSqlMode] = useState(false);
-    const [customSql, setCustomSql] = useState('CREATE TABLE usr_my_table (\n    id INTEGER PRIMARY KEY,\n    name TEXT,\n    amount REAL\n);');
     const [createColumns, setCreateColumns] = useState<{ name: string, type: string }[]>([{ name: 'id', type: 'INTEGER PRIMARY KEY' }]);
 
     const { isBackupRecommended, changeCount, markBackupComplete } = useBackupStatus();
@@ -461,32 +460,35 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const activeConfig = getImportConfig();
 
     // Table Actions
+    const openCreateTableModal = () => {
+        setNewTableName('');
+        setCreateColumns([{ name: 'id', type: 'INTEGER PRIMARY KEY' }]);
+        setIsCreateModalOpen(true);
+    };
+
     const handleCreateTable = async () => {
         try {
-            if (sqlMode) {
-                await SystemRepository.executeRaw(customSql);
-            } else {
-                const normalizedTableName = newTableName.trim();
-                if (!isValidIdentifier(normalizedTableName)) {
-                    await appDialog.warning(t('datasource.invalid_table_name', 'Ungueltiger Tabellenname. Bitte nur Buchstaben, Zahlen und Unterstrich verwenden.'));
-                    return;
-                }
-                if (!createColumns.length) {
+            const normalizedTableName = newTableName.trim();
+            if (!isValidIdentifier(normalizedTableName)) {
+                await appDialog.warning(t('datasource.invalid_table_name', 'Ungueltiger Tabellenname. Bitte nur Buchstaben, Zahlen und Unterstrich verwenden.'));
+                return;
+            }
+            if (!createColumns.length) {
+                await appDialog.warning(t('datasource.invalid_columns', 'Bitte mindestens eine gueltige Spalte angeben.'));
+                return;
+            }
+            for (const col of createColumns) {
+                const colName = col.name.trim();
+                const colType = col.type.trim();
+                if (!isValidIdentifier(colName) || !colType || !isSafeColumnType(colType)) {
                     await appDialog.warning(t('datasource.invalid_columns', 'Bitte mindestens eine gueltige Spalte angeben.'));
                     return;
                 }
-                for (const col of createColumns) {
-                    const colName = col.name.trim();
-                    const colType = col.type.trim();
-                    if (!isValidIdentifier(colName) || !colType || !isSafeColumnType(colType)) {
-                        await appDialog.warning(t('datasource.invalid_columns', 'Bitte mindestens eine gueltige Spalte angeben.'));
-                        return;
-                    }
-                }
-                const cols = createColumns.map(c => `${quoteIdentifier(c.name.trim())} ${c.type.trim()}`).join(', ');
-                const sql = `CREATE TABLE ${quoteIdentifier(normalizedTableName)} (${cols})`;
-                await SystemRepository.executeRaw(sql);
             }
+            const cols = createColumns.map(c => `${quoteIdentifier(c.name.trim())} ${c.type.trim()}`).join(', ');
+            const sql = `CREATE TABLE ${quoteIdentifier(normalizedTableName)} (${cols})`;
+            await SystemRepository.executeRaw(sql);
+
             setIsCreateModalOpen(false);
             refreshTables();
             setNewTableName('');
@@ -734,7 +736,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 </div>
                                 {!isReadOnly && (
                                     <button
-                                        onClick={() => setIsCreateModalOpen(true)}
+                                        onClick={openCreateTableModal}
                                         className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
                                     >
                                         <Plus className="w-4 h-4" /> {t('datasource.new_table')}
@@ -1192,51 +1194,15 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             </div>
 
             {/* Modals outside tabs */}
-            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title={t('datasource.create_table_title')}>
-                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                    <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-lg w-fit">
-                        <button onClick={() => setSqlMode(false)} className={`px-3 py-1 text-xs font-bold rounded ${!sqlMode ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t('datasource.assistant')}</button>
-                        <button onClick={() => setSqlMode(true)} className={`px-3 py-1 text-xs font-bold rounded ${sqlMode ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>SQL</button>
-                    </div>
-
-                    {sqlMode ? (
-                        <textarea
-                            value={customSql} onChange={e => setCustomSql(e.target.value)}
-                            className="w-full h-40 font-mono text-sm p-3 bg-slate-900 text-white rounded-lg"
-                        />
-                    ) : (
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.name_label')}</label>
-                                <input value={newTableName} onChange={e => setNewTableName(e.target.value)} className="w-full p-2 border rounded" placeholder="usr_tabelle" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.columns_label')}</label>
-                                {createColumns.map((col, idx) => (
-                                    <div key={idx} className="flex gap-2">
-                                        <input value={col.name} onChange={e => {
-                                            const newCols = [...createColumns]; newCols[idx].name = e.target.value; setCreateColumns(newCols);
-                                        }} className="flex-1 p-2 border rounded text-sm" placeholder={t('datasource.name_label')} />
-                                        <select value={col.type} onChange={e => {
-                                            const newCols = [...createColumns]; newCols[idx].type = e.target.value; setCreateColumns(newCols);
-                                        }} className="w-32 p-2 border rounded text-sm">
-                                            <option value="TEXT">TEXT</option>
-                                            <option value="INTEGER">INTEGER</option>
-                                            <option value="REAL">REAL</option>
-                                            <option value="INTEGER PRIMARY KEY">ID (PK)</option>
-                                        </select>
-                                        <button onClick={() => setCreateColumns(createColumns.filter((_, i) => i !== idx))} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
-                                    </div>
-                                ))}
-                                <button onClick={() => setCreateColumns([...createColumns, { name: '', type: 'TEXT' }])} className="text-xs text-blue-600 font-bold flex items-center gap-1">{t('datasource.add_column')}</button>
-                            </div>
-                        </div>
-                    )}
-                    <div className="flex justify-end gap-2 pt-4">
-                        <button onClick={handleCreateTable} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">{t('datasource.create_btn')}</button>
-                    </div>
-                </div>
-            </Modal>
+            <CreateTableModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                tableName={newTableName}
+                onTableNameChange={setNewTableName}
+                columns={createColumns}
+                onColumnsChange={setCreateColumns}
+                onSubmit={handleCreateTable}
+            />
 
             <Modal isOpen={isSchemaOpen} onClose={() => setIsSchemaOpen(false)} title={tableSchema?.title || selectedTable}>
                 {tableSchema ? <SchemaTable schema={tableSchema} /> : <div className="p-4 text-center">{t('datasource.schema_not_available')}</div>}

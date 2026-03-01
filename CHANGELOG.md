@@ -22,16 +22,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - value suggestions for filters now derive from actual distinct DB values
     - categorical/time-like fields: show full value set
     - free-text-like fields: show first sample values.
+- Data Inspector `Table Tools` was expanded with a new `Tables` tab:
+  - activate table
+  - clear table
+  - delete table
+  - create index
+  - create table (`Neu`) directly from sidepanel.
+- SQL Workspace sidepanel now includes a dedicated `Actions` tab with quick actions:
+  - create table
+  - create index
+  - load SELECT template (`*`)
+  - load SELECT with explicit column list
+  - run/save shortcuts.
+- SQL Workspace `Actions` now includes source-aware SQL templates (open/run) moved from SQL Manager for contextual use.
+- Added reusable shared `CreateTableModal` component and integrated it in both Data Inspector and Datasource structure management.
+- Added read-only CodeMirror SQL previews in:
+  - create-table dialog (`SQL` tab preview)
+  - create-index dialog (`Manual` tab preview)
+  - SQL Builder preview panel.
 
 ### Changed
 - Dashboard Tools tab order was reorganized to: `Dashboards` -> `Widgets` -> `Filters`.
 - Dashboard management UX was moved from modal dialog to sidepanel tab for consistent in-context editing.
 - Dashboard title wording was normalized to plural form (`Meine Dashboards` / `My Dashboards`).
 - Header filter button now opens the sidepanel filter tab directly instead of toggling an inline filter section.
+- Data Inspector index creation workflow was redesigned:
+  - moved index suggestions out of `Table Tools` actions into the `Create Index` dialog
+  - split dialog into `Manual` and `Suggestions` tabs
+  - moved dialog tabs into modal header and made title source-specific (`Create index for table X`)
+  - fixed dialog height behavior so tab switching no longer resizes the modal.
+- SQL-sidepanel action layout was reorganized into collapsible groups (`General`, `Source-dependent`) with persisted open/closed state.
+- Data Inspector `Table Tools` tabs were simplified to `Tables`, `Columns`, `Filters` (removed `Actions` tab redundancy).
 
 ### Fixed
 - Fixed dashboard header subtitle in English locale (removed unresolved `{{count}}` / `{{mode}}` placeholders).
 - Localized newly added dashboard-management labels and hints for DE/EN to avoid fallback-only strings.
+- Fixed non-working `Create Index` quick-action buttons in Data Inspector table view after handler signature update.
+- Fixed dark-mode inconsistencies in `Create Index` and `Create Table` dialogs (inputs, controls, lists, and action buttons).
+- Fixed duplicated/invalid translation key usage in create-table flows (raw key text shown in UI).
+- Fixed SQL safety-limit notice UX: dismissing the notice is now persisted and no longer reappears every run.
 
 ## [1.3.0] - 2026-02-28
 
