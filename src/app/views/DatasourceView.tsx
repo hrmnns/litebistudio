@@ -17,7 +17,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { encryptBuffer, decryptBuffer } from '../../lib/utils/crypto';
 import { Lock, Unlock } from 'lucide-react';
 import { useDashboard } from '../../lib/context/DashboardContext';
-import type { TableIndexInfo } from '../../lib/repositories/SystemRepository';
+import type { BackupHistoryEntry, TableIndexInfo } from '../../lib/repositories/SystemRepository';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
@@ -189,7 +189,33 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const restoreInputRef = useRef<HTMLInputElement | null>(null);
     const backupDirectorySupported = isBackupDirectorySupported();
 
-    const processRestoreFile = async (file: File): Promise<void> => {
+    const { data: backupHistory, refresh: refreshBackupHistory } = useAsync<BackupHistoryEntry[]>(
+        () => SystemRepository.listBackupHistory(12),
+        []
+    );
+    const backupHistoryEntries = Array.isArray(backupHistory) ? backupHistory : [];
+
+    const appendBackupHistorySafe = async (entry: {
+        action: 'backup' | 'restore';
+        status: 'success' | 'warning' | 'error';
+        fileName: string;
+        locationType?: 'remembered_folder' | 'browser_download' | 'file_picker' | 'unknown';
+        locationLabel?: string;
+        encrypted?: boolean;
+        message?: string;
+    }) => {
+        try {
+            await SystemRepository.appendBackupHistory(entry);
+            await refreshBackupHistory();
+        } catch (err) {
+            logger.warn('Failed to append backup history entry', err);
+        }
+    };
+
+    const processRestoreFile = async (
+        file: File,
+        source: { type: 'remembered_folder' | 'file_picker'; label?: string } = { type: 'file_picker' }
+    ): Promise<void> => {
         const logTime = () => new Date().toLocaleTimeString();
         logger.debug(`[Restore][${logTime()}] File selected:`, file.name, file.size, file.type);
 
@@ -213,6 +239,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     const decrypted = await decryptBuffer(buffer, pwd);
                     finalBuffer = decrypted;
                 } catch {
+                    await appendBackupHistorySafe({
+                        action: 'restore',
+                        status: 'error',
+                        fileName: file.name,
+                        locationType: source.type,
+                        locationLabel: source.label || '',
+                        message: t('datasource.restore_failed')
+                    });
                     setRestoreAlert({
                         type: 'error',
                         title: t('common.error'),
@@ -222,7 +256,17 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 }
             }
 
-            if (!(await appDialog.confirm(t('datasource.restore_confirm')))) return;
+            if (!(await appDialog.confirm(t('datasource.restore_confirm')))) {
+                await appendBackupHistorySafe({
+                    action: 'restore',
+                    status: 'warning',
+                    fileName: file.name,
+                    locationType: source.type,
+                    locationLabel: source.label || '',
+                    message: 'Restore cancelled by user.'
+                });
+                return;
+            }
             logger.info(`[Restore][${logTime()}] User confirmed restore. Starting process...`);
             setRestoreAlert({
                 type: 'warning',
@@ -237,6 +281,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 const { versionInfo } = report;
 
                 if (!report.headerMatch) {
+                    await appendBackupHistorySafe({
+                        action: 'restore',
+                        status: 'error',
+                        fileName: file.name,
+                        locationType: source.type,
+                        locationLabel: source.label || '',
+                        message: report.error || t('datasource.restore_warning_hint')
+                    });
                     setRestoreAlert({
                         type: 'error',
                         title: t('datasource.restore_invalid'),
@@ -246,6 +298,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 }
 
                 if (report.error) {
+                    await appendBackupHistorySafe({
+                        action: 'restore',
+                        status: 'error',
+                        fileName: file.name,
+                        locationType: source.type,
+                        locationLabel: source.label || '',
+                        message: report.error
+                    });
                     setRestoreAlert({
                         type: 'error',
                         title: report.isDowngrade ? 'Incompatible Backup' : t('common.error'),
@@ -271,6 +331,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                         }
                     }
 
+                    await appendBackupHistorySafe({
+                        action: 'restore',
+                        status: 'warning',
+                        fileName: file.name,
+                        locationType: source.type,
+                        locationLabel: source.label || '',
+                        message: t('datasource.restore_warning_hint')
+                    });
                     setRestoreAlert({
                         type: 'warning',
                         title: t('datasource.restore_warning_title'),
@@ -278,6 +346,15 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                         details
                     });
                 } else {
+                    await appendBackupHistorySafe({
+                        action: 'restore',
+                        status: 'success',
+                        fileName: file.name,
+                        locationType: source.type,
+                        locationLabel: source.label || '',
+                        encrypted: !isSqlite,
+                        message: t('datasource.restore_success_reload')
+                    });
                     setRestoreAlert({
                         type: 'success',
                         title: t('common.success'),
@@ -289,6 +366,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     setTimeout(() => window.location.reload(), 2000);
                 }
             } catch (err: unknown) {
+                await appendBackupHistorySafe({
+                    action: 'restore',
+                    status: 'error',
+                    fileName: file.name,
+                    locationType: source.type,
+                    locationLabel: source.label || '',
+                    message: getErrorMessage(err)
+                });
                 logger.error(`[Restore][${logTime()}] Inner Error:`, err);
                 setRestoreAlert({
                     type: 'error',
@@ -297,6 +382,14 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 });
             }
         } catch (err: unknown) {
+            await appendBackupHistorySafe({
+                action: 'restore',
+                status: 'error',
+                fileName: file.name,
+                locationType: source.type,
+                locationLabel: source.label || '',
+                message: getErrorMessage(err)
+            });
             logger.error(`[Restore][${logTime()}] Outer Error:`, err);
             setRestoreAlert({
                 type: 'error',
@@ -312,7 +405,10 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             const picked = await pickBackupFileFromRememberedDirectoryWithStatus();
             if (picked.cancelled) return;
             if (picked.file) {
-                await processRestoreFile(picked.file);
+                await processRestoreFile(picked.file, {
+                    type: 'remembered_folder',
+                    label: getSavedBackupDirectoryLabel()
+                });
                 return;
             }
             if (restoreInputRef.current) restoreInputRef.current.click();
@@ -960,6 +1056,9 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                                     <button
                                         onClick={async () => {
+                                            let fileName = '';
+                                            let locationType: 'remembered_folder' | 'browser_download' | 'unknown' = 'unknown';
+                                            let locationLabel = '';
                                             try {
                                                 if (useEncryption) {
                                                     const password = backupPassword.trim();
@@ -981,7 +1080,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     outputBuffer = await encryptBuffer(plainBuffer, backupPassword.trim());
                                                 }
 
-                                                const fileName = buildBackupFileName(backupNamePattern, useEncryption);
+                                                fileName = buildBackupFileName(backupNamePattern, useEncryption);
                                                 let savedToRememberedLocation = false;
                                                 if (backupUseSavedLocation && backupDirectorySupported) {
                                                     try {
@@ -1008,6 +1107,17 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                         ? t('datasource.backup_saved_location_named', { folder: savedFolderLabel })
                                                         : t('datasource.backup_saved_location_remembered', 'Remembered backup folder'))
                                                     : t('datasource.backup_saved_location_downloads', 'Browser download folder');
+                                                locationType = savedToRememberedLocation ? 'remembered_folder' : 'browser_download';
+                                                locationLabel = savedToRememberedLocation ? (savedFolderLabel || '') : locationHint;
+                                                await appendBackupHistorySafe({
+                                                    action: 'backup',
+                                                    status: 'success',
+                                                    fileName,
+                                                    locationType,
+                                                    locationLabel,
+                                                    encrypted: useEncryption,
+                                                    message: locationHint
+                                                });
                                                 await appDialog.info(
                                                     t(
                                                         'datasource.backup_saved_success_details',
@@ -1018,6 +1128,15 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     )
                                                 );
                                             } catch (err: unknown) {
+                                                await appendBackupHistorySafe({
+                                                    action: 'backup',
+                                                    status: 'error',
+                                                    fileName: fileName || '-',
+                                                    locationType,
+                                                    locationLabel,
+                                                    encrypted: useEncryption,
+                                                    message: getErrorMessage(err)
+                                                });
                                                 await appDialog.error(
                                                     `${t('datasource.backup_save_failed', 'Backup could not be created.')}: ${getErrorMessage(err)}`
                                                 );
@@ -1045,12 +1164,68 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                             const file = e.target.files?.[0];
                                             if (!file) return;
                                             setRestoreAlert(null);
-                                            await processRestoreFile(file);
+                                            await processRestoreFile(file, { type: 'file_picker' });
                                             e.currentTarget.value = '';
                                         }}
                                     />
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+                                    {t('datasource.backup_history_title', 'Backup-Verlauf')}
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => { void refreshBackupHistory(); }}
+                                    className="text-xs font-semibold text-blue-600 dark:text-blue-300 hover:underline"
+                                >
+                                    {t('common.refresh', 'Aktualisieren')}
+                                </button>
+                            </div>
+                            {backupHistoryEntries.length === 0 ? (
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    {t('datasource.backup_history_empty', 'Noch keine Backup-/Restore-Einträge vorhanden.')}
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {backupHistoryEntries.map((entry) => (
+                                        <div
+                                            key={entry.id}
+                                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30 px-3 py-2"
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                                    {entry.action === 'backup'
+                                                        ? t('datasource.backup_history_action_backup', 'Backup')
+                                                        : t('datasource.backup_history_action_restore', 'Restore')}
+                                                    {' · '}
+                                                    {entry.fileName}
+                                                </div>
+                                                <div className={`text-[11px] font-bold uppercase ${entry.status === 'success'
+                                                    ? 'text-emerald-600 dark:text-emerald-300'
+                                                    : entry.status === 'warning'
+                                                        ? 'text-amber-600 dark:text-amber-300'
+                                                        : 'text-red-600 dark:text-red-300'
+                                                    }`}>
+                                                    {entry.status}
+                                                </div>
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                                {new Date(entry.timestamp).toLocaleString()} · {entry.locationLabel || entry.locationType}
+                                                {entry.encrypted ? ` · ${t('datasource.backup_history_encrypted', 'verschlüsselt')}` : ''}
+                                            </div>
+                                            {entry.message ? (
+                                                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                                    {entry.message}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Danger Zone */}

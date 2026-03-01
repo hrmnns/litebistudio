@@ -15,7 +15,7 @@ import { formatValue } from '../utils/formatUtils';
 import { type WidgetConfig, type DbRow } from '../../types';
 import { PivotTable } from './PivotTable';
 import type { SchemaDefinition } from './SchemaDocumentation';
-import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
+import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_PENDING_SQL_META_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 import { MarkdownContent } from './ui/MarkdownContent';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -29,6 +29,8 @@ interface WidgetRendererProps {
     title: string;
     sql: string;
     config: WidgetConfig;
+    description?: string;
+    headerActions?: React.ReactNode;
     globalFilters?: FilterDef[];
     showInspectorJump?: boolean;
     inspectorReturnHash?: string;
@@ -36,7 +38,7 @@ interface WidgetRendererProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, globalFilters, showInspectorJump = false, inspectorReturnHash }) => {
+const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, description, headerActions, globalFilters, showInspectorJump = false, inspectorReturnHash }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
@@ -97,10 +99,17 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
     const handleOpenInInspector = React.useCallback(() => {
         if (!canOpenInInspector) return;
         localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, effectiveSql);
+        const descriptionFromConfig = (config.widgetDescription || '').trim();
+        const descriptionText = (description || '').trim() || descriptionFromConfig;
+        const pendingMeta = {
+            name: (title || '').trim(),
+            description: descriptionText
+        };
+        localStorage.setItem(INSPECTOR_PENDING_SQL_META_KEY, JSON.stringify(pendingMeta));
         const currentHash = `#${location.pathname}${location.search || ''}`;
         localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, inspectorReturnHash || currentHash);
         navigate('/sql-workspace');
-    }, [canOpenInInspector, effectiveSql, inspectorReturnHash, location.pathname, location.search, navigate]);
+    }, [canOpenInInspector, config.widgetDescription, description, effectiveSql, inspectorReturnHash, location.pathname, location.search, navigate, title]);
 
     const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {
@@ -497,7 +506,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
     }
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
+        <div className="group flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden">
             <div className="flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="p-1.5 rounded-xl shrink-0 shadow-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400">
@@ -508,17 +517,19 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, glo
                         <div className="h-0.5 w-4 bg-slate-200 dark:bg-slate-700 rounded-full mt-0.5" />
                     </div>
                 </div>
-                {canOpenInInspector && (
-                    <button
-                        type="button"
-                        onClick={handleOpenInInspector}
-                        className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-                        title={t('common.open_in_inspector')}
-                    >
-                        <ExternalLink className="w-3 h-3" />
-                        {t('common.open')}
-                    </button>
-                )}
+                <div className="flex items-center gap-1.5">
+                    {headerActions}
+                    {canOpenInInspector && (
+                        <button
+                            type="button"
+                            onClick={handleOpenInInspector}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-300 dark:hover:border-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title={t('common.open_in_inspector')}
+                        >
+                            <ExternalLink className="w-3 h-3" />
+                        </button>
+                    )}
+                </div>
             </div>
             {renderWidgetDescription('top')}
             <div className="flex-1 min-h-0 p-2">

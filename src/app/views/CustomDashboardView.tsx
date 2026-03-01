@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useAsync } from '../../hooks/useAsync';
-import { Plus, Layout, Trash2, Database, Star, Settings, Edit2, Download, Maximize2, Filter, ArrowUp, ArrowDown, ArrowRightLeft, FolderOpen } from 'lucide-react';
+import { Plus, Layout, Trash2, Database, Star, Settings, Edit2, Download, Maximize2, Minimize2, Filter, ArrowUp, ArrowDown, ArrowRightLeft, FolderOpen } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -41,6 +41,7 @@ interface SavedWidget {
     id: string; // Either UUID for custom or 'sys_...' for system
     type: 'custom' | 'system';
     position?: number;
+    size?: '1x1' | '1x2' | '2x1' | '2x2';
 }
 
 interface DashboardDef {
@@ -50,6 +51,46 @@ interface DashboardDef {
     is_default: boolean;
     filters?: FilterDef[];
 }
+
+type WidgetTileSize = NonNullable<SavedWidget['size']>;
+
+const DEFAULT_SYSTEM_WIDGET_SIZE: WidgetTileSize = '1x1';
+const DEFAULT_CUSTOM_WIDGET_SIZE: WidgetTileSize = '2x1';
+
+const WIDGET_TILE_SIZE_OPTIONS: WidgetTileSize[] = ['1x1', '1x2', '2x1', '2x2'];
+
+const getDefaultWidgetSize = (type: SavedWidget['type']): WidgetTileSize => (
+    type === 'system' ? DEFAULT_SYSTEM_WIDGET_SIZE : DEFAULT_CUSTOM_WIDGET_SIZE
+);
+
+const normalizeSavedWidget = (raw: unknown): SavedWidget | null => {
+    if (!raw || typeof raw !== 'object') return null;
+    const item = raw as Partial<SavedWidget>;
+    if (typeof item.id !== 'string' || (item.type !== 'custom' && item.type !== 'system')) return null;
+    const nextSize = item.size && WIDGET_TILE_SIZE_OPTIONS.includes(item.size) ? item.size : getDefaultWidgetSize(item.type);
+    return {
+        id: item.id,
+        type: item.type,
+        position: typeof item.position === 'number' ? item.position : undefined,
+        size: nextSize
+    };
+};
+
+const getWidgetSizeClassName = (size: WidgetTileSize): string => {
+    switch (size) {
+        case '1x2':
+            return 'md:col-span-1 xl:col-span-1 row-span-2';
+        case '2x1':
+            return 'md:col-span-2 xl:col-span-2 row-span-1';
+        case '2x2':
+            return 'md:col-span-2 xl:col-span-2 row-span-2';
+        case '1x1':
+        default:
+            return 'md:col-span-1 xl:col-span-1 row-span-1';
+    }
+};
+
+const getWidgetRefKey = (widget: SavedWidget): string => `${widget.type}:${widget.id}`;
 
 interface CustomWidgetRecord extends DbRow {
     id: string;
@@ -110,6 +151,7 @@ export const CustomDashboardView: React.FC = () => {
     const [showDashboardTools, setShowDashboardTools] = useLocalStorage<boolean>('dashboard_tools_open', false);
     const [dashboardToolsTab, setDashboardToolsTab] = useLocalStorage<'layout' | 'filters' | 'dashboards'>('dashboard_tools_tab_v1', 'layout');
     const [movePickerWidgetId, setMovePickerWidgetId] = useState<string | null>(null);
+    const [zoomedWidgetKey, setZoomedWidgetKey] = useState<string | null>(null);
     const [suggestedColumns, setSuggestedColumns] = useState<string[]>([]);
     const [filterValueSuggestions, setFilterValueSuggestions] = useState<Record<string, string[]>>({});
     const { visibleSidebarComponentIds, setVisibleSidebarComponentIds, togglePresentationMode, isReadOnly } = useDashboard();
@@ -147,10 +189,15 @@ export const CustomDashboardView: React.FC = () => {
             // Migration from localStorage
             const legacyLayout = localStorage.getItem('custom_dashboard_layout');
             if (dbDashboards.length === 0) {
+                const migratedLegacyLayout = legacyLayout
+                    ? (JSON.parse(legacyLayout) as unknown[])
+                        .map(normalizeSavedWidget)
+                        .filter((w): w is SavedWidget => Boolean(w))
+                    : [];
                 const defaultDash: DashboardDef = {
                     id: crypto.randomUUID(),
                     name: t('dashboard.default_name'),
-                    layout: legacyLayout ? JSON.parse(legacyLayout) : [],
+                    layout: migratedLegacyLayout,
                     is_default: true
                 };
                 await SystemRepository.saveDashboard(defaultDash, true);
@@ -158,10 +205,23 @@ export const CustomDashboardView: React.FC = () => {
                 dbDashboards = [defaultDash];
             } else if (dbDashboards.length > 0) {
                 // Parse layouts from strings
-                dbDashboards = dbDashboards.map((d: DashboardDef) => ({
-                    ...d,
-                    layout: typeof d.layout === 'string' ? JSON.parse(d.layout) : d.layout
-                }));
+                dbDashboards = dbDashboards.map((d: DashboardDef) => {
+                    let rawLayout: unknown = d.layout;
+                    if (typeof rawLayout === 'string') {
+                        try {
+                            rawLayout = JSON.parse(rawLayout);
+                        } catch {
+                            rawLayout = [];
+                        }
+                    }
+                    const normalizedLayout = (Array.isArray(rawLayout) ? rawLayout : [])
+                        .map(normalizeSavedWidget)
+                        .filter((w): w is SavedWidget => Boolean(w));
+                    return {
+                        ...d,
+                        layout: normalizedLayout
+                    };
+                });
             }
 
             setDashboards(dbDashboards);
@@ -197,6 +257,10 @@ export const CustomDashboardView: React.FC = () => {
         if (!movePickerWidgetId || !activeDashboard) return null;
         return activeDashboard.layout.some(w => w.id === movePickerWidgetId) ? movePickerWidgetId : null;
     }, [activeDashboard, movePickerWidgetId]);
+    const zoomedWidgetRef = React.useMemo(() => {
+        if (!zoomedWidgetKey || !activeDashboard) return null;
+        return activeDashboard.layout.find((w) => getWidgetRefKey(w) === zoomedWidgetKey) || null;
+    }, [activeDashboard, zoomedWidgetKey]);
 
     // Compute filterable columns that are available across all active query widgets.
     useEffect(() => {
@@ -260,7 +324,7 @@ export const CustomDashboardView: React.FC = () => {
 
         const updated = {
             ...activeDashboard,
-            layout: [...activeDashboard.layout, { id, type }]
+            layout: [...activeDashboard.layout, { id, type, size: getDefaultWidgetSize(type) }]
         };
         await syncDashboard(updated);
         setIsAddModalOpen(false);
@@ -273,6 +337,24 @@ export const CustomDashboardView: React.FC = () => {
             layout: activeDashboard.layout.filter(w => w.id !== id)
         };
         await syncDashboard(updated);
+        setZoomedWidgetKey((prev) => {
+            const removed = activeDashboard.layout.find((w) => w.id === id);
+            if (!removed) return prev;
+            return prev === getWidgetRefKey(removed) ? null : prev;
+        });
+    };
+
+    const updateWidgetSize = async (widgetId: string, size: WidgetTileSize) => {
+        if (!activeDashboard) return;
+        const nextLayout = activeDashboard.layout.map((widget) =>
+            widget.id === widgetId
+                ? {
+                    ...widget,
+                    size: widget.type === 'system' ? DEFAULT_SYSTEM_WIDGET_SIZE : size
+                }
+                : widget
+        );
+        await syncDashboard({ ...activeDashboard, layout: nextLayout });
     };
 
     const handleDashboardDragEnd = async (event: DragEndEvent) => {
@@ -382,6 +464,25 @@ export const CustomDashboardView: React.FC = () => {
         }
         return customWidgets?.find(w => w.id === widget.id)?.name || widget.id;
     };
+    const getWidgetSize = (widget: SavedWidget): WidgetTileSize => {
+        if (widget.size && WIDGET_TILE_SIZE_OPTIONS.includes(widget.size)) return widget.size;
+        return getDefaultWidgetSize(widget.type);
+    };
+
+    useEffect(() => {
+        if (!zoomedWidgetKey || !activeDashboard) return;
+        const exists = activeDashboard.layout.some((widget) => getWidgetRefKey(widget) === zoomedWidgetKey);
+        if (!exists) setZoomedWidgetKey(null);
+    }, [activeDashboard, zoomedWidgetKey]);
+
+    useEffect(() => {
+        if (!zoomedWidgetKey) return;
+        const handleEsc = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setZoomedWidgetKey(null);
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [zoomedWidgetKey]);
 
     const deleteCustomWidget = async (id: string) => {
         if (await appDialog.confirm(t('dashboard.confirm_delete_report'))) {
@@ -707,16 +808,32 @@ export const CustomDashboardView: React.FC = () => {
                                             const customWidgetRecord = widget.type === 'custom'
                                                 ? customWidgets?.find(w => w.id === widget.id)
                                                 : undefined;
+                                            const currentSize = getWidgetSize(widget);
                                             return (
                                             <div key={`${widget.type}:${widget.id}`} className="p-3 flex items-center justify-between gap-2">
                                                 <div className="min-w-0 flex items-center gap-2">
                                                     <div className="min-w-0">
                                                         <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{getWidgetLabel(widget)}</div>
-                                                        <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase">{widget.type}</div>
+                                                        <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase">{widget.type} | {currentSize}</div>
                                                     </div>
                                                 </div>
                                                 {!isReadOnly && (
                                                     <div className="relative flex items-center gap-1">
+                                                        <select
+                                                            value={currentSize}
+                                                            onChange={(e) => { void updateWidgetSize(widget.id, e.target.value as WidgetTileSize); }}
+                                                            disabled={widget.type === 'system'}
+                                                            className="h-7 px-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-300 outline-none disabled:opacity-40"
+                                                            title={widget.type === 'system'
+                                                                ? t('dashboard.widget_size_system_locked', 'System widgets stay 1x1')
+                                                                : t('dashboard.widget_size', 'Widget size')}
+                                                        >
+                                                            {WIDGET_TILE_SIZE_OPTIONS.map((sizeOption) => (
+                                                                <option key={sizeOption} value={sizeOption}>
+                                                                    {sizeOption}
+                                                                </option>
+                                                            ))}
+                                                        </select>
                                                         <button
                                                             type="button"
                                                             onClick={() => setMovePickerWidgetId(prev => prev === widget.id ? null : widget.id)}
@@ -1046,20 +1163,30 @@ export const CustomDashboardView: React.FC = () => {
                                 if (!meta) return null;
                                 const Component = getComponent(meta.id);
                                 if (!Component) return null;
+                                const widgetClassName = getWidgetSizeClassName(getWidgetSize(widgetRef));
+                                const widgetKey = getWidgetRefKey(widgetRef);
 
                                 return (
-                                    <DashboardSortableItem key={widgetRef.id} id={widgetRef.id} className={`relative group h-full ${meta.defaultColSpan === 2 ? 'md:col-span-2' : ''}`}>
-                                        {!isReadOnly && (
-                                            <div className="absolute -top-2 -right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <DashboardSortableItem key={widgetRef.id} id={widgetRef.id} className={`relative group h-full ${widgetClassName}`}>
+                                        <div className="absolute top-2 right-2 z-20 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); setZoomedWidgetKey(widgetKey); }}
+                                                className="p-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-full text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 shadow-sm"
+                                                title={t('dashboard.widget_zoom', 'Zoom')}
+                                            >
+                                                <Maximize2 className="w-3 h-3" />
+                                            </button>
+                                            {!isReadOnly && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); removeFromDashboard(widgetRef.id); }}
-                                                    className="p-1.5 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-full text-slate-400 hover:text-red-500 shadow-sm"
+                                                    className="p-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-full text-slate-400 dark:text-slate-300 hover:text-red-500 shadow-sm"
                                                     title={t('common.remove')}
                                                 >
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                         <div className="h-full">
                                             <Component
                                                 onRemove={undefined}
@@ -1080,24 +1207,38 @@ export const CustomDashboardView: React.FC = () => {
                             } catch {
                                 config = { type: 'table' };
                             }
+                            const widgetClassName = getWidgetSizeClassName(getWidgetSize(widgetRef));
+                            const widgetKey = getWidgetRefKey(widgetRef);
 
                             return (
-                                <DashboardSortableItem key={widgetRef.id} id={widgetRef.id} className="relative group md:col-span-1 xl:col-span-2 h-full">
-                                    {!isReadOnly && (
-                                        <div className="absolute -top-2 -right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => removeFromDashboard(widgetRef.id)}
-                                                className="p-1.5 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-full text-slate-400 hover:text-red-500 shadow-sm"
-                                                title="Entfernen"
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    )}
+                                <DashboardSortableItem key={widgetRef.id} id={widgetRef.id} className={`relative group h-full ${widgetClassName}`}>
                                     <WidgetRenderer
                                         title={dbWidget.name}
                                         sql={dbWidget.sql_query}
                                         config={config}
+                                        description={dbWidget.description || ''}
+                                        headerActions={(
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setZoomedWidgetKey(widgetKey); }}
+                                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-300 dark:hover:border-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title={t('dashboard.widget_zoom', 'Zoom')}
+                                                >
+                                                    <Maximize2 className="w-3 h-3" />
+                                                </button>
+                                                {!isReadOnly && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); removeFromDashboard(widgetRef.id); }}
+                                                        className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-slate-400 dark:text-slate-300 hover:text-red-500 hover:border-rose-300 dark:hover:border-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        title={t('common.remove')}
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
                                         globalFilters={activeDashboard.filters}
                                         showInspectorJump
                                         inspectorReturnHash={activeDashboard?.id ? `#/?dashboard=${encodeURIComponent(activeDashboard.id)}` : '#/'}
@@ -1109,6 +1250,73 @@ export const CustomDashboardView: React.FC = () => {
                     </DndContext>
                 ) : null
             }
+
+            {zoomedWidgetRef && (
+                <div
+                    className="fixed inset-0 z-[130] bg-slate-950/55 backdrop-blur-sm p-3 md:p-6"
+                    onClick={() => setZoomedWidgetKey(null)}
+                >
+                    <div
+                        className="relative w-full h-full rounded-2xl border border-slate-300/30 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="h-12 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+                                {getWidgetLabel(zoomedWidgetRef)} ({getWidgetSize(zoomedWidgetRef)})
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setZoomedWidgetKey(null)}
+                                className="h-8 w-8 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                title={t('common.close', 'Close')}
+                            >
+                                <Minimize2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="h-[calc(100%-3rem)] p-3 md:p-4">
+                            {zoomedWidgetRef.type === 'system' ? (
+                                (() => {
+                                    const meta = SYSTEM_WIDGETS.find(w => w.id === zoomedWidgetRef.id);
+                                    const Component = meta ? getComponent(meta.id) : null;
+                                    if (!Component) return null;
+                                    return (
+                                        <div className="h-full">
+                                            <Component
+                                                onRemove={undefined}
+                                                targetView={COMPONENTS.find(c => c.component === meta.id)?.targetView}
+                                            />
+                                        </div>
+                                    );
+                                })()
+                            ) : (
+                                (() => {
+                                    const dbWidget = customWidgets?.find(w => w.id === zoomedWidgetRef.id);
+                                    if (!dbWidget) return null;
+                                    let config: WidgetConfig;
+                                    try {
+                                        config = JSON.parse(dbWidget.visualization_config) as WidgetConfig;
+                                    } catch {
+                                        config = { type: 'table' };
+                                    }
+                                    return (
+                                        <div className="h-full">
+                                            <WidgetRenderer
+                                                title={dbWidget.name}
+                                                sql={dbWidget.sql_query}
+                                                config={config}
+                                                description={dbWidget.description || ''}
+                                                globalFilters={activeDashboard?.filters}
+                                                showInspectorJump
+                                                inspectorReturnHash={activeDashboard?.id ? `#/?dashboard=${encodeURIComponent(activeDashboard.id)}` : '#/'}
+                                            />
+                                        </div>
+                                    );
+                                })()
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Add Widget Modal (Customized for active dashboard) */}
             <Modal

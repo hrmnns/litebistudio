@@ -23,7 +23,7 @@ import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
 import { CreateTableModal } from '../components/CreateTableModal';
 import type { DataSourceEntry, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
-import { INSPECTOR_LAST_SELECT_SQL_KEY, INSPECTOR_PENDING_SQL_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
+import { INSPECTOR_LAST_SELECT_SQL_KEY, INSPECTOR_PENDING_SQL_KEY, INSPECTOR_PENDING_SQL_META_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
 import { appDialog } from '../../lib/appDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -245,11 +245,26 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
     useEffect(() => {
         const pendingSql = localStorage.getItem(INSPECTOR_PENDING_SQL_KEY);
+        const pendingSqlMetaRaw = localStorage.getItem(INSPECTOR_PENDING_SQL_META_KEY);
         const pendingReturnHash = localStorage.getItem(INSPECTOR_RETURN_HASH_KEY);
         if (pendingReturnHash) {
             const normalized = pendingReturnHash.startsWith('#/') ? pendingReturnHash : '#/';
             setInspectorReturnHash(normalized);
             localStorage.removeItem(INSPECTOR_RETURN_HASH_KEY);
+        }
+        if (pendingSqlMetaRaw) {
+            try {
+                const parsed = JSON.parse(pendingSqlMetaRaw) as { name?: unknown; description?: unknown };
+                const name = typeof parsed?.name === 'string' ? parsed.name.trim() : '';
+                const description = typeof parsed?.description === 'string' ? parsed.description.trim() : '';
+                setLoadedSqlTemplateMeta({ name, description });
+            } catch {
+                setLoadedSqlTemplateMeta({ name: '', description: '' });
+            } finally {
+                localStorage.removeItem(INSPECTOR_PENDING_SQL_META_KEY);
+            }
+        } else {
+            setLoadedSqlTemplateMeta({ name: '', description: '' });
         }
         if (!pendingSql) return;
         localStorage.removeItem(INSPECTOR_PENDING_SQL_KEY);

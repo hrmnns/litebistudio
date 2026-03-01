@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - create-table dialog (`SQL` tab preview)
   - create-index dialog (`Manual` tab preview)
   - SQL Builder preview panel.
+- Dashboard widget presentation was extended with:
+  - per-widget temporary zoom/focus overlay (full-area preview, closable via button, backdrop click, or `ESC`)
+  - persisted widget tile sizes aligned to dashboard grid slots (`1x1`, `1x2`, `2x1`, `2x2`).
 
 ### Changed
 - Dashboard Tools tab order was reorganized to: `Dashboards` -> `Widgets` -> `Filters`.
@@ -53,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - fixed dialog height behavior so tab switching no longer resizes the modal.
 - SQL-sidepanel action layout was reorganized into collapsible groups (`General`, `Source-dependent`) with persisted open/closed state.
 - Data Inspector `Table Tools` tabs were simplified to `Tables`, `Columns`, `Filters` (removed `Actions` tab redundancy).
+- Dashboard widget layout model now stores a size per widget with normalized defaults:
+  - system widgets default/fallback to `1x1`
+  - custom widgets default/fallback to `2x1`.
 
 ### Fixed
 - Fixed dashboard header subtitle in English locale (removed unresolved `{{count}}` / `{{mode}}` placeholders).
@@ -61,6 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed dark-mode inconsistencies in `Create Index` and `Create Table` dialogs (inputs, controls, lists, and action buttons).
 - Fixed duplicated/invalid translation key usage in create-table flows (raw key text shown in UI).
 - Fixed SQL safety-limit notice UX: dismissing the notice is now persisted and no longer reappears every run.
+- Fixed dashboard widget action consistency:
+  - `Open`, `Zoom`, and `Remove` now follow unified hover behavior
+  - custom-widget header actions were aligned to one single row with consistent spacing.
 
 ## [1.3.0] - 2026-02-28
 

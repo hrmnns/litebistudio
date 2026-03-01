@@ -6,8 +6,10 @@ import { createWidgetRepository } from './WidgetRepository';
 import { createReportPackRepository } from './ReportPackRepository';
 import { createSqlStatementRepository } from './SqlStatementRepository';
 import { createWorklistRepository } from './WorklistRepository';
+import { createBackupHistoryRepository } from './BackupHistoryRepository';
 import { isAdminModeRuntimeActive } from '../security/runtimeFlags';
 export type { SqlStatementRecord } from './SqlStatementRepository';
+export type { BackupHistoryEntry } from './BackupHistoryRepository';
 
 const schemaCache = new Map<string, TableColumn[]>();
 type BindValue = string | number | null | undefined;
@@ -321,5 +323,6 @@ export const SystemRepository = {
     ...createSqlStatementRepository(),
     ...createWorklistRepository({
         getTableSchema: getTableSchemaCached
-    })
+    }),
+    ...createBackupHistoryRepository()
 };
