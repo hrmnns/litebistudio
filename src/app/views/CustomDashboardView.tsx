@@ -1278,12 +1278,13 @@ export const CustomDashboardView: React.FC = () => {
                                 (() => {
                                     const meta = SYSTEM_WIDGETS.find(w => w.id === zoomedWidgetRef.id);
                                     const Component = meta ? getComponent(meta.id) : null;
-                                    if (!Component) return null;
+                                    if (!meta || !Component) return null;
+                                    const targetView = COMPONENTS.find(c => c.component === meta.id)?.targetView;
                                     return (
                                         <div className="h-full">
                                             <Component
                                                 onRemove={undefined}
-                                                targetView={COMPONENTS.find(c => c.component === meta.id)?.targetView}
+                                                targetView={targetView}
                                             />
                                         </div>
                                     );

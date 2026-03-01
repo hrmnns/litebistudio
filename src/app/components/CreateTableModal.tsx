@@ -23,17 +23,22 @@ interface CreateTableModalProps {
 
 const quoteIdentifier = (identifier: string): string => `"${identifier.replace(/"/g, '""')}"`;
 
-const buildCreateTablePreviewSql = (tableName: string, columns: CreateTableColumn[], t: (key: string, fallback?: string) => string): string => {
+const buildCreateTablePreviewSql = (
+    tableName: string,
+    columns: CreateTableColumn[],
+    invalidTableNameMessage: string,
+    invalidColumnsMessage: string
+): string => {
     const trimmedTableName = tableName.trim();
     const validColumns = columns
         .map((col) => ({ name: col.name.trim(), type: col.type.trim() }))
         .filter((col) => col.name.length > 0 && col.type.length > 0);
 
     if (!trimmedTableName) {
-        return `-- ${t('datasource.invalid_table_name', 'Invalid table name. Use letters, numbers and underscore only.')}`;
+        return `-- ${invalidTableNameMessage}`;
     }
     if (validColumns.length === 0) {
-        return `-- ${t('datasource.invalid_columns', 'Please provide at least one valid column.')}`;
+        return `-- ${invalidColumnsMessage}`;
     }
 
     const cols = validColumns.map((col) => `${quoteIdentifier(col.name)} ${col.type}`).join(',\n    ');
@@ -71,7 +76,12 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
     }, []);
 
     const previewSql = React.useMemo(
-        () => buildCreateTablePreviewSql(tableName, columns, t),
+        () => buildCreateTablePreviewSql(
+            tableName,
+            columns,
+            t('datasource.invalid_table_name', 'Invalid table name. Use letters, numbers and underscore only.'),
+            t('datasource.invalid_columns', 'Please provide at least one valid column.')
+        ),
         [columns, tableName, t]
     );
 
@@ -234,4 +244,3 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
         </Modal>
     );
 };
-
