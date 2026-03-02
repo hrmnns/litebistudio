@@ -253,6 +253,7 @@
         "sql_manager_search_placeholder": "Search patterns...",
         "sql_manager_no_results": "No matches",
         "active_template": "Template",
+        "active_statement_id": "Statement ID",
         "no_template_description": "No description",
         "assistant_hint": "Build SQL by selecting table, columns and optional aggregation.",
         "assistant_table": "Table",

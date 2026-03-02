@@ -268,7 +268,10 @@ export const QueryBuilderView: React.FC = () => {
         activeWidgetId: overrides?.currentActiveWidgetId ?? activeWidgetId
     }), [sql, builderMode, queryConfig, visType, visConfig, widgetName, activeWidgetId]);
 
-    const handleRun = useCallback(async (overrideSql?: string): Promise<boolean> => {
+    const handleRun = useCallback(async (
+        overrideSql?: string,
+        options?: { preserveVisualization?: boolean }
+    ): Promise<boolean> => {
         setLoading(true);
         setError('');
         try {
@@ -276,7 +279,7 @@ export const QueryBuilderView: React.FC = () => {
             const data = await SystemRepository.executeRaw(sqlToExecute);
             setResults(data);
             setLastRunSql(sqlToExecute);
-            if (data.length > 0) {
+            if (!options?.preserveVisualization && data.length > 0) {
                 const numericCols = Object.keys(data[0]).filter(k => typeof data[0][k] === 'number');
                 const textCols = Object.keys(data[0]).filter(k => typeof data[0][k] === 'string');
 
@@ -365,7 +368,7 @@ export const QueryBuilderView: React.FC = () => {
             }
         } else {
             setSql(widgetSql);
-            setTimeout(() => handleRun(widgetSql), 100);
+            setTimeout(() => { void handleRun(widgetSql, { preserveVisualization: true }); }, 100);
             if (navigate) {
                 setGuidedStep(3);
                 setSidebarTab('visual');
@@ -819,20 +822,24 @@ export const QueryBuilderView: React.FC = () => {
             t('common.warning', 'Warnung')
         );
     }, [hasUnsavedChanges, t]);
-    const resetToNewWidget = useCallback(async () => {
-        if (hasUnsavedChanges) {
-            const shouldSave = await appDialog.confirm(
-                t(
-                    'querybuilder.confirm_save_or_discard_before_new_widget',
-                    'Es gibt ungespeicherte Änderungen. OK = Speichern, Abbrechen = ohne Speichern fortfahren.'
-                ),
-                t('common.warning', 'Warnung')
-            );
-            if (shouldSave) {
-                const saved = await handleSaveWidget(activeWidgetId ? 'update' : 'new');
-                if (!saved) return;
-            }
+    const confirmSaveOrDiscardBeforeContinue = useCallback(async () => {
+        if (!hasUnsavedChanges) return true;
+        const shouldSave = await appDialog.confirm(
+            t(
+                'querybuilder.confirm_save_or_discard_before_new_widget',
+                'Es gibt ungespeicherte Änderungen. OK = Speichern, Abbrechen = ohne Speichern fortfahren.'
+            ),
+            t('common.warning', 'Warnung')
+        );
+        if (shouldSave) {
+            const saved = await handleSaveWidget(activeWidgetId ? 'update' : 'new');
+            return saved;
         }
+        return true;
+    }, [activeWidgetId, handleSaveWidget, hasUnsavedChanges, t]);
+    const resetToNewWidget = useCallback(async () => {
+        const canContinue = await confirmSaveOrDiscardBeforeContinue();
+        if (!canContinue) return;
 
         const defaultVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
         setActiveWidgetId(null);
@@ -851,21 +858,23 @@ export const QueryBuilderView: React.FC = () => {
         setGuidedStep(1);
         setSidebarTab('visual');
         setSavedSnapshot('');
-    }, [activeWidgetId, handleSaveWidget, hasUnsavedChanges, t]);
-    const openLoadDialog = useCallback((tab: 'widget' | 'sql') => {
+    }, [confirmSaveOrDiscardBeforeContinue]);
+    const openLoadDialog = useCallback(async (tab: 'widget' | 'sql') => {
+        if (tab === 'widget') {
+            const canContinue = await confirmSaveOrDiscardBeforeContinue();
+            if (!canContinue) return;
+        }
         setLoadDialogTab(tab);
         setLoadDialogSearch('');
         setSelectedLoadWidgetId(activeWidgetId || '');
         setSelectedLoadSqlId(selectedSqlStatementId || '');
         setIsLoadDialogOpen(true);
-    }, [activeWidgetId, selectedSqlStatementId]);
+    }, [activeWidgetId, confirmSaveOrDiscardBeforeContinue, selectedSqlStatementId]);
     const applyLoadSelection = async () => {
         if (loadDialogTab === 'widget') {
             if (!selectedLoadWidgetId) return;
             const nextWidget = (savedWidgets || []).find((w) => w.id === selectedLoadWidgetId);
             if (!nextWidget) return;
-            const allow = await confirmDiscardUnsavedChanges();
-            if (!allow) return;
             setSourceSelectTab('widget');
             loadWidget(nextWidget, true);
             setIsLoadDialogOpen(false);
@@ -1862,7 +1871,7 @@ export const QueryBuilderView: React.FC = () => {
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => openLoadDialog('widget')}
+                                            onClick={() => { void openLoadDialog('widget'); }}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <Folder className="w-3 h-3" />
@@ -1888,7 +1897,7 @@ export const QueryBuilderView: React.FC = () => {
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => openLoadDialog('sql')}
+                                            onClick={() => { void openLoadDialog('sql'); }}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <FileCode2 className="w-3 h-3" />
@@ -2794,4 +2803,5 @@ export const QueryBuilderView: React.FC = () => {
         </PageLayout>
     );
 };
+
 

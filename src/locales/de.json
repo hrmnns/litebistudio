@@ -253,6 +253,7 @@
         "sql_manager_search_placeholder": "Muster suchen...",
         "sql_manager_no_results": "Keine Treffer",
         "active_template": "Vorlage",
+        "active_statement_id": "Statement-ID",
         "no_template_description": "Keine Beschreibung",
         "assistant_hint": "SQL per Auswahl von Tabelle, Spalten und optionaler Aggregation erstellen.",
         "assistant_table": "Tabelle",

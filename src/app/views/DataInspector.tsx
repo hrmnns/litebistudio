@@ -110,6 +110,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [sqlRequireLimitConfirm] = useLocalStorage<boolean>('data_inspector_sql_require_limit_confirm', true);
     const [sqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
+    const [activeSqlStatementId, setActiveSqlStatementId] = useState<string>('');
     const [sqlLibrarySearch, setSqlLibrarySearch] = useState('');
     const [lastSavedSqlTemplateName, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
     const [lastSavedSqlTemplateDescription, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('data_inspector_last_saved_sql_template_description', '');
@@ -274,6 +275,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(pendingSql);
+        setActiveSqlStatementId('');
         setSqlOutputView('result');
     }, [fixedMode, forwardSqlToWorkspace]);
 
@@ -288,6 +290,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         const lastSelectSql = localStorage.getItem(INSPECTOR_LAST_SELECT_SQL_KEY);
         if (!lastSelectSql || !/^\s*SELECT\b/i.test(lastSelectSql)) return;
         setInputSql(lastSelectSql);
+        setActiveSqlStatementId('');
         setSqlOutputView('result');
     }, [fixedMode, inputSql]);
 
@@ -520,6 +523,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const handleClearSqlWorkspace = useCallback(() => {
         setInputSql('');
         setSqlExecutionSql('');
+        setActiveSqlStatementId('');
         setSqlLimitNotice('');
         setSqlOutputView('result');
         setExplainRows([]);
@@ -580,6 +584,29 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const handleSaveCustomTemplate = async () => {
         const trimmedSql = inputSql.trim();
         if (!trimmedSql) return;
+        const activeSqlStatement = activeSqlStatementId
+            ? sqlStatements.find(stmt => stmt.id === activeSqlStatementId && stmt.scope === SQL_LIBRARY_SCOPE)
+            : undefined;
+        if (activeSqlStatement) {
+            const nextDescription = (activeSqlStatement.description || '').trim();
+            await SystemRepository.saveSqlStatement({
+                id: activeSqlStatement.id,
+                name: activeSqlStatement.name,
+                sql_text: trimmedSql,
+                description: nextDescription,
+                scope: activeSqlStatement.scope,
+                tags: activeSqlStatement.tags,
+                is_favorite: Number(activeSqlStatement.is_favorite) === 1
+            });
+            setLastSavedSqlTemplateName(activeSqlStatement.name);
+            setLastSavedSqlTemplateDescription(nextDescription);
+            setLoadedSqlTemplateMeta({
+                name: activeSqlStatement.name,
+                description: nextDescription
+            });
+            await loadSqlStatements();
+            return;
+        }
 
         const normalized = normalizeSql(trimmedSql);
         const matchingStatement = sqlStatements.find(
@@ -628,6 +655,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         });
         setLastSavedSqlTemplateName(name);
         setLastSavedSqlTemplateDescription(description);
+        setActiveSqlStatementId(targetId);
         await loadSqlStatements();
     };
 
@@ -1273,6 +1301,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(sql);
+        setActiveSqlStatementId('');
         setSqlOutputView('result');
         setShowSqlAssist(false);
         if (mode === 'run') {
@@ -1281,7 +1310,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     }, [assistantSqlPreview, executeSqlText, fixedMode, forwardSqlToWorkspace, setShowSqlAssist]);
 
     const currentSqlNormalized = normalizeSql(inputSql);
-    const currentSqlStatement = sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === currentSqlNormalized);
+    const activeSqlStatement = activeSqlStatementId
+        ? (sqlStatements.find(stmt => stmt.id === activeSqlStatementId) || null)
+        : null;
+    const currentSqlStatement = activeSqlStatement || sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === currentSqlNormalized);
     const isCurrentSqlFavorite = Boolean(currentSqlStatement && Number(currentSqlStatement.is_favorite) === 1);
     const filteredSqlStatements = React.useMemo(() => {
         const query = sqlLibrarySearch.trim().toLowerCase();
@@ -1313,6 +1345,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(statement.sql_text);
+        setActiveSqlStatementId(statement.id);
         setLoadedSqlTemplateMeta({
             name: statement.name,
             description: (statement.description || '').trim()
@@ -1333,6 +1366,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         setMode('sql');
         setInputSql(sql);
+        setActiveSqlStatementId('');
         setLoadedSqlTemplateMeta({
             name: (templateName || '').trim(),
             description: (templateDescription || '').trim()
@@ -1366,8 +1400,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const handleDeleteSqlStatement = useCallback(async (statement: SqlStatementRecord) => {
         if (!(await appDialog.confirm(t('datainspector.custom_template_delete_confirm')))) return;
         await SystemRepository.deleteSqlStatement(statement.id);
+        if (activeSqlStatementId === statement.id) {
+            setActiveSqlStatementId('');
+            setLoadedSqlTemplateMeta({ name: '', description: '' });
+        }
         await loadSqlStatements();
-    }, [loadSqlStatements, t]);
+    }, [activeSqlStatementId, loadSqlStatements, t]);
 
     const handleRenameSqlStatement = useCallback(async (statement: SqlStatementRecord) => {
         const prompted = await appDialog.prompt2(
@@ -3161,6 +3199,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             ) : (
                                 <span className="text-slate-400 dark:text-slate-500">-</span>
                             )}
+                            <span className="mx-1 text-slate-300 dark:text-slate-600">|</span>
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">
+                                {t('datainspector.active_statement_id', 'Statement-ID')}
+                                :
+                            </span>
+                            <code className="font-mono text-[10px] text-slate-500 dark:text-slate-400" title={activeSqlStatementId || '-'}>
+                                {activeSqlStatementId || '-'}
+                            </code>
                         </div>
                         <div className="inline-flex items-center gap-1 whitespace-nowrap ml-auto text-right">
                             <span>{t('datainspector.sql_assist', 'SQL Workspace')}:</span>
