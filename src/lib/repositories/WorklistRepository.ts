@@ -48,6 +48,14 @@ export function createWorklistRepository(deps: WorklistRepositoryDeps) {
             notifyDbChange();
         },
 
+        async removeWorklistItemById(id: number | string): Promise<void> {
+            await runQuery(
+                'DELETE FROM sys_worklist WHERE id = ?',
+                [Number(id)]
+            );
+            notifyDbChange();
+        },
+
         async updateWorklistItem(id: number | string, data: { status?: string; comment?: string; priority?: string; due_at?: string | null }): Promise<void> {
             const fields: string[] = [];
             const params: Array<string | number | null | undefined> = [];

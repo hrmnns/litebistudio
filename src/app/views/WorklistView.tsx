@@ -93,7 +93,7 @@ export const WorklistView: React.FC = () => {
 
     const handleRemove = async (id: number) => {
         if (isReadOnly) return;
-        await SystemRepository.executeRaw('DELETE FROM sys_worklist WHERE id = ?', [id]);
+        await SystemRepository.removeWorklistItemById(id);
         await loadWorklist();
     };
 
