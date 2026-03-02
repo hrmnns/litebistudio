@@ -40,6 +40,7 @@ import { RightOverlayPanel } from '../components/ui/RightOverlayPanel';
 type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
 const DEFAULT_SQL = '';
+const GRAPHIC_PREVIEW_MIN_HEIGHT = 360;
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const logger = createLogger('QueryBuilderView');
@@ -108,7 +109,7 @@ export const QueryBuilderView: React.FC = () => {
     const [, setSidebarTab] = useState<'source' | 'visual' | 'widget'>('visual');
     const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>('none');
     const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
-    const [graphicPreviewMinHeight, setGraphicPreviewMinHeight] = useLocalStorage<number>('querybuilder_graphic_preview_min_height', 260);
+    const [graphicPreviewMinHeight, setGraphicPreviewMinHeight] = useLocalStorage<number>('querybuilder_graphic_preview_min_height', GRAPHIC_PREVIEW_MIN_HEIGHT);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
     const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
 
@@ -147,6 +148,10 @@ export const QueryBuilderView: React.FC = () => {
     const { togglePresentationMode, isReadOnly } = useDashboard();
     const graphicResizeStartYRef = useRef<number | null>(null);
     const graphicResizeStartHeightRef = useRef<number>(graphicPreviewMinHeight);
+    const previewPanelRef = useRef<HTMLDivElement | null>(null);
+    const previewHeaderRef = useRef<HTMLDivElement | null>(null);
+    const previewFooterRef = useRef<HTMLDivElement | null>(null);
+    const [graphicPreviewMaxHeight, setGraphicPreviewMaxHeight] = useState<number>(520);
 
     // Fetch saved widgets
     const { data: savedWidgets, refresh: refreshWidgets } = useAsync<SavedWidget[]>(
@@ -177,6 +182,34 @@ export const QueryBuilderView: React.FC = () => {
         observer.observe(root, { attributes: true, attributeFilter: ['class'] });
         return () => observer.disconnect();
     }, []);
+    useEffect(() => {
+        const updateGraphicMaxHeight = () => {
+            const panelTop = previewPanelRef.current?.getBoundingClientRect().top ?? 0;
+            const availablePanelHeight = Math.floor(window.innerHeight - panelTop - 24);
+            const headerHeight = previewHeaderRef.current?.offsetHeight ?? 0;
+            const footerHeight = previewFooterRef.current?.offsetHeight ?? 0;
+            const availableHeight = Math.floor(availablePanelHeight - headerHeight - footerHeight - 8);
+            const nextMax = Math.max(GRAPHIC_PREVIEW_MIN_HEIGHT, availableHeight);
+            setGraphicPreviewMaxHeight(nextMax);
+            setGraphicPreviewMinHeight((prev) => Math.min(prev, nextMax));
+        };
+
+        updateGraphicMaxHeight();
+        window.addEventListener('resize', updateGraphicMaxHeight);
+
+        let resizeObserver: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(updateGraphicMaxHeight);
+            if (previewPanelRef.current) resizeObserver.observe(previewPanelRef.current);
+            if (previewHeaderRef.current) resizeObserver.observe(previewHeaderRef.current);
+            if (previewFooterRef.current) resizeObserver.observe(previewFooterRef.current);
+        }
+
+        return () => {
+            window.removeEventListener('resize', updateGraphicMaxHeight);
+            resizeObserver?.disconnect();
+        };
+    }, [previewTab, workspaceTab, isConfigPanelOpen]);
 
     const sqlPreviewHighlightStyle = useMemo(() => {
         if (isDarkSqlPreview) {
@@ -567,6 +600,10 @@ export const QueryBuilderView: React.FC = () => {
         return usageMap;
     }, [dashboards, savedWidgets, t]);
     const dashboardUsedWidgetCount = useMemo(() => dashboardUsageByWidgetId.size, [dashboardUsageByWidgetId]);
+    const graphicPreviewRenderHeight = useMemo(
+        () => Math.max(GRAPHIC_PREVIEW_MIN_HEIGHT, Math.min(graphicPreviewMinHeight, graphicPreviewMaxHeight)),
+        [graphicPreviewMinHeight, graphicPreviewMaxHeight]
+    );
     const sortedManageWidgets = useMemo(() => {
         const rows = [...filteredManageWidgets];
         const toTs = (value?: string | null) => {
@@ -1176,8 +1213,9 @@ export const QueryBuilderView: React.FC = () => {
         const onMouseMove = (moveEvent: MouseEvent) => {
             if (graphicResizeStartYRef.current === null) return;
             const deltaY = moveEvent.clientY - graphicResizeStartYRef.current;
-            const maxHeight = Math.max(360, Math.floor(window.innerHeight * 0.9));
-            const nextHeight = Math.max(260, Math.min(maxHeight, graphicResizeStartHeightRef.current + deltaY));
+            const minHeight = GRAPHIC_PREVIEW_MIN_HEIGHT;
+            const maxHeight = Math.max(minHeight, graphicPreviewMaxHeight);
+            const nextHeight = Math.max(minHeight, Math.min(maxHeight, graphicResizeStartHeightRef.current + deltaY));
             setGraphicPreviewMinHeight(nextHeight);
         };
 
@@ -1189,7 +1227,7 @@ export const QueryBuilderView: React.FC = () => {
 
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
-    }, [graphicPreviewMinHeight, setGraphicPreviewMinHeight]);
+    }, [graphicPreviewMinHeight, graphicPreviewMaxHeight, setGraphicPreviewMinHeight]);
 
     return (
         <PageLayout
@@ -1842,8 +1880,8 @@ export const QueryBuilderView: React.FC = () => {
                     </RightOverlayPanel>
 
                     {/* Preview Area */}
-                    <div id="query-visualization" className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full min-h-[320px] sm:min-h-[380px] lg:min-h-[460px] relative">
-                        <div className="border-b border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                    <div id="query-visualization" ref={previewPanelRef} className="w-full min-w-0 h-auto lg:self-start bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col min-h-[320px] sm:min-h-[380px] lg:min-h-[460px] relative">
+                        <div ref={previewHeaderRef} className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
                             <div className="p-3 flex items-center justify-between gap-2">
                                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                                     {previewHeaderTitleWithDirty}
@@ -1857,7 +1895,7 @@ export const QueryBuilderView: React.FC = () => {
                                     </p>
                                 )}
                             </div>
-                            <div className="px-3 pb-2 border-t border-slate-200 dark:border-slate-600/90">
+                            <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
                                 <div className="pt-2 flex items-center justify-between gap-2">
                                     <div className="inline-flex items-center gap-1">
                                         <button
@@ -1967,7 +2005,13 @@ export const QueryBuilderView: React.FC = () => {
                                         ? 'min-h-0 flex flex-col overflow-auto p-4 container-scrollbar'
                                         : 'flex-1 min-h-0 flex flex-col overflow-auto p-4 container-scrollbar'
                             }
-                            style={previewTab === 'graphic' ? { height: `${Math.max(260, graphicPreviewMinHeight)}px`, flex: '0 0 auto' } : undefined}
+                            style={previewTab === 'graphic'
+                                ? {
+                                    height: `${graphicPreviewRenderHeight}px`,
+                                    maxHeight: `${graphicPreviewMaxHeight}px`,
+                                    flex: '0 0 auto'
+                                }
+                                : undefined}
                         >
                             {previewTab === 'graphic' ? (
                                 <div className="relative h-full flex flex-col">
@@ -2172,7 +2216,7 @@ export const QueryBuilderView: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="h-[220px] w-full rounded-lg border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center text-slate-400">
+                                                        <div className="h-[260px] w-full rounded-lg border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center text-slate-400">
                                                             <ImageIcon className="w-8 h-8 mb-2 opacity-60" />
                                                             <p className="text-xs font-semibold text-center">{t('querybuilder.image_empty_hint', 'Bitte eine Bild-URL hinterlegen.')}</p>
                                                         </div>
@@ -2526,7 +2570,7 @@ export const QueryBuilderView: React.FC = () => {
                                 )
                             )}
                         </div>
-                        <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/90">
+                        <div ref={previewFooterRef} className="px-3 py-2 border-t border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90">
                             <div className="flex items-end justify-between gap-3">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
                                     <span className="inline-flex items-center gap-1">
@@ -2546,7 +2590,7 @@ export const QueryBuilderView: React.FC = () => {
                                     <button
                                         type="button"
                                         onMouseDown={handleGraphicResizeStart}
-                                        onDoubleClick={() => setGraphicPreviewMinHeight(260)}
+                                        onDoubleClick={() => setGraphicPreviewMinHeight(GRAPHIC_PREVIEW_MIN_HEIGHT)}
                                         className="h-5 w-5 rounded text-slate-400 hover:text-blue-500 dark:text-slate-500 dark:hover:text-blue-300 flex items-center justify-center cursor-ns-resize select-none shrink-0"
                                         title={t('common.resize', 'Groesse aendern')}
                                         aria-label={t('common.resize', 'Groesse aendern')}
@@ -2561,8 +2605,8 @@ export const QueryBuilderView: React.FC = () => {
                 ) : (
                     <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
                         <div className="h-full min-h-0 flex flex-col">
-                            <div className="shrink-0 border-b border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
-                                <div className="p-3 border-b border-slate-200 dark:border-slate-600/90">
+                            <div className="shrink-0 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                                <div className="p-3 border-b border-slate-300 dark:border-slate-600/90">
                                     <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                                         {t('querybuilder.manage_widgets_title', 'Widgets verwalten')}
                                     </h3>
@@ -2677,7 +2721,7 @@ export const QueryBuilderView: React.FC = () => {
                                     ))
                                 )}
                             </div>
-                            <div className="shrink-0 px-3 py-2 border-t border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/90">
+                            <div className="shrink-0 px-3 py-2 border-t border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
                                     <span className="inline-flex items-center gap-1">
                                         <span className="font-semibold uppercase tracking-wide">{t('querybuilder.manage_widgets_total', 'Vorhandene Widgets')}:</span>
