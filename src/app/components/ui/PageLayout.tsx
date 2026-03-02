@@ -358,7 +358,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                     </div>
                 </footer>
             )}
-            {rightPanel && isRightPanelEnabled && (
+            {rightPanel && isRightPanelEnabled && rightPanel.content != null && (
                 <RightOverlayPanel
                     isOpen={isRightPanelOpenEffective}
                     onClose={() => setRightPanelOpen(false)}

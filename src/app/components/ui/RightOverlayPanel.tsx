@@ -12,6 +12,8 @@ interface RightOverlayPanelProps {
     children: React.ReactNode;
     width?: RightOverlayPanelWidth;
     noScroll?: boolean;
+    backdropStyle?: 'default' | 'subtle';
+    contentClassName?: string;
 }
 
 const widthClassByPreset: Record<'sm' | 'md' | 'lg', string> = {
@@ -38,7 +40,9 @@ export const RightOverlayPanel: React.FC<RightOverlayPanelProps> = ({
     title,
     children,
     width = 'md',
-    noScroll
+    noScroll,
+    backdropStyle = 'default',
+    contentClassName
 }) => {
     useEffect(() => {
         if (!isOpen) return;
@@ -59,7 +63,12 @@ export const RightOverlayPanel: React.FC<RightOverlayPanelProps> = ({
     return createPortal(
         <div className="fixed inset-0 z-[90] flex justify-end">
             <div
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+                className={cn(
+                    'absolute inset-0 animate-in fade-in duration-200',
+                    backdropStyle === 'subtle'
+                        ? 'bg-slate-900/35 backdrop-blur-[1px]'
+                        : 'bg-slate-900/60 backdrop-blur-sm'
+                )}
                 onClick={onClose}
             />
             <aside
@@ -83,7 +92,7 @@ export const RightOverlayPanel: React.FC<RightOverlayPanelProps> = ({
                             <X className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className={cn('flex-1 min-h-0 p-5', !noScroll && 'overflow-auto')}>
+                    <div className={cn('flex-1 min-h-0', contentClassName ?? 'p-5', !noScroll && 'overflow-auto')}>
                         {children}
                     </div>
                 </div>

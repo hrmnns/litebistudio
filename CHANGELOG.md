@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Widget editor toolbar now includes a dedicated `Remove SQL` action to clear SQL source binding for non-data widgets without leaving the current widget.
+
+### Changed
+- Widget load/apply behavior in `Widget erstellen` was refined:
+  - selecting a new SQL statement now replaces the SQL source while keeping the current widget context active
+  - the current preview tab (`Graphic`, `Table`, `SQL`) is preserved on SQL apply instead of forcing a switch to SQL view.
+- Widget workspace usability on smaller screens was improved:
+  - command bar now supports horizontal overflow scrolling
+  - long button labels collapse to icon-first display on smaller breakpoints while keeping tooltips.
+
+### Fixed
+- Removed redundant unsaved-changes confirmation when applying a new SQL statement from the SQL selection dialog.
+- Widget workspace now restores the last active top tab (`Widgets verwalten` / `Widget erstellen`) when returning to the view.
+
 ## [1.4.0] - 2026-03-01
 
 ### Added

@@ -529,6 +529,7 @@
         "save_widget": "Widget speichern",
         "save_widget_as": "Speichern unter",
         "select_sql_statement": "SQL-Statement auswählen",
+        "remove_sql_statement": "SQL entfernen",
         "open_config_panel": "Konfiguration öffnen",
         "tab_config": "Konfiguration",
         "tab_metadata": "Metadaten",

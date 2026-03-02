@@ -529,6 +529,7 @@
         "save_widget": "Save widget",
         "save_widget_as": "Save as",
         "select_sql_statement": "Select SQL statement",
+        "remove_sql_statement": "Remove SQL",
         "open_config_panel": "Open configuration",
         "tab_config": "Configuration",
         "tab_metadata": "Metadata",
