@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Widget editor toolbar now includes a dedicated `Remove SQL` action to clear SQL source binding for non-data widgets without leaving the current widget.
+- Workspace state persistence was extended:
+  - Widget editor now remembers and restores the last opened widget when returning from other app areas.
+  - SQL Workspace now remembers and restores the last opened SQL statement when returning from other app areas.
+- Widget editor now persists the selected SQL statement ID, so footer metadata remains stable across navigation.
 
 ### Changed
 - Widget load/apply behavior in `Widget erstellen` was refined:
@@ -17,10 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Widget workspace usability on smaller screens was improved:
   - command bar now supports horizontal overflow scrolling
   - long button labels collapse to icon-first display on smaller breakpoints while keeping tooltips.
+- SQL Workspace and Widget editor visual parity was improved:
+  - SQL Workspace panel spacing beneath workspace tabs was aligned closer to the widget editor layout.
+  - SQL Workspace toolbar now includes a vertical separator between `Save as` and `Run`.
+  - SQL Workspace German label now consistently uses `Öffnen`.
+- Widget SQL preview editor now uses the same global CodeMirror settings profile as SQL Workspace (line behavior, theme intensity, active-line handling, typography/tab sizing).
+- Widget editor dark-mode surface color was aligned with CodeMirror background for a seamless panel/editor transition.
 
 ### Fixed
 - Removed redundant unsaved-changes confirmation when applying a new SQL statement from the SQL selection dialog.
 - Widget workspace now restores the last active top tab (`Widgets verwalten` / `Widget erstellen`) when returning to the view.
+- Fixed SQL Workspace footer metadata so `Statement-ID` is restored reliably after cross-view navigation when statement content matches.
+- Removed manual resize grip from widget preview footer and disabled the associated custom graphic-height drag behavior to prevent layout drift.
 
 ## [1.4.0] - 2026-03-01
 

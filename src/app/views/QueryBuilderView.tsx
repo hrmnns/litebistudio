@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql as sqlLang } from '@codemirror/lang-sql';
@@ -40,7 +40,6 @@ import { RightOverlayPanel } from '../components/ui/RightOverlayPanel';
 type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
 const DEFAULT_SQL = '';
-const GRAPHIC_PREVIEW_MIN_HEIGHT = 360;
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const logger = createLogger('QueryBuilderView');
@@ -109,7 +108,6 @@ export const QueryBuilderView: React.FC = () => {
     const [, setSidebarTab] = useState<'source' | 'visual' | 'widget'>('visual');
     const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>('none');
     const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
-    const [graphicPreviewMinHeight, setGraphicPreviewMinHeight] = useLocalStorage<number>('querybuilder_graphic_preview_min_height', GRAPHIC_PREVIEW_MIN_HEIGHT);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
     const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
 
@@ -119,10 +117,11 @@ export const QueryBuilderView: React.FC = () => {
 
     // Active Widget State
     const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
+    const [lastOpenWidgetId, setLastOpenWidgetId] = useLocalStorage<string>('querybuilder_last_open_widget_id', '');
 
     // Save Widget State
     const [widgetName, setWidgetName] = useState('');
-    const [selectedSqlStatementId, setSelectedSqlStatementId] = useState<string>('');
+    const [selectedSqlStatementId, setSelectedSqlStatementId] = useLocalStorage<string>('querybuilder_selected_sql_statement_id', '');
     const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
     const [loadDialogTab, setLoadDialogTab] = useState<'widget' | 'sql'>('widget');
     const [loadDialogSearch, setLoadDialogSearch] = useState('');
@@ -137,21 +136,16 @@ export const QueryBuilderView: React.FC = () => {
     const [sqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
     const [sqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
     const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
+    const [sqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', true);
     const [sqlEditorFontSize] = useLocalStorage<number>('sql_editor_font_size', 14);
     const [sqlEditorTabSize] = useLocalStorage<number>('sql_editor_tab_size', 4);
     const [sqlEditorThemeIntensity] = useLocalStorage<'subtle' | 'normal' | 'high'>('sql_editor_theme_intensity', 'normal');
-    const [sqlEditorPreviewHighlight] = useLocalStorage<boolean>('sql_editor_preview_highlighting', true);
     const [isDarkSqlPreview, setIsDarkSqlPreview] = useState<boolean>(
         typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
     );
     const { isExporting, exportToPdf } = useReportExport();
     const { togglePresentationMode, isReadOnly } = useDashboard();
-    const graphicResizeStartYRef = useRef<number | null>(null);
-    const graphicResizeStartHeightRef = useRef<number>(graphicPreviewMinHeight);
-    const previewPanelRef = useRef<HTMLDivElement | null>(null);
-    const previewHeaderRef = useRef<HTMLDivElement | null>(null);
-    const previewFooterRef = useRef<HTMLDivElement | null>(null);
-    const [graphicPreviewMaxHeight, setGraphicPreviewMaxHeight] = useState<number>(520);
+    const hasRestoredLastWidgetRef = useRef(false);
 
     // Fetch saved widgets
     const { data: savedWidgets, refresh: refreshWidgets } = useAsync<SavedWidget[]>(
@@ -182,35 +176,6 @@ export const QueryBuilderView: React.FC = () => {
         observer.observe(root, { attributes: true, attributeFilter: ['class'] });
         return () => observer.disconnect();
     }, []);
-    useEffect(() => {
-        const updateGraphicMaxHeight = () => {
-            const panelTop = previewPanelRef.current?.getBoundingClientRect().top ?? 0;
-            const availablePanelHeight = Math.floor(window.innerHeight - panelTop - 24);
-            const headerHeight = previewHeaderRef.current?.offsetHeight ?? 0;
-            const footerHeight = previewFooterRef.current?.offsetHeight ?? 0;
-            const availableHeight = Math.floor(availablePanelHeight - headerHeight - footerHeight - 8);
-            const nextMax = Math.max(GRAPHIC_PREVIEW_MIN_HEIGHT, availableHeight);
-            setGraphicPreviewMaxHeight(nextMax);
-            setGraphicPreviewMinHeight((prev) => Math.min(prev, nextMax));
-        };
-
-        updateGraphicMaxHeight();
-        window.addEventListener('resize', updateGraphicMaxHeight);
-
-        let resizeObserver: ResizeObserver | null = null;
-        if (typeof ResizeObserver !== 'undefined') {
-            resizeObserver = new ResizeObserver(updateGraphicMaxHeight);
-            if (previewPanelRef.current) resizeObserver.observe(previewPanelRef.current);
-            if (previewHeaderRef.current) resizeObserver.observe(previewHeaderRef.current);
-            if (previewFooterRef.current) resizeObserver.observe(previewFooterRef.current);
-        }
-
-        return () => {
-            window.removeEventListener('resize', updateGraphicMaxHeight);
-            resizeObserver?.disconnect();
-        };
-    }, [previewTab, workspaceTab, isConfigPanelOpen]);
-
     const sqlPreviewHighlightStyle = useMemo(() => {
         if (isDarkSqlPreview) {
             return HighlightStyle.define([
@@ -236,52 +201,63 @@ export const QueryBuilderView: React.FC = () => {
         () => {
             const activeLineDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.08)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.18)' : 'rgba(96, 165, 250, 0.12)';
             const activeLineLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.05)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(59, 130, 246, 0.08)';
+            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.34)' : 'rgba(96, 165, 250, 0.24)';
+            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.34)' : 'rgba(59, 130, 246, 0.25)';
             return EditorView.theme({
                 '&': {
                     height: '100%',
                     fontSize: `${Math.max(12, Math.min(15, sqlEditorFontSize))}px`,
-                    borderRadius: '0.5rem'
+                    borderRadius: '0.5rem',
+                    backgroundColor: isDarkSqlPreview ? '#0b1220' : '#f8fafc',
+                    color: isDarkSqlPreview ? '#e2e8f0' : '#0f172a'
                 },
                 '.cm-editor': {
-                    backgroundColor: isDarkSqlPreview ? '#0b1220' : '#f8fafc',
+                    backgroundColor: `${isDarkSqlPreview ? '#0b1220' : '#f8fafc'} !important`,
                     color: isDarkSqlPreview ? '#e2e8f0' : '#0f172a'
                 },
                 '.cm-scroller': {
                     overflow: 'auto',
-                    backgroundColor: isDarkSqlPreview ? '#0b1220' : '#f8fafc',
+                    backgroundColor: `${isDarkSqlPreview ? '#0b1220' : '#f8fafc'} !important`,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
                 },
                 '.cm-content': {
-                    padding: '0.75rem'
+                    padding: '0.75rem',
+                    backgroundColor: `${isDarkSqlPreview ? '#0b1220' : '#f8fafc'} !important`,
+                    color: isDarkSqlPreview ? '#e2e8f0' : '#0f172a',
+                    caretColor: isDarkSqlPreview ? '#60a5fa' : '#2563eb'
                 },
                 '.cm-activeLine': {
-                    backgroundColor: isDarkSqlPreview ? activeLineDark : activeLineLight
+                    backgroundColor: sqlEditorHighlightActiveLine ? (isDarkSqlPreview ? activeLineDark : activeLineLight) : 'transparent'
+                },
+                '.cm-selectionBackground, ::selection': {
+                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
                 },
                 '.cm-focused': {
                     outline: 'none'
                 },
                 '.cm-gutters': {
-                    backgroundColor: 'transparent',
-                    border: 'none'
+                    backgroundColor: `${isDarkSqlPreview ? '#0b1220' : '#f8fafc'} !important`,
+                    border: 'none',
+                    color: isDarkSqlPreview ? '#94a3b8' : '#64748b'
                 },
                 '.cm-cursor, .cm-dropCursor': {
-                    borderLeftColor: 'transparent'
+                    borderLeftColor: isDarkSqlPreview ? '#60a5fa' : '#2563eb'
                 }
             }, { dark: isDarkSqlPreview });
         },
-        [isDarkSqlPreview, sqlEditorFontSize, sqlEditorThemeIntensity]
+        [isDarkSqlPreview, sqlEditorFontSize, sqlEditorHighlightActiveLine, sqlEditorThemeIntensity]
     );
 
     const sqlPreviewExtensions = useMemo(() => {
         const exts = [sqlLang(), sqlPreviewTheme, EditorState.tabSize.of(Math.max(2, Math.min(4, sqlEditorTabSize)))];
-        if (sqlEditorPreviewHighlight && sqlEditorSyntaxHighlight) {
+        if (sqlEditorSyntaxHighlight) {
             exts.push(syntaxHighlighting(sqlPreviewHighlightStyle));
         }
         if (sqlEditorLineWrap) {
             exts.push(EditorView.lineWrapping);
         }
         return exts;
-    }, [sqlEditorLineWrap, sqlEditorPreviewHighlight, sqlEditorSyntaxHighlight, sqlEditorTabSize, sqlPreviewHighlightStyle, sqlPreviewTheme]);
+    }, [sqlEditorLineWrap, sqlEditorSyntaxHighlight, sqlEditorTabSize, sqlPreviewHighlightStyle, sqlPreviewTheme]);
 
     const buildSnapshot = useCallback((overrides?: {
         currentSql?: string;
@@ -600,10 +576,6 @@ export const QueryBuilderView: React.FC = () => {
         return usageMap;
     }, [dashboards, savedWidgets, t]);
     const dashboardUsedWidgetCount = useMemo(() => dashboardUsageByWidgetId.size, [dashboardUsageByWidgetId]);
-    const graphicPreviewRenderHeight = useMemo(
-        () => Math.max(GRAPHIC_PREVIEW_MIN_HEIGHT, Math.min(graphicPreviewMinHeight, graphicPreviewMaxHeight)),
-        [graphicPreviewMinHeight, graphicPreviewMaxHeight]
-    );
     const sortedManageWidgets = useMemo(() => {
         const rows = [...filteredManageWidgets];
         const toTs = (value?: string | null) => {
@@ -627,6 +599,25 @@ export const QueryBuilderView: React.FC = () => {
         });
         return rows;
     }, [filteredManageWidgets, manageSort, dashboardUsageByWidgetId]);
+    useEffect(() => {
+        if (!activeWidgetId) {
+            setLastOpenWidgetId('');
+            return;
+        }
+        if (lastOpenWidgetId === activeWidgetId) return;
+        setLastOpenWidgetId(activeWidgetId);
+    }, [activeWidgetId, lastOpenWidgetId, setLastOpenWidgetId]);
+
+    useEffect(() => {
+        if (hasRestoredLastWidgetRef.current) return;
+        if (!savedWidgets || savedWidgets.length === 0) return;
+        hasRestoredLastWidgetRef.current = true;
+        if (!lastOpenWidgetId || activeWidgetId) return;
+        const saved = savedWidgets.find((widget) => widget.id === lastOpenWidgetId);
+        if (!saved) return;
+        setSourceSelectTab('widget');
+        loadWidget(saved, false);
+    }, [activeWidgetId, lastOpenWidgetId, loadWidget, savedWidgets]);
 
     const selectedSqlStatement = useMemo(
         () => (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId),
@@ -843,6 +834,7 @@ export const QueryBuilderView: React.FC = () => {
         [buildSnapshot]
     );
     const hasUnsavedChanges = savedSnapshot.length > 0 && currentSnapshot !== savedSnapshot;
+    const canSaveCurrentWidget = !saveDisabled && hasUnsavedChanges;
     const applySqlStatementSource = useCallback((statement: SqlStatementRecord) => {
         setSelectedSqlStatementId(statement.id);
         setQueryConfig(undefined);
@@ -855,20 +847,26 @@ export const QueryBuilderView: React.FC = () => {
     const confirmDiscardUnsavedChanges = useCallback(async () => {
         if (!hasUnsavedChanges) return true;
         return appDialog.confirm(
-            t('querybuilder.confirm_discard_unsaved', 'Es gibt ungespeicherte Änderungen. Fortfahren?'),
+            t('querybuilder.confirm_discard_unsaved', 'Es gibt ungespeicherte Ã„nderungen. Fortfahren?'),
             t('common.warning', 'Warnung')
         );
     }, [hasUnsavedChanges, t]);
     const confirmSaveOrDiscardBeforeContinue = useCallback(async () => {
         if (!hasUnsavedChanges) return true;
-        const shouldSave = await appDialog.confirm(
+        const choice = await appDialog.confirm3(
             t(
                 'querybuilder.confirm_save_or_discard_before_new_widget',
-                'Es gibt ungespeicherte Änderungen. OK = Speichern, Abbrechen = ohne Speichern fortfahren.'
+                'Es gibt ungespeicherte Ã„nderungen. Sollen diese vor dem Fortfahren gespeichert werden?'
             ),
-            t('common.warning', 'Warnung')
+            {
+                title: t('common.warning', 'Warnung'),
+                confirmLabel: t('common.yes', 'Ja'),
+                secondaryLabel: t('common.no', 'Nein'),
+                cancelLabel: t('common.cancel', 'Abbrechen')
+            }
         );
-        if (shouldSave) {
+        if (choice === 'cancel') return false;
+        if (choice === 'confirm') {
             const saved = await handleSaveWidget(activeWidgetId ? 'update' : 'new');
             return saved;
         }
@@ -933,7 +931,7 @@ export const QueryBuilderView: React.FC = () => {
         const confirmDelete = await appDialog.confirm(
             t('querybuilder.confirm_delete_widget', {
                 name: widget.name,
-                defaultValue: `Widget "${widget.name}" löschen?`
+                defaultValue: `Widget "${widget.name}" lÃ¶schen?`
             }),
             t('common.warning', 'Warnung')
         );
@@ -1123,7 +1121,7 @@ export const QueryBuilderView: React.FC = () => {
             gotoStep(4);
             return;
         }
-        if (guidedStep === 4 && !saveDisabled) {
+        if (guidedStep === 4 && canSaveCurrentWidget) {
             await handleSaveWidget('update');
         }
     };
@@ -1195,7 +1193,7 @@ export const QueryBuilderView: React.FC = () => {
 
             if (key === 's') {
                 event.preventDefault();
-                if (!saveDisabled) {
+                if (canSaveCurrentWidget) {
                     void handleSaveWidget('update');
                 }
             }
@@ -1203,31 +1201,7 @@ export const QueryBuilderView: React.FC = () => {
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [loading, saveDisabled, handleRun, handleSaveWidget]);
-
-    const handleGraphicResizeStart = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-        event.preventDefault();
-        graphicResizeStartYRef.current = event.clientY;
-        graphicResizeStartHeightRef.current = graphicPreviewMinHeight;
-
-        const onMouseMove = (moveEvent: MouseEvent) => {
-            if (graphicResizeStartYRef.current === null) return;
-            const deltaY = moveEvent.clientY - graphicResizeStartYRef.current;
-            const minHeight = GRAPHIC_PREVIEW_MIN_HEIGHT;
-            const maxHeight = Math.max(minHeight, graphicPreviewMaxHeight);
-            const nextHeight = Math.max(minHeight, Math.min(maxHeight, graphicResizeStartHeightRef.current + deltaY));
-            setGraphicPreviewMinHeight(nextHeight);
-        };
-
-        const onMouseUp = () => {
-            graphicResizeStartYRef.current = null;
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-        };
-
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-    }, [graphicPreviewMinHeight, graphicPreviewMaxHeight, setGraphicPreviewMinHeight]);
+    }, [loading, canSaveCurrentWidget, handleRun, handleSaveWidget]);
 
     return (
         <PageLayout
@@ -1261,8 +1235,9 @@ export const QueryBuilderView: React.FC = () => {
                 enabled: true,
                 isOpen: isConfigPanelOpen,
                 onOpenChange: (open) => setIsConfigPanelOpen(open),
-                triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration öffnen')
+                triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration Ã¶ffnen')
             }}
+            fillHeight
         >
             <div className="flex flex-col gap-4 h-full min-h-0">
                 <div className="border-b border-slate-200 dark:border-slate-700">
@@ -1880,8 +1855,8 @@ export const QueryBuilderView: React.FC = () => {
                     </RightOverlayPanel>
 
                     {/* Preview Area */}
-                    <div id="query-visualization" ref={previewPanelRef} className="w-full min-w-0 h-auto lg:self-start bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col min-h-[320px] sm:min-h-[380px] lg:min-h-[460px] relative">
-                        <div ref={previewHeaderRef} className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                    <div id="query-visualization" className="w-full min-w-0 flex-1 min-h-0 bg-white dark:bg-[#0b1220] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col relative">
+                        <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
                             <div className="p-3 flex items-center justify-between gap-2">
                                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                                     {previewHeaderTitleWithDirty}
@@ -1918,7 +1893,7 @@ export const QueryBuilderView: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => { void handleSaveWidget(activeWidgetId ? 'update' : 'new'); }}
-                                            disabled={saveDisabled}
+                                            disabled={!canSaveCurrentWidget}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
                                             <Save className="w-3 h-3" />
@@ -1939,7 +1914,7 @@ export const QueryBuilderView: React.FC = () => {
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <FileCode2 className="w-3 h-3" />
-                                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswählen')}
+                                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswÃ¤hlen')}
                                         </button>
                                         <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                         <button
@@ -1950,7 +1925,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
                                                     : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100'
                                             }`}
-                                            title={t('querybuilder.open_config_panel', 'Konfiguration öffnen')}
+                                            title={t('querybuilder.open_config_panel', 'Konfiguration Ã¶ffnen')}
                                         >
                                             <SlidersHorizontal className="w-3 h-3" />
                                             {t('querybuilder.tab_config', 'Konfiguration')}
@@ -2002,16 +1977,9 @@ export const QueryBuilderView: React.FC = () => {
                                 previewTab === 'sql'
                                     ? 'flex-1 min-h-0 flex flex-col overflow-hidden p-0'
                                     : previewTab === 'graphic'
-                                        ? 'min-h-0 flex flex-col overflow-auto p-4 container-scrollbar'
+                                        ? 'flex-1 min-h-0 flex flex-col overflow-auto p-4 container-scrollbar'
                                         : 'flex-1 min-h-0 flex flex-col overflow-auto p-4 container-scrollbar'
                             }
-                            style={previewTab === 'graphic'
-                                ? {
-                                    height: `${graphicPreviewRenderHeight}px`,
-                                    maxHeight: `${graphicPreviewMaxHeight}px`,
-                                    flex: '0 0 auto'
-                                }
-                                : undefined}
                         >
                             {previewTab === 'graphic' ? (
                                 <div className="relative h-full flex flex-col">
@@ -2560,8 +2528,8 @@ export const QueryBuilderView: React.FC = () => {
                                                 basicSetup={{
                                                     lineNumbers: sqlEditorLineNumbers,
                                                     foldGutter: false,
-                                                    highlightActiveLine: sqlEditorPreviewHighlight,
-                                                    highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorPreviewHighlight
+                                                    highlightActiveLine: sqlEditorHighlightActiveLine,
+                                                    highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorHighlightActiveLine
                                                 }}
                                                 extensions={sqlPreviewExtensions}
                                             />
@@ -2570,7 +2538,7 @@ export const QueryBuilderView: React.FC = () => {
                                 )
                             )}
                         </div>
-                        <div ref={previewFooterRef} className="px-3 py-2 border-t border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90">
+                        <div className="px-3 py-2 border-t border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90">
                             <div className="flex items-end justify-between gap-3">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
                                     <span className="inline-flex items-center gap-1">
@@ -2586,18 +2554,6 @@ export const QueryBuilderView: React.FC = () => {
                                         <code className="font-mono text-[10px]" title={previewTypeMeta.label}>{previewTypeMeta.label}</code>
                                     </span>
                                 </div>
-                                {previewTab === 'graphic' && (
-                                    <button
-                                        type="button"
-                                        onMouseDown={handleGraphicResizeStart}
-                                        onDoubleClick={() => setGraphicPreviewMinHeight(GRAPHIC_PREVIEW_MIN_HEIGHT)}
-                                        className="h-5 w-5 rounded text-slate-400 hover:text-blue-500 dark:text-slate-500 dark:hover:text-blue-300 flex items-center justify-center cursor-ns-resize select-none shrink-0"
-                                        title={t('common.resize', 'Groesse aendern')}
-                                        aria-label={t('common.resize', 'Groesse aendern')}
-                                    >
-                                        <span className="text-[12px] leading-none">↕</span>
-                                    </button>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -2620,11 +2576,11 @@ export const QueryBuilderView: React.FC = () => {
                                                 className="w-44 shrink-0 px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                                 title={t('querybuilder.manage_sort_label', 'Sortierung')}
                                             >
-                                                <option value="updated_desc">{t('querybuilder.manage_sort_updated_desc', 'Zuletzt geändert (neu zuerst)')}</option>
-                                                <option value="updated_asc">{t('querybuilder.manage_sort_updated_asc', 'Zuletzt geändert (alt zuerst)')}</option>
+                                                <option value="updated_desc">{t('querybuilder.manage_sort_updated_desc', 'Zuletzt geÃ¤ndert (neu zuerst)')}</option>
+                                                <option value="updated_asc">{t('querybuilder.manage_sort_updated_asc', 'Zuletzt geÃ¤ndert (alt zuerst)')}</option>
                                                 <option value="name_asc">{t('querybuilder.manage_sort_name_asc', 'Name (A-Z)')}</option>
                                                 <option value="name_desc">{t('querybuilder.manage_sort_name_desc', 'Name (Z-A)')}</option>
-                                                <option value="usage_desc">{t('querybuilder.manage_sort_usage_desc', 'Nutzung (häufig zuerst)')}</option>
+                                                <option value="usage_desc">{t('querybuilder.manage_sort_usage_desc', 'Nutzung (hÃ¤ufig zuerst)')}</option>
                                             </select>
                                             <div className="relative w-full max-w-sm">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -2712,7 +2668,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     type="button"
                                                     onClick={() => { void handleDeleteWidget(widget); }}
                                                     className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                                                    title={t('common.delete', 'Löschen')}
+                                                    title={t('common.delete', 'LÃ¶schen')}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -2761,7 +2717,7 @@ export const QueryBuilderView: React.FC = () => {
                             onClick={() => setLoadDialogTab('sql')}
                             className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${loadDialogTab === 'sql' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                         >
-                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswählen')}
+                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswÃ¤hlen')}
                         </button>
                     </div>
                     <div className="relative">
@@ -2830,7 +2786,7 @@ export const QueryBuilderView: React.FC = () => {
                             disabled={loadDialogTab === 'widget' ? !selectedLoadWidgetId : !selectedLoadSqlId}
                             className="min-w-[128px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
-                            {t('common.apply', 'Übernehmen')}
+                            {t('common.apply', 'Ãœbernehmen')}
                         </button>
                     </div>
                 </div>

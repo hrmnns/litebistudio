@@ -28,6 +28,8 @@ export const AppDialogHost: React.FC = () => {
     const onCancel = () => {
         if (active.kind === 'prompt' || active.kind === 'prompt2') {
             active.resolve({ confirmed: false, value: undefined });
+        } else if (active.kind === 'confirm3') {
+            active.resolve({ confirmed: false, choice: 'cancel' });
         } else if (active.kind === 'confirm') {
             active.resolve({ confirmed: false });
         } else {
@@ -35,12 +37,20 @@ export const AppDialogHost: React.FC = () => {
         }
         setActive(null);
     };
+    const onSecondary = () => {
+        if (active.kind === 'confirm3') {
+            active.resolve({ confirmed: false, choice: 'secondary' });
+            setActive(null);
+        }
+    };
 
     const onConfirm = () => {
         if (active.kind === 'prompt') {
             active.resolve({ confirmed: true, value: inputValue });
         } else if (active.kind === 'prompt2') {
             active.resolve({ confirmed: true, value: inputValue, secondValue: inputValueSecond });
+        } else if (active.kind === 'confirm3') {
+            active.resolve({ confirmed: true, choice: 'confirm' });
         } else {
             active.resolve({ confirmed: true });
         }
@@ -146,13 +156,22 @@ export const AppDialogHost: React.FC = () => {
 
                 <div className="mt-auto border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-3">
                     <div className="flex justify-end gap-2">
-                        {(active.kind === 'confirm' || active.kind === 'prompt' || active.kind === 'prompt2') && (
+                        {(active.kind === 'confirm' || active.kind === 'confirm3' || active.kind === 'prompt' || active.kind === 'prompt2') && (
                             <button
                                 type="button"
                                 onClick={onCancel}
                                 className="w-32 px-3 py-1.5 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60"
                             >
-                                {t('common.cancel')}
+                                {active.cancelLabel || t('common.cancel')}
+                            </button>
+                        )}
+                        {active.kind === 'confirm3' && (
+                            <button
+                                type="button"
+                                onClick={onSecondary}
+                                className="w-32 px-3 py-1.5 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60"
+                            >
+                                {active.secondaryLabel || t('common.no', 'No')}
                             </button>
                         )}
                         <button
@@ -160,7 +179,7 @@ export const AppDialogHost: React.FC = () => {
                             onClick={onConfirm}
                             className="w-32 px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70"
                         >
-                            {t('common.ok', 'OK')}
+                            {active.confirmLabel || t('common.ok', 'OK')}
                         </button>
                     </div>
                 </div>

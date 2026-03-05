@@ -147,9 +147,9 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system'>(() => {
+    const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system' | 'danger'>(() => {
         const stored = sessionStorage.getItem('litebistudio_datasource_tab');
-        if (stored === 'import' || stored === 'structure' || stored === 'system') {
+        if (stored === 'import' || stored === 'structure' || stored === 'system' || stored === 'danger') {
             return stored;
         }
         return 'import';
@@ -747,6 +747,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                             {t('datasource.tab_system')}
                             {activeTab === 'system' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
                         </button>
+                        <button
+                            onClick={() => setActiveTab('danger')}
+                            className={`relative py-3 text-sm font-bold transition-colors ${activeTab === 'danger' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        >
+                            {t('datasource.tab_danger_zone', 'Gefahrenzone')}
+                            {activeTab === 'danger' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
+                        </button>
                     </div>
                 </div>
 
@@ -994,8 +1001,10 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 )}
 
                 {/* --- TAB: SYSTEM (Maintenace & Backup) --- */}
-                {activeTab === 'system' && (
+                {(activeTab === 'system' || activeTab === 'danger') && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {activeTab === 'system' && (
+                            <>
                         {/* Backup Section */}
                         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">{t('datasource.backup_restore')}</h3>
@@ -1227,8 +1236,11 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 </div>
                             )}
                         </div>
+                            </>
+                        )}
 
                         {/* Danger Zone */}
+                        {activeTab === 'danger' && (
                         <div className="bg-red-50/50 dark:bg-red-900/10 rounded-2xl border border-red-200 dark:border-red-900/50 p-6 shadow-sm">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-lg">
@@ -1364,6 +1376,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 </div>
                             </div>
                         </div>
+                        )}
                     </div>
                 )}
             </div>

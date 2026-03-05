@@ -1,9 +1,12 @@
-export type AppDialogKind = 'info' | 'warning' | 'error' | 'confirm' | 'prompt' | 'prompt2';
+export type AppDialogKind = 'info' | 'warning' | 'error' | 'confirm' | 'confirm3' | 'prompt' | 'prompt2';
 
 export interface AppDialogRequest {
     kind: AppDialogKind;
     title?: string;
     message: string;
+    confirmLabel?: string;
+    secondaryLabel?: string;
+    cancelLabel?: string;
     defaultValue?: string;
     placeholder?: string;
     secondMessage?: string;
@@ -13,6 +16,7 @@ export interface AppDialogRequest {
 
 export interface AppDialogResponse {
     confirmed: boolean;
+    choice?: 'confirm' | 'secondary' | 'cancel';
     value?: string;
     secondValue?: string;
 }
@@ -40,6 +44,10 @@ export function registerDialogPresenter(nextPresenter: DialogPresenter) {
 function fallback(request: AppDialogRequest): AppDialogResponse {
     if (request.kind === 'confirm') {
         return { confirmed: window.confirm(request.message) };
+    }
+    if (request.kind === 'confirm3') {
+        const confirmed = window.confirm(request.message);
+        return { confirmed, choice: confirmed ? 'confirm' : 'secondary' };
     }
     if (request.kind === 'prompt') {
         const value = window.prompt(request.message, request.defaultValue || '');
@@ -74,9 +82,34 @@ export const appDialog = {
     async error(message: string, title?: string): Promise<void> {
         await open({ kind: 'error', title, message });
     },
-    async confirm(message: string, title?: string): Promise<boolean> {
-        const result = await open({ kind: 'confirm', title, message });
+    async confirm(
+        message: string,
+        options?: string | { title?: string; confirmLabel?: string; cancelLabel?: string }
+    ): Promise<boolean> {
+        const title = typeof options === 'string' ? options : options?.title;
+        const confirmLabel = typeof options === 'string' ? undefined : options?.confirmLabel;
+        const cancelLabel = typeof options === 'string' ? undefined : options?.cancelLabel;
+        const result = await open({ kind: 'confirm', title, message, confirmLabel, cancelLabel });
         return result.confirmed;
+    },
+    async confirm3(
+        message: string,
+        options?: {
+            title?: string;
+            confirmLabel?: string;
+            secondaryLabel?: string;
+            cancelLabel?: string;
+        }
+    ): Promise<'confirm' | 'secondary' | 'cancel'> {
+        const result = await open({
+            kind: 'confirm3',
+            title: options?.title,
+            message,
+            confirmLabel: options?.confirmLabel,
+            secondaryLabel: options?.secondaryLabel,
+            cancelLabel: options?.cancelLabel
+        });
+        return result.choice || (result.confirmed ? 'confirm' : 'cancel');
     },
     async prompt(message: string, options?: { title?: string; defaultValue?: string; placeholder?: string }): Promise<string | null> {
         const result = await open({

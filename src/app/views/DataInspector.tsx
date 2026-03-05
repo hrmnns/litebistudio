@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql as sqlLang } from '@codemirror/lang-sql';
@@ -15,7 +15,7 @@ import { DataTable, type Column, type DataTableSortConfig } from '../../componen
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { exportToExcel } from '../../lib/utils/exportUtils';
 import { isValidIdentifier } from '../../lib/utils';
-import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Pencil, Trash2, FolderOpen, ChevronDown, ListChecks, Eraser, Table2, Filter, Plus } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, Search, Database, Table as TableIcon, Code, Play, Star, Save, ListPlus, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Pencil, Trash2, FolderOpen, ChevronDown, ListChecks, Eraser, Table2, Filter, Plus, PanelsTopBottom, GripHorizontal } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow } from '../../types';
@@ -111,6 +111,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [sqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
     const [activeSqlStatementId, setActiveSqlStatementId] = useState<string>('');
+    const [lastOpenSqlStatementId, setLastOpenSqlStatementId] = useLocalStorage<string>('sql_workspace_last_open_statement_id', '');
+    const [sqlSavedSnapshot, setSqlSavedSnapshot] = useState<{ id: string; normalizedSql: string }>({ id: '', normalizedSql: '' });
     const [sqlLibrarySearch, setSqlLibrarySearch] = useState('');
     const [lastSavedSqlTemplateName, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
     const [lastSavedSqlTemplateDescription, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('data_inspector_last_saved_sql_template_description', '');
@@ -170,6 +172,22 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [explainError, setExplainError] = useState('');
     const [explainLoading, setExplainLoading] = useState(false);
     const [sqlOutputView, setSqlOutputView] = useState<'result' | 'explain'>(explainMode ? 'explain' : 'result');
+    const [sqlWorkspaceView, setSqlWorkspaceView] = useLocalStorage<'sql' | 'result' | 'explain'>(
+        'data_inspector_sql_workspace_view_v1',
+        'sql'
+    );
+    const [sqlWorkspaceSplitView, setSqlWorkspaceSplitView] = useLocalStorage<boolean>(
+        'data_inspector_sql_workspace_split_view_v1',
+        false
+    );
+    const [sqlSplitTopHeight, setSqlSplitTopHeight] = useLocalStorage<number>(
+        'data_inspector_sql_workspace_split_top_height_v1',
+        260
+    );
+    const [sqlWorkspaceTab, setSqlWorkspaceTab] = useLocalStorage<'manage' | 'editor'>(
+        'data_inspector_sql_workspace_tab_v1',
+        'editor'
+    );
     const [sqlExecutionSql, setSqlExecutionSql] = useState('');
     const [sqlLimitNotice, setSqlLimitNotice] = useState('');
     const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('data_inspector_sql_limit_notice_dismissed', false);
@@ -213,12 +231,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         nullRate: 30,
         cardinalityRate: 95
     });
-    const [isResizingSqlPane, setIsResizingSqlPane] = useState(false);
-    const sqlPaneResizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
-    const sqlPaneLiveHeightRef = useRef<number>(sqlEditorHeight);
-    const sqlPaneCommitTimestampRef = useRef<number>(0);
     const sqlEditorPaneRef = useRef<HTMLDivElement | null>(null);
-    const SQL_RESULTS_MIN_HEIGHT = 180;
+    const sqlSplitContainerRef = useRef<HTMLDivElement | null>(null);
     const [inspectorReturnHash, setInspectorReturnHash] = useState<string | null>(null);
     const modeLocked = Boolean(fixedMode);
     const pageTitle = t(titleKey || 'sidebar.data_inspector');
@@ -226,6 +240,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [isDarkEditor, setIsDarkEditor] = useState<boolean>(
         typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
     );
+    const hasRestoredLastOpenSqlRef = useRef(false);
 
     const forwardSqlToWorkspace = useCallback((sql: string) => {
         const trimmed = sql.trim();
@@ -314,6 +329,12 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     useEffect(() => {
         void loadSqlStatements();
     }, [loadSqlStatements]);
+
+    useEffect(() => {
+        if (!activeSqlStatementId) return;
+        if (lastOpenSqlStatementId === activeSqlStatementId) return;
+        setLastOpenSqlStatementId(activeSqlStatementId);
+    }, [activeSqlStatementId, lastOpenSqlStatementId, setLastOpenSqlStatementId]);
 
     useEffect(() => {
         const migrateSqlLibrary = async () => {
@@ -524,6 +545,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setInputSql('');
         setSqlExecutionSql('');
         setActiveSqlStatementId('');
+        setSqlSavedSnapshot({ id: '', normalizedSql: '' });
         setSqlLimitNotice('');
         setSqlOutputView('result');
         setExplainRows([]);
@@ -532,13 +554,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setLoadedSqlTemplateMeta({ name: '', description: '' });
         localStorage.removeItem(INSPECTOR_LAST_SELECT_SQL_KEY);
     }, []);
-
-    const handleCancelSql = async () => {
-        const cancelled = await SystemRepository.abortActiveQueries();
-        if (!cancelled) {
-            await appDialog.info(t('datainspector.cancel_not_available', 'No cancellable SQL query is currently running in this tab.'));
-        }
-    };
 
     const runExplainPlan = useCallback(async (sql: string) => {
         const trimmed = sql.trim();
@@ -560,30 +575,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
     }, []);
 
-    const toggleFavoriteQuery = async (query: string) => {
-        const trimmed = query.trim();
-        if (!trimmed) return;
-        const normalized = normalizeSql(trimmed);
-        const existing = sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === normalized);
-        if (existing) {
-            await SystemRepository.setSqlStatementFavorite(existing.id, Number(existing.is_favorite) !== 1);
-            await loadSqlStatements();
-            return;
-        }
-        const singleLine = trimmed.split('\n').map(line => line.trim()).find(Boolean) || trimmed;
-        await SystemRepository.saveSqlStatement({
-            id: crypto.randomUUID(),
-            name: singleLine.slice(0, 42),
-            sql_text: trimmed,
-            scope: SQL_LIBRARY_SCOPE,
-            is_favorite: true
-        });
-        await loadSqlStatements();
-    };
-
     const handleSaveCustomTemplate = async () => {
         const trimmedSql = inputSql.trim();
-        if (!trimmedSql) return;
+        if (!trimmedSql) return false;
         const activeSqlStatement = activeSqlStatementId
             ? sqlStatements.find(stmt => stmt.id === activeSqlStatementId && stmt.scope === SQL_LIBRARY_SCOPE)
             : undefined;
@@ -604,8 +598,9 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 name: activeSqlStatement.name,
                 description: nextDescription
             });
+            setSqlSavedSnapshot({ id: activeSqlStatement.id, normalizedSql: normalizeSql(trimmedSql) });
             await loadSqlStatements();
-            return;
+            return true;
         }
 
         const normalized = normalizeSql(trimmedSql);
@@ -627,19 +622,19 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             defaultValue: suggestedName,
             secondDefaultValue: suggestedDescription
         });
-        if (!prompted) return;
+        if (!prompted) return false;
         const name = prompted.value.trim();
-        if (!name) return;
+        if (!name) return false;
         const description = prompted.secondValue.trim();
 
         const existingByName = sqlStatements.find(
             tpl => tpl.name.toLowerCase() === name.toLowerCase() && tpl.scope === SQL_LIBRARY_SCOPE
         );
         if (existingByName && matchingStatement && existingByName.id !== matchingStatement.id) {
-            if (!(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return;
+            if (!(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return false;
             await SystemRepository.deleteSqlStatement(existingByName.id);
         } else if (existingByName && !matchingStatement) {
-            if (!(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return;
+            if (!(await appDialog.confirm(t('datainspector.custom_template_overwrite_confirm', { name })))) return false;
         }
         const targetId = matchingStatement?.id || existingByName?.id || crypto.randomUUID();
         const targetFavorite = matchingStatement
@@ -656,8 +651,58 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setLastSavedSqlTemplateName(name);
         setLastSavedSqlTemplateDescription(description);
         setActiveSqlStatementId(targetId);
+        setSqlSavedSnapshot({ id: targetId, normalizedSql: normalizeSql(trimmedSql) });
         await loadSqlStatements();
+        return true;
     };
+    const handleSaveSqlAs = useCallback(async () => {
+        const trimmedSql = inputSql.trim();
+        if (!trimmedSql) return false;
+
+        const suggestedName = loadedSqlTemplateMeta.name || lastSavedSqlTemplateName || `${selectedTable || 'Query'} Template`;
+        const suggestedDescription = loadedSqlTemplateMeta.description || lastSavedSqlTemplateDescription || '';
+        const prompted = await appDialog.prompt2(
+            t('datainspector.custom_template_prompt', 'Template name:'),
+            t('datainspector.custom_template_description_prompt', 'Template description (optional):'),
+            {
+                title: t('datainspector.save_template', 'Save Template'),
+                defaultValue: suggestedName,
+                secondDefaultValue: suggestedDescription
+            }
+        );
+        if (!prompted) return false;
+        const name = prompted.value.trim();
+        if (!name) return false;
+        const description = prompted.secondValue.trim();
+
+        const id = crypto.randomUUID();
+        await SystemRepository.saveSqlStatement({
+            id,
+            name,
+            sql_text: trimmedSql,
+            description,
+            scope: SQL_LIBRARY_SCOPE,
+            is_favorite: false
+        });
+        setLastSavedSqlTemplateName(name);
+        setLastSavedSqlTemplateDescription(description);
+        setLoadedSqlTemplateMeta({ name, description });
+        setActiveSqlStatementId(id);
+        setSqlSavedSnapshot({ id, normalizedSql: normalizeSql(trimmedSql) });
+        await loadSqlStatements();
+        return true;
+    }, [
+        inputSql,
+        lastSavedSqlTemplateDescription,
+        lastSavedSqlTemplateName,
+        loadSqlStatements,
+        loadedSqlTemplateMeta.description,
+        loadedSqlTemplateMeta.name,
+        selectedTable,
+        setLastSavedSqlTemplateDescription,
+        setLastSavedSqlTemplateName,
+        t
+    ]);
 
     const applyViewPreset = (preset: InspectorViewPreset) => {
         setSelectedTable(preset.table);
@@ -1314,7 +1359,17 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         ? (sqlStatements.find(stmt => stmt.id === activeSqlStatementId) || null)
         : null;
     const currentSqlStatement = activeSqlStatement || sqlStatements.find(stmt => normalizeSql(stmt.sql_text) === currentSqlNormalized);
-    const isCurrentSqlFavorite = Boolean(currentSqlStatement && Number(currentSqlStatement.is_favorite) === 1);
+    const hasUnsavedSqlChanges = useMemo(() => {
+        const trimmed = inputSql.trim();
+        if (!trimmed) return false;
+        const normalizedCurrent = normalizeSql(trimmed);
+        if (sqlSavedSnapshot.id && sqlSavedSnapshot.id === activeSqlStatementId && sqlSavedSnapshot.normalizedSql === normalizedCurrent) {
+            return false;
+        }
+        if (!activeSqlStatement) return true;
+        return normalizeSql(activeSqlStatement.sql_text) !== normalizedCurrent;
+    }, [activeSqlStatement, activeSqlStatementId, inputSql, normalizeSql, sqlSavedSnapshot]);
+    const canSaveCurrentSql = inputSql.trim().length > 0 && hasUnsavedSqlChanges;
     const filteredSqlStatements = React.useMemo(() => {
         const query = sqlLibrarySearch.trim().toLowerCase();
         if (!query) return sqlStatements;
@@ -1337,7 +1392,51 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         return loadedSqlTemplateMeta;
     }, [currentSqlStatement, loadedSqlTemplateMeta]);
-
+    const confirmSaveBeforeReplaceSql = useCallback(async () => {
+        if (!hasUnsavedSqlChanges) return true;
+        const choice = await appDialog.confirm3(
+            t('datainspector.unsaved_changes_save_before_continue', 'Es gibt ungespeicherte Änderungen. Vor dem Fortfahren speichern?'),
+            {
+                title: t('common.warning', 'Warning'),
+                confirmLabel: t('common.yes', 'Yes'),
+                secondaryLabel: t('common.no', 'No'),
+                cancelLabel: t('common.cancel', 'Cancel')
+            }
+        );
+        if (choice === 'cancel') return false;
+        if (choice === 'confirm') {
+            const saved = await handleSaveCustomTemplate();
+            if (!saved) return false;
+        }
+        return true;
+    }, [handleSaveCustomTemplate, hasUnsavedSqlChanges, t]);
+    const sqlWorkspaceStatementName = (activeSqlTemplateMeta.name || '').trim() || t('datainspector.sql_statement_unnamed', 'Unbenannt');
+    const sqlWorkspaceHeaderTitle = `${t('datainspector.sql_statement_title_prefix', 'SQL-Statement')} (${sqlWorkspaceStatementName})${hasUnsavedSqlChanges ? ' *' : ''}`;
+    const canResetSqlWorkspace = Boolean(activeSqlStatementId) || hasUnsavedSqlChanges || Boolean((activeSqlTemplateMeta.name || '').trim());
+    const showSqlEditorPane = sqlWorkspaceSplitView || sqlWorkspaceView === 'sql';
+    const showSqlOutputPane = sqlWorkspaceSplitView || sqlWorkspaceView !== 'sql';
+    const startSqlSplitResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+        if (!sqlWorkspaceSplitView || !sqlSplitContainerRef.current) return;
+        event.preventDefault();
+        const container = sqlSplitContainerRef.current;
+        const startY = event.clientY;
+        const startHeight = sqlSplitTopHeight;
+        const minPaneHeight = 140;
+        const dividerHeight = 10;
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientY - startY;
+            const totalHeight = container.clientHeight;
+            const maxTop = Math.max(minPaneHeight, totalHeight - minPaneHeight - dividerHeight);
+            const next = Math.max(minPaneHeight, Math.min(maxTop, startHeight + delta));
+            setSqlSplitTopHeight(next);
+        };
+        const handleMouseUp = () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    }, [sqlSplitTopHeight, sqlWorkspaceSplitView, setSqlSplitTopHeight]);
     const applySqlStatement = useCallback(async (statement: SqlStatementRecord, runImmediately: boolean) => {
         if (fixedMode === 'table') {
             forwardSqlToWorkspace(statement.sql_text);
@@ -1350,6 +1449,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             name: statement.name,
             description: (statement.description || '').trim()
         });
+        setSqlSavedSnapshot({ id: statement.id, normalizedSql: normalizeSql(statement.sql_text) });
         setSqlOutputView('result');
         setShowSqlAssist(false);
         await SystemRepository.markSqlStatementUsed(statement.id);
@@ -1358,6 +1458,47 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         }
         await loadSqlStatements();
     }, [executeSqlText, fixedMode, forwardSqlToWorkspace, loadSqlStatements, setShowSqlAssist]);
+    const handleOpenSqlStatement = useCallback(async (statement: SqlStatementRecord, runImmediately: boolean) => {
+        const proceed = await confirmSaveBeforeReplaceSql();
+        if (!proceed) return;
+        await applySqlStatement(statement, runImmediately);
+    }, [applySqlStatement, confirmSaveBeforeReplaceSql]);
+
+    useEffect(() => {
+        if (hasRestoredLastOpenSqlRef.current) return;
+        if (mode !== 'sql' && fixedMode !== 'sql') return;
+        if (!sqlStatements.length) return;
+        hasRestoredLastOpenSqlRef.current = true;
+        if (activeSqlStatementId) return;
+        if (!lastOpenSqlStatementId) return;
+        const statement = sqlStatements.find((stmt) => stmt.id === lastOpenSqlStatementId);
+        if (!statement) return;
+        const currentSqlNormalized = normalizeSql(inputSql);
+        const statementSqlNormalized = normalizeSql(statement.sql_text);
+        if (!inputSql.trim()) {
+            void applySqlStatement(statement, false);
+            return;
+        }
+        if (currentSqlNormalized === statementSqlNormalized) {
+            setActiveSqlStatementId(statement.id);
+            setLoadedSqlTemplateMeta({
+                name: statement.name,
+                description: (statement.description || '').trim()
+            });
+            setSqlSavedSnapshot({ id: statement.id, normalizedSql: statementSqlNormalized });
+        }
+    }, [
+        activeSqlStatementId,
+        applySqlStatement,
+        fixedMode,
+        inputSql,
+        normalizeSql,
+        lastOpenSqlStatementId,
+        mode,
+        setLoadedSqlTemplateMeta,
+        setSqlSavedSnapshot,
+        sqlStatements
+    ]);
 
     const applySqlTemplate = useCallback(async (sql: string, runImmediately: boolean, templateName?: string, templateDescription?: string) => {
         if (fixedMode === 'table') {
@@ -1371,6 +1512,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             name: (templateName || '').trim(),
             description: (templateDescription || '').trim()
         });
+        setSqlSavedSnapshot({ id: '', normalizedSql: normalizeSql(sql) });
         setSqlOutputView('result');
         setShowSqlAssist(false);
         if (runImmediately) {
@@ -1563,19 +1705,22 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 '&': {
                     height: '100%',
                     fontSize: `${Math.max(12, Math.min(15, sqlEditorFontSize))}px`,
-                    borderRadius: '0.5rem'
+                    borderRadius: '0.5rem',
+                    backgroundColor: isDarkEditor ? '#0b1220' : '#f8fafc',
+                    color: isDarkEditor ? '#e2e8f0' : '#0f172a'
                 },
                 '.cm-editor': {
-                    backgroundColor: isDarkEditor ? '#0b1220' : '#f8fafc',
+                    backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,
                     color: isDarkEditor ? '#e2e8f0' : '#0f172a'
                 },
                 '.cm-scroller': {
                     overflow: 'auto',
-                    backgroundColor: isDarkEditor ? '#0b1220' : '#f8fafc',
+                    backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
                 },
                 '.cm-content': {
                     padding: '1rem',
+                    backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,
                     color: isDarkEditor ? '#e2e8f0' : '#0f172a',
                     caretColor: isDarkEditor ? '#60a5fa' : '#2563eb'
                 },
@@ -1589,7 +1734,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                     backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
                 },
                 '.cm-gutters': {
-                    backgroundColor: 'transparent',
+                    backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,
                     border: 'none',
                     color: isDarkEditor ? '#94a3b8' : '#64748b'
                 },
@@ -1829,55 +1974,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         () => profiling.reduce((sum, p) => sum + p.issues.length, 0),
         [profiling]
     );
-
-    const startSqlPaneResize = (event: React.MouseEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
-        sqlPaneResizeRef.current = { startY: event.clientY, startHeight: sqlEditorHeight };
-        sqlPaneLiveHeightRef.current = sqlEditorHeight;
-        setIsResizingSqlPane(true);
-    };
-
-    useEffect(() => {
-        if (!isResizingSqlPane) return;
-
-        const handleMouseMove = (event: MouseEvent) => {
-            const state = sqlPaneResizeRef.current;
-            if (!state) return;
-            const delta = event.clientY - state.startY;
-            const minHeight = 120;
-            const fallbackMaxHeight = Math.max(260, Math.floor(window.innerHeight * 0.62));
-            const editorTop = sqlEditorPaneRef.current?.getBoundingClientRect().top ?? 0;
-            const viewportBottomPadding = 24;
-            const dynamicMaxHeightRaw = Math.floor(window.innerHeight - editorTop - SQL_RESULTS_MIN_HEIGHT - viewportBottomPadding);
-            const maxHeight = Math.max(minHeight, dynamicMaxHeightRaw > 0 ? dynamicMaxHeightRaw : fallbackMaxHeight);
-            const nextHeight = Math.max(minHeight, Math.min(maxHeight, state.startHeight + delta));
-            sqlPaneLiveHeightRef.current = nextHeight;
-            setSqlEditorHeight(nextHeight);
-        };
-
-        const handleMouseUp = () => {
-            const nextHeight = Math.round(sqlPaneLiveHeightRef.current);
-            sqlPaneCommitTimestampRef.current = Date.now();
-            setSqlEditorHeight(nextHeight);
-            setIsResizingSqlPane(false);
-            sqlPaneResizeRef.current = null;
-        };
-
-        document.body.style.cursor = 'row-resize';
-        document.body.style.userSelect = 'none';
-        document.body.style.overflowAnchor = 'none';
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-
-        return () => {
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            document.body.style.overflowAnchor = '';
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isResizingSqlPane, setSqlEditorHeight]);
 
     return (
         <PageLayout
@@ -2321,7 +2417,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                             <div className="flex flex-wrap gap-1">
                                                 <button
                                                     type="button"
-                                                    onClick={() => { void applySqlStatement(statement, false); }}
+                                                    onClick={() => { void handleOpenSqlStatement(statement, false); }}
                                                     className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
                                                     title={t('common.open', 'Open')}
                                                     aria-label={t('common.open', 'Open')}
@@ -2848,7 +2944,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
                             </div>
 
-                            <div className="mt-3 -mx-5 -mb-5 px-5 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/90">
+                            <div className="mt-3 -mx-5 -mb-5 px-5 py-3 border-t border-slate-200 dark:border-slate-700 bg-blue-50/40 dark:bg-blue-950/20">
                             <div className="flex flex-wrap justify-center gap-2">
                                 <button
                                     type="button"
@@ -2895,7 +2991,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         <button
                                             type="button"
                                             onClick={handleSaveCustomTemplate}
-                                            className="h-9 w-full px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
+                                            disabled={!canSaveCurrentSql}
+                                            className={`h-9 w-full px-3 rounded-lg border text-xs font-semibold text-left transition-colors ${canSaveCurrentSql
+                                                ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                                : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                                                }`}
                                         >
                                             {t('common.save', 'Save')}
                                         </button>
@@ -3029,6 +3129,35 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 )}
             </div>
 
+            {mode === 'sql' && (
+                <div className="border-b border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-8 px-1">
+                        <button
+                            type="button"
+                            onClick={() => setSqlWorkspaceTab('manage')}
+                            className={`relative py-3 text-sm font-bold transition-colors ${sqlWorkspaceTab === 'manage'
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                        >
+                            {t('datainspector.sql_workspace_tab_manage', 'SQL-Statements verwalten')}
+                            {sqlWorkspaceTab === 'manage' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSqlWorkspaceTab('editor')}
+                            className={`relative py-3 text-sm font-bold transition-colors ${sqlWorkspaceTab === 'editor'
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                        >
+                            {t('datainspector.sql_workspace_tab_editor', 'SQL-Statements erstellen')}
+                            {sqlWorkspaceTab === 'editor' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Controls Row: Selection or SQL Editor */}
             {mode === 'table' ? (
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
@@ -3083,84 +3212,191 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                         </div>
                     </div>
                 </div>
-            ) : (
-                <div ref={sqlEditorPaneRef} className="flex flex-col gap-2 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm ring-1 ring-slate-900/5 flex-shrink-0">
-                    <div className="relative">
-                        <div
-                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden text-slate-800 dark:text-slate-200 min-h-[120px]"
-                            style={{ height: `${sqlEditorHeight}px` }}
-                        >
-                            <CodeMirror
-                                value={inputSql}
-                                height={`${sqlEditorHeight}px`}
-                                basicSetup={{
-                                    lineNumbers: sqlEditorLineNumbers,
-                                    foldGutter: false,
-                                    highlightActiveLine: sqlEditorHighlightActiveLine,
-                                    highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorHighlightActiveLine
-                                }}
-                                extensions={sqlEditorExtensions}
-                                placeholder={t('datainspector.sql_placeholder')}
-                                onChange={(value) => {
-                                    setInputSql(value);
-                                    setSqlOutputView('explain');
-                                }}
-                            />
-                        </div>
-                        <div className="absolute bottom-4 right-4 flex gap-2">
-                            <button
-                                onClick={handleClearSqlWorkspace}
-                                className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                            >
-                                {t('datainspector.clear_sql')}
-                            </button>
-                            <button
-                                onClick={() => { void handleRunSql(); }}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
-                            >
-                                {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
-                                {t('datainspector.run_sql')}
-                            </button>
-                            {loading && (
-                                <button
-                                    onClick={() => { void handleCancelSql(); }}
-                                    className="px-3 py-1.5 rounded-md text-sm font-medium border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+            ) : sqlWorkspaceTab === 'editor' ? (
+                <div className="-mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+                    <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                        <div className="p-3 flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                                {sqlWorkspaceHeaderTitle}
+                            </h3>
+                            {activeSqlTemplateMeta.description && (
+                                <p
+                                    className="max-w-[55%] text-[11px] text-slate-500 dark:text-slate-400 truncate text-right"
+                                    title={activeSqlTemplateMeta.description}
                                 >
-                                    {t('datainspector.stop_sql', 'Stop')}
-                                </button>
+                                    {activeSqlTemplateMeta.description}
+                                </p>
                             )}
-                            <button
-                                onClick={() => setShowSqlAssist(true)}
-                                className="h-9 w-9 flex items-center justify-center rounded-md border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-                                title={t('datainspector.sql_assist', 'SQL Workspace')}
-                                aria-label={t('datainspector.sql_assist', 'SQL Workspace')}
-                            >
-                                <FolderOpen className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={handleSaveCustomTemplate}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-                                title={t('common.save', 'Save')}
-                            >
-                                <Save className="w-3.5 h-3.5" />
-                                {t('common.save', 'Save')}
-                            </button>
-                            <button
-                                onClick={() => { void toggleFavoriteQuery(inputSql); }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                                    isCurrentSqlFavorite
-                                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
-                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                }`}
-                                title={isCurrentSqlFavorite ? t('datainspector.unpin_query') : t('datainspector.pin_query')}
-                            >
-                                <Star className={`w-3.5 h-3.5 ${isCurrentSqlFavorite ? 'fill-current' : ''}`} />
-                                {isCurrentSqlFavorite ? t('datainspector.unpin') : t('datainspector.pin')}
-                            </button>
+                        </div>
+                        <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
+                            <div className="pt-2 flex items-center justify-between gap-2">
+                                <div className="inline-flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            const proceed = await confirmSaveBeforeReplaceSql();
+                                            if (!proceed) return;
+                                            handleClearSqlWorkspace();
+                                        }}
+                                        disabled={!canResetSqlWorkspace}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${canResetSqlWorkspace
+                                            ? 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100'
+                                            : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                        {t('common.new', 'Neu')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowSqlAssist(true);
+                                        }}
+                                        className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <FolderOpen className="w-3 h-3" />
+                                        {t('common.open', 'Öffnen')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveCustomTemplate}
+                                        disabled={!canSaveCurrentSql}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${canSaveCurrentSql
+                                            ? 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100'
+                                            : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        <Save className="w-3 h-3" />
+                                        {t('common.save', 'Speichern')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { void handleSaveSqlAs(); }}
+                                        className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        {t('datainspector.save_as', 'Speichern unter')}
+                                    </button>
+                                    <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
+                                    <button
+                                        type="button"
+                                        onClick={() => { void handleRunSql(); }}
+                                        className="px-2 py-1.5 rounded text-[10px] font-bold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
+                                        {t('datainspector.run_sql', 'Ausführen')}
+                                    </button>
+                                </div>
+                                <div className="inline-flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const next = !sqlWorkspaceSplitView;
+                                            setSqlWorkspaceSplitView(next);
+                                            if (next && sqlWorkspaceView === 'sql') {
+                                                setSqlWorkspaceView(sqlOutputView === 'explain' ? 'explain' : 'result');
+                                            }
+                                        }}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${sqlWorkspaceSplitView
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                            }`}
+                                        title={t('datainspector.sql_split_view_toggle', 'Split-Ansicht')}
+                                    >
+                                        <PanelsTopBottom className="w-3 h-3" />
+                                        {t('datainspector.sql_split_view_short', 'Split')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (sqlWorkspaceSplitView) setSqlWorkspaceSplitView(false);
+                                            setSqlWorkspaceView('sql');
+                                        }}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${!sqlWorkspaceSplitView && sqlWorkspaceView === 'sql'
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                            }`}
+                                    >
+                                        <Code className="w-3 h-3" />
+                                        {t('datainspector.sql_mode', 'SQL')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSqlOutputView('result');
+                                            setSqlWorkspaceView('result');
+                                        }}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${sqlWorkspaceView === 'result'
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                            }`}
+                                    >
+                                        <TableIcon className="w-3 h-3" />
+                                        {t('datainspector.output_results', 'Ergebnisse')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSqlOutputView('explain');
+                                            setSqlWorkspaceView('explain');
+                                        }}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${sqlWorkspaceView === 'explain'
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                            }`}
+                                    >
+                                        <Search className="w-3 h-3" />
+                                        {t('datainspector.output_explain', 'Explain')}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <div ref={sqlSplitContainerRef} className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                    {showSqlEditorPane && (
+                        <div
+                            ref={sqlEditorPaneRef}
+                            className={`overflow-hidden flex flex-col relative min-h-0 ${sqlWorkspaceSplitView ? 'shrink-0' : 'flex-1'}`}
+                            style={sqlWorkspaceSplitView ? { height: `${sqlSplitTopHeight}px` } : undefined}
+                        >
+                            <div
+                                className="w-full flex-1 bg-slate-50 dark:bg-[#0b1220] overflow-hidden text-slate-800 dark:text-slate-200 min-h-0"
+                                style={{ minHeight: `${Math.max(120, sqlEditorHeight)}px` }}
+                            >
+                                <CodeMirror
+                                    value={inputSql}
+                                    height="100%"
+                                    basicSetup={{
+                                        lineNumbers: sqlEditorLineNumbers,
+                                        foldGutter: false,
+                                        highlightActiveLine: sqlEditorHighlightActiveLine,
+                                        highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorHighlightActiveLine
+                                    }}
+                                    extensions={sqlEditorExtensions}
+                                    placeholder={t('datainspector.sql_placeholder')}
+                                    onChange={(value) => {
+                                        setInputSql(value);
+                                        setSqlOutputView('explain');
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {sqlWorkspaceSplitView && showSqlEditorPane && showSqlOutputPane && (
+                        <button
+                            type="button"
+                            onMouseDown={startSqlSplitResize}
+                            className="h-[10px] shrink-0 border-y border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 cursor-row-resize flex items-center justify-center text-slate-400 dark:text-slate-500"
+                            title={t('datainspector.split_resize', 'Bereiche groesse aendern')}
+                        >
+                            <GripHorizontal className="w-3 h-3" />
+                        </button>
+                    )}
+
                     {sqlLimitNotice && (
-                        <div className="mt-2 px-3 py-2 text-xs rounded-md border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3">
+                        <div className="mx-3 mt-3 px-3 py-2 text-xs rounded-md border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3">
                             <span>{sqlLimitNotice}</span>
                             <button
                                 type="button"
@@ -3176,98 +3412,212 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             </button>
                         </div>
                     )}
-                    <div className="px-3 py-2 text-[11px] rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 flex items-center justify-between gap-3 flex-wrap">
-                        <div className="min-w-0 inline-flex items-center gap-1 text-left">
-                            <span className="font-semibold text-slate-600 dark:text-slate-300">
-                                {t('datainspector.active_template', 'Template')}
-                                :
-                            </span>
-                            {activeSqlTemplateMeta.name ? (
-                                <>
-                                    <span className="font-medium text-slate-700 dark:text-slate-200">
-                                        {activeSqlTemplateMeta.name}
-                                    </span>
-                                    <span
-                                        className="truncate max-w-[22rem] text-slate-500 dark:text-slate-400"
-                                        title={activeSqlTemplateMeta.description || t('datainspector.no_template_description', 'No description')}
-                                    >
-                                        {activeSqlTemplateMeta.description
-                                            ? `(${activeSqlTemplateMeta.description})`
-                                            : `(${t('datainspector.no_template_description', 'No description')})`}
-                                    </span>
-                                </>
-                            ) : (
-                                <span className="text-slate-400 dark:text-slate-500">-</span>
+
+                    {showSqlOutputPane && (
+                        <div className={`flex-1 overflow-hidden flex flex-col relative min-h-0 ${sqlWorkspaceSplitView ? 'border-t border-slate-200 dark:border-slate-700' : ''}`}>
+                            {loading && items && items.length > 0 && sqlOutputView !== 'explain' && (
+                                <div className="absolute inset-0 bg-white/40 dark:bg-slate-800/40 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-full shadow-xl border border-slate-100 dark:border-slate-700">
+                                        <RefreshCw className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                                    </div>
+                                </div>
                             )}
-                            <span className="mx-1 text-slate-300 dark:text-slate-600">|</span>
-                            <span className="font-semibold text-slate-600 dark:text-slate-300">
-                                {t('datainspector.active_statement_id', 'Statement-ID')}
-                                :
-                            </span>
-                            <code className="font-mono text-[10px] text-slate-500 dark:text-slate-400" title={activeSqlStatementId || '-'}>
-                                {activeSqlStatementId || '-'}
-                            </code>
+
+                            <div className="flex-1 overflow-hidden flex flex-col relative min-h-0">
+                                {sqlOutputView === 'explain' ? (
+                                    explainLoading ? (
+                                        <div className="flex-1 flex items-center justify-center p-6 text-xs text-slate-400 gap-2">
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                            {t('common.loading')}
+                                        </div>
+                                    ) : explainError ? (
+                                        <div className="flex-1 p-4 text-xs text-rose-600">{explainError}</div>
+                                    ) : explainRows.length === 0 ? (
+                                        <div className="flex-1 p-4 text-xs text-slate-400">{t('datainspector.explain_empty')}</div>
+                                    ) : (
+                                        <div className="flex-1 overflow-auto custom-scrollbar">
+                                            <table className="w-full text-xs min-w-[520px]">
+                                                <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-300 uppercase text-[10px] z-[1] border-b border-slate-200 dark:border-slate-700">
+                                                    <tr>
+                                                        {Object.keys(explainRows[0]).map(col => (
+                                                            <th key={col} className="text-left px-2 py-1.5">{col}</th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {explainRows.map((row, idx) => (
+                                                        <tr key={idx} className="border-t border-slate-100 dark:border-slate-700">
+                                                            {Object.keys(explainRows[0]).map(col => (
+                                                                <td key={col} className="px-2 py-1.5 text-slate-600 dark:text-slate-300">{String(row[col] ?? '')}</td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )
+                                ) : (
+                                    <DataTable
+                                        data={items || []}
+                                        columns={columns}
+                                        searchTerm=""
+                                        emptyMessage={t('common.no_data')}
+                                        onRowClick={(item) => setSelectedItem(item)}
+                                        rounded={false}
+                                        bordered={false}
+                                        headerContainerClassName="dark:bg-slate-800 dark:border-slate-700"
+                                        headerTextClassName="dark:text-slate-300"
+                                        bodyContainerClassName="dark:bg-slate-900"
+                                    />
+                                )}
+                            </div>
                         </div>
-                        <div className="inline-flex items-center gap-1 whitespace-nowrap ml-auto text-right">
-                            <span>{t('datainspector.sql_assist', 'SQL Workspace')}:</span>
-                            <span>{sqlTemplates.length} {t('datainspector.templates')}</span>
-                            <span>|</span>
-                            <span>{favoriteSqlStatementCount} {t('datainspector.favorite_queries')}</span>
-                            <span>|</span>
-                            <span>{sqlStatements.length} {t('datainspector.custom_templates')}</span>
+                    )}
+                    </div>
+
+                    <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/90">
+                        <div className="flex items-center justify-between gap-3 flex-wrap text-[10px] text-slate-500 dark:text-slate-400">
+                            <div className="min-w-0 inline-flex items-center gap-1 text-left">
+                                <span className="font-semibold uppercase tracking-wide">{t('datainspector.active_template', 'Vorlage')}:</span>
+                                {activeSqlTemplateMeta.name ? (
+                                    <>
+                                        <span className="font-medium text-slate-700 dark:text-slate-200">
+                                            {activeSqlTemplateMeta.name}
+                                        </span>
+                                        <span
+                                            className="truncate max-w-[22rem]"
+                                            title={activeSqlTemplateMeta.description || t('datainspector.no_template_description', 'No description')}
+                                        >
+                                            {activeSqlTemplateMeta.description
+                                                ? `(${activeSqlTemplateMeta.description})`
+                                                : `(${t('datainspector.no_template_description', 'No description')})`}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span>-</span>
+                                )}
+                                <span className="mx-1 text-slate-300 dark:text-slate-600">|</span>
+                                <span className="font-semibold uppercase tracking-wide">{t('datainspector.active_statement_id', 'Statement-ID')}:</span>
+                                <code className="font-mono text-[10px]" title={activeSqlStatementId || '-'}>
+                                    {activeSqlStatementId || '-'}
+                                </code>
+                            </div>
+                            <div className="inline-flex items-center gap-1 whitespace-nowrap ml-auto text-right">
+                                <span>{t('datainspector.sql_assist', 'SQL Workspace')}:</span>
+                                <span>{sqlTemplates.length} {t('datainspector.templates')}</span>
+                                <span>|</span>
+                                <span>{favoriteSqlStatementCount} {t('datainspector.favorite_queries')}</span>
+                                <span>|</span>
+                                <span>{sqlStatements.length} {t('datainspector.custom_templates')}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="-mt-2 flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                    <div className="h-full min-h-0 flex flex-col">
+                        <div className="shrink-0 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                            <div className="p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="relative w-full max-w-sm">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                        <input
+                                            value={sqlLibrarySearch}
+                                            onChange={(e) => setSqlLibrarySearch(e.target.value)}
+                                            placeholder={t('datainspector.sql_manager_search_placeholder', 'Search patterns...')}
+                                            className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 container-scrollbar">
+                            {filteredSqlStatements.length === 0 ? (
+                                <div className="h-full min-h-[240px] flex items-center justify-center text-xs text-slate-500">
+                                    {t('datainspector.sql_manager_no_results', 'No matches')}
+                                </div>
+                            ) : (
+                                filteredSqlStatements.map((statement) => (
+                                    <div key={statement.id} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 flex items-start justify-between gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSqlWorkspaceTab('editor');
+                                                void handleOpenSqlStatement(statement, false);
+                                            }}
+                                            className="min-w-0 text-left"
+                                        >
+                                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
+                                                {statement.name}
+                                                {Number(statement.is_favorite) === 1 && <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />}
+                                            </div>
+                                            <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                {(statement.description || '').trim() || statement.sql_text || '-'}
+                                            </div>
+                                        </button>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSqlWorkspaceTab('editor');
+                                                    void handleOpenSqlStatement(statement, false);
+                                                }}
+                                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                title={t('common.open', 'Open')}
+                                            >
+                                                <FolderOpen className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { void handleRenameSqlStatement(statement); }}
+                                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                title={t('datainspector.rename_template')}
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { void handleDeleteSqlStatement(statement); }}
+                                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                title={t('datainspector.delete_template')}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <div className="shrink-0 px-3 py-2 border-t border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/90">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="font-semibold uppercase tracking-wide">{t('datainspector.templates', 'Templates')}:</span>
+                                    <code className="font-mono text-[10px]">{sqlTemplates.length}</code>
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="font-semibold uppercase tracking-wide">{t('datainspector.favorite_queries', 'Favorite Queries')}:</span>
+                                    <code className="font-mono text-[10px]">{favoriteSqlStatementCount}</code>
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="font-semibold uppercase tracking-wide">{t('datainspector.custom_templates', 'Custom Templates')}:</span>
+                                    <code className="font-mono text-[10px]">{sqlStatements.length}</code>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {mode === 'sql' && (
-                <div
-                    onMouseDown={startSqlPaneResize}
-                    className={`h-3 -mt-2 -mb-1 flex items-center justify-center cursor-row-resize ${isResizingSqlPane ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
-                    title={t('datainspector.resize_sql_split', 'Resize SQL and results panes')}
-                >
-                    <div className="h-1 w-12 rounded-full bg-slate-300 dark:bg-slate-600" />
-                </div>
-            )}
-
+            {mode === 'table' && (
             <div
                 className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative"
-                style={mode === 'sql' ? { minHeight: `${SQL_RESULTS_MIN_HEIGHT}px` } : undefined}
             >
                 {/* Opaque loading overlay when refreshing results */}
-                {loading && items && items.length > 0 && !(mode === 'sql' && sqlOutputView === 'explain') && (
+                {loading && items && items.length > 0 && (
                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-800/40 z-10 flex items-center justify-center backdrop-blur-[1px]">
                         <div className="bg-white dark:bg-slate-900 p-4 rounded-full shadow-xl border border-slate-100 dark:border-slate-700">
                             <RefreshCw className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
                         </div>
-                    </div>
-                )}
-
-                {mode === 'sql' && (
-                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 flex items-center justify-between gap-3">
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
-                            <button
-                                onClick={() => setSqlOutputView('result')}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlOutputView === 'result'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100'
-                                    }`}
-                            >
-                                {t('datainspector.output_results', 'Results')}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setSqlOutputView('explain');
-                                }}
-                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${sqlOutputView === 'explain'
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100'
-                                    }`}
-                            >
-                                {t('datainspector.output_explain', 'Explain')}
-                            </button>
-                        </div>
-                        <span className="text-[11px] text-slate-400">{t('datainspector.explain_hint')}</span>
                     </div>
                 )}
 
@@ -3426,39 +3776,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 )}
 
                 <div className="flex-1 overflow-hidden flex flex-col relative min-h-0">
-                    {mode === 'sql' && sqlOutputView === 'explain' ? (
-                        explainLoading ? (
-                            <div className="flex-1 flex items-center justify-center p-6 text-xs text-slate-400 gap-2">
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                {t('common.loading')}
-                            </div>
-                        ) : explainError ? (
-                            <div className="flex-1 p-4 text-xs text-rose-600">{explainError}</div>
-                        ) : explainRows.length === 0 ? (
-                            <div className="flex-1 p-4 text-xs text-slate-400">{t('datainspector.explain_empty')}</div>
-                        ) : (
-                            <div className="flex-1 overflow-auto custom-scrollbar">
-                                <table className="w-full text-xs min-w-[520px]">
-                                    <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 text-slate-400 uppercase text-[10px] z-[1]">
-                                        <tr>
-                                            {Object.keys(explainRows[0]).map(col => (
-                                                <th key={col} className="text-left px-2 py-1.5">{col}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {explainRows.map((row, idx) => (
-                                            <tr key={idx} className="border-t border-slate-100 dark:border-slate-700">
-                                                {Object.keys(explainRows[0]).map(col => (
-                                                    <td key={col} className="px-2 py-1.5 text-slate-600 dark:text-slate-300">{String(row[col] ?? '')}</td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )
-                    ) : mode === 'table' && tableResultTab === 'profiling' ? (
+                    {mode === 'table' && tableResultTab === 'profiling' ? (
                         profiling.length === 0 ? (
                             <div className="flex-1 p-4 text-xs text-slate-400">{t('datainspector.no_profile')}</div>
                         ) : (
@@ -3535,7 +3853,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             data={items || []}
                             columns={columns}
                             searchTerm=""
-                            emptyMessage={mode === 'sql' && !inputSql ? t('datainspector.empty_sql') : t('common.no_data')}
+                            emptyMessage={t('common.no_data')}
                             onRowClick={(item) => setSelectedItem(item)}
                             sortConfig={mode === 'table' ? tableSortConfig : undefined}
                             onSortConfigChange={mode === 'table' ? setTableSortConfig : undefined}
@@ -3568,9 +3886,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                     ))}
                                 </select>
                             )
-                        ) : sqlOutputView === 'explain'
-                            ? t('datainspector.output_explain', 'Explain')
-                            : t('datainspector.sql_mode')}
+                        ) : t('datainspector.sql_mode')}
                     </div>
                     <div className="flex items-center gap-4">
                         {mode === 'table' && tableResultTab === 'data' && (
@@ -3624,9 +3940,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                         <span className="flex items-center gap-1"><Database className="w-3 h-3" /> LiteBI Studio DB</span>
                         <span className="font-medium">
                             {t('common.results_count', {
-                                count: mode === 'sql' && sqlOutputView === 'explain'
-                                    ? explainRows.length
-                                    : mode === 'table' && tableResultTab === 'profiling'
+                                count: mode === 'table' && tableResultTab === 'profiling'
                                         ? profiling.length
                                         : (items?.length || 0)
                             })}
@@ -3634,6 +3948,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Universal Record Detail Modal */}
             <RecordDetailModal

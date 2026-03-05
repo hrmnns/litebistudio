@@ -33,6 +33,11 @@ interface DataTableProps<T> {
     onShowFiltersChange?: (visible: boolean) => void;
     columnWidths?: ColumnWidthMap;
     onColumnWidthsChange?: (widths: ColumnWidthMap) => void;
+    rounded?: boolean;
+    bordered?: boolean;
+    headerContainerClassName?: string;
+    headerTextClassName?: string;
+    bodyContainerClassName?: string;
 }
 
 export function DataTable<T>({
@@ -49,7 +54,12 @@ export function DataTable<T>({
     showFilters,
     onShowFiltersChange,
     columnWidths,
-    onColumnWidthsChange
+    onColumnWidthsChange,
+    rounded = true,
+    bordered = true,
+    headerContainerClassName,
+    headerTextClassName,
+    bodyContainerClassName
 }: DataTableProps<T>) {
     const headerRef = React.useRef<HTMLDivElement>(null);
     const bodyRef = React.useRef<HTMLDivElement>(null);
@@ -231,14 +241,14 @@ export function DataTable<T>({
     );
 
     return (
-        <div className="flex flex-col flex-1 overflow-hidden h-full relative border rounded-lg border-slate-300 dark:border-slate-700">
+        <div className={`flex flex-col flex-1 overflow-hidden h-full relative ${bordered ? 'border border-slate-300 dark:border-slate-700' : ''} ${rounded ? 'rounded-lg' : 'rounded-none'}`}>
             <div
                 ref={headerRef}
-                className="overflow-hidden flex-none bg-slate-50 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-700"
+                className={`overflow-hidden flex-none bg-slate-50 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-700 ${headerContainerClassName ?? ''}`}
             >
                 <table className="w-full text-sm text-left table-fixed">
                     {renderColGroup()}
-                    <thead className="text-[10px] text-slate-400 uppercase font-bold text-left">
+                    <thead className={`text-[10px] text-slate-400 uppercase font-bold text-left ${headerTextClassName ?? ''}`}>
                         <tr>
                             {columns.map((col, i) => {
                                 const key = getColumnKey(col);
@@ -325,7 +335,7 @@ export function DataTable<T>({
             <div
                 ref={bodyRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-auto bg-white dark:bg-slate-800"
+                className={`flex-1 overflow-auto bg-white dark:bg-slate-800 ${bodyContainerClassName ?? ''}`}
             >
                 <table className="w-full text-sm text-left table-fixed">
                     {renderColGroup()}
