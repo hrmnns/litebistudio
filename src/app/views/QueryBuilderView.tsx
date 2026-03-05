@@ -847,7 +847,7 @@ export const QueryBuilderView: React.FC = () => {
     const confirmDiscardUnsavedChanges = useCallback(async () => {
         if (!hasUnsavedChanges) return true;
         return appDialog.confirm(
-            t('querybuilder.confirm_discard_unsaved', 'Es gibt ungespeicherte Ã„nderungen. Fortfahren?'),
+            t('querybuilder.confirm_discard_unsaved', 'Es gibt ungespeicherte Änderungen. Fortfahren?'),
             t('common.warning', 'Warnung')
         );
     }, [hasUnsavedChanges, t]);
@@ -856,7 +856,7 @@ export const QueryBuilderView: React.FC = () => {
         const choice = await appDialog.confirm3(
             t(
                 'querybuilder.confirm_save_or_discard_before_new_widget',
-                'Es gibt ungespeicherte Ã„nderungen. Sollen diese vor dem Fortfahren gespeichert werden?'
+                'Es gibt ungespeicherte Änderungen. Sollen diese vor dem Fortfahren gespeichert werden?'
             ),
             {
                 title: t('common.warning', 'Warnung'),
@@ -931,7 +931,7 @@ export const QueryBuilderView: React.FC = () => {
         const confirmDelete = await appDialog.confirm(
             t('querybuilder.confirm_delete_widget', {
                 name: widget.name,
-                defaultValue: `Widget "${widget.name}" lÃ¶schen?`
+                defaultValue: `Widget "${widget.name}" löschen?`
             }),
             t('common.warning', 'Warnung')
         );
@@ -1235,7 +1235,7 @@ export const QueryBuilderView: React.FC = () => {
                 enabled: true,
                 isOpen: isConfigPanelOpen,
                 onOpenChange: (open) => setIsConfigPanelOpen(open),
-                triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration Ã¶ffnen')
+                triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration öffnen')
             }}
             fillHeight
         >
@@ -1914,7 +1914,7 @@ export const QueryBuilderView: React.FC = () => {
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <FileCode2 className="w-3 h-3" />
-                                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswÃ¤hlen')}
+                                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswählen')}
                                         </button>
                                         <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                         <button
@@ -1925,7 +1925,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
                                                     : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100'
                                             }`}
-                                            title={t('querybuilder.open_config_panel', 'Konfiguration Ã¶ffnen')}
+                                            title={t('querybuilder.open_config_panel', 'Konfiguration öffnen')}
                                         >
                                             <SlidersHorizontal className="w-3 h-3" />
                                             {t('querybuilder.tab_config', 'Konfiguration')}
@@ -2576,11 +2576,11 @@ export const QueryBuilderView: React.FC = () => {
                                                 className="w-44 shrink-0 px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                                 title={t('querybuilder.manage_sort_label', 'Sortierung')}
                                             >
-                                                <option value="updated_desc">{t('querybuilder.manage_sort_updated_desc', 'Zuletzt geÃ¤ndert (neu zuerst)')}</option>
-                                                <option value="updated_asc">{t('querybuilder.manage_sort_updated_asc', 'Zuletzt geÃ¤ndert (alt zuerst)')}</option>
+                                                <option value="updated_desc">{t('querybuilder.manage_sort_updated_desc', 'Zuletzt geändert (neu zuerst)')}</option>
+                                                <option value="updated_asc">{t('querybuilder.manage_sort_updated_asc', 'Zuletzt geändert (alt zuerst)')}</option>
                                                 <option value="name_asc">{t('querybuilder.manage_sort_name_asc', 'Name (A-Z)')}</option>
                                                 <option value="name_desc">{t('querybuilder.manage_sort_name_desc', 'Name (Z-A)')}</option>
-                                                <option value="usage_desc">{t('querybuilder.manage_sort_usage_desc', 'Nutzung (hÃ¤ufig zuerst)')}</option>
+                                                <option value="usage_desc">{t('querybuilder.manage_sort_usage_desc', 'Nutzung (häufig zuerst)')}</option>
                                             </select>
                                             <div className="relative w-full max-w-sm">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -2668,7 +2668,7 @@ export const QueryBuilderView: React.FC = () => {
                                                     type="button"
                                                     onClick={() => { void handleDeleteWidget(widget); }}
                                                     className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                                                    title={t('common.delete', 'LÃ¶schen')}
+                                                    title={t('common.delete', 'Löschen')}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -2717,7 +2717,7 @@ export const QueryBuilderView: React.FC = () => {
                             onClick={() => setLoadDialogTab('sql')}
                             className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${loadDialogTab === 'sql' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                         >
-                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswÃ¤hlen')}
+                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswählen')}
                         </button>
                     </div>
                     <div className="relative">
@@ -2786,7 +2786,7 @@ export const QueryBuilderView: React.FC = () => {
                             disabled={loadDialogTab === 'widget' ? !selectedLoadWidgetId : !selectedLoadSqlId}
                             className="min-w-[128px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
-                            {t('common.apply', 'Ãœbernehmen')}
+                            {t('common.apply', 'Übernehmen')}
                         </button>
                     </div>
                 </div>
