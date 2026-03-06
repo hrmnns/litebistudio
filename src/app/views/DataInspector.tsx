@@ -92,6 +92,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         : 'data_inspector_sql_editor_height';
     const [mode, setMode] = useState<'table' | 'sql'>(fixedMode ?? 'table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
+    const [, setSqlHistory] = useLocalStorage<string[]>('data_inspector_sql_history', []);
     const [explainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
     const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
     const [autocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
@@ -548,7 +549,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setSqlOutputView('result');
         setSqlExecutionSql(executionSql);
         execute();
-        setSqlHistory(prev => [trimmed, ...prev.filter(q => q !== trimmed)].slice(0, 12));
+        setSqlHistory((prev: string[]) => [trimmed, ...prev.filter((q: string) => q !== trimmed)].slice(0, 12));
         if (isSelect) {
             localStorage.setItem(INSPECTOR_LAST_SELECT_SQL_KEY, trimmed);
         }
