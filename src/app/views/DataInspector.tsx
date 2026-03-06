@@ -92,7 +92,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         : 'data_inspector_sql_editor_height';
     const [mode, setMode] = useState<'table' | 'sql'>(fixedMode ?? 'table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
-    const [sqlHistory, setSqlHistory] = useLocalStorage<string[]>('data_inspector_sql_history', []);
     const [explainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
     const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
     const [autocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
@@ -118,8 +117,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [sqlLibrarySort, setSqlLibrarySort] = useLocalStorage<
         'updated_desc' | 'name_asc' | 'name_desc' | 'last_used_desc' | 'favorite_then_updated'
     >('data_inspector_sql_library_sort_v1', 'updated_desc');
-    const [lastSavedSqlTemplateName, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
-    const [lastSavedSqlTemplateDescription, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('data_inspector_last_saved_sql_template_description', '');
+    const [, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
+    const [, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('data_inspector_last_saved_sql_template_description', '');
     const [loadedSqlTemplateMeta, setLoadedSqlTemplateMeta] = useState<{ name: string; description: string }>({ name: '', description: '' });
     const [isSqlOpenDialogOpen, setIsSqlOpenDialogOpen] = useState(false);
     const [selectedOpenSqlId, setSelectedOpenSqlId] = useState('');
@@ -631,8 +630,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         const matchingStatement = sqlStatements.find(
             stmt => stmt.scope === SQL_LIBRARY_SCOPE && normalizeSql(stmt.sql_text) === normalized
         );
-        const suggestedName = (activeSqlStatement?.name || loadedSqlTemplateMeta.name || '').trim();
-        const suggestedDescription = (activeSqlStatement?.description || loadedSqlTemplateMeta.description || '').trim();
+        const suggestedName = (loadedSqlTemplateMeta.name || '').trim();
+        const suggestedDescription = (loadedSqlTemplateMeta.description || '').trim();
         const promptLabel = matchingStatement
             ? t('datainspector.custom_template_prompt_update', 'SQL statement name (updates existing):')
             : t('datainspector.custom_template_prompt');
@@ -1632,27 +1631,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         sqlStatements
     ]);
 
-    const applySqlTemplate = useCallback(async (sql: string, runImmediately: boolean, templateName?: string, templateDescription?: string) => {
-        if (fixedMode === 'table') {
-            forwardSqlToWorkspace(sql);
-            return;
-        }
-        setMode('sql');
-        resetSqlOutputState();
-        setInputSql(sql);
-        setActiveSqlStatementId('');
-        setLoadedSqlTemplateMeta({
-            name: (templateName || '').trim(),
-            description: (templateDescription || '').trim()
-        });
-        setSqlSavedSnapshot({ id: '', normalizedSql: normalizeSql(sql) });
-        setSqlOutputView('result');
-        setShowSqlAssist(false);
-        if (runImmediately) {
-            await executeSqlText(sql);
-        }
-    }, [executeSqlText, fixedMode, forwardSqlToWorkspace, resetSqlOutputState, setShowSqlAssist]);
-
     const toggleAssistantPanel = useCallback((panel: 'table' | 'columns' | 'aggregation' | 'grouping' | 'filter' | 'sorting' | 'preview') => {
         setAssistantPanels(prev => ({
             ...prev,
@@ -1756,19 +1734,6 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setTableToolsTab(tab);
         setShowTableTools(true);
     }, [setShowTableTools, setTableToolsTab]);
-
-    const loadSelectedSourceIntoSql = useCallback(async (runImmediately: boolean, explicitColumns: boolean) => {
-        if (!selectedTable) return;
-        const safeTable = selectedTable.replace(/"/g, '""');
-        const quotedColumns = (selectedTableSchema || []).map((col) => `"${String(col.name).replace(/"/g, '""')}"`);
-        const selectList = explicitColumns && quotedColumns.length > 0 ? quotedColumns.join(',\n    ') : '*';
-        const sql = `SELECT ${selectList === '*' ? '*' : `\n    ${selectList}`}\nFROM "${safeTable}"\nLIMIT 100`;
-        setInputSql(sql);
-        setSqlOutputView('result');
-        if (runImmediately) {
-            await executeSqlText(sql);
-        }
-    }, [executeSqlText, selectedTable, selectedTableSchema]);
 
     const buildFieldPickerSql = useCallback((columns: string[]) => {
         const safeTable = selectedTable.replace(/"/g, '""');
@@ -2995,55 +2960,67 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
             {/* Controls Row: Selection or SQL Editor */}
             {mode === 'table' ? (
-                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-shrink-0">
-                    <div className="grid grid-cols-1 gap-3">
-                        <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,320px)_minmax(280px,1fr)_auto] gap-3">
-                            <div className="relative min-w-0">
-                            <select
-                                value={selectedTable}
-                                onChange={(e) => {
-                                    setSelectedTable(e.target.value);
-                                    setSearchTerm('');
-                                    setTableSortConfig(null);
-                                    setTableFilters({});
-                                    setShowTableFilters(false);
-                                    setActiveViewId('');
-                                    setCurrentPage(1);
-                                }}
-                                className="w-full h-10 appearance-none pl-10 pr-10 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium"
-                            >
-                                {dataSources?.map(source => (
-                                    <option key={source.name} value={source.name}>
-                                        {source.type === 'view' ? `${source.name} (view)` : source.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
+                <div className="-mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-shrink-0">
+                    <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                        <div className="p-3 flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                                {t('datainspector.title', 'Data Inspector')}
+                            </h3>
+                            {selectedTable && (
+                                <p className="max-w-[55%] text-[11px] text-slate-500 dark:text-slate-400 truncate text-right" title={selectedTable}>
+                                    {selectedTable}
+                                </p>
+                            )}
                         </div>
+                        <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
+                            <div className="pt-2 grid grid-cols-1 lg:grid-cols-[minmax(220px,320px)_minmax(280px,1fr)_auto] gap-2">
+                                <div className="relative min-w-0">
+                                    <select
+                                        value={selectedTable}
+                                        onChange={(e) => {
+                                            setSelectedTable(e.target.value);
+                                            setSearchTerm('');
+                                            setTableSortConfig(null);
+                                            setTableFilters({});
+                                            setShowTableFilters(false);
+                                            setActiveViewId('');
+                                            setCurrentPage(1);
+                                        }}
+                                        className="w-full h-8 appearance-none pl-9 pr-9 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-xs font-semibold"
+                                    >
+                                        {dataSources?.map(source => (
+                                            <option key={source.name} value={source.name}>
+                                                {source.type === 'view' ? `${source.name} (view)` : source.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
+                                </div>
 
-                            <div className="relative min-w-0">
-                            <input
-                                type="text"
-                                placeholder={t('datainspector.search_placeholder')}
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="w-full h-10 pl-10 pr-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        </div>
+                                <div className="relative min-w-0">
+                                    <input
+                                        type="text"
+                                        placeholder={t('datainspector.search_placeholder')}
+                                        value={searchTerm}
+                                        onChange={(e) => {
+                                            setSearchTerm(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                        className="w-full h-8 pl-9 pr-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                                    />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                </div>
 
-                            <button
-                                onClick={() => execute()}
-                                className="h-10 px-3 flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium"
-                                title={t('datainspector.refresh_title')}
-                            >
-                                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                <span>{t('common.refresh', 'Refresh')}</span>
-                            </button>
+                                <button
+                                    onClick={() => execute()}
+                                    className="h-8 px-3 flex items-center justify-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-bold"
+                                    title={t('datainspector.refresh_title')}
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                                    <span>{t('common.refresh', 'Refresh')}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3516,7 +3493,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
             {mode === 'table' && (
             <div
-                className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative"
+                className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative"
             >
                 {/* Opaque loading overlay when refreshing results */}
                 {loading && items && items.length > 0 && (
@@ -3528,7 +3505,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 )}
 
                 {mode === 'table' && (
-                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 flex items-center justify-between gap-3">
+                    <div className="px-4 py-2 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85 flex items-center justify-between gap-3">
                         <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
                             <button
                                 onClick={() => setTableResultTab('data')}
@@ -3558,7 +3535,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 )}
 
                 {mode === 'table' && tableResultTab === 'profiling' && (
-                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between gap-3 text-[11px]">
+                    <div className="px-4 py-2 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90 flex items-center justify-between gap-3 text-[11px]">
                         <div className="font-semibold uppercase tracking-wider text-slate-500">
                             {t('datainspector.profiling_settings', 'Profiling Settings')}
                         </div>
@@ -3606,11 +3583,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 )}
 
                 {mode === 'table' && tableResultTab === 'data' && (
-                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between gap-3 text-[11px]">
-                        <div className="flex items-center gap-1.5">
+                    <div className="px-4 py-2 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90 flex items-center justify-between gap-3 text-[11px]">
+                        <div className="flex items-center gap-2">
                             <button
                                 onClick={() => openTableToolsTab('tables')}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
                                 title={t('datainspector.table_tools_tab_tables', 'Tables')}
                                 aria-label={t('datainspector.table_tools_tab_tables', 'Tables')}
                             >
@@ -3618,7 +3595,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             </button>
                             <button
                                 onClick={() => openTableToolsTab('columns')}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
                                 title={t('datainspector.table_tools_tab_columns', 'Columns')}
                                 aria-label={t('datainspector.table_tools_tab_columns', 'Columns')}
                             >
@@ -3626,7 +3603,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             </button>
                             <button
                                 onClick={() => openTableToolsTab('filters')}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
                                 title={t('datainspector.table_tools_tab_filters', 'Filters')}
                                 aria-label={t('datainspector.table_tools_tab_filters', 'Filters')}
                             >
@@ -3635,7 +3612,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             <button
                                 onClick={() => openCreateIndexModal()}
                                 disabled={selectedSourceType !== 'table'}
-                                className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 flex items-center gap-1"
+                                className="h-8 px-3 text-[11px] font-bold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 flex items-center gap-1.5"
                                 title={selectedSourceType !== 'table'
                                     ? t('datasource.view_type', 'VIEW')
                                     : t('datasource.create_index_title', 'Create index')}
@@ -3643,8 +3620,17 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                 <ListPlus className="w-3.5 h-3.5" />
                                 {t('datasource.create_index_btn', 'Create index')}
                             </button>
+                            <button
+                                onClick={openCreateTableModal}
+                                className="h-8 px-3 text-[11px] font-bold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center gap-1.5"
+                                title={t('datasource.create_table_title', 'Neue Tabelle')}
+                            >
+                                <Table2 className="w-3.5 h-3.5" />
+                                {t('datasource.create_table_title', 'Neue Tabelle')}
+                            </button>
                         </div>
                         <div className="flex items-center gap-2 justify-end">
+                            <div className="h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                             <span className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
                                 {t('datainspector.saved_views', 'Saved Views')}
                             </span>
@@ -3657,7 +3643,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                     const preset = savedViews.find(v => v.id === nextId);
                                     if (preset) applyViewPreset(preset);
                                 }}
-                                className="h-7 px-2 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] outline-none min-w-[180px]"
+                                className="h-8 px-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-[11px] font-semibold outline-none min-w-[180px]"
                             >
                                 <option value="">{t('datainspector.select_view')}</option>
                                 {savedViews.map(view => (
@@ -3666,14 +3652,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             </select>
                             <button
                                 onClick={handleSaveCurrentView}
-                                className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                className="h-8 px-3 text-[11px] font-bold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
                             >
                                 {activeViewId ? t('datainspector.update_view') : t('datainspector.save_view')}
                             </button>
                             <button
                                 onClick={handleDeleteCurrentView}
                                 disabled={!activeViewId}
-                                className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 disabled:opacity-40"
+                                className="h-8 px-3 text-[11px] font-bold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-300 disabled:opacity-40"
                             >
                                 {t('datainspector.delete_view')}
                             </button>
@@ -3769,10 +3755,15 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             onShowFiltersChange={mode === 'table' ? setShowTableFilters : undefined}
                             columnWidths={mode === 'table' ? activeColumnWidths : undefined}
                             onColumnWidthsChange={mode === 'table' ? handleColumnWidthsChange : undefined}
+                            rounded={false}
+                            bordered={false}
+                            headerContainerClassName="bg-slate-50 dark:bg-slate-800/90 border-b border-slate-300 dark:border-slate-600 dark:[&_th:first-child]:bg-slate-800/95"
+                            headerTextClassName="text-slate-500 dark:text-slate-100"
+                            bodyContainerClassName="bg-white dark:bg-[#0b1220] text-slate-700 dark:text-slate-100"
                         />
                     )}
                 </div>
-                <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-[10px] flex justify-between items-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="px-4 py-2 border-t border-slate-300 dark:border-slate-600 text-[10px] flex justify-between items-center text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/90">
                     <div className="font-medium">
                         {mode === 'table' ? (
                             tableResultTab === 'profiling' ? (

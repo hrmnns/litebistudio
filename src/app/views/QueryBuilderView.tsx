@@ -323,7 +323,6 @@ export const QueryBuilderView: React.FC = () => {
         let parsedVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
         let parsedVisType: VisualizationType = 'table';
         let parsedBuilderMode: 'sql' | 'visual' = 'sql';
-        let parsedQueryConfig: QueryConfig | undefined;
         const linkedStatement = widget.sql_statement_id
             ? (sqlStatements || []).find(stmt => stmt.id === widget.sql_statement_id)
             : undefined;
@@ -362,11 +361,6 @@ export const QueryBuilderView: React.FC = () => {
             setVisConfig(parsedVisConfig);
 
             parsedBuilderMode = 'sql';
-            if (widget.visual_builder_config) {
-                parsedQueryConfig = JSON.parse(widget.visual_builder_config) as QueryConfig;
-            } else {
-                parsedQueryConfig = undefined;
-            }
             setBuilderMode(parsedBuilderMode);
             setQueryConfig(undefined);
         } catch (e) {
