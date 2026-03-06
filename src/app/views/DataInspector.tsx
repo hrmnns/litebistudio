@@ -1862,7 +1862,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 '.cm-activeLine': {
                     backgroundColor: sqlEditorHighlightActiveLine ? (isDarkEditor ? activeLineDark : activeLineLight) : 'transparent'
                 },
-                '.cm-selectionBackground, ::selection': {
+                '.cm-selectionLayer .cm-selectionBackground': {
+                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
+                },
+                '.cm-content ::selection': {
+                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
+                },
+                '.cm-line::selection, .cm-line > span::selection': {
                     backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
                 },
                 '.cm-gutters': {

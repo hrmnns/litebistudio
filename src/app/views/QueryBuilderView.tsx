@@ -233,7 +233,13 @@ export const QueryBuilderView: React.FC = () => {
                 '.cm-activeLine': {
                     backgroundColor: sqlEditorHighlightActiveLine ? (isDarkSqlPreview ? activeLineDark : activeLineLight) : 'transparent'
                 },
-                '.cm-selectionBackground, ::selection': {
+                '.cm-selectionLayer .cm-selectionBackground': {
+                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
+                },
+                '.cm-content ::selection': {
+                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
+                },
+                '.cm-line::selection, .cm-line > span::selection': {
                     backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
                 },
                 '.cm-focused': {
