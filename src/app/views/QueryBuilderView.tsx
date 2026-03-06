@@ -11,7 +11,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
     Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
     Layout, Maximize2, Folder, Gauge, Image as ImageIcon,
-    Edit3, X, Download, Search, FileCode2, Save, SlidersHorizontal, Plus, Trash2, Copy, FolderOpen
+    Edit3, X, Download, Search, FileCode2, Save, SlidersHorizontal, Plus, Trash2, Copy, FolderOpen, Star
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { DataTable } from '../../components/ui/DataTable';
@@ -34,8 +34,8 @@ import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
 import type { SqlStatementRecord } from '../../lib/repositories/SystemRepository';
 import { MarkdownContent } from '../components/ui/MarkdownContent';
-import { Modal } from '../components/Modal';
 import { RightOverlayPanel } from '../components/ui/RightOverlayPanel';
+import { SelectionListDialog } from '../components/ui/SelectionListDialog';
 
 type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
@@ -90,7 +90,7 @@ const parseMaybeJson = (value: unknown): unknown => {
     }
 };
 export const QueryBuilderView: React.FC = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [sql, setSql] = useState(DEFAULT_SQL);
     const [results, setResults] = useState<DbRow[]>([]);
     const [error, setError] = useState('');
@@ -104,7 +104,7 @@ export const QueryBuilderView: React.FC = () => {
     const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
     const [workspaceTab, setWorkspaceTab] = useLocalStorage<'manage' | 'editor'>('querybuilder_workspace_tab', 'editor');
     const [manageSearch, setManageSearch] = useState('');
-    const [manageSort, setManageSort] = useState<'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc'>('updated_desc');
+    const [manageSort, setManageSort] = useState<'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc' | 'favorite_then_updated'>('updated_desc');
     const [, setSidebarTab] = useState<'source' | 'visual' | 'widget'>('visual');
     const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>('none');
     const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
@@ -123,11 +123,15 @@ export const QueryBuilderView: React.FC = () => {
     const [widgetName, setWidgetName] = useState('');
     const [selectedSqlStatementId, setSelectedSqlStatementId] = useLocalStorage<string>('querybuilder_selected_sql_statement_id', '');
     const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
-    const [loadDialogTab, setLoadDialogTab] = useState<'widget' | 'sql'>('widget');
+    const [loadDialogType, setLoadDialogType] = useState<'widget' | 'sql'>('widget');
     const [loadDialogSearch, setLoadDialogSearch] = useState('');
+    const [loadDialogPinnedOnly, setLoadDialogPinnedOnly] = useLocalStorage<boolean>('querybuilder_load_dialog_pinned_only', false);
+    const [loadDialogSort, setLoadDialogSort] = useLocalStorage<'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first'>('querybuilder_load_dialog_sort', 'updated_desc');
+    const [pinnedWidgetIds, setPinnedWidgetIds] = useLocalStorage<string[]>('querybuilder_pinned_widget_ids', []);
     const [selectedLoadWidgetId, setSelectedLoadWidgetId] = useState<string>('');
     const [selectedLoadSqlId, setSelectedLoadSqlId] = useState<string>('');
     const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
+    const [localWidgetSavedAtById, setLocalWidgetSavedAtById] = useState<Record<string, string>>({});
 
     // Detail View State
     const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -152,7 +156,7 @@ export const QueryBuilderView: React.FC = () => {
         async () => await SystemRepository.getUserWidgets() as unknown as SavedWidget[],
         []
     );
-    const { data: sqlStatements } = useAsync<SqlStatementRecord[]>(
+    const { data: sqlStatements, refresh: refreshSqlStatements } = useAsync<SqlStatementRecord[]>(
         async () => await SystemRepository.listSqlStatements('global'),
         []
     );
@@ -386,7 +390,7 @@ export const QueryBuilderView: React.FC = () => {
         setSavedSnapshot(buildSnapshot({
             currentSql: (parsedVisType === 'text' || parsedVisType === 'markdown' || parsedVisType === 'status' || parsedVisType === 'section' || parsedVisType === 'kpi_manual' || parsedVisType === 'image') ? '' : widgetSql,
             currentBuilderMode: parsedBuilderMode,
-            currentQueryConfig: (parsedVisType === 'text' || parsedVisType === 'markdown' || parsedVisType === 'status' || parsedVisType === 'section' || parsedVisType === 'kpi_manual' || parsedVisType === 'image') ? undefined : parsedQueryConfig,
+            currentQueryConfig: undefined,
             currentVisType: parsedVisType,
             currentVisConfig: parsedVisConfig,
             currentWidgetName: widget.name,
@@ -397,77 +401,133 @@ export const QueryBuilderView: React.FC = () => {
     const handleSaveWidget = useCallback(async (mode: 'update' | 'new' = 'update'): Promise<boolean> => {
         if (isReadOnly) return false;
         const saveAsContentWidget = CONTENT_VIS_TYPES.has(visType);
-        const shouldCreateNew = mode === 'new';
-        let targetId = shouldCreateNew ? crypto.randomUUID() : (activeWidgetId || crypto.randomUUID());
-        const existingTarget = (savedWidgets || []).find((w) => w.id === targetId);
-        const prompted = await appDialog.prompt2(
-            t('querybuilder.archive_name'),
-            t('common.description', 'Description'),
-            {
-                title: activeWidgetId ? t('querybuilder.update_title') : t('querybuilder.save_title'),
-                defaultValue: (widgetName || existingTarget?.name || '').trim(),
-                secondDefaultValue: (existingTarget?.description || '').trim(),
-                placeholder: t('querybuilder.archive_placeholder'),
-                secondPlaceholder: t('querybuilder.widget_description_placeholder', 'Short context or note (optional)')
+        const persistWidget = async (targetId: string, name: string, description: string): Promise<boolean> => {
+            try {
+                const linkedStatement = (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId);
+                const sqlText = saveAsContentWidget ? '' : sql.trim();
+                const linkedStatementId =
+                    !saveAsContentWidget && linkedStatement && normalizeSqlText(linkedStatement.sql_text) === normalizeSqlText(sqlText)
+                        ? linkedStatement.id
+                        : null;
+                const widget = {
+                    id: targetId,
+                    name,
+                    description,
+                    sql_statement_id: linkedStatementId,
+                    sql_query: sqlText,
+                    visualization_config: { ...visConfig, type: visType },
+                    visual_builder_config: null
+                };
+
+                await SystemRepository.saveUserWidget(widget);
+                refreshWidgets();
+                setActiveWidgetId(widget.id);
+                setWidgetName(widget.name);
+                setLocalWidgetSavedAtById((prev) => ({
+                    ...prev,
+                    [widget.id]: new Date().toISOString()
+                }));
+                setSavedSnapshot(buildSnapshot({
+                    currentSql: widget.sql_query,
+                    currentBuilderMode: builderMode,
+                    currentQueryConfig: builderMode === 'visual' ? queryConfig : undefined,
+                    currentVisType: visType,
+                    currentVisConfig: { ...visConfig, type: visType },
+                    currentWidgetName: widget.name,
+                    currentActiveWidgetId: widget.id
+                }));
+                setGuidedStep(1);
+                setSidebarTab('source');
+                setSourceSelectTab('widget');
+                setPreviewTab('graphic');
+                return true;
+            } catch (err: unknown) {
+                await appDialog.error(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
+                return false;
             }
-        );
-        if (!prompted) return false;
-        const trimmedName = prompted.value.trim();
-        if (!trimmedName) return false;
-        const trimmedDescription = prompted.secondValue.trim();
-        const normalizedName = trimmedName.toLowerCase();
-        const conflictingWidget = (savedWidgets || []).find((w) =>
-            w.id !== targetId && w.name.trim().toLowerCase() === normalizedName
-        );
-        if (conflictingWidget) {
-            const overwrite = await appDialog.confirm(t('querybuilder.confirm_overwrite_widget_name', {
-                name: trimmedName,
-                defaultValue: `Ein Widget mit dem Namen "${trimmedName}" existiert bereits. Ueberschreiben?`
-            }));
-            if (!overwrite) return false;
-            targetId = conflictingWidget.id;
-        }
-        try {
-            const linkedStatement = (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId);
-            const sqlText = saveAsContentWidget ? '' : sql.trim();
-            const linkedStatementId =
-                !saveAsContentWidget && linkedStatement && normalizeSqlText(linkedStatement.sql_text) === normalizeSqlText(sqlText)
-                    ? linkedStatement.id
-                    : null;
-            const widget = {
-                id: targetId,
-                name: trimmedName,
-                description: trimmedDescription,
-                sql_statement_id: linkedStatementId,
-                sql_query: sqlText,
-                visualization_config: { ...visConfig, type: visType },
-                visual_builder_config: null
-            };
+        };
 
-            await SystemRepository.saveUserWidget(widget);
-
-            refreshWidgets();
-            setActiveWidgetId(widget.id);
-            setWidgetName(widget.name);
-            setSavedSnapshot(buildSnapshot({
-                currentSql: widget.sql_query,
-                currentBuilderMode: builderMode,
-                currentQueryConfig: undefined,
-                currentVisType: visType,
-                currentVisConfig: { ...visConfig, type: visType },
-                currentWidgetName: widget.name,
-                currentActiveWidgetId: widget.id
-            }));
-            setGuidedStep(1);
-            setSidebarTab('source');
-            setSourceSelectTab('widget');
-            setPreviewTab('graphic');
-        } catch (err: unknown) {
-            await appDialog.error(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
-            return false;
+        // Standard Save: update current widget directly (no prompt), like SQL workspace save.
+        if (mode === 'update' && activeWidgetId) {
+            const current = (savedWidgets || []).find((w) => w.id === activeWidgetId);
+            const name = (current?.name || widgetName).trim();
+            if (!name) return false;
+            const description = (current?.description || '').trim();
+            const saved = await persistWidget(activeWidgetId, name, description);
+            if (!saved) return false;
+            await appDialog.info(
+                t('querybuilder.success_update_detail', {
+                    name,
+                    defaultValue: `Das Widget "${name}" wurde erfolgreich gespeichert.`
+                }),
+                t('querybuilder.success_update_title', 'Widget erfolgreich gespeichert')
+            );
+            return true;
         }
-        await appDialog.info(shouldCreateNew ? t('querybuilder.success_save') : t('querybuilder.success_update'));
-        return true;
+
+        // Save as / new: prompt for name + description, overwrite by name with explicit confirm.
+        let suggestedName = (widgetName || '').trim();
+        let suggestedDescription = '';
+        const current = activeWidgetId ? (savedWidgets || []).find((w) => w.id === activeWidgetId) : undefined;
+        if (current) {
+            suggestedName = current.name.trim();
+            suggestedDescription = (current.description || '').trim();
+        }
+        while (true) {
+            const prompted = await appDialog.prompt2(
+                t('querybuilder.archive_name'),
+                t('common.description', 'Description'),
+                {
+                    title: t('querybuilder.save_widget_as_title', 'Widget speichern unter'),
+                    defaultValue: suggestedName,
+                    secondDefaultValue: suggestedDescription,
+                    placeholder: t('querybuilder.archive_placeholder'),
+                    secondPlaceholder: t('querybuilder.widget_description_placeholder', 'Short context or note (optional)')
+                }
+            );
+            if (!prompted) return false;
+            const trimmedName = prompted.value.trim();
+            if (!trimmedName) return false;
+            const trimmedDescription = prompted.secondValue.trim();
+            suggestedName = trimmedName;
+            suggestedDescription = trimmedDescription;
+
+            const existingByName = (savedWidgets || []).find((w) => w.name.trim().toLowerCase() === trimmedName.toLowerCase());
+            if (existingByName) {
+                const overwrite = await appDialog.confirm(
+                    t('querybuilder.confirm_overwrite_widget_name', {
+                        name: trimmedName,
+                        defaultValue: `Ein Widget mit dem Namen "${trimmedName}" existiert bereits. Ueberschreiben?`
+                    }),
+                    {
+                        confirmLabel: t('common.yes', 'Ja'),
+                        cancelLabel: t('common.no', 'Nein')
+                    }
+                );
+                if (!overwrite) continue;
+                const saved = await persistWidget(existingByName.id, trimmedName, trimmedDescription);
+                if (!saved) return false;
+                await appDialog.info(
+                    t('querybuilder.success_save_detail', {
+                        name: trimmedName,
+                        defaultValue: `Das Widget "${trimmedName}" wurde erfolgreich gespeichert.`
+                    }),
+                    t('querybuilder.success_save_title', 'Widget erfolgreich gespeichert')
+                );
+                return true;
+            }
+
+            const saved = await persistWidget(crypto.randomUUID(), trimmedName, trimmedDescription);
+            if (!saved) return false;
+            await appDialog.info(
+                t('querybuilder.success_save_detail', {
+                    name: trimmedName,
+                    defaultValue: `Das Widget "${trimmedName}" wurde erfolgreich gespeichert.`
+                }),
+                t('querybuilder.success_save_title', 'Widget erfolgreich gespeichert')
+            );
+            return true;
+        }
     }, [
         activeWidgetId,
         builderMode,
@@ -479,6 +539,7 @@ export const QueryBuilderView: React.FC = () => {
         sql,
         sqlStatements,
         t,
+        queryConfig,
         visConfig,
         visType,
         widgetName
@@ -511,6 +572,57 @@ export const QueryBuilderView: React.FC = () => {
             (stmt.description || '').toLowerCase().includes(term)
         );
     }, [sqlStatements, loadDialogSearch]);
+    const isWidgetPinned = useCallback((id: string) => pinnedWidgetIds.includes(id), [pinnedWidgetIds]);
+    const isSqlPinned = useCallback(
+        (id: string) => Boolean((sqlStatements || []).find((stmt) => stmt.id === id && Number(stmt.is_favorite) === 1)),
+        [sqlStatements]
+    );
+    const sortedFilteredLoadWidgets = useMemo(() => {
+        const rows = [...filteredLoadWidgets];
+        const toTs = (value?: string | null) => {
+            const ts = value ? Date.parse(value) : NaN;
+            return Number.isFinite(ts) ? ts : 0;
+        };
+        rows.sort((a, b) => {
+            switch (loadDialogSort) {
+                case 'name_asc':
+                    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+                case 'name_desc':
+                    return b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
+                case 'updated_asc':
+                    return toTs(a.updated_at || a.created_at) - toTs(b.updated_at || b.created_at);
+                case 'pinned_first':
+                    return Number(isWidgetPinned(b.id)) - Number(isWidgetPinned(a.id));
+                case 'updated_desc':
+                default:
+                    return toTs(b.updated_at || b.created_at) - toTs(a.updated_at || a.created_at);
+            }
+        });
+        return loadDialogPinnedOnly ? rows.filter((row) => isWidgetPinned(row.id)) : rows;
+    }, [filteredLoadWidgets, isWidgetPinned, loadDialogPinnedOnly, loadDialogSort]);
+    const sortedFilteredLoadSqlStatements = useMemo(() => {
+        const rows = [...filteredLoadSqlStatements];
+        const toTs = (value?: string | null) => {
+            const ts = value ? Date.parse(value) : NaN;
+            return Number.isFinite(ts) ? ts : 0;
+        };
+        rows.sort((a, b) => {
+            switch (loadDialogSort) {
+                case 'name_asc':
+                    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+                case 'name_desc':
+                    return b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
+                case 'updated_asc':
+                    return toTs(a.updated_at || a.created_at) - toTs(b.updated_at || b.created_at);
+                case 'pinned_first':
+                    return Number(Number(b.is_favorite) === 1) - Number(Number(a.is_favorite) === 1);
+                case 'updated_desc':
+                default:
+                    return toTs(b.updated_at || b.created_at) - toTs(a.updated_at || a.created_at);
+            }
+        });
+        return loadDialogPinnedOnly ? rows.filter((row) => Number(row.is_favorite) === 1) : rows;
+    }, [filteredLoadSqlStatements, loadDialogPinnedOnly, loadDialogSort]);
     const filteredManageWidgets = useMemo(() => {
         const all = savedWidgets || [];
         const term = manageSearch.trim().toLowerCase();
@@ -592,13 +704,18 @@ export const QueryBuilderView: React.FC = () => {
                     return toTs(a.updated_at || a.created_at) - toTs(b.updated_at || b.created_at);
                 case 'usage_desc':
                     return (dashboardUsageByWidgetId.get(b.id)?.count || 0) - (dashboardUsageByWidgetId.get(a.id)?.count || 0);
+                case 'favorite_then_updated': {
+                    const byFavorite = Number(isWidgetPinned(b.id)) - Number(isWidgetPinned(a.id));
+                    if (byFavorite !== 0) return byFavorite;
+                    return toTs(b.updated_at || b.created_at) - toTs(a.updated_at || a.created_at);
+                }
                 case 'updated_desc':
                 default:
                     return toTs(b.updated_at || b.created_at) - toTs(a.updated_at || a.created_at);
             }
         });
         return rows;
-    }, [filteredManageWidgets, manageSort, dashboardUsageByWidgetId]);
+    }, [filteredManageWidgets, manageSort, dashboardUsageByWidgetId, isWidgetPinned]);
     useEffect(() => {
         if (!activeWidgetId) {
             setLastOpenWidgetId('');
@@ -844,13 +961,6 @@ export const QueryBuilderView: React.FC = () => {
         setError('');
         setPreviewTab('sql');
     }, [setQueryConfig]);
-    const confirmDiscardUnsavedChanges = useCallback(async () => {
-        if (!hasUnsavedChanges) return true;
-        return appDialog.confirm(
-            t('querybuilder.confirm_discard_unsaved', 'Es gibt ungespeicherte Änderungen. Fortfahren?'),
-            t('common.warning', 'Warnung')
-        );
-    }, [hasUnsavedChanges, t]);
     const confirmSaveOrDiscardBeforeContinue = useCallback(async () => {
         if (!hasUnsavedChanges) return true;
         const choice = await appDialog.confirm3(
@@ -894,46 +1004,115 @@ export const QueryBuilderView: React.FC = () => {
         setSidebarTab('visual');
         setSavedSnapshot('');
     }, [confirmSaveOrDiscardBeforeContinue]);
-    const openLoadDialog = useCallback(async (tab: 'widget' | 'sql') => {
-        if (tab === 'widget') {
-            const canContinue = await confirmSaveOrDiscardBeforeContinue();
-            if (!canContinue) return;
-        }
-        setLoadDialogTab(tab);
+    const openLoadDialog = useCallback((tab: 'widget' | 'sql') => {
+        setLoadDialogType(tab);
         setLoadDialogSearch('');
         setSelectedLoadWidgetId(activeWidgetId || '');
         setSelectedLoadSqlId(selectedSqlStatementId || '');
         setIsLoadDialogOpen(true);
-    }, [activeWidgetId, confirmSaveOrDiscardBeforeContinue, selectedSqlStatementId]);
+    }, [activeWidgetId, selectedSqlStatementId]);
+    const openWidgetWithUnsavedGuard = useCallback(async (widget: SavedWidget, closeLoadDialog = false) => {
+        const canContinue = await confirmSaveOrDiscardBeforeContinue();
+        if (!canContinue) return false;
+        setSourceSelectTab('widget');
+        setWorkspaceTab('editor');
+        loadWidget(widget, true);
+        if (closeLoadDialog) setIsLoadDialogOpen(false);
+        return true;
+    }, [confirmSaveOrDiscardBeforeContinue, loadWidget, setWorkspaceTab]);
     const applyLoadSelection = async () => {
-        if (loadDialogTab === 'widget') {
+        if (loadDialogType === 'widget') {
             if (!selectedLoadWidgetId) return;
             const nextWidget = (savedWidgets || []).find((w) => w.id === selectedLoadWidgetId);
             if (!nextWidget) return;
-            setSourceSelectTab('widget');
-            loadWidget(nextWidget, true);
-            setIsLoadDialogOpen(false);
+            await openWidgetWithUnsavedGuard(nextWidget, true);
             return;
         }
         if (!selectedLoadSqlId) return;
         const nextStatement = (sqlStatements || []).find((stmt) => stmt.id === selectedLoadSqlId);
         if (!nextStatement) return;
-        const allow = await confirmDiscardUnsavedChanges();
+        const allow = await confirmSaveOrDiscardBeforeContinue();
         if (!allow) return;
-        setSourceSelectTab('query');
-        setActiveWidgetId(null);
-        setWidgetName('');
+        setSourceSelectTab(activeWidgetId ? 'widget' : 'query');
         applySqlStatementSource(nextStatement);
         await handleRun(nextStatement.sql_text);
         setIsLoadDialogOpen(false);
     };
+    const handleToggleLoadItemPin = useCallback(async (id: string) => {
+        if (loadDialogType === 'widget') {
+            setPinnedWidgetIds((current) => {
+                if (current.includes(id)) return current.filter((entry) => entry !== id);
+                return [...current, id];
+            });
+            return;
+        }
+        const current = (sqlStatements || []).find((stmt) => stmt.id === id);
+        if (!current) return;
+        await SystemRepository.setSqlStatementFavorite(id, Number(current.is_favorite) !== 1);
+        refreshSqlStatements();
+    }, [loadDialogType, pinnedWidgetIds, refreshSqlStatements, setPinnedWidgetIds, sqlStatements]);
+    const formatTimestamp = useCallback((raw?: string | null) => {
+        if (!raw) return '-';
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-US');
+    }, [i18n.language]);
+    const loadDialogItems = useMemo(() => {
+        if (loadDialogType === 'widget') {
+            return sortedFilteredLoadWidgets.map((w) => ({
+                id: w.id,
+                title: w.name,
+                subtitle: (w.sql_query || '').trim() || '-',
+                description: (w.description || '').trim() || '',
+                meta: [
+                    { label: t('querybuilder.widget_id', 'Widget-ID'), value: w.id },
+                    {
+                        label: t('datainspector.last_saved_at', 'Letzte Speicherung'),
+                        value: formatTimestamp(localWidgetSavedAtById[w.id] || w.updated_at || w.created_at)
+                    }
+                ]
+            }));
+        }
+        return sortedFilteredLoadSqlStatements.map((stmt) => ({
+            id: stmt.id,
+            title: stmt.name,
+            subtitle: stmt.sql_text,
+            description: (stmt.description || '').trim() || '',
+            meta: [
+                { label: t('querybuilder.sql_statement_id', 'SQL-Statement-ID'), value: stmt.id },
+                { label: t('datainspector.last_saved_at', 'Letzte Speicherung'), value: formatTimestamp(stmt.updated_at || stmt.created_at) }
+            ]
+        }));
+    }, [formatTimestamp, loadDialogType, localWidgetSavedAtById, sortedFilteredLoadSqlStatements, sortedFilteredLoadWidgets, t]);
+    const selectedLoadId = loadDialogType === 'widget' ? selectedLoadWidgetId : selectedLoadSqlId;
+    const loadDialogTitle = loadDialogType === 'widget'
+        ? t('querybuilder.open_widget_title', 'Widget öffnen')
+        : t('querybuilder.open_sql_statement_title', 'SQL-Statement öffnen');
+    const loadDialogEmptyLabel = loadDialogType === 'widget'
+        ? t('querybuilder.no_saved_reports_filtered', 'No matching widgets found.')
+        : t('querybuilder.no_sql_statements', 'No SQL statements found.');
+    const loadDialogSortOptions = useMemo(() => ([
+        { value: 'updated_desc', label: t('querybuilder.manage_sort_updated_desc', 'Zuletzt geändert (neu zuerst)') },
+        { value: 'updated_asc', label: t('querybuilder.manage_sort_updated_asc', 'Zuletzt geändert (alt zuerst)') },
+        { value: 'name_asc', label: t('querybuilder.manage_sort_name_asc', 'Name (A-Z)') },
+        { value: 'name_desc', label: t('querybuilder.manage_sort_name_desc', 'Name (Z-A)') },
+        { value: 'pinned_first', label: t('querybuilder.load_sort_pinned_first', 'Angepinnt zuerst') }
+    ]), [t]);
     const handleDeleteWidget = useCallback(async (widget: SavedWidget) => {
+        const usageInfo = dashboardUsageByWidgetId.get(widget.id);
+        const dependencyHint = usageInfo && usageInfo.count > 0
+            ? t('querybuilder.delete_widget_with_dashboard_dependency', {
+                count: usageInfo.count,
+                defaultValue: 'Dieses Widget wird aktuell in {{count}} Dashboard(s) verwendet. Beim Löschen wird es aus diesen Dashboards entfernt.'
+            })
+            : t('querybuilder.delete_widget_without_dependency', 'Dieses Widget wird aktuell in keinem Dashboard verwendet.');
+
         const confirmDelete = await appDialog.confirm(
-            t('querybuilder.confirm_delete_widget', {
+            `${t('querybuilder.confirm_delete_widget', {
                 name: widget.name,
                 defaultValue: `Widget "${widget.name}" löschen?`
-            }),
-            t('common.warning', 'Warnung')
+            })}\n\n${dependencyHint}`,
+            { title: t('common.confirm_title', 'Sind Sie sicher?') }
         );
         if (!confirmDelete) return;
         await SystemRepository.deleteUserWidget(widget.id);
@@ -943,7 +1122,13 @@ export const QueryBuilderView: React.FC = () => {
             setWidgetName('');
             setSavedSnapshot('');
         }
-    }, [activeWidgetId, refreshWidgets, t]);
+    }, [activeWidgetId, dashboardUsageByWidgetId, refreshWidgets, t]);
+    const handleToggleWidgetFavorite = useCallback((widgetId: string) => {
+        setPinnedWidgetIds((current) => {
+            if (current.includes(widgetId)) return current.filter((entry) => entry !== widgetId);
+            return [...current, widgetId];
+        });
+    }, [setPinnedWidgetIds]);
     const handleRenameWidget = useCallback(async (widget: SavedWidget) => {
         const prompted = await appDialog.prompt2(
             t('common.name', 'Name'),
@@ -1043,8 +1228,19 @@ export const QueryBuilderView: React.FC = () => {
     const activeWidgetLabel = (widgetName || '').trim() || t('common.untitled', 'Unbenannt');
     const previewHeaderTitle = `Widget (${activeWidgetLabel})`;
     const previewHeaderTitleWithDirty = hasUnsavedChanges ? `${previewHeaderTitle} *` : previewHeaderTitle;
+    const activeWidgetRecord = useMemo(
+        () => (savedWidgets || []).find((widget) => widget.id === activeWidgetId) || null,
+        [activeWidgetId, savedWidgets]
+    );
     const activeWidgetDbId = activeWidgetId || '-';
     const activeSqlStatementDbId = selectedSqlStatementId || '-';
+    const activeWidgetLastSaved = useMemo(() => {
+        const raw = (activeWidgetId ? localWidgetSavedAtById[activeWidgetId] : undefined) || activeWidgetRecord?.updated_at || activeWidgetRecord?.created_at;
+        if (!raw) return '-';
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-US');
+    }, [activeWidgetId, activeWidgetRecord?.created_at, activeWidgetRecord?.updated_at, i18n.language, localWidgetSavedAtById]);
     const previewTooltipContentStyle: React.CSSProperties = {
         borderRadius: '12px',
         border: isDarkSqlPreview ? '1px solid #334155' : '1px solid #e2e8f0',
@@ -1232,7 +1428,7 @@ export const QueryBuilderView: React.FC = () => {
             rightPanel={{
                 title: t('querybuilder.config_panel_title', 'Widget-Konfiguration'),
                 content: null,
-                enabled: true,
+                enabled: workspaceTab === 'editor',
                 isOpen: isConfigPanelOpen,
                 onOpenChange: (open) => setIsConfigPanelOpen(open),
                 triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration öffnen')
@@ -1888,7 +2084,7 @@ export const QueryBuilderView: React.FC = () => {
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <Folder className="w-3 h-3" />
-                                            {t('querybuilder.load_widget', 'Widget laden')}
+                                            {t('common.open', 'Öffnen')}
                                         </button>
                                         <button
                                             type="button"
@@ -1897,7 +2093,7 @@ export const QueryBuilderView: React.FC = () => {
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
                                             <Save className="w-3 h-3" />
-                                            {t('querybuilder.save_widget', 'Widget speichern')}
+                                            {t('common.save', 'Speichern')}
                                         </button>
                                         <button
                                             type="button"
@@ -1908,13 +2104,14 @@ export const QueryBuilderView: React.FC = () => {
                                             <Download className="w-3 h-3" />
                                             {t('querybuilder.save_widget_as', 'Speichern unter')}
                                         </button>
+                                        <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                         <button
                                             type="button"
                                             onClick={() => { void openLoadDialog('sql'); }}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <FileCode2 className="w-3 h-3" />
-                                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswählen')}
+                                            {t('querybuilder.sql_statement', 'SQL-Statement')}
                                         </button>
                                         <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                         <button
@@ -2553,44 +2750,47 @@ export const QueryBuilderView: React.FC = () => {
                                         <span className="font-semibold uppercase tracking-wide">{t('querybuilder.widget_chart_type', 'Diagrammtyp')}:</span>
                                         <code className="font-mono text-[10px]" title={previewTypeMeta.label}>{previewTypeMeta.label}</code>
                                     </span>
+                                    <span className="inline-flex items-center gap-1">
+                                        <span className="font-semibold uppercase tracking-wide">{t('datainspector.last_saved_at', 'Letzte Speicherung')}:</span>
+                                        <code className="font-mono text-[10px]" title={activeWidgetLastSaved}>{activeWidgetLastSaved}</code>
+                                    </span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 ) : (
-                    <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                    <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent shadow-sm">
                         <div className="h-full min-h-0 flex flex-col">
                             <div className="shrink-0 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
-                                <div className="p-3 border-b border-slate-300 dark:border-slate-600/90">
-                                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                                        {t('querybuilder.manage_widgets_title', 'Widgets verwalten')}
-                                    </h3>
-                                </div>
                                 <div className="p-3">
                                     <div className="flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2 w-full max-w-2xl">
+                                        <div className="relative w-full max-w-sm">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                            <input
+                                                value={manageSearch}
+                                                onChange={(e) => setManageSearch(e.target.value)}
+                                                placeholder={t('common.search', 'Suchen...')}
+                                                className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div className="inline-flex items-center gap-2 shrink-0">
+                                            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                {t('querybuilder.manage_sort_label', 'Sortierung')}
+                                            </label>
                                             <select
                                                 value={manageSort}
-                                                onChange={(e) => setManageSort(e.target.value as 'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc')}
-                                                className="w-44 shrink-0 px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                                onChange={(e) => setManageSort(e.target.value as 'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc' | 'favorite_then_updated')}
+                                                className="h-8 min-w-[180px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                                 title={t('querybuilder.manage_sort_label', 'Sortierung')}
                                             >
+                                                <option value="favorite_then_updated">{t('querybuilder.manage_sort_favorite_then_updated', 'Favoriten zuerst')}</option>
                                                 <option value="updated_desc">{t('querybuilder.manage_sort_updated_desc', 'Zuletzt geändert (neu zuerst)')}</option>
                                                 <option value="updated_asc">{t('querybuilder.manage_sort_updated_asc', 'Zuletzt geändert (alt zuerst)')}</option>
                                                 <option value="name_asc">{t('querybuilder.manage_sort_name_asc', 'Name (A-Z)')}</option>
                                                 <option value="name_desc">{t('querybuilder.manage_sort_name_desc', 'Name (Z-A)')}</option>
                                                 <option value="usage_desc">{t('querybuilder.manage_sort_usage_desc', 'Nutzung (häufig zuerst)')}</option>
                                             </select>
-                                            <div className="relative w-full max-w-sm">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                                <input
-                                                    value={manageSearch}
-                                                    onChange={(e) => setManageSearch(e.target.value)}
-                                                    placeholder={t('common.search', 'Suchen...')}
-                                                    className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2610,33 +2810,77 @@ export const QueryBuilderView: React.FC = () => {
                                                     : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
                                             }`}
                                         >
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setWorkspaceTab('editor');
-                                                    loadWidget(widget, true);
-                                                }}
-                                                className="min-w-0 text-left"
-                                            >
-                                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{widget.name}</div>
-                                                <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                                    {(widget.description || '').trim() || (widget.sql_query || '').trim() || '-'}
-                                                </div>
-                                                {dashboardUsageByWidgetId.has(widget.id) && (
-                                                    <div
-                                                        className="mt-1 inline-flex items-center rounded-md border border-blue-200 dark:border-blue-800 bg-blue-100/70 dark:bg-blue-900/40 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-200"
-                                                        title={dashboardUsageByWidgetId.get(widget.id)?.dashboards.join(', ')}
-                                                    >
-                                                        {(dashboardUsageByWidgetId.get(widget.id)?.count || 0) === 1
-                                                            ? t('querybuilder.manage_widget_usage_single', 'In 1 Dashboard')
-                                                            : t('querybuilder.manage_widget_usage_multi', {
-                                                                count: dashboardUsageByWidgetId.get(widget.id)?.count || 0,
-                                                                defaultValue: `In ${(dashboardUsageByWidgetId.get(widget.id)?.count || 0)} Dashboards`
-                                                            })}
-                                                    </div>
-                                                )}
-                                            </button>
+                                             <button
+                                                 type="button"
+                                                 onClick={() => { void openWidgetWithUnsavedGuard(widget); }}
+                                                 className="min-w-0 text-left"
+                                             >
+                                                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
+                                                     {widget.name}
+                                                     {isWidgetPinned(widget.id) && <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />}
+                                                     {dashboardUsageByWidgetId.has(widget.id) && (
+                                                         <span
+                                                             className="inline-flex items-center rounded-md border border-blue-200 dark:border-blue-800 bg-blue-100/70 dark:bg-blue-900/40 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-200"
+                                                             title={dashboardUsageByWidgetId.get(widget.id)?.dashboards.join(', ')}
+                                                         >
+                                                            {(dashboardUsageByWidgetId.get(widget.id)?.count || 0) === 1
+                                                                ? t('querybuilder.manage_widget_usage_single', 'In 1 Dashboard')
+                                                                : t('querybuilder.manage_widget_usage_multi', {
+                                                                    count: dashboardUsageByWidgetId.get(widget.id)?.count || 0,
+                                                                    defaultValue: `In ${(dashboardUsageByWidgetId.get(widget.id)?.count || 0)} Dashboards`
+                                                                })}
+                                                        </span>
+                                                     )}
+                                                 </div>
+                                                 <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                     {(widget.description || '').trim() || (widget.sql_query || '').trim() || '-'}
+                                                 </div>
+                                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-mono">
+                                                     {(widget.sql_query || '').trim() || '-'}
+                                                 </div>
+                                                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-400 dark:text-slate-500">
+                                                     <span className="inline-flex items-center gap-1">
+                                                         <span className="font-semibold uppercase tracking-wide">{t('querybuilder.widget_id', 'Widget-ID')}:</span>
+                                                         <code className="font-mono text-[10px]" title={widget.id}>{widget.id}</code>
+                                                     </span>
+                                                     <span className="inline-flex items-center gap-1">
+                                                         <span className="font-semibold uppercase tracking-wide">{t('querybuilder.sql_statement_id', 'SQL-Statement-ID')}:</span>
+                                                         <code className="font-mono text-[10px]" title={widget.sql_statement_id || '-'}>{widget.sql_statement_id || '-'}</code>
+                                                     </span>
+                                                     <span className="inline-flex items-center gap-1">
+                                                         <span className="font-semibold uppercase tracking-wide">{t('datainspector.last_saved_at', 'Letzte Speicherung')}:</span>
+                                                         <code className="font-mono text-[10px]">{formatTimestamp(localWidgetSavedAtById[widget.id] || widget.updated_at || widget.created_at)}</code>
+                                                     </span>
+                                                 </div>
+                                             </button>
                                             <div className="flex items-center gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { void openWidgetWithUnsavedGuard(widget); }}
+                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                    title={t('common.open', 'Öffnen')}
+                                                    aria-label={t('common.open', 'Öffnen')}
+                                                >
+                                                    <FolderOpen className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { void handleDuplicateWidget(widget); }}
+                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                                    title={t('querybuilder.manage_action_duplicate', 'Duplizieren')}
+                                                    aria-label={t('querybuilder.manage_action_duplicate', 'Duplizieren')}
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleWidgetFavorite(widget.id)}
+                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                                    title={isWidgetPinned(widget.id) ? t('querybuilder.unpin_widget', 'Favorit entfernen') : t('querybuilder.pin_widget', 'Als Favorit markieren')}
+                                                    aria-label={isWidgetPinned(widget.id) ? t('querybuilder.unpin_widget', 'Favorit entfernen') : t('querybuilder.pin_widget', 'Als Favorit markieren')}
+                                                >
+                                                    <Star className={`w-4 h-4 ${isWidgetPinned(widget.id) ? 'fill-current' : ''}`} />
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => { void handleRenameWidget(widget); }}
@@ -2644,25 +2888,6 @@ export const QueryBuilderView: React.FC = () => {
                                                     title={t('querybuilder.manage_action_rename', 'Umbenennen')}
                                                 >
                                                     <Edit3 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { void handleDuplicateWidget(widget); }}
-                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                                    title={t('querybuilder.manage_action_duplicate', 'Duplizieren')}
-                                                >
-                                                    <Copy className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setWorkspaceTab('editor');
-                                                        loadWidget(widget, true);
-                                                    }}
-                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                                    title={t('common.edit', 'Bearbeiten')}
-                                                >
-                                                    <FolderOpen className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     type="button"
@@ -2694,103 +2919,38 @@ export const QueryBuilderView: React.FC = () => {
                 )}
             </div>
 
-            <Modal
+            <SelectionListDialog
                 isOpen={isLoadDialogOpen}
                 onClose={() => setIsLoadDialogOpen(false)}
-                title={t('querybuilder.load_title', 'Inhalt laden')}
-                noScroll
-            >
-                <div
-                    className="flex min-h-0 flex-1 flex-col gap-4"
-                    style={{ height: '32rem', maxHeight: 'calc(90vh - 11rem)' }}
-                >
-                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 w-full">
-                        <button
-                            type="button"
-                            onClick={() => setLoadDialogTab('widget')}
-                            className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${loadDialogTab === 'widget' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                        >
-                            {t('querybuilder.load_widget', 'Widget laden')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setLoadDialogTab('sql')}
-                            className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${loadDialogTab === 'sql' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                        >
-                            {t('querybuilder.select_sql_statement', 'SQL-Statement auswählen')}
-                        </button>
-                    </div>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                        <input
-                            value={loadDialogSearch}
-                            onChange={(e) => setLoadDialogSearch(e.target.value)}
-                            placeholder={t('common.search', 'Suchen...')}
-                            className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 space-y-1">
-                        {loadDialogTab === 'widget' ? (
-                            filteredLoadWidgets.length === 0 ? (
-                                <div className="p-3 text-xs text-slate-500 text-center">
-                                    {t('querybuilder.no_saved_reports_filtered', 'No matching widgets found.')}
-                                </div>
-                            ) : (
-                                filteredLoadWidgets.map((w) => (
-                                    <button
-                                        key={w.id}
-                                        type="button"
-                                        onClick={() => setSelectedLoadWidgetId(w.id)}
-                                        className={`w-full text-left p-2 rounded-lg border transition-colors ${selectedLoadWidgetId === w.id ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'}`}
-                                    >
-                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{w.name}</div>
-                                        <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                                            {(w.description || '').trim() || (w.sql_query || '').trim() || '-'}
-                                        </div>
-                                    </button>
-                                ))
-                            )
-                        ) : (
-                            filteredLoadSqlStatements.length === 0 ? (
-                                <div className="p-3 text-xs text-slate-500 text-center">
-                                    {t('querybuilder.no_sql_statements', 'No SQL statements found.')}
-                                </div>
-                            ) : (
-                                filteredLoadSqlStatements.map((stmt) => (
-                                    <button
-                                        key={stmt.id}
-                                        type="button"
-                                        onClick={() => setSelectedLoadSqlId(stmt.id)}
-                                        className={`w-full text-left p-2 rounded-lg border transition-colors ${selectedLoadSqlId === stmt.id ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'}`}
-                                    >
-                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{stmt.name}</div>
-                                        <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                                            {(stmt.description || '').trim() || stmt.sql_text
-                                        }</div>
-                                    </button>
-                                ))
-                            )
-                        )}
-                    </div>
-                    <div className="mt-2 px-5 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-end gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setIsLoadDialogOpen(false)}
-                            className="min-w-[128px] px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                        >
-                            {t('common.cancel', 'Abbrechen')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { void applyLoadSelection(); }}
-                            disabled={loadDialogTab === 'widget' ? !selectedLoadWidgetId : !selectedLoadSqlId}
-                            className="min-w-[128px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {t('common.apply', 'Übernehmen')}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
+                title={loadDialogTitle}
+                searchValue={loadDialogSearch}
+                onSearchChange={setLoadDialogSearch}
+                searchPlaceholder={t('common.search', 'Suchen...')}
+                items={loadDialogItems}
+                selectedId={selectedLoadId}
+                onSelect={(id) => {
+                    if (loadDialogType === 'widget') {
+                        setSelectedLoadWidgetId(id);
+                        return;
+                    }
+                    setSelectedLoadSqlId(id);
+                }}
+                emptyLabel={loadDialogEmptyLabel}
+                onApply={() => { void applyLoadSelection(); }}
+                applyDisabled={!selectedLoadId}
+                cancelLabel={t('common.cancel', 'Abbrechen')}
+                applyLabel={t('common.apply', 'Übernehmen')}
+                sortOptions={loadDialogSortOptions}
+                sortValue={loadDialogSort}
+                onSortChange={(value) => setLoadDialogSort(value as 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first')}
+                sortLabel={t('common.sort', 'Sortieren')}
+                showPinnedOnlyToggle
+                pinnedOnly={loadDialogPinnedOnly}
+                onPinnedOnlyToggle={setLoadDialogPinnedOnly}
+                pinnedOnlyLabel={t('querybuilder.pinned_only', 'Nur angepinnt')}
+                isItemPinned={(id) => (loadDialogType === 'widget' ? isWidgetPinned(id) : isSqlPinned(id))}
+                onToggleItemPin={(id) => { void handleToggleLoadItemPin(id); }}
+            />
 
             <RecordDetailModal
                 isOpen={detailModalOpen}

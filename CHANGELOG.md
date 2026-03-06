@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - right-side stats were reduced to a single counter (`SQL Workspace: X SQL-Statements`)
   - left-side primary label now uses `SQL-Statement` instead of `Vorlage`
   - added `Letzte Speicherung` timestamp display for the active SQL statement.
+- SQL-Statement management list now mirrors widget-management usage semantics:
+  - statements used by widgets are highlighted with a blue outline/background
+  - compact usage badge (`In 1 Widget` / `In X Widgets`) replaces the previous green check marker.
+- Widget management now disables the global right-side panel trigger in `Widgets verwalten`; the configuration sidepanel remains available only in `Widget erstellen`.
 
 ### Fixed
 - Removed redundant unsaved-changes confirmation when applying a new SQL statement from the SQL selection dialog.
@@ -49,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Removed manual resize grip from widget preview footer and disabled the associated custom graphic-height drag behavior to prevent layout drift.
 - Standard input dialogs now disable the primary `OK` action while the required name field is empty.
 - Opening or applying a different SQL statement now resets stale SQL output state so previous `Ergebnisse`/`Explain` data is not shown for the newly loaded statement.
+- Repaired corrupted German locale encoding (`de.json`) that caused broken umlaut rendering in navigation/sidebar labels (for example `Übersicht`, `Über`).
 
 ## [1.4.0] - 2026-03-01
 
