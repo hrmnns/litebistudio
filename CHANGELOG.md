@@ -27,12 +27,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - SQL Workspace German label now consistently uses `Öffnen`.
 - Widget SQL preview editor now uses the same global CodeMirror settings profile as SQL Workspace (line behavior, theme intensity, active-line handling, typography/tab sizing).
 - Widget editor dark-mode surface color was aligned with CodeMirror background for a seamless panel/editor transition.
+- SQL Workspace save flows were streamlined:
+  - save dialog title now uses `SQL-Statement speichern`
+  - `Speichern unter` now uses `SQL-Statement speichern unter`
+  - save dialogs prefill name/description from the currently opened SQL statement
+  - new/unnamed statements open with empty name/description fields.
+- SQL Workspace overwrite flow for `Speichern unter` was clarified:
+  - when a statement name already exists, users are asked explicitly whether to overwrite
+  - prompt actions use `Ja/Nein` instead of `OK/Abbrechen`
+  - choosing `Nein` returns to the `Speichern unter` dialog to adjust name/description.
+- SQL Workspace footer metadata was simplified:
+  - `Statement-ID` label was shortened to `ID`
+  - right-side stats were reduced to a single counter (`SQL Workspace: X SQL-Statements`)
+  - left-side primary label now uses `SQL-Statement` instead of `Vorlage`
+  - added `Letzte Speicherung` timestamp display for the active SQL statement.
 
 ### Fixed
 - Removed redundant unsaved-changes confirmation when applying a new SQL statement from the SQL selection dialog.
 - Widget workspace now restores the last active top tab (`Widgets verwalten` / `Widget erstellen`) when returning to the view.
 - Fixed SQL Workspace footer metadata so `Statement-ID` is restored reliably after cross-view navigation when statement content matches.
 - Removed manual resize grip from widget preview footer and disabled the associated custom graphic-height drag behavior to prevent layout drift.
+- Standard input dialogs now disable the primary `OK` action while the required name field is empty.
+- Opening or applying a different SQL statement now resets stale SQL output state so previous `Ergebnisse`/`Explain` data is not shown for the newly loaded statement.
 
 ## [1.4.0] - 2026-03-01
 

@@ -24,6 +24,8 @@ export const AppDialogHost: React.FC = () => {
 
     if (!active) return null;
     const isPrompt2 = active.kind === 'prompt2';
+    const requiresPrimaryInput = active.kind === 'prompt' || active.kind === 'prompt2';
+    const isConfirmDisabled = requiresPrimaryInput && !inputValue.trim();
 
     const onCancel = () => {
         if (active.kind === 'prompt' || active.kind === 'prompt2') {
@@ -45,6 +47,7 @@ export const AppDialogHost: React.FC = () => {
     };
 
     const onConfirm = () => {
+        if (isConfirmDisabled) return;
         if (active.kind === 'prompt') {
             active.resolve({ confirmed: true, value: inputValue });
         } else if (active.kind === 'prompt2') {
@@ -113,7 +116,7 @@ export const AppDialogHost: React.FC = () => {
                                             placeholder={active.placeholder}
                                             className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-300"
                                             onKeyDown={(e) => {
-                                                if (e.key === 'Enter') onConfirm();
+                                                if (e.key === 'Enter' && !isConfirmDisabled) onConfirm();
                                                 if (e.key === 'Escape') onCancel();
                                             }}
                                         />
@@ -133,7 +136,7 @@ export const AppDialogHost: React.FC = () => {
                                 placeholder={active.placeholder}
                                 className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-300"
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter') onConfirm();
+                                    if (e.key === 'Enter' && !isConfirmDisabled) onConfirm();
                                     if (e.key === 'Escape') onCancel();
                                 }}
                             />
@@ -146,7 +149,7 @@ export const AppDialogHost: React.FC = () => {
                                 placeholder={active.secondPlaceholder}
                                 className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-300"
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter') onConfirm();
+                                    if (e.key === 'Enter' && !isConfirmDisabled) onConfirm();
                                     if (e.key === 'Escape') onCancel();
                                 }}
                             />
@@ -177,7 +180,8 @@ export const AppDialogHost: React.FC = () => {
                         <button
                             type="button"
                             onClick={onConfirm}
-                            className="w-32 px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70"
+                            disabled={isConfirmDisabled}
+                            className="w-32 px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                         >
                             {active.confirmLabel || t('common.ok', 'OK')}
                         </button>
