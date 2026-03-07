@@ -45,6 +45,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - statements used by widgets are highlighted with a blue outline/background
   - compact usage badge (`In 1 Widget` / `In X Widgets`) replaces the previous green check marker.
 - Widget management now disables the global right-side panel trigger in `Widgets verwalten`; the configuration sidepanel remains available only in `Widget erstellen`.
+- Data Inspector table-mode layout was streamlined:
+  - removed the separate top control strip
+  - moved table source selection and `Daten/Profiling` switch into the main panel header row
+  - moved search to the right side of the same row
+  - removed redundant refresh action from this row (refresh remains available in the global top bar).
+- Data Inspector visual parity was improved to match SQL/Widget workspace design:
+  - command bar/button styling in table mode aligned to SQL workspace conventions
+  - table panel surfaces, borders, and footer styling aligned with the shared dark/light design language
+  - data-table header/body styling in table mode now follows the SQL-statement table look (including dark background contrast and first-header-cell emphasis).
+- Widget management badges were refined:
+  - replaced text-only `Datengetrieben`/`Ohne Daten` tags with compact icon badges
+  - added speaking tooltips for both states:
+    - data-driven (`Database` icon)
+    - no-data (`FileText` icon).
 
 ### Fixed
 - Removed redundant unsaved-changes confirmation when applying a new SQL statement from the SQL selection dialog.
@@ -54,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Standard input dialogs now disable the primary `OK` action while the required name field is empty.
 - Opening or applying a different SQL statement now resets stale SQL output state so previous `Ergebnisse`/`Explain` data is not shown for the newly loaded statement.
 - Repaired corrupted German locale encoding (`de.json`) that caused broken umlaut rendering in navigation/sidebar labels (for example `Übersicht`, `Über`).
+- Fixed remaining dark-mode inconsistencies in Data Inspector profiling/footer inputs and badges (number spinners, pattern/issue badges, and page-jump controls now render with dark-compatible styling).
 
 ## [1.4.0] - 2026-03-01
 

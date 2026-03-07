@@ -11,7 +11,7 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
     Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
     Layout, Maximize2, Folder, Gauge, Image as ImageIcon,
-    Edit3, X, Download, Search, FileCode2, Save, SlidersHorizontal, Plus, Trash2, Copy, FolderOpen, Star
+    Edit3, X, Download, Search, FileCode2, Save, SlidersHorizontal, Plus, Trash2, Copy, FolderOpen, Star, Database, FileText
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { DataTable } from '../../components/ui/DataTable';
@@ -2801,7 +2801,9 @@ export const QueryBuilderView: React.FC = () => {
                                         {t('querybuilder.manage_widgets_empty', 'Keine Widgets gefunden.')}
                                     </div>
                                 ) : (
-                                    sortedManageWidgets.map((widget) => (
+                                    sortedManageWidgets.map((widget) => {
+                                        const isDataDriven = Boolean((widget.sql_statement_id || '').trim() || (widget.sql_query || '').trim());
+                                        return (
                                         <div
                                             key={widget.id}
                                             className={`rounded-lg border px-3 py-2 flex items-start justify-between gap-3 ${
@@ -2816,13 +2818,28 @@ export const QueryBuilderView: React.FC = () => {
                                                  className="min-w-0 text-left"
                                              >
                                                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
-                                                     {widget.name}
-                                                     {isWidgetPinned(widget.id) && <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />}
-                                                     {dashboardUsageByWidgetId.has(widget.id) && (
-                                                         <span
-                                                             className="inline-flex items-center rounded-md border border-blue-200 dark:border-blue-800 bg-blue-100/70 dark:bg-blue-900/40 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-200"
-                                                             title={dashboardUsageByWidgetId.get(widget.id)?.dashboards.join(', ')}
-                                                         >
+                                                      {widget.name}
+                                                      {isWidgetPinned(widget.id) && <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />}
+                                                      <span
+                                                          className={`inline-flex items-center justify-center h-5 w-5 rounded-md border ${
+                                                              isDataDriven
+                                                                  ? 'border-cyan-200 dark:border-cyan-800 bg-cyan-100/70 dark:bg-cyan-900/35 text-cyan-700 dark:text-cyan-200'
+                                                                  : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                                          }`}
+                                                          title={isDataDriven
+                                                              ? t('querybuilder.badge_data_driven_tooltip', 'Datengetrieben (mit SQL-Statement)')
+                                                              : t('querybuilder.badge_not_data_driven_tooltip', 'Ohne Daten (kein SQL-Statement)')}
+                                                          aria-label={isDataDriven
+                                                              ? t('querybuilder.badge_data_driven_tooltip', 'Datengetrieben (mit SQL-Statement)')
+                                                              : t('querybuilder.badge_not_data_driven_tooltip', 'Ohne Daten (kein SQL-Statement)')}
+                                                      >
+                                                          {isDataDriven ? <Database className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                                                      </span>
+                                                      {dashboardUsageByWidgetId.has(widget.id) && (
+                                                          <span
+                                                              className="inline-flex items-center rounded-md border border-blue-200 dark:border-blue-800 bg-blue-100/70 dark:bg-blue-900/40 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-200"
+                                                              title={dashboardUsageByWidgetId.get(widget.id)?.dashboards.join(', ')}
+                                                          >
                                                             {(dashboardUsageByWidgetId.get(widget.id)?.count || 0) === 1
                                                                 ? t('querybuilder.manage_widget_usage_single', 'In 1 Dashboard')
                                                                 : t('querybuilder.manage_widget_usage_multi', {
@@ -2899,7 +2916,8 @@ export const QueryBuilderView: React.FC = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
                             <div className="shrink-0 px-3 py-2 border-t border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90">

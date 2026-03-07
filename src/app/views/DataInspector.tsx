@@ -2959,73 +2959,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                 </div>
             )}
 
-            {/* Controls Row: Selection or SQL Editor */}
-            {mode === 'table' ? (
-                <div className="-mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-shrink-0">
-                    <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
-                        <div className="p-3 flex items-center justify-between gap-2">
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                                {t('datainspector.title', 'Data Inspector')}
-                            </h3>
-                            {selectedTable && (
-                                <p className="max-w-[55%] text-[11px] text-slate-500 dark:text-slate-400 truncate text-right" title={selectedTable}>
-                                    {selectedTable}
-                                </p>
-                            )}
-                        </div>
-                        <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
-                            <div className="pt-2 grid grid-cols-1 lg:grid-cols-[minmax(220px,320px)_minmax(280px,1fr)_auto] gap-2">
-                                <div className="relative min-w-0">
-                                    <select
-                                        value={selectedTable}
-                                        onChange={(e) => {
-                                            setSelectedTable(e.target.value);
-                                            setSearchTerm('');
-                                            setTableSortConfig(null);
-                                            setTableFilters({});
-                                            setShowTableFilters(false);
-                                            setActiveViewId('');
-                                            setCurrentPage(1);
-                                        }}
-                                        className="w-full h-8 appearance-none pl-9 pr-9 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-xs font-semibold"
-                                    >
-                                        {dataSources?.map(source => (
-                                            <option key={source.name} value={source.name}>
-                                                {source.type === 'view' ? `${source.name} (view)` : source.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
-                                </div>
-
-                                <div className="relative min-w-0">
-                                    <input
-                                        type="text"
-                                        placeholder={t('datainspector.search_placeholder')}
-                                        value={searchTerm}
-                                        onChange={(e) => {
-                                            setSearchTerm(e.target.value);
-                                            setCurrentPage(1);
-                                        }}
-                                        className="w-full h-8 pl-9 pr-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                                    />
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                </div>
-
-                                <button
-                                    onClick={() => execute()}
-                                    className="h-8 px-3 flex items-center justify-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-bold"
-                                    title={t('datainspector.refresh_title')}
-                                >
-                                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                                    <span>{t('common.refresh', 'Refresh')}</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            ) : sqlWorkspaceTab === 'editor' ? (
+            {/* SQL Workspace main panels */}
+            {mode === 'sql' && (sqlWorkspaceTab === 'editor' ? (
                 <div className="-mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
                     <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
                         <div className="p-3 flex items-center justify-between gap-2">
@@ -3490,7 +3425,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                         </div>
                     </div>
                 </div>
-            )}
+            ))}
 
             {mode === 'table' && (
             <div
@@ -3507,7 +3442,31 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
 
                 {mode === 'table' && (
                     <div className="px-4 py-2 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85 flex items-center justify-between gap-3">
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="relative min-w-[220px] max-w-[320px] w-full">
+                                <select
+                                    value={selectedTable}
+                                    onChange={(e) => {
+                                        setSelectedTable(e.target.value);
+                                        setSearchTerm('');
+                                        setTableSortConfig(null);
+                                        setTableFilters({});
+                                        setShowTableFilters(false);
+                                        setActiveViewId('');
+                                        setCurrentPage(1);
+                                    }}
+                                    className="w-full h-8 appearance-none pl-9 pr-9 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-xs font-semibold"
+                                >
+                                    {dataSources?.map(source => (
+                                        <option key={source.name} value={source.name}>
+                                            {source.type === 'view' ? `${source.name} (view)` : source.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 border-r-2 border-b-2 border-slate-400 rotate-45 pointer-events-none" />
+                            </div>
+                            <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
                             <button
                                 onClick={() => setTableResultTab('data')}
                                 className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${tableResultTab === 'data'
@@ -3526,12 +3485,28 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                             >
                                 {t('datainspector.result_tab_profile', 'Profiling')}
                             </button>
+                            </div>
                         </div>
-                        <span className="text-[11px] text-slate-400">
-                            {tableResultTab === 'profiling'
-                                ? t('datainspector.profiling_issues', { count: profilingIssueCount })
-                                : t('datainspector.auto_limit', { limit: pageSize })}
-                        </span>
+                        <div className="flex items-center gap-2 min-w-0 ml-auto">
+                            <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                                {tableResultTab === 'profiling'
+                                    ? t('datainspector.profiling_issues', { count: profilingIssueCount })
+                                    : t('datainspector.auto_limit', { limit: pageSize })}
+                            </span>
+                            <div className="relative min-w-[220px] max-w-[340px] w-full">
+                                <input
+                                    type="text"
+                                    placeholder={t('datainspector.search_placeholder')}
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="w-full h-8 pl-9 pr-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                                />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -3553,7 +3528,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         if (Number.isNaN(value)) return;
                                         setProfilingThresholds({ ...profilingThresholds, nullRate: Math.max(0, Math.min(100, value)) });
                                     }}
-                                    className="w-14 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
+                                    className="w-14 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 [color-scheme:light] dark:[color-scheme:dark]"
                                 />
                                 <span>%</span>
                             </label>
@@ -3569,7 +3544,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         if (Number.isNaN(value)) return;
                                         setProfilingThresholds({ ...profilingThresholds, cardinalityRate: Math.max(0, Math.min(100, value)) });
                                     }}
-                                    className="w-14 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
+                                    className="w-14 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 [color-scheme:light] dark:[color-scheme:dark]"
                                 />
                                 <span>%</span>
                             </label>
@@ -3705,7 +3680,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                                     {col.patterns.length > 0 ? (
                                                         <div className="flex flex-wrap gap-1">
                                                             {col.patterns.map((pattern) => (
-                                                                <span key={pattern} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold">
+                                                                <span key={pattern} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/25 dark:text-indigo-300 dark:border-indigo-700 text-[10px] font-semibold">
                                                                     {t(`datainspector.pattern_${pattern}`)}
                                                                 </span>
                                                             ))}
@@ -3719,7 +3694,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                                     {col.issues.length > 0 ? (
                                                         <div className="flex flex-wrap gap-1">
                                                             {col.issues.map(issue => (
-                                                                <span key={issue} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold">
+                                                                <span key={issue} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700 text-[10px] font-semibold">
                                                                     {t(`datainspector.issue_${issue}`)}
                                                                 </span>
                                                             ))}
@@ -3818,7 +3793,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         value={pageJumpInput}
                                         onChange={(e) => setPageJumpInput(e.target.value)}
                                         placeholder={t('datainspector.page_number_placeholder')}
-                                        className="w-16 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] outline-none"
+                                        className="w-16 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] outline-none [color-scheme:light] dark:[color-scheme:dark]"
                                     />
                                     <button
                                         onClick={() => {
