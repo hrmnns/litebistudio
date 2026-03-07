@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -15,7 +15,7 @@ import { formatValue } from '../utils/formatUtils';
 import { type WidgetConfig, type DbRow } from '../../types';
 import { PivotTable } from './PivotTable';
 import type { SchemaDefinition } from './SchemaDocumentation';
-import { INSPECTOR_PENDING_SQL_KEY, INSPECTOR_PENDING_SQL_META_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
+import { TABLES_PENDING_SQL_KEY, TABLES_PENDING_SQL_META_KEY, TABLES_RETURN_HASH_KEY } from '../../lib/tablesBridge';
 import { MarkdownContent } from './ui/MarkdownContent';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -98,16 +98,16 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
     const canOpenInInspector = showInspectorJump && /^\s*SELECT\b/i.test(effectiveSql);
     const handleOpenInInspector = React.useCallback(() => {
         if (!canOpenInInspector) return;
-        localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, effectiveSql);
+        localStorage.setItem(TABLES_PENDING_SQL_KEY, effectiveSql);
         const descriptionFromConfig = (config.widgetDescription || '').trim();
         const descriptionText = (description || '').trim() || descriptionFromConfig;
         const pendingMeta = {
             name: (title || '').trim(),
             description: descriptionText
         };
-        localStorage.setItem(INSPECTOR_PENDING_SQL_META_KEY, JSON.stringify(pendingMeta));
+        localStorage.setItem(TABLES_PENDING_SQL_META_KEY, JSON.stringify(pendingMeta));
         const currentHash = `#${location.pathname}${location.search || ''}`;
-        localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, inspectorReturnHash || currentHash);
+        localStorage.setItem(TABLES_RETURN_HASH_KEY, inspectorReturnHash || currentHash);
         navigate('/sql-workspace');
     }, [canOpenInInspector, config.widgetDescription, description, effectiveSql, inspectorReturnHash, location.pathname, location.search, navigate, title]);
 
@@ -916,5 +916,8 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
 
 export { WidgetRenderer };
 export default WidgetRenderer;
+
+
+
 
 

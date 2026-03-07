@@ -42,7 +42,7 @@ type GuidedStep = 1 | 2 | 3 | 4;
 const DEFAULT_SQL = '';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-const logger = createLogger('QueryBuilderView');
+const logger = createLogger('WidgetsView');
 const CONTENT_VIS_TYPES = new Set<VisualizationType>(['text', 'markdown', 'status', 'section', 'kpi_manual', 'image']);
 const QUERY_VIS_OPTIONS: Array<{ id: VisualizationType; icon: React.ComponentType<{ className?: string }>; labelKey: string; fallback: string }> = [
     { id: 'table', icon: TableIcon, labelKey: 'querybuilder.table', fallback: 'Table' },
@@ -89,7 +89,7 @@ const parseMaybeJson = (value: unknown): unknown => {
         return value;
     }
 };
-export const QueryBuilderView: React.FC = () => {
+export const WidgetsView: React.FC = () => {
     const { t, i18n } = useTranslation();
     const [sql, setSql] = useState(DEFAULT_SQL);
     const [results, setResults] = useState<DbRow[]>([]);
@@ -102,14 +102,14 @@ export const QueryBuilderView: React.FC = () => {
 
     // Mode State
     const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
-    const [workspaceTab, setWorkspaceTab] = useLocalStorage<'manage' | 'editor'>('querybuilder_workspace_tab', 'editor');
+    const [workspaceTab, setWorkspaceTab] = useLocalStorage<'manage' | 'editor'>('widgets_workspace_tab', 'editor');
     const [manageSearch, setManageSearch] = useState('');
     const [manageSort, setManageSort] = useState<'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc' | 'favorite_then_updated'>('updated_desc');
     const [, setSidebarTab] = useState<'source' | 'visual' | 'widget'>('visual');
     const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>('none');
     const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
-    const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('query_builder_config', undefined);
+    const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('widgets_config', undefined);
 
     // Visualization State
     const [visType, setVisType] = useState<VisualizationType>('table');
@@ -117,17 +117,17 @@ export const QueryBuilderView: React.FC = () => {
 
     // Active Widget State
     const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
-    const [lastOpenWidgetId, setLastOpenWidgetId] = useLocalStorage<string>('querybuilder_last_open_widget_id', '');
+    const [lastOpenWidgetId, setLastOpenWidgetId] = useLocalStorage<string>('widgets_last_open_widget_id', '');
 
     // Save Widget State
     const [widgetName, setWidgetName] = useState('');
-    const [selectedSqlStatementId, setSelectedSqlStatementId] = useLocalStorage<string>('querybuilder_selected_sql_statement_id', '');
+    const [selectedSqlStatementId, setSelectedSqlStatementId] = useLocalStorage<string>('widgets_selected_sql_statement_id', '');
     const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
     const [loadDialogType, setLoadDialogType] = useState<'widget' | 'sql'>('widget');
     const [loadDialogSearch, setLoadDialogSearch] = useState('');
-    const [loadDialogPinnedOnly, setLoadDialogPinnedOnly] = useLocalStorage<boolean>('querybuilder_load_dialog_pinned_only', false);
-    const [loadDialogSort, setLoadDialogSort] = useLocalStorage<'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first'>('querybuilder_load_dialog_sort', 'updated_desc');
-    const [pinnedWidgetIds, setPinnedWidgetIds] = useLocalStorage<string[]>('querybuilder_pinned_widget_ids', []);
+    const [loadDialogPinnedOnly, setLoadDialogPinnedOnly] = useLocalStorage<boolean>('widgets_load_dialog_pinned_only', false);
+    const [loadDialogSort, setLoadDialogSort] = useLocalStorage<'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first'>('widgets_load_dialog_sort', 'updated_desc');
+    const [pinnedWidgetIds, setPinnedWidgetIds] = useLocalStorage<string[]>('widgets_pinned_widget_ids', []);
     const [selectedLoadWidgetId, setSelectedLoadWidgetId] = useState<string>('');
     const [selectedLoadSqlId, setSelectedLoadSqlId] = useState<string>('');
     const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
@@ -2981,5 +2981,7 @@ export const QueryBuilderView: React.FC = () => {
         </PageLayout>
     );
 };
+
+
 
 

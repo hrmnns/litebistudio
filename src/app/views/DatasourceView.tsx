@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+﻿import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle, Loader2, ListPlus } from 'lucide-react';
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
@@ -58,8 +58,8 @@ const logger = createLogger('DatasourceView');
 
 const FACTORY_RESET_LOCALSTORAGE_PREFIXES = [
     'litebistudio_',
-    'data_inspector_',
-    'query_builder_',
+    'tables_',
+    'widgets_',
     'data_table_',
     'ui_table_',
     'notifications_',
@@ -79,8 +79,8 @@ const FACTORY_RESET_LOCALSTORAGE_KEYS = new Set([
 
 const FACTORY_RESET_SESSIONSTORAGE_PREFIXES = [
     'litebistudio_',
-    'data_inspector_',
-    'query_builder_'
+    'tables_',
+    'widgets_'
 ];
 
 const pad2 = (value: number): string => String(value).padStart(2, '0');
@@ -610,7 +610,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
     const handleDropView = async (viewName: string) => {
         const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
-        if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName })))) return;
+        if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_view_confirm', `View "${viewName}" lÃ¶schen?`, { name: viewName })))) return;
         try {
             await SystemRepository.executeRaw(`DROP VIEW ${quoteIdentifier(viewName)}`);
             refreshTables();
@@ -697,7 +697,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             return;
         }
         if (indexColumns.length === 0) {
-            await appDialog.warning(t('datasource.index_create_columns_required', 'Bitte mindestens eine Spalte auswählen.'));
+            await appDialog.warning(t('datasource.index_create_columns_required', 'Bitte mindestens eine Spalte auswÃ¤hlen.'));
             return;
         }
         try {
@@ -863,7 +863,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{t_name}</span>
                                                     <span className="text-[10px] text-slate-400 dark:text-slate-500">
                                                         {t('datasource.table_meta_rows', { count: tableMetaStats?.[t_name]?.rows ?? 0 })}
-                                                        {' • '}
+                                                        {' â€¢ '}
                                                         {t('datasource.table_meta_indexes', { count: tableMetaStats?.[t_name]?.indexes ?? 0 })}
                                                     </span>
                                                 </div>
@@ -1196,7 +1196,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                             </div>
                             {backupHistoryEntries.length === 0 ? (
                                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                                    {t('datasource.backup_history_empty', 'Noch keine Backup-/Restore-Einträge vorhanden.')}
+                                    {t('datasource.backup_history_empty', 'Noch keine Backup-/Restore-EintrÃ¤ge vorhanden.')}
                                 </p>
                             ) : (
                                 <div className="space-y-2">
@@ -1210,7 +1210,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     {entry.action === 'backup'
                                                         ? t('datasource.backup_history_action_backup', 'Backup')
                                                         : t('datasource.backup_history_action_restore', 'Restore')}
-                                                    {' · '}
+                                                    {' Â· '}
                                                     {entry.fileName}
                                                 </div>
                                                 <div className={`text-[11px] font-bold uppercase ${entry.status === 'success'
@@ -1223,8 +1223,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 </div>
                                             </div>
                                             <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                                                {new Date(entry.timestamp).toLocaleString()} · {entry.locationLabel || entry.locationType}
-                                                {entry.encrypted ? ` · ${t('datasource.backup_history_encrypted', 'verschlüsselt')}` : ''}
+                                                {new Date(entry.timestamp).toLocaleString()} Â· {entry.locationLabel || entry.locationType}
+                                                {entry.encrypted ? ` Â· ${t('datasource.backup_history_encrypted', 'verschlÃ¼sselt')}` : ''}
                                             </div>
                                             {entry.message ? (
                                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
@@ -1351,7 +1351,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                 setIsResetting(true);
                                                                 await factoryResetDatabase();
                                                                 resetEnvironmentSettings();
-                                                                await appDialog.info(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));
+                                                                await appDialog.info(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurÃ¼ckgesetzt! Lade neu...'));
                                                                 markBackupComplete();
                                                                 sessionStorage.removeItem('litebistudio_datasource_tab');
                                                                 navigate('/');
@@ -1368,7 +1368,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 className="flex items-center gap-2 px-4 py-2 bg-red-900 hover:bg-black text-white rounded font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 {isResetting && <Loader2 className="w-4 h-4 animate-spin" />}
-                                                {t('datasource.factory_reset_btn', 'Komplett zurücksetzen')}
+                                                {t('datasource.factory_reset_btn', 'Komplett zurÃ¼cksetzen')}
                                             </button>
                                         </div>
                                         <p className="text-[10px] text-slate-400 italic">{t('datasource.factory_reset_hint', 'Loescht die gesamte Datenbank inklusive Tabellen, Views und Indizes, setzt lokale Einstellungen zurueck und erstellt ein frisches, leeres Schema der neuesten Version.')}</p>
@@ -1457,7 +1457,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 disabled={idx === 0}
                                                 className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
                                             >
-                                                ↑
+                                                â†‘
                                             </button>
                                             <button
                                                 type="button"
@@ -1465,7 +1465,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 disabled={idx === indexColumns.length - 1}
                                                 className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
                                             >
-                                                ↓
+                                                â†“
                                             </button>
                                         </div>
                                     </div>
@@ -1503,5 +1503,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         </PageLayout >
     );
 };
+
+
 
 

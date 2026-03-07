@@ -1,12 +1,12 @@
-import React from 'react';
+﻿import React from 'react';
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { Layout } from './app/Layout';
 // import { ComponentGridPage } from './app/pages/ComponentGridPage';
 import { SettingsPage } from './app/pages/SettingsPage';
 
 const DatasourceView = React.lazy(() => import('./app/views/DatasourceView').then(m => ({ default: m.DatasourceView })));
-const DataInspector = React.lazy(() => import('./app/views/DataInspector').then(m => ({ default: m.DataInspector })));
-const QueryBuilderView = React.lazy(() => import('./app/views/QueryBuilderView').then(m => ({ default: m.QueryBuilderView })));
+const TablesView = React.lazy(() => import('./app/views/TablesView').then(m => ({ default: m.TablesView })));
+const WidgetsView = React.lazy(() => import('./app/views/WidgetsView').then(m => ({ default: m.WidgetsView })));
 const CustomDashboardView = React.lazy(() => import('./app/views/CustomDashboardView').then(m => ({ default: m.CustomDashboardView })));
 const WorklistView = React.lazy(() => import('./app/views/WorklistView').then(m => ({ default: m.WorklistView })));
 const AboutView = React.lazy(() => import('./app/views/AboutView').then(m => ({ default: m.AboutView })));
@@ -23,8 +23,8 @@ const AppRoutes: React.FC = () => {
                         <DatasourceView onImportComplete={() => { navigate('/'); }} />
                     } />
                     <Route path="settings" element={<SettingsPage />} />
-                    <Route path="inspector" element={
-                        <DataInspector
+                    <Route path="tables" element={
+                        <TablesView
                             onBack={() => navigate(-1)}
                             fixedMode="table"
                             titleKey="sidebar.data_inspector"
@@ -32,15 +32,15 @@ const AppRoutes: React.FC = () => {
                         />
                     } />
                     <Route path="sql-workspace" element={
-                        <DataInspector
+                        <TablesView
                             onBack={() => navigate(-1)}
                             fixedMode="sql"
                             titleKey="sidebar.sql_workspace"
                             breadcrumbKey="sidebar.sql_workspace"
                         />
                     } />
-                    <Route path="query" element={
-                        <QueryBuilderView />
+                    <Route path="widgets" element={
+                        <WidgetsView />
                     } />
                     <Route path="worklist" element={
                         <WorklistView />
@@ -58,3 +58,5 @@ export const AppRouter: React.FC = () => (
         <AppRoutes />
     </HashRouter>
 );
+
+

@@ -1,4 +1,4 @@
-import type { ComponentConfig } from '../types';
+﻿import type { ComponentConfig } from '../types';
 
 export const COMPONENTS: ComponentConfig[] = [
     {
@@ -8,10 +8,10 @@ export const COMPONENTS: ComponentConfig[] = [
         defaultSize: 'small',
     },
     {
-        id: 'data-inspector',
-        title: 'Data Inspector',
-        component: 'DataInspectorComponent',
-        targetView: '/inspector',
+        id: 'tables',
+        title: 'Tables',
+        component: 'TablesComponent',
+        targetView: '/tables',
         defaultSize: 'small',
     },
     {
@@ -34,3 +34,4 @@ export const COMPONENTS: ComponentConfig[] = [
         defaultSize: 'medium'
     }
 ];
+

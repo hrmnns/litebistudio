@@ -1,7 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { QueryBuilderView } from './QueryBuilderView';
+import { WidgetsView } from './WidgetsView';
 
 type MockWidget = {
     id: string;
@@ -94,7 +94,7 @@ vi.mock('../components/RecordDetailModal', () => ({
     RecordDetailModal: () => null
 }));
 
-describe('QueryBuilderView guided flow', () => {
+describe('WidgetsView guided flow', () => {
     beforeEach(() => {
         mockRows = [];
         mockWidgets = [];
@@ -103,7 +103,7 @@ describe('QueryBuilderView guided flow', () => {
 
     it('keeps visualize step locked until query run returns data in guided mode', async () => {
         mockRows = [{ id: 1, label: 'A' }];
-        render(<QueryBuilderView />);
+        render(<WidgetsView />);
 
         const visualizeStepBefore = screen.getByRole('button', { name: 'querybuilder.step_visualize' });
         expect(visualizeStepBefore).toBeDisabled();
@@ -136,7 +136,7 @@ describe('QueryBuilderView guided flow', () => {
             }
         ];
 
-        render(<QueryBuilderView />);
+        render(<WidgetsView />);
 
         fireEvent.click(await screen.findByText('Saved Widget'));
         fireEvent.click(screen.getByRole('button', { name: 'querybuilder.step_source_run' }));
@@ -165,7 +165,7 @@ describe('QueryBuilderView guided flow', () => {
             }
         ];
 
-        render(<QueryBuilderView />);
+        render(<WidgetsView />);
 
         fireEvent.click(await screen.findByText('Guard Widget'));
         fireEvent.click(screen.getByRole('button', { name: 'querybuilder.step_source_run' }));
@@ -185,3 +185,4 @@ describe('QueryBuilderView guided flow', () => {
         expect(event.returnValue).toBe('');
     });
 });
+

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Database, Table as TableIcon } from 'lucide-react';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
@@ -7,7 +7,7 @@ import { Skeleton } from '../ui/Skeleton';
 import { useAsync } from '../../../hooks/useAsync';
 import { useNavigate } from 'react-router-dom';
 
-export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
+export const TablesComponent: React.FC<DashboardTileProps> = ({ onRemove, dragHandleProps, onClick, targetView }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { data: stats, loading, error } = useAsync<{ tables: number; records: number }>(
@@ -26,7 +26,7 @@ export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove,
 
     const handleClick = () => {
         if (onClick) onClick();
-        navigate('/inspector');
+        navigate('/tables');
     };
 
     return (
@@ -44,7 +44,7 @@ export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove,
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-                        navigate('/inspector');
+                        navigate('/tables');
                     }}
                     className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors group/footer"
                 >
@@ -79,3 +79,4 @@ export const DataInspectorComponent: React.FC<DashboardTileProps> = ({ onRemove,
         </DashboardComponent>
     );
 };
+

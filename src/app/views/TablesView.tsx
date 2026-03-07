@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql as sqlLang } from '@codemirror/lang-sql';
@@ -23,12 +23,12 @@ import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
 import { CreateTableModal } from '../components/CreateTableModal';
 import type { DataSourceEntry, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
-import { INSPECTOR_LAST_SELECT_SQL_KEY, INSPECTOR_PENDING_SQL_KEY, INSPECTOR_PENDING_SQL_META_KEY, INSPECTOR_RETURN_HASH_KEY } from '../../lib/inspectorBridge';
+import { TABLES_LAST_SELECT_SQL_KEY, TABLES_PENDING_SQL_KEY, TABLES_PENDING_SQL_META_KEY, TABLES_RETURN_HASH_KEY } from '../../lib/tablesBridge';
 import { appDialog } from '../../lib/appDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SelectionListDialog } from '../components/ui/SelectionListDialog';
 
-interface DataInspectorProps {
+interface TablesViewProps {
     onBack: () => void;
     fixedMode?: 'table' | 'sql';
     titleKey?: string;
@@ -80,22 +80,22 @@ const SQL_KEYWORDS = [
     'COUNT(*)', 'SUM()', 'AVG()', 'MIN()', 'MAX()', 'DISTINCT'
 ];
 
-export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode, titleKey, breadcrumbKey }) => {
+export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, titleKey, breadcrumbKey }) => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const { isAdminMode } = useDashboard();
     const SQL_LIBRARY_SCOPE = 'global';
-    const SQL_LIBRARY_MIGRATION_KEY = 'data_inspector_sql_library_migrated_v1';
+    const SQL_LIBRARY_MIGRATION_KEY = 'tables_sql_library_migrated_v1';
     const sqlEditorHeightStorageKey = fixedMode === 'sql'
         ? 'sql_workspace_sql_editor_height'
-        : 'data_inspector_sql_editor_height';
+        : 'tables_sql_editor_height';
     const [mode, setMode] = useState<'table' | 'sql'>(fixedMode ?? 'table');
     const [inputSql, setInputSql] = useState(''); // Textarea content
-    const [, setSqlHistory] = useLocalStorage<string[]>('data_inspector_sql_history', []);
-    const [explainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
-    const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
-    const [autocompleteEnabled] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [, setSqlHistory] = useLocalStorage<string[]>('tables_sql_history', []);
+    const [explainMode] = useLocalStorage<boolean>('tables_explain_mode', false);
+    const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('tables_sql_assist_open', false);
+    const [autocompleteEnabled] = useLocalStorage<boolean>('tables_autocomplete_enabled', true);
     const [sqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
     const [sqlEditorAutocompleteTyping] = useLocalStorage<boolean>('sql_editor_autocomplete_on_typing', true);
     const [sqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
@@ -108,8 +108,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [sqlEditorUppercaseKeywords] = useLocalStorage<boolean>('sql_editor_uppercase_keywords', false);
     const [sqlEditorSchemaHints] = useLocalStorage<boolean>('sql_editor_schema_hints', true);
     const [sqlEditorRememberHeight] = useLocalStorage<boolean>('sql_editor_remember_height', true);
-    const [sqlRequireLimitConfirm] = useLocalStorage<boolean>('data_inspector_sql_require_limit_confirm', true);
-    const [sqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
+    const [sqlRequireLimitConfirm] = useLocalStorage<boolean>('tables_sql_require_limit_confirm', true);
+    const [sqlMaxRows] = useLocalStorage<number>('tables_sql_max_rows', 5000);
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
     const [activeSqlStatementId, setActiveSqlStatementId] = useState<string>('');
     const [lastOpenSqlStatementId, setLastOpenSqlStatementId] = useLocalStorage<string>('sql_workspace_last_open_statement_id', '');
@@ -117,16 +117,16 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [sqlLibrarySearch, setSqlLibrarySearch] = useState('');
     const [sqlLibrarySort, setSqlLibrarySort] = useLocalStorage<
         'updated_desc' | 'name_asc' | 'name_desc' | 'last_used_desc' | 'favorite_then_updated'
-    >('data_inspector_sql_library_sort_v1', 'updated_desc');
-    const [, setLastSavedSqlTemplateName] = useLocalStorage<string>('data_inspector_last_saved_sql_template_name', '');
-    const [, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('data_inspector_last_saved_sql_template_description', '');
+    >('tables_sql_library_sort_v1', 'updated_desc');
+    const [, setLastSavedSqlTemplateName] = useLocalStorage<string>('tables_last_saved_sql_template_name', '');
+    const [, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('tables_last_saved_sql_template_description', '');
     const [loadedSqlTemplateMeta, setLoadedSqlTemplateMeta] = useState<{ name: string; description: string }>({ name: '', description: '' });
     const [isSqlOpenDialogOpen, setIsSqlOpenDialogOpen] = useState(false);
     const [selectedOpenSqlId, setSelectedOpenSqlId] = useState('');
-    const [sqlOpenPinnedOnly, setSqlOpenPinnedOnly] = useLocalStorage<boolean>('data_inspector_sql_open_pinned_only', false);
-    const [showTableTools, setShowTableTools] = useLocalStorage<boolean>('data_inspector_table_tools_open', false);
+    const [sqlOpenPinnedOnly, setSqlOpenPinnedOnly] = useLocalStorage<boolean>('tables_sql_open_pinned_only', false);
+    const [showTableTools, setShowTableTools] = useLocalStorage<boolean>('tables_table_tools_open', false);
     const [tableToolsTab, setTableToolsTab] = useLocalStorage<'tables' | 'columns' | 'filters'>(
-        'data_inspector_table_tools_tab_v1',
+        'tables_table_tools_tab_v1',
         'tables'
     );
     const [isCreateTableOpen, setIsCreateTableOpen] = useState(false);
@@ -147,7 +147,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         sorting: boolean;
         preview: boolean;
     }>(
-        'data_inspector_sql_assistant_panels_v2',
+        'tables_sql_assistant_panels_v2',
         { table: true, columns: true, aggregation: false, grouping: true, filter: false, sorting: false, preview: true }
     );
     const [assistantTable, setAssistantTable] = useState('');
@@ -171,24 +171,24 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [explainLoading, setExplainLoading] = useState(false);
     const [sqlOutputView, setSqlOutputView] = useState<'result' | 'explain'>(explainMode ? 'explain' : 'result');
     const [sqlWorkspaceView, setSqlWorkspaceView] = useLocalStorage<'sql' | 'result' | 'explain'>(
-        'data_inspector_sql_workspace_view_v1',
+        'tables_sql_workspace_view_v1',
         'sql'
     );
     const [sqlWorkspaceSplitView, setSqlWorkspaceSplitView] = useLocalStorage<boolean>(
-        'data_inspector_sql_workspace_split_view_v1',
+        'tables_sql_workspace_split_view_v1',
         false
     );
     const [sqlSplitTopHeight, setSqlSplitTopHeight] = useLocalStorage<number>(
-        'data_inspector_sql_workspace_split_top_height_v1',
+        'tables_sql_workspace_split_top_height_v1',
         260
     );
     const [sqlWorkspaceTab, setSqlWorkspaceTab] = useLocalStorage<'manage' | 'editor'>(
-        'data_inspector_sql_workspace_tab_v1',
+        'tables_sql_workspace_tab_v1',
         'editor'
     );
     const [sqlExecutionSql, setSqlExecutionSql] = useState('');
     const [sqlLimitNotice, setSqlLimitNotice] = useState('');
-    const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('data_inspector_sql_limit_notice_dismissed', false);
+    const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('tables_sql_limit_notice_dismissed', false);
     const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
     const [indexModalTab, setIndexModalTab] = useState<'manual' | 'suggestions'>('manual');
     const [indexName, setIndexName] = useState('');
@@ -209,7 +209,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTable, setSelectedTable] = useState('');
     const [selectedItem, setSelectedItem] = useState<DbRow | null>(null);
-    const [pageSize, setPageSize] = useLocalStorage<number>('data_inspector_page_size', 100);
+    const [pageSize, setPageSize] = useLocalStorage<number>('tables_page_size', 100);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageJumpInput, setPageJumpInput] = useState('');
     const offset = (currentPage - 1) * pageSize;
@@ -223,14 +223,14 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const [defaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
     const [showTableFilters, setShowTableFilters] = useState(defaultShowFilters);
     const [columnWidthsBySource, setColumnWidthsBySource] = useLocalStorage<Record<string, Record<string, number>>>(
-        'data_inspector_column_widths_v1',
+        'tables_column_widths_v1',
         {}
     );
-    const [savedViews, setSavedViews] = useLocalStorage<InspectorViewPreset[]>('data_inspector_saved_views', []);
-    const [activeViewId, setActiveViewId] = useLocalStorage<string>('data_inspector_active_view', '');
-    const [defaultShowProfiling] = useLocalStorage<boolean>('data_inspector_show_profiling', true);
+    const [savedViews, setSavedViews] = useLocalStorage<InspectorViewPreset[]>('tables_saved_views', []);
+    const [activeViewId, setActiveViewId] = useLocalStorage<string>('tables_active_view', '');
+    const [defaultShowProfiling] = useLocalStorage<boolean>('tables_show_profiling', true);
     const [tableResultTab, setTableResultTab] = useState<'data' | 'profiling'>(defaultShowProfiling ? 'profiling' : 'data');
-    const [profilingThresholds, setProfilingThresholds] = useLocalStorage<ProfilingThresholds>('data_inspector_profiling_thresholds', {
+    const [profilingThresholds, setProfilingThresholds] = useLocalStorage<ProfilingThresholds>('tables_profiling_thresholds', {
         nullRate: 30,
         cardinalityRate: 95
     });
@@ -248,8 +248,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const forwardSqlToWorkspace = useCallback((sql: string) => {
         const trimmed = sql.trim();
         if (!trimmed) return;
-        localStorage.setItem(INSPECTOR_PENDING_SQL_KEY, trimmed);
-        localStorage.setItem(INSPECTOR_RETURN_HASH_KEY, `#${location.pathname}${location.search || ''}`);
+        localStorage.setItem(TABLES_PENDING_SQL_KEY, trimmed);
+        localStorage.setItem(TABLES_RETURN_HASH_KEY, `#${location.pathname}${location.search || ''}`);
         navigate('/sql-workspace');
     }, [location.pathname, location.search, navigate]);
     const resetSqlOutputState = useCallback(() => {
@@ -269,13 +269,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     }, [fixedMode, mode]);
 
     useEffect(() => {
-        const pendingSql = localStorage.getItem(INSPECTOR_PENDING_SQL_KEY);
-        const pendingSqlMetaRaw = localStorage.getItem(INSPECTOR_PENDING_SQL_META_KEY);
-        const pendingReturnHash = localStorage.getItem(INSPECTOR_RETURN_HASH_KEY);
+        const pendingSql = localStorage.getItem(TABLES_PENDING_SQL_KEY);
+        const pendingSqlMetaRaw = localStorage.getItem(TABLES_PENDING_SQL_META_KEY);
+        const pendingReturnHash = localStorage.getItem(TABLES_RETURN_HASH_KEY);
         if (pendingReturnHash) {
             const normalized = pendingReturnHash.startsWith('#/') ? pendingReturnHash : '#/';
             setInspectorReturnHash(normalized);
-            localStorage.removeItem(INSPECTOR_RETURN_HASH_KEY);
+            localStorage.removeItem(TABLES_RETURN_HASH_KEY);
         }
         if (pendingSqlMetaRaw) {
             try {
@@ -286,13 +286,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             } catch {
                 setLoadedSqlTemplateMeta({ name: '', description: '' });
             } finally {
-                localStorage.removeItem(INSPECTOR_PENDING_SQL_META_KEY);
+                localStorage.removeItem(TABLES_PENDING_SQL_META_KEY);
             }
         } else {
             setLoadedSqlTemplateMeta({ name: '', description: '' });
         }
         if (!pendingSql) return;
-        localStorage.removeItem(INSPECTOR_PENDING_SQL_KEY);
+        localStorage.removeItem(TABLES_PENDING_SQL_KEY);
         if (fixedMode === 'table') {
             forwardSqlToWorkspace(pendingSql);
             return;
@@ -312,7 +312,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             return;
         }
         hasAutoRestoredLastSelectRef.current = true;
-        const lastSelectSql = localStorage.getItem(INSPECTOR_LAST_SELECT_SQL_KEY);
+        const lastSelectSql = localStorage.getItem(TABLES_LAST_SELECT_SQL_KEY);
         if (!lastSelectSql || !/^\s*SELECT\b/i.test(lastSelectSql)) return;
         resetSqlOutputState();
         setInputSql(lastSelectSql);
@@ -360,8 +360,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             try {
                 const existing = await SystemRepository.listSqlStatements(SQL_LIBRARY_SCOPE);
                 const existingSql = new Set(existing.map(stmt => normalizeSql(stmt.sql_text)));
-                const legacyTemplatesRaw = localStorage.getItem('data_inspector_custom_sql_templates');
-                const legacyFavoritesRaw = localStorage.getItem('data_inspector_favorite_queries');
+                const legacyTemplatesRaw = localStorage.getItem('tables_custom_sql_templates');
+                const legacyFavoritesRaw = localStorage.getItem('tables_favorite_queries');
                 const legacyTemplates = legacyTemplatesRaw ? JSON.parse(legacyTemplatesRaw) as Array<{ name?: string; sql?: string }> : [];
                 const legacyFavorites = legacyFavoritesRaw ? JSON.parse(legacyFavoritesRaw) as string[] : [];
 
@@ -551,7 +551,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         execute();
         setSqlHistory((prev: string[]) => [trimmed, ...prev.filter((q: string) => q !== trimmed)].slice(0, 12));
         if (isSelect) {
-            localStorage.setItem(INSPECTOR_LAST_SELECT_SQL_KEY, trimmed);
+            localStorage.setItem(TABLES_LAST_SELECT_SQL_KEY, trimmed);
         }
     }, [execute, setSqlHistory, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, t]);
 
@@ -566,7 +566,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         setSqlLimitNotice('');
         setSqlOutputView('result');
         setLoadedSqlTemplateMeta({ name: '', description: '' });
-        localStorage.removeItem(INSPECTOR_LAST_SELECT_SQL_KEY);
+        localStorage.removeItem(TABLES_LAST_SELECT_SQL_KEY);
     }, [resetSqlOutputState]);
 
     const runExplainPlan = useCallback(async (sql: string) => {
@@ -1526,7 +1526,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
     const confirmSaveBeforeReplaceSql = useCallback(async () => {
         if (!hasUnsavedSqlChanges) return true;
         const choice = await appDialog.confirm3(
-            t('datainspector.unsaved_changes_save_before_continue', 'Es gibt ungespeicherte Änderungen. Vor dem Fortfahren speichern?'),
+            t('datainspector.unsaved_changes_save_before_continue', 'Es gibt ungespeicherte Ã„nderungen. Vor dem Fortfahren speichern?'),
             {
                 title: t('common.warning', 'Warning'),
                 confirmLabel: t('common.yes', 'Yes'),
@@ -1646,7 +1646,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         const dependencyHint = linkedWidgets.length > 0
             ? t('datainspector.sql_delete_confirm_with_widget_dependency', {
                 count: linkedWidgets.length,
-                defaultValue: 'Dieses SQL-Statement wird aktuell in {{count}} Widget(s) verwendet. Diese Widgets würden dadurch fehlerhaft werden.'
+                defaultValue: 'Dieses SQL-Statement wird aktuell in {{count}} Widget(s) verwendet. Diese Widgets wÃ¼rden dadurch fehlerhaft werden.'
             })
             : t('datainspector.sql_delete_confirm_without_dependency', 'Dieses SQL-Statement wird aktuell in keinem Widget verwendet.');
 
@@ -3004,7 +3004,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                     >
                                         <FolderOpen className="w-3 h-3" />
-                                        {t('common.open', 'Öffnen')}
+                                        {t('common.open', 'Ã–ffnen')}
                                     </button>
                                     <button
                                         type="button"
@@ -3033,7 +3033,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                         className="px-2 py-1.5 rounded text-[10px] font-bold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
                                     >
                                         {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
-                                        {t('datainspector.run_sql', 'Ausführen')}
+                                        {t('datainspector.run_sql', 'AusfÃ¼hren')}
                                     </button>
                                     <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                     <button
@@ -3355,7 +3355,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
                                                 {statement.sql_text || '-'}
                                             </div>
                                             <div className="text-[10px] text-slate-400 dark:text-slate-500">
-                                                {t('datainspector.last_changed_at', 'Zuletzt geändert')}: {formatSqlTimestamp(statement.updated_at)}
+                                                {t('datainspector.last_changed_at', 'Zuletzt geÃ¤ndert')}: {formatSqlTimestamp(statement.updated_at)}
                                             </div>
                                         </button>
                                         <div className="flex items-center gap-2 shrink-0">
@@ -3826,7 +3826,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
             <SelectionListDialog
                 isOpen={isSqlOpenDialogOpen}
                 onClose={() => setIsSqlOpenDialogOpen(false)}
-                title={t('datainspector.open_sql_statement_title', 'SQL-Statement öffnen')}
+                title={t('datainspector.open_sql_statement_title', 'SQL-Statement Ã¶ffnen')}
                 searchValue={sqlLibrarySearch}
                 onSearchChange={setSqlLibrarySearch}
                 searchPlaceholder={t('datainspector.sql_manager_search_placeholder', 'Muster suchen...')}
@@ -4117,3 +4117,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack, fixedMode,
         </PageLayout >
     );
 };
+
+
+
+

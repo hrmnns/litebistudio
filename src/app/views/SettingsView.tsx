@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
 import { PageLayout } from '../components/ui/PageLayout';
@@ -13,7 +13,7 @@ import { SystemHealthModal } from '../components/SystemHealthModal';
 import { clearSavedBackupDirectory, getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickAndSaveBackupDirectory } from '../../lib/utils/backupLocation';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
-type AppsSubTab = 'inspector' | 'sqlworkspace' | 'querybuilder' | 'reports' | 'worklist' | 'datamanagement';
+type AppsSubTab = 'tables' | 'sqlworkspace' | 'widgets' | 'reports' | 'worklist' | 'datamanagement';
 type ControlsSubTab = 'datatable' | 'notifications' | 'sqleditor';
 
 export const SettingsView: React.FC = () => {
@@ -37,14 +37,14 @@ export const SettingsView: React.FC = () => {
     const [isEditingPin, setIsEditingPin] = React.useState(false);
     const [pinInput, setPinInput] = React.useState('');
 
-    const [inspectorPageSize, setInspectorPageSize] = useLocalStorage<number>('data_inspector_page_size', 100);
-    const [inspectorShowProfiling, setInspectorShowProfiling] = useLocalStorage<boolean>('data_inspector_show_profiling', true);
-    const [inspectorExplainMode, setInspectorExplainMode] = useLocalStorage<boolean>('data_inspector_explain_mode', false);
-    const [inspectorSqlAssistOpen, setInspectorSqlAssistOpen] = useLocalStorage<boolean>('data_inspector_sql_assist_open', false);
-    const [inspectorSqlRequireLimitConfirm, setInspectorSqlRequireLimitConfirm] = useLocalStorage<boolean>('data_inspector_sql_require_limit_confirm', true);
-    const [inspectorSqlMaxRows, setInspectorSqlMaxRows] = useLocalStorage<number>('data_inspector_sql_max_rows', 5000);
+    const [inspectorPageSize, setInspectorPageSize] = useLocalStorage<number>('tables_page_size', 100);
+    const [inspectorShowProfiling, setInspectorShowProfiling] = useLocalStorage<boolean>('tables_show_profiling', true);
+    const [inspectorExplainMode, setInspectorExplainMode] = useLocalStorage<boolean>('tables_explain_mode', false);
+    const [inspectorSqlAssistOpen, setInspectorSqlAssistOpen] = useLocalStorage<boolean>('tables_sql_assist_open', false);
+    const [inspectorSqlRequireLimitConfirm, setInspectorSqlRequireLimitConfirm] = useLocalStorage<boolean>('tables_sql_require_limit_confirm', true);
+    const [inspectorSqlMaxRows, setInspectorSqlMaxRows] = useLocalStorage<number>('tables_sql_max_rows', 5000);
     const [inspectorThresholds, setInspectorThresholds] = useLocalStorage<{ nullRate: number; cardinalityRate: number }>(
-        'data_inspector_profiling_thresholds',
+        'tables_profiling_thresholds',
         { nullRate: 30, cardinalityRate: 95 }
     );
     const [importDefaultMode, setImportDefaultMode] = useLocalStorage<'append' | 'overwrite'>('import_default_mode', 'append');
@@ -71,7 +71,7 @@ export const SettingsView: React.FC = () => {
     const [confirmDestructive, setConfirmDestructive] = useLocalStorage<boolean>('notifications_confirm_destructive', true);
     const [appLogLevel, setAppLogLevel] = useLocalStorage<AppLogLevel>(LOG_LEVEL_STORAGE_KEY, 'error');
     const [sqlEditorSyntaxHighlight, setSqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
-    const [sqlEditorAutocomplete, setSqlEditorAutocomplete] = useLocalStorage<boolean>('data_inspector_autocomplete_enabled', true);
+    const [sqlEditorAutocomplete, setSqlEditorAutocomplete] = useLocalStorage<boolean>('tables_autocomplete_enabled', true);
     const [sqlEditorAutocompleteOnTyping, setSqlEditorAutocompleteOnTyping] = useLocalStorage<boolean>('sql_editor_autocomplete_on_typing', true);
     const [sqlEditorLineWrap, setSqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
     const [sqlEditorLineNumbers, setSqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
@@ -97,10 +97,10 @@ export const SettingsView: React.FC = () => {
 
     const handleResetInspectorLayout = async () => {
         if (!(await confirmAction(t('settings.inspector_reset_layout_confirm')))) return;
-        localStorage.removeItem('data_inspector_column_widths_v1');
-        localStorage.removeItem('data_inspector_saved_views');
-        localStorage.removeItem('data_inspector_active_view');
-        localStorage.removeItem('data_inspector_sql_editor_height');
+        localStorage.removeItem('tables_column_widths_v1');
+        localStorage.removeItem('tables_saved_views');
+        localStorage.removeItem('tables_active_view');
+        localStorage.removeItem('tables_sql_editor_height');
         await appDialog.info(t('settings.inspector_reset_layout_done'));
     };
 
@@ -112,11 +112,11 @@ export const SettingsView: React.FC = () => {
 
     const handleClearSqlWorkspaceMemory = async () => {
         if (!(await confirmAction(t('settings.sql_workspace_reset_sql_confirm')))) return;
-        localStorage.removeItem('data_inspector_sql_history');
-        localStorage.removeItem('data_inspector_favorite_queries');
-        localStorage.removeItem('data_inspector_custom_sql_templates');
-        localStorage.removeItem('data_inspector_selected_custom_template');
-        localStorage.removeItem('data_inspector_last_select_sql');
+        localStorage.removeItem('tables_sql_history');
+        localStorage.removeItem('tables_favorite_queries');
+        localStorage.removeItem('tables_custom_sql_templates');
+        localStorage.removeItem('tables_selected_custom_template');
+        localStorage.removeItem('tables_last_select_sql');
         await appDialog.info(t('settings.sql_workspace_reset_sql_done'));
     };
 
@@ -212,7 +212,7 @@ export const SettingsView: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                     setActiveTab('apps');
-                                    setAppsSubTab('inspector');
+                                    setAppsSubTab('tables');
                                 }}
                                 className={`px-3 py-2 rounded-lg text-left border transition-colors ${
                                     activeTab === 'apps'
@@ -268,9 +268,9 @@ export const SettingsView: React.FC = () => {
                         <div className="flex items-center overflow-x-auto">
                             {[
                                 { id: 'datamanagement', label: t('sidebar.datasource') },
-                                { id: 'inspector', label: t('sidebar.data_inspector') },
+                                { id: 'tables', label: t('sidebar.data_inspector') },
                                 { id: 'sqlworkspace', label: t('sidebar.sql_workspace') },
-                                { id: 'querybuilder', label: t('sidebar.query_builder') },
+                                { id: 'widgets', label: t('sidebar.query_builder') },
                                 { id: 'reports', label: t('sidebar.reports') },
                                 { id: 'worklist', label: t('sidebar.worklist') }
                             ].map((tab) => (
@@ -537,7 +537,7 @@ export const SettingsView: React.FC = () => {
                     </div>
                 )}
 
-                {activeTab === 'apps' && appsSubTab === 'inspector' && (
+                {activeTab === 'apps' && appsSubTab === 'tables' && (
                     <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                             <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
@@ -707,7 +707,7 @@ export const SettingsView: React.FC = () => {
                     </div>
                 )}
 
-                {activeTab === 'apps' && appsSubTab === 'querybuilder' && (
+                {activeTab === 'apps' && appsSubTab === 'widgets' && (
                     <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                             <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
@@ -1233,4 +1233,6 @@ export const SettingsView: React.FC = () => {
         </PageLayout>
     );
 };
+
+
 

@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         'SystemsComponent': <Server className="w-5 h-5 flex-shrink-0 text-blue-500" />,
         'AnomalyRadarComponent': <Radar className="w-5 h-5 flex-shrink-0 text-rose-500" />,
         'WorklistComponent': <ClipboardList className="w-5 h-5 flex-shrink-0 text-amber-500" />,
-        'DataInspectorComponent': <Search className="w-5 h-5 flex-shrink-0 text-indigo-500" />,
+        'TablesComponent': <Search className="w-5 h-5 flex-shrink-0 text-indigo-500" />,
     };
 
     const staticTopItems: NavItem[] = [
@@ -94,16 +94,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const staticBottomItems: NavItem[] = [
         { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.datasource') },
         { to: '/sql-workspace', icon: <Code2 className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.sql_workspace') },
-        { to: '/query', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.query_builder') },
+        { to: '/widgets', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.query_builder') },
         { to: '/reports', icon: <FileText className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.reports') },
         { to: '/about', icon: <Info className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.about') },
     ];
     const navOrder: Record<string, number> = {
         '/': 0,
         '/datasource': 1,
-        '/inspector': 2,
+        '/tables': 2,
         '/sql-workspace': 3,
-        '/query': 4,
+        '/widgets': 4,
         '/reports': 5,
         '/worklist': 6,
         '/settings': 7,
@@ -223,4 +223,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </aside >
     );
 };
+
 

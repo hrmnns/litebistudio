@@ -54,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - command bar/button styling in table mode aligned to SQL workspace conventions
   - table panel surfaces, borders, and footer styling aligned with the shared dark/light design language
   - data-table header/body styling in table mode now follows the SQL-statement table look (including dark background contrast and first-header-cell emphasis).
+- Tables module cleanup was completed without backward-compatibility constraints:
+  - app route was renamed from `/inspector` to `/tables`
+  - persisted local state keys were renamed from `data_inspector_*` to `tables_*`
+  - related bridge/navigation wiring was aligned to the new naming.
 - Widget management badges were refined:
   - replaced text-only `Datengetrieben`/`Ohne Daten` tags with compact icon badges
   - added speaking tooltips for both states:
