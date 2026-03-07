@@ -438,7 +438,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
                                     <div className="text-xs text-purple-600 dark:text-purple-400 font-bold uppercase mb-1">{t('widgets.system_health.device_memory')}</div>
                                     <div className="text-2xl font-black text-purple-700 dark:text-purple-300" title={t('widgets.system_health.memory_limit_hint')}>
                                         {navigatorWithDeviceMemory.deviceMemory ?
-                                            `${navigatorWithDeviceMemory.deviceMemory >= 8 ? 'â‰¥ ' : '~'}${navigatorWithDeviceMemory.deviceMemory} GB`
+                                            `${navigatorWithDeviceMemory.deviceMemory >= 8 ? '≥ ' : '~'}${navigatorWithDeviceMemory.deviceMemory} GB`
                                             : '?'}
                                     </div>
                                     <div className="text-[9px] text-purple-400 dark:text-purple-500 mt-1 leading-tight">

@@ -814,7 +814,7 @@ function getDatabaseHealth(): DatabaseHealthReport {
             rowMode: 'object',
             callback: (row: SqliteRow) => {
                 const name = getRowString(row, 'name');
-                if (!name || name.startsWith('sqlite_')) return;
+                if (!name) return;
                 indexNames.push({
                     name,
                     unique: Number(row.unique || 0) === 1
