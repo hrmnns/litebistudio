@@ -1526,7 +1526,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const confirmSaveBeforeReplaceSql = useCallback(async () => {
         if (!hasUnsavedSqlChanges) return true;
         const choice = await appDialog.confirm3(
-            t('datainspector.unsaved_changes_save_before_continue', 'Es gibt ungespeicherte Ã„nderungen. Vor dem Fortfahren speichern?'),
+            t('datainspector.unsaved_changes_save_before_continue', 'Es gibt ungespeicherte Änderungen. Vor dem Fortfahren speichern?'),
             {
                 title: t('common.warning', 'Warning'),
                 confirmLabel: t('common.yes', 'Yes'),
@@ -1646,7 +1646,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         const dependencyHint = linkedWidgets.length > 0
             ? t('datainspector.sql_delete_confirm_with_widget_dependency', {
                 count: linkedWidgets.length,
-                defaultValue: 'Dieses SQL-Statement wird aktuell in {{count}} Widget(s) verwendet. Diese Widgets wÃ¼rden dadurch fehlerhaft werden.'
+                defaultValue: 'Dieses SQL-Statement wird aktuell in {{count}} Widget(s) verwendet. Diese Widgets würden dadurch fehlerhaft werden.'
             })
             : t('datainspector.sql_delete_confirm_without_dependency', 'Dieses SQL-Statement wird aktuell in keinem Widget verwendet.');
 
@@ -3004,7 +3004,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                     >
                                         <FolderOpen className="w-3 h-3" />
-                                        {t('common.open', 'Ã–ffnen')}
+                                        {t('common.open', 'Öffnen')}
                                     </button>
                                     <button
                                         type="button"
@@ -3033,7 +3033,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         className="px-2 py-1.5 rounded text-[10px] font-bold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
                                     >
                                         {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
-                                        {t('datainspector.run_sql', 'AusfÃ¼hren')}
+                                        {t('datainspector.run_sql', 'Ausführen')}
                                     </button>
                                     <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                     <button
@@ -3355,7 +3355,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                 {statement.sql_text || '-'}
                                             </div>
                                             <div className="text-[10px] text-slate-400 dark:text-slate-500">
-                                                {t('datainspector.last_changed_at', 'Zuletzt geÃ¤ndert')}: {formatSqlTimestamp(statement.updated_at)}
+                                                {t('datainspector.last_changed_at', 'Zuletzt geändert')}: {formatSqlTimestamp(statement.updated_at)}
                                             </div>
                                         </button>
                                         <div className="flex items-center gap-2 shrink-0">
@@ -3826,7 +3826,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
             <SelectionListDialog
                 isOpen={isSqlOpenDialogOpen}
                 onClose={() => setIsSqlOpenDialogOpen(false)}
-                title={t('datainspector.open_sql_statement_title', 'SQL-Statement Ã¶ffnen')}
+                title={t('datainspector.open_sql_statement_title', 'SQL-Statement öffnen')}
                 searchValue={sqlLibrarySearch}
                 onSearchChange={setSqlLibrarySearch}
                 searchPlaceholder={t('datainspector.sql_manager_search_placeholder', 'Muster suchen...')}
