@@ -38,7 +38,12 @@ export const AboutView: React.FC = () => {
     return (
         <PageLayout
             header={{
-                title: t('about.title', 'About LiteBI Studio'),
+                title: (
+                    <span>
+                        {t('about.about_prefix', 'About')}{' '}
+                        <span className="font-normal">Lite</span><span className="font-black">BI</span> Studio
+                    </span>
+                ),
                 subtitle: t('about.subtitle', 'Information about the project and system'),
                 onBack: () => navigate(-1),
             }}
@@ -54,7 +59,10 @@ export const AboutView: React.FC = () => {
                             <AppBrandIcon size={80} />
                         </div>
                         <div className="text-center md:text-left">
-                            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-2">LiteBI Studio</h2>
+                            <h2 className="text-3xl md:text-4xl tracking-tight mb-2">
+                                <span className="font-normal">Lite</span><span className="font-black">BI</span>{' '}
+                                <span className="font-black">Studio</span>
+                            </h2>
                             <p className="text-blue-100 text-lg md:text-xl font-medium max-w-xl">
                                 {t('about.tagline', 'The lightweight business intelligence platform directly in your browser.')}
                             </p>

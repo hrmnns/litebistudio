@@ -128,7 +128,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <AppBrandIcon size={32} className="flex-shrink-0" />
                     <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100 flex flex-col'}`}>
                         <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
-                            LiteBI <span className="text-blue-600">Studio</span>
+                            <span className="font-normal">Lite</span><span className="font-black">BI</span>{' '}
+                            <span className="text-blue-600">Studio</span>
                         </h1>
                         <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest whitespace-nowrap">{t('sidebar.analytics_platform')}</p>
                     </div>

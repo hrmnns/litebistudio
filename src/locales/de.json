@@ -64,7 +64,7 @@
         "query_builder": "Widgets",
         "datasource": "Datenverwaltung",
         "settings": "Einstellungen",
-        "analytics_platform": "Self-Service BI",
+        "analytics_platform": "A Self-Service BI",
         "clock": "Status & Uhr",
         "database_status": "Datenbank-Status",
         "system_status": "System-Status",
@@ -1103,7 +1103,7 @@
     "about": {
         "title": "Über LiteBI Studio",
         "subtitle": "Informationen zum Projekt und System",
-        "tagline": "Die leichtgewichtige Business Intelligence Plattform direkt im Browser.",
+        "tagline": "Die leichtgewichtige Self-Service-Business Intelligence Plattform direkt im Browser.",
         "status_stable": "Stabil (Lokal)",
         "philosophy_title": "Unsere Philosophie",
         "philosophy_description": "LiteBI Studio wurde mit dem Ziel entwickelt, Datenanalyse so einfach und sicher wie möglich zu machen. Im Gegensatz zu herkömmlichen BI-Tools verlassen Ihre Daten bei LiteBI Studio niemals Ihren Browser.",

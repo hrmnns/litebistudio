@@ -46,7 +46,7 @@ export const Layout: React.FC = () => {
                         </button>
                         <h1 className="text-lg font-bold flex items-center gap-2">
                             <AppBrandIcon size={24} />
-                            LiteBI Studio
+                            <span><span className="font-normal">Lite</span><span className="font-extrabold">BI</span> Studio</span>
                             {isReadOnly && <span className="text-[10px] uppercase font-bold tracking-wider bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Lese-Modus</span>}
                         </h1>
                     </header>
