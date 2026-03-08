@@ -74,6 +74,42 @@ interface AssistantSort {
     direction: 'ASC' | 'DESC';
 }
 
+interface SqlResultCacheEntry {
+    executionSql: string;
+    rows: DbRow[];
+    cachedAt: number;
+}
+
+const SQL_RESULT_CACHE_MAX_ENTRIES = 10;
+const sqlResultCache = new Map<string, SqlResultCacheEntry>();
+const SQL_HEADER_HYDRATION_MIN_MS = 120;
+
+const getCachedSqlRows = (executionSql: string): DbRow[] | null => {
+    const key = executionSql.trim();
+    if (!key) return null;
+    const entry = sqlResultCache.get(key);
+    if (!entry) return null;
+    // Touch for simple LRU behavior.
+    sqlResultCache.delete(key);
+    sqlResultCache.set(key, entry);
+    return [...entry.rows];
+};
+
+const setCachedSqlRows = (executionSql: string, rows: DbRow[]): void => {
+    const key = executionSql.trim();
+    if (!key) return;
+    sqlResultCache.set(key, {
+        executionSql: key,
+        rows: Array.isArray(rows) ? [...rows] : [],
+        cachedAt: Date.now()
+    });
+    while (sqlResultCache.size > SQL_RESULT_CACHE_MAX_ENTRIES) {
+        const oldestKey = sqlResultCache.keys().next().value as string | undefined;
+        if (!oldestKey) break;
+        sqlResultCache.delete(oldestKey);
+    }
+};
+
 const SQL_KEYWORDS = [
     'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET',
     'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'ON',
@@ -92,7 +128,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         ? 'sql_workspace_sql_editor_height'
         : 'tables_sql_editor_height';
     const [mode, setMode] = useState<'table' | 'sql'>(fixedMode ?? 'table');
-    const [inputSql, setInputSql] = useState(''); // Textarea content
+    const [inputSql, setInputSql] = useLocalStorage<string>('tables_sql_workspace_input_v1', ''); // Textarea content
     const [, setSqlHistory] = useLocalStorage<string[]>('tables_sql_history', []);
     const [explainMode] = useLocalStorage<boolean>('tables_explain_mode', false);
     const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('tables_sql_assist_open', false);
@@ -112,6 +148,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [sqlRequireLimitConfirm] = useLocalStorage<boolean>('tables_sql_require_limit_confirm', true);
     const [sqlMaxRows] = useLocalStorage<number>('tables_sql_max_rows', 5000);
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
+    const [sqlStatementsLoaded, setSqlStatementsLoaded] = useState(false);
     const [activeSqlStatementId, setActiveSqlStatementId] = useState<string>('');
     const [lastOpenSqlStatementId, setLastOpenSqlStatementId] = useLocalStorage<string>('sql_workspace_last_open_statement_id', '');
     const [sqlSavedSnapshot, setSqlSavedSnapshot] = useState<{ id: string; normalizedSql: string }>({ id: '', normalizedSql: '' });
@@ -187,7 +224,11 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         'tables_sql_workspace_tab_v1',
         'editor'
     );
-    const [sqlExecutionSql, setSqlExecutionSql] = useState('');
+    const [isSqlHeaderHydrating, setIsSqlHeaderHydrating] = useState(true);
+    const [cachedSqlHeaderName, setCachedSqlHeaderName] = useLocalStorage<string>('tables_sql_header_name_cache_v1', '');
+    const [, setCachedSqlHeaderDirty] = useLocalStorage<boolean>('tables_sql_header_dirty_cache_v1', false);
+    const [, setCachedSqlHeaderStatementId] = useLocalStorage<string>('tables_sql_header_statement_id_cache_v1', '');
+    const [sqlExecutionSql, setSqlExecutionSql] = useLocalStorage<string>('tables_sql_workspace_execution_sql_v1', '');
     const [sqlRunToken, setSqlRunToken] = useState(0);
     const [sqlLimitNotice, setSqlLimitNotice] = useState('');
     const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('tables_sql_limit_notice_dismissed', false);
@@ -206,6 +247,28 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const indexSuggestionCacheRef = useRef<Map<string, IndexSuggestion[]>>(new Map());
     const indexSuggestionRunRef = useRef(0);
     const hasAutoRestoredLastSelectRef = useRef(false);
+    const sqlHeaderHydrationStartedAtRef = useRef(Date.now());
+    const sqlHeaderHydrationTimerRef = useRef<number | null>(null);
+    const finishSqlHeaderHydration = useCallback(() => {
+        if (!isSqlHeaderHydrating) return;
+        const elapsed = Date.now() - sqlHeaderHydrationStartedAtRef.current;
+        const remaining = SQL_HEADER_HYDRATION_MIN_MS - elapsed;
+        if (remaining <= 0) {
+            if (sqlHeaderHydrationTimerRef.current !== null) {
+                window.clearTimeout(sqlHeaderHydrationTimerRef.current);
+                sqlHeaderHydrationTimerRef.current = null;
+            }
+            setIsSqlHeaderHydrating(false);
+            return;
+        }
+        if (sqlHeaderHydrationTimerRef.current !== null) {
+            window.clearTimeout(sqlHeaderHydrationTimerRef.current);
+        }
+        sqlHeaderHydrationTimerRef.current = window.setTimeout(() => {
+            setIsSqlHeaderHydrating(false);
+            sqlHeaderHydrationTimerRef.current = null;
+        }, remaining);
+    }, [isSqlHeaderHydrating]);
 
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
@@ -337,8 +400,12 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const normalizeSql = useCallback((value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase(), []);
 
     const loadSqlStatements = useCallback(async () => {
-        const rows = await SystemRepository.listSqlStatements(SQL_LIBRARY_SCOPE);
-        setSqlStatements(rows);
+        try {
+            const rows = await SystemRepository.listSqlStatements(SQL_LIBRARY_SCOPE);
+            setSqlStatements(rows);
+        } finally {
+            setSqlStatementsLoaded(true);
+        }
     }, [SQL_LIBRARY_SCOPE]);
 
     useEffect(() => {
@@ -452,7 +519,11 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 return await SystemRepository.inspectTable(selectedTable, pageSize, searchTerm, offset, selectedSourceType);
             } else {
                 if (!sqlExecutionSql) return []; // Don't run empty SQL
-                return await SystemRepository.executeRaw(sqlExecutionSql);
+                const cachedRows = getCachedSqlRows(sqlExecutionSql);
+                if (cachedRows) return cachedRows;
+                const rows = await SystemRepository.executeRaw(sqlExecutionSql);
+                setCachedSqlRows(sqlExecutionSql, rows);
+                return rows;
             }
         },
         [mode, selectedTable, selectedSourceType, pageSize, currentPage, sqlExecutionSql, sqlRunToken] // Auto-run when mode/source/page changes
@@ -1482,7 +1553,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         if (!activeSqlStatement) return true;
         return normalizeSql(activeSqlStatement.sql_text) !== normalizedCurrent;
     }, [activeSqlStatement, activeSqlStatementId, inputSql, normalizeSql, sqlSavedSnapshot]);
-    const canSaveCurrentSql = inputSql.trim().length > 0 && hasUnsavedSqlChanges;
+    const canSaveCurrentSql = !isSqlHeaderHydrating && inputSql.trim().length > 0 && hasUnsavedSqlChanges;
     const canRunSqlWorkspace = React.useMemo(
         () => hasExecutableSqlCommand(inputSql) && !loading,
         [hasExecutableSqlCommand, inputSql, loading]
@@ -1576,8 +1647,21 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         }
         return true;
     }, [handleSaveCustomTemplate, hasUnsavedSqlChanges, t]);
-    const sqlWorkspaceStatementName = (activeSqlTemplateMeta.name || '').trim() || t('datainspector.sql_statement_unnamed', 'Unbenannt');
-    const sqlWorkspaceHeaderTitle = `${t('datainspector.sql_statement_title_prefix', 'SQL-Statement')} (${sqlWorkspaceStatementName})${hasUnsavedSqlChanges ? ' *' : ''}`;
+    const liveSqlWorkspaceStatementName = (activeSqlTemplateMeta.name || '').trim();
+    const sqlWorkspaceStatementName = liveSqlWorkspaceStatementName
+        || (isSqlHeaderHydrating ? (cachedSqlHeaderName || '').trim() : '')
+        || t('datainspector.sql_statement_unnamed', 'Unbenannt');
+    const showSqlHeaderDirty = !isSqlHeaderHydrating && hasUnsavedSqlChanges;
+    const sqlWorkspaceHeaderTitle = `${t('datainspector.sql_statement_title_prefix', 'SQL-Statement')} (${sqlWorkspaceStatementName})${showSqlHeaderDirty ? ' *' : ''}`;
+    useEffect(() => {
+        if (isSqlHeaderHydrating) return;
+        const label = (activeSqlTemplateMeta.name || '').trim();
+        if (label) {
+            setCachedSqlHeaderName(label);
+        }
+        setCachedSqlHeaderStatementId(activeSqlStatementId || '');
+        setCachedSqlHeaderDirty(hasUnsavedSqlChanges);
+    }, [activeSqlStatementId, activeSqlTemplateMeta.name, hasUnsavedSqlChanges, isSqlHeaderHydrating, setCachedSqlHeaderDirty, setCachedSqlHeaderName, setCachedSqlHeaderStatementId]);
     const canResetSqlWorkspace = Boolean(activeSqlStatementId) || hasUnsavedSqlChanges || Boolean((activeSqlTemplateMeta.name || '').trim());
     const showSqlEditorPane = sqlWorkspaceSplitView || sqlWorkspaceView === 'sql';
     const showSqlOutputPane = sqlWorkspaceSplitView || sqlWorkspaceView !== 'sql';
@@ -1658,38 +1742,65 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     useEffect(() => {
         if (hasRestoredLastOpenSqlRef.current) return;
         if (mode !== 'sql' && fixedMode !== 'sql') return;
-        if (!sqlStatements.length) return;
+        if (!sqlStatements.length) {
+            if (sqlStatementsLoaded) {
+                hasRestoredLastOpenSqlRef.current = true;
+                finishSqlHeaderHydration();
+            }
+            return;
+        }
         hasRestoredLastOpenSqlRef.current = true;
-        if (activeSqlStatementId) return;
-        if (!lastOpenSqlStatementId) return;
+        if (activeSqlStatementId) {
+            finishSqlHeaderHydration();
+            return;
+        }
+        if (!lastOpenSqlStatementId) {
+            finishSqlHeaderHydration();
+            return;
+        }
         const statement = sqlStatements.find((stmt) => stmt.id === lastOpenSqlStatementId);
-        if (!statement) return;
+        if (!statement) {
+            finishSqlHeaderHydration();
+            return;
+        }
         const currentSqlNormalized = normalizeSql(inputSql);
         const statementSqlNormalized = normalizeSql(statement.sql_text);
         if (!inputSql.trim()) {
-            void applySqlStatement(statement, false);
+            void applySqlStatement(statement, false).finally(() => {
+                finishSqlHeaderHydration();
+            });
             return;
         }
-        if (currentSqlNormalized === statementSqlNormalized) {
-            setActiveSqlStatementId(statement.id);
-            setLoadedSqlTemplateMeta({
-                name: statement.name,
-                description: (statement.description || '').trim()
-            });
-            setSqlSavedSnapshot({ id: statement.id, normalizedSql: statementSqlNormalized });
-        }
+        setActiveSqlStatementId(statement.id);
+        setLoadedSqlTemplateMeta({
+            name: statement.name,
+            description: (statement.description || '').trim()
+        });
+        // Keep base snapshot tied to the restored statement. If SQL differs, dirty state remains true.
+        setSqlSavedSnapshot({ id: statement.id, normalizedSql: statementSqlNormalized });
+        finishSqlHeaderHydration();
     }, [
         activeSqlStatementId,
         applySqlStatement,
+        finishSqlHeaderHydration,
         fixedMode,
         inputSql,
         normalizeSql,
         lastOpenSqlStatementId,
         mode,
+        sqlStatementsLoaded,
         setLoadedSqlTemplateMeta,
         setSqlSavedSnapshot,
         sqlStatements
     ]);
+    useEffect(() => {
+        return () => {
+            if (sqlHeaderHydrationTimerRef.current !== null) {
+                window.clearTimeout(sqlHeaderHydrationTimerRef.current);
+                sqlHeaderHydrationTimerRef.current = null;
+            }
+        };
+    }, []);
 
     const toggleAssistantPanel = useCallback((panel: 'table' | 'columns' | 'aggregation' | 'grouping' | 'filter' | 'sorting' | 'preview') => {
         setAssistantPanels(prev => ({

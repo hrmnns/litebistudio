@@ -18,6 +18,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Dashboard and Reporting action placement was normalized:
   - moved context actions from top header actions into local lower toolbars where they match workflow context.
   - migrated selected actions to icon-only controls with tooltips for visual consistency.
+- Dashboard widget runtime performance was improved:
+  - added query-result caching in `WidgetRenderer` (keyed by visualization type + effective SQL, with TTL) to reduce repeated heavy widget queries on dashboard reopen/re-render.
+  - widget query loading now uses cache-first behavior with background revalidation through the shared async cache flow.
+- SQL Workspace persistence and return behavior were improved:
+  - SQL editor content and last executed SQL are now persisted and restored across page switches.
+  - SQL result rendering now uses cached result reuse for repeated executions/returns, reducing unnecessary re-runs.
+  - SQL Workspace header hydration now restores name/status more smoothly on page return (reduced title/status jitter).
+- Widget editor persistence and header stability were improved:
+  - widget run results are cached and reused on return (`stale-while-revalidate`) for faster reopen behavior.
+  - header hydration now restores title state from cache and applies a short stabilization window to avoid fast title flicker on mount.
+- Worklist loading and interaction performance were improved:
+  - replaced per-item existence checks with grouped, batched table-level existence verification (with safe fallback path).
+  - optimized client-side filtering/sorting/stat derivations via memoization to reduce repeated render work.
+  - introduced optimistic updates for status/priority/due-date/batch/remove operations and reduced full-list reload churn.
+  - added silent reconcile/debounced self-update handling for DB change events to reduce visible table flicker after local updates.
+
+### Fixed
+- Removed temporary widget debug footer output from the widget editor preview footer.
+- Fixed SQL Workspace restore behavior where dirty statements could temporarily show as `Unbenannt *` instead of restoring the last opened statement metadata.
+- Fixed header dirty-state presentation in Widget/SQL workspaces during initial hydration:
+  - dirty marker and save affordance now wait until hydration is complete, avoiding misleading short-lived state transitions.
 
 ## [1.5.0] - 2026-03-08
 

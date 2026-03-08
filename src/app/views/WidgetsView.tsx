@@ -45,6 +45,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 const logger = createLogger('WidgetsView');
 const WIDGET_QUERY_TIMEOUT_MS = 15_000;
 const WIDGET_RUN_ERR_UNKNOWN = '__WIDGET_RUN_UNKNOWN__';
+const HEADER_HYDRATION_MIN_MS = 120;
 const CONTENT_VIS_TYPES = new Set<VisualizationType>(['text', 'markdown', 'status', 'section', 'kpi_manual', 'image']);
 const QUERY_VIS_OPTIONS: Array<{ id: VisualizationType; icon: React.ComponentType<{ className?: string }>; labelKey: string; fallback: string }> = [
     { id: 'table', icon: TableIcon, labelKey: 'querybuilder.table', fallback: 'Table' },
@@ -95,6 +96,42 @@ const parseMaybeJson = (value: unknown): unknown => {
         return value;
     }
 };
+interface WidgetRunCacheEntry {
+    widgetId: string;
+    normalizedSql: string;
+    rows: DbRow[];
+    cachedAt: number;
+}
+const WIDGET_RUN_CACHE_MAX_ENTRIES = 12;
+const widgetRunCache = new Map<string, WidgetRunCacheEntry>();
+
+const getCachedWidgetRun = (widgetId: string, normalizedSql: string): WidgetRunCacheEntry | null => {
+    const key = widgetId.trim();
+    if (!key || !normalizedSql) return null;
+    const entry = widgetRunCache.get(key);
+    if (!entry || entry.normalizedSql !== normalizedSql) return null;
+    // Touch entry for a simple LRU behavior.
+    widgetRunCache.delete(key);
+    widgetRunCache.set(key, entry);
+    return entry;
+};
+
+const setCachedWidgetRun = (widgetId: string, normalizedSql: string, rows: DbRow[]): void => {
+    const key = widgetId.trim();
+    if (!key || !normalizedSql) return;
+    widgetRunCache.set(key, {
+        widgetId: key,
+        normalizedSql,
+        rows: Array.isArray(rows) ? [...rows] : [],
+        cachedAt: Date.now()
+    });
+    while (widgetRunCache.size > WIDGET_RUN_CACHE_MAX_ENTRIES) {
+        const oldestKey = widgetRunCache.keys().next().value as string | undefined;
+        if (!oldestKey) break;
+        widgetRunCache.delete(oldestKey);
+    }
+};
+
 export const WidgetsView: React.FC = () => {
     const { t, i18n } = useTranslation();
     const [sql, setSql] = useState(DEFAULT_SQL);
@@ -106,6 +143,10 @@ export const WidgetsView: React.FC = () => {
     const [previewTab, setPreviewTab] = useLocalStorage<'graphic' | 'table' | 'sql'>('widgets_preview_tab', 'graphic');
     const [savedSnapshot, setSavedSnapshot] = useState('');
     const [pendingBaselineSync, setPendingBaselineSync] = useState(false);
+    const [isHeaderHydrating, setIsHeaderHydrating] = useState(true);
+    const [cachedHeaderName, setCachedHeaderName] = useLocalStorage<string>('widgets_header_name_cache_v1', '');
+    const [, setCachedHeaderDirty] = useLocalStorage<boolean>('widgets_header_dirty_cache_v1', false);
+    const [, setCachedHeaderWidgetId] = useLocalStorage<string>('widgets_header_widget_id_cache_v1', '');
 
     // Mode State
     const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
@@ -158,6 +199,28 @@ export const WidgetsView: React.FC = () => {
     const { isExporting, exportToPdf } = useReportExport();
     const { togglePresentationMode, isReadOnly } = useDashboard();
     const hasRestoredLastWidgetRef = useRef(false);
+    const headerHydrationStartedAtRef = useRef(Date.now());
+    const headerHydrationTimerRef = useRef<number | null>(null);
+    const finishHeaderHydration = useCallback(() => {
+        if (!isHeaderHydrating) return;
+        const elapsed = Date.now() - headerHydrationStartedAtRef.current;
+        const remaining = HEADER_HYDRATION_MIN_MS - elapsed;
+        if (remaining <= 0) {
+            if (headerHydrationTimerRef.current !== null) {
+                window.clearTimeout(headerHydrationTimerRef.current);
+                headerHydrationTimerRef.current = null;
+            }
+            setIsHeaderHydrating(false);
+            return;
+        }
+        if (headerHydrationTimerRef.current !== null) {
+            window.clearTimeout(headerHydrationTimerRef.current);
+        }
+        headerHydrationTimerRef.current = window.setTimeout(() => {
+            setIsHeaderHydrating(false);
+            headerHydrationTimerRef.current = null;
+        }, remaining);
+    }, [isHeaderHydrating]);
     const openConfigPanel = useCallback(() => {
         setPreviewTab('graphic');
         setIsConfigPanelOpen(true);
@@ -324,7 +387,11 @@ export const WidgetsView: React.FC = () => {
 
     const handleRun = useCallback(async (
         overrideSql?: string,
-        options?: { preserveVisualization?: boolean; onError?: (message: string) => void }
+        options?: {
+            preserveVisualization?: boolean;
+            onError?: (message: string) => void;
+            cacheTarget?: { widgetId: string; normalizedSql?: string };
+        }
     ): Promise<boolean> => {
         setLoading(true);
         setError('');
@@ -350,6 +417,11 @@ export const WidgetsView: React.FC = () => {
             }
             setResults(data);
             setLastRunSql(sqlToExecute);
+            const normalizedSql = options?.cacheTarget?.normalizedSql || normalizeSqlText(sqlToExecute);
+            const cacheWidgetId = options?.cacheTarget?.widgetId || activeWidgetId || '';
+            if (cacheWidgetId && normalizedSql) {
+                setCachedWidgetRun(cacheWidgetId, normalizedSql, data);
+            }
             if (!options?.preserveVisualization && data.length > 0) {
                 const numericCols = Object.keys(data[0]).filter(k => typeof data[0][k] === 'number');
                 const textCols = Object.keys(data[0]).filter(k => typeof data[0][k] === 'string');
@@ -374,7 +446,7 @@ export const WidgetsView: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [sql, visConfig.xAxis]);
+    }, [sql, visConfig.xAxis, activeWidgetId]);
 
     const loadWidget = useCallback(async (widget: SavedWidget, navigate = true): Promise<void> => {
         setPendingBaselineSync(true);
@@ -440,7 +512,20 @@ export const WidgetsView: React.FC = () => {
             }
         } else {
             setSql(widgetSql);
-            await handleRun(widgetSql, { preserveVisualization: true });
+            const normalizedWidgetSql = normalizeSqlText(widgetSql);
+            const cachedRun = getCachedWidgetRun(widget.id, normalizedWidgetSql);
+            if (cachedRun) {
+                setResults(cachedRun.rows);
+                setLastRunSql(widgetSql);
+                setError('');
+            }
+            await handleRun(widgetSql, {
+                preserveVisualization: true,
+                cacheTarget: {
+                    widgetId: widget.id,
+                    normalizedSql: normalizedWidgetSql
+                }
+            });
             if (navigate) {
                 setGuidedStep(3);
                 setSidebarTab('visual');
@@ -490,7 +575,7 @@ export const WidgetsView: React.FC = () => {
                     currentBuilderMode: builderMode,
                     currentQueryConfig: builderMode === 'visual' ? queryConfig : undefined,
                     currentVisType: visType,
-                    currentVisConfig: { ...visConfig, type: visType },
+                    currentVisConfig: visConfig,
                     currentWidgetName: widget.name,
                     currentActiveWidgetId: widget.id
                 }));
@@ -786,22 +871,42 @@ export const WidgetsView: React.FC = () => {
         if (!savedWidgets || savedWidgets.length === 0) return;
         if (!lastOpenWidgetId) {
             hasRestoredLastWidgetRef.current = true;
+            finishHeaderHydration();
             return;
         }
         if (activeWidgetId) {
             hasRestoredLastWidgetRef.current = true;
+            finishHeaderHydration();
             return;
         }
         const saved = savedWidgetsById.get(lastOpenWidgetId);
         if (!saved) {
             setLastOpenWidgetId('');
             hasRestoredLastWidgetRef.current = true;
+            finishHeaderHydration();
             return;
         }
         hasRestoredLastWidgetRef.current = true;
         setSourceSelectTab('widget');
-        void loadWidget(saved, false);
-    }, [activeWidgetId, lastOpenWidgetId, loadWidget, savedWidgets, savedWidgetsById, setLastOpenWidgetId]);
+        void loadWidget(saved, false).finally(() => {
+            finishHeaderHydration();
+        });
+    }, [activeWidgetId, finishHeaderHydration, lastOpenWidgetId, loadWidget, savedWidgets, savedWidgetsById, setLastOpenWidgetId]);
+    useEffect(() => {
+        if (!isHeaderHydrating) return;
+        if (!savedWidgets) return;
+        if (savedWidgets.length === 0) {
+            finishHeaderHydration();
+        }
+    }, [finishHeaderHydration, isHeaderHydrating, savedWidgets]);
+    useEffect(() => {
+        return () => {
+            if (headerHydrationTimerRef.current !== null) {
+                window.clearTimeout(headerHydrationTimerRef.current);
+                headerHydrationTimerRef.current = null;
+            }
+        };
+    }, []);
 
     const hasSelectedSqlStatement = Boolean((selectedSqlStatementId || '').trim());
     const resultColumns = useMemo(
@@ -1011,7 +1116,7 @@ export const WidgetsView: React.FC = () => {
         [buildSnapshot]
     );
     const hasUnsavedChanges = savedSnapshot.length > 0 && currentSnapshot !== savedSnapshot;
-    const canSaveCurrentWidget = !saveDisabled && hasUnsavedChanges;
+    const canSaveCurrentWidget = !isHeaderHydrating && !saveDisabled && hasUnsavedChanges;
     const applySqlStatementSource = useCallback((statement: SqlStatementRecord) => {
         setSelectedSqlStatementId(statement.id);
         setQueryConfig(undefined);
@@ -1303,9 +1408,13 @@ export const WidgetsView: React.FC = () => {
                 return { icon: <Layout className={iconClass} />, label: previewVisType.toUpperCase() };
         }
     }, [previewVisType, t]);
-    const activeWidgetLabel = (widgetName || '').trim() || t('common.untitled', 'Unbenannt');
+    const liveWidgetLabel = (widgetName || '').trim();
+    const activeWidgetLabel = liveWidgetLabel
+        || (isHeaderHydrating ? (cachedHeaderName || '').trim() : '')
+        || t('common.untitled', 'Unbenannt');
     const previewHeaderTitle = `Widget (${activeWidgetLabel})`;
-    const previewHeaderTitleWithDirty = hasUnsavedChanges ? `${previewHeaderTitle} *` : previewHeaderTitle;
+    const showHeaderDirty = !isHeaderHydrating && hasUnsavedChanges;
+    const previewHeaderTitleWithDirty = showHeaderDirty ? `${previewHeaderTitle} *` : previewHeaderTitle;
     const activeWidgetRecord = useMemo(
         () => (activeWidgetId ? (savedWidgetsById.get(activeWidgetId) || null) : null),
         [activeWidgetId, savedWidgetsById]
@@ -1319,24 +1428,6 @@ export const WidgetsView: React.FC = () => {
         if (Number.isNaN(date.getTime())) return '-';
         return date.toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-US');
     }, [activeWidgetId, activeWidgetRecord?.created_at, activeWidgetRecord?.updated_at, i18n.language, localWidgetSavedAtById]);
-    const widgetDebugSummary = useMemo(() => {
-        const sqlTrimmed = sql.trim();
-        const lastRunTrimmed = lastRunSql.trim();
-        const errorShort = (error || '').trim();
-        const normalizedMatch = sqlTrimmed.length > 0 && lastRunTrimmed.length > 0 && sqlTrimmed === lastRunTrimmed;
-        return [
-            `src=${sourceSelectTab}`,
-            `rows=${results.length}`,
-            `stmt=${selectedSqlStatementId || '-'}`,
-            `sql=${sqlTrimmed.length}`,
-            `last=${lastRunTrimmed.length}`,
-            `match=${normalizedMatch ? 'yes' : 'no'}`,
-            `loading=${loading ? 'yes' : 'no'}`,
-            `tab=${previewTab}`,
-            `type=${visType}`,
-            `err=${errorShort ? 'yes' : 'no'}`
-        ].join(' | ');
-    }, [error, lastRunSql, loading, previewTab, results.length, selectedSqlStatementId, sourceSelectTab, sql, visType]);
     const previewTooltipContentStyle: React.CSSProperties = {
         borderRadius: '12px',
         border: isDarkSqlPreview ? '1px solid #334155' : '1px solid #e2e8f0',
@@ -1435,6 +1526,15 @@ export const WidgetsView: React.FC = () => {
             setSavedSnapshot(currentSnapshot);
         }
     }, [savedSnapshot, currentSnapshot]);
+    useEffect(() => {
+        if (isHeaderHydrating) return;
+        const label = (widgetName || '').trim();
+        if (label) {
+            setCachedHeaderName(label);
+        }
+        setCachedHeaderWidgetId(activeWidgetId || '');
+        setCachedHeaderDirty(hasUnsavedChanges);
+    }, [activeWidgetId, hasUnsavedChanges, isHeaderHydrating, setCachedHeaderDirty, setCachedHeaderName, setCachedHeaderWidgetId, widgetName]);
 
     useEffect(() => {
         if (!pendingBaselineSync) return;
@@ -2902,10 +3002,6 @@ export const WidgetsView: React.FC = () => {
                                     <span className="inline-flex items-center gap-1">
                                         <span className="font-semibold uppercase tracking-wide">{t('datainspector.last_saved_at', 'Letzte Speicherung')}:</span>
                                         <code className="font-mono text-[10px]" title={activeWidgetLastSaved}>{activeWidgetLastSaved}</code>
-                                    </span>
-                                    <span className="inline-flex items-center gap-1">
-                                        <span className="font-semibold uppercase tracking-wide">Debug:</span>
-                                        <code className="font-mono text-[10px]" title={widgetDebugSummary}>{widgetDebugSummary}</code>
                                     </span>
                                 </div>
                             </div>

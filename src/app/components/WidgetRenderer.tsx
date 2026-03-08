@@ -2,6 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
+import { queryCache } from '../../lib/cache';
 import { DataTable } from '../../components/ui/DataTable';
 import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
@@ -37,6 +38,7 @@ interface WidgetRendererProps {
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const DASHBOARD_WIDGET_QUERY_TTL_MS = 90_000;
 
 const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, description, headerActions, globalFilters, showInspectorJump = false, inspectorReturnHash }) => {
     const { t } = useTranslation();
@@ -96,6 +98,12 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
     }, [sql, globalFilters]);
 
     const canOpenInInspector = showInspectorJump && /^\s*SELECT\b/i.test(effectiveSql);
+    const widgetQueryCacheKey = useMemo(() => {
+        const normalizedType = String(config.type || '').trim().toLowerCase();
+        const normalizedSql = String(effectiveSql || '').trim();
+        if (!normalizedSql) return '';
+        return `widget-renderer:${normalizedType}:${normalizedSql}`;
+    }, [config.type, effectiveSql]);
     const handleOpenInInspector = React.useCallback(() => {
         if (!canOpenInInspector) return;
         localStorage.setItem(TABLES_PENDING_SQL_KEY, effectiveSql);
@@ -115,9 +123,17 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
         async () => {
             if (config.type === 'text' || config.type === 'markdown' || config.type === 'status' || config.type === 'section' || config.type === 'kpi_manual' || config.type === 'kpu_manual' || config.type === 'image') return [];
             if (!effectiveSql) return [];
+            if (widgetQueryCacheKey) {
+                const cachedRows = queryCache.get<DbRow[]>(widgetQueryCacheKey);
+                if (cachedRows) return cachedRows;
+            }
             return await SystemRepository.executeRaw(effectiveSql);
         },
-        [effectiveSql, config.type]
+        [effectiveSql, config.type, widgetQueryCacheKey],
+        {
+            cacheKey: widgetQueryCacheKey || undefined,
+            ttl: DASHBOARD_WIDGET_QUERY_TTL_MS
+        }
     );
     const imageUrlForError = (config.imageUrl || '').trim();
     const [imageLoadFailed, setImageLoadFailed] = React.useState(false);

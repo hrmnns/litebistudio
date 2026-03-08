@@ -107,6 +107,10 @@ export const SettingsView: React.FC = () => {
     const handleResetSqlWorkspaceLayout = async () => {
         if (!(await confirmAction(t('settings.sql_workspace_reset_layout_confirm')))) return;
         localStorage.removeItem('sql_workspace_sql_editor_height');
+        localStorage.removeItem('tables_sql_workspace_view_v1');
+        localStorage.removeItem('tables_sql_workspace_split_view_v1');
+        localStorage.removeItem('tables_sql_workspace_split_top_height_v1');
+        localStorage.removeItem('tables_sql_workspace_tab_v1');
         await appDialog.info(t('settings.sql_workspace_reset_layout_done'));
     };
 
@@ -117,7 +121,22 @@ export const SettingsView: React.FC = () => {
         localStorage.removeItem('tables_custom_sql_templates');
         localStorage.removeItem('tables_selected_custom_template');
         localStorage.removeItem('tables_last_select_sql');
+        localStorage.removeItem('tables_sql_workspace_input_v1');
+        localStorage.removeItem('tables_sql_workspace_execution_sql_v1');
+        localStorage.removeItem('tables_sql_header_name_cache_v1');
+        localStorage.removeItem('tables_sql_header_dirty_cache_v1');
+        localStorage.removeItem('tables_sql_header_statement_id_cache_v1');
+        localStorage.removeItem('sql_workspace_last_open_statement_id');
         await appDialog.info(t('settings.sql_workspace_reset_sql_done'));
+    };
+
+    const handleClearWidgetsMemory = async () => {
+        if (!(await confirmAction(t('settings.widgets_reset_memory_confirm', 'Clear widget workspace memory?')))) return;
+        localStorage.removeItem('widgets_header_name_cache_v1');
+        localStorage.removeItem('widgets_header_dirty_cache_v1');
+        localStorage.removeItem('widgets_header_widget_id_cache_v1');
+        localStorage.removeItem('widgets_last_open_widget_id');
+        await appDialog.info(t('settings.widgets_reset_memory_done', 'Widget workspace memory was cleared.'));
     };
 
     const handleSavePin = async () => {
@@ -536,6 +555,38 @@ export const SettingsView: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                    <Activity className="w-4 h-4 text-blue-500" />
+                                </span>
+                                {t('settings.logging_title', 'Logging')}
+                            </h3>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    {t('settings.logging_hint', 'Control diagnostic logging detail in the browser.')}
+                                </p>
+                                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.log_level')}</label>
+                                    <select
+                                        value={appLogLevel}
+                                        onChange={(e) => {
+                                            const next = e.target.value as AppLogLevel;
+                                            setAppLogLevel(next);
+                                            window.dispatchEvent(new CustomEvent('app-log-level-changed', { detail: { level: next } }));
+                                        }}
+                                        className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
+                                    >
+                                        <option value="off">{t('settings.log_level_off')}</option>
+                                        <option value="error">{t('settings.log_level_error')}</option>
+                                        <option value="warn">{t('settings.log_level_warn')}</option>
+                                        <option value="info">{t('settings.log_level_info')}</option>
+                                        <option value="debug">{t('settings.log_level_debug')}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -719,8 +770,17 @@ export const SettingsView: React.FC = () => {
                         </h3>
                         <div className="space-y-5">
                             <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.querybuilder_hint')}</p>
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                {t('settings.querybuilder_no_tunable_options', 'Derzeit sind keine weiteren Widgets-spezifischen Optionen erforderlich.')}
+                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    {t('settings.widgets_reset_title', 'Reset')}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={handleClearWidgetsMemory}
+                                    className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                >
+                                    {t('settings.widgets_reset_memory', 'Clear widget workspace memory')}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1170,24 +1230,6 @@ export const SettingsView: React.FC = () => {
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.notifications_confirm_destructive')}</span>
                                 <input type="checkbox" className="h-4 w-4" checked={confirmDestructive} onChange={() => setConfirmDestructive(!confirmDestructive)} />
                             </label>
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.log_level')}</label>
-                                <select
-                                    value={appLogLevel}
-                                    onChange={(e) => {
-                                        const next = e.target.value as AppLogLevel;
-                                        setAppLogLevel(next);
-                                        window.dispatchEvent(new CustomEvent('app-log-level-changed', { detail: { level: next } }));
-                                    }}
-                                    className="w-full sm:w-52 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm"
-                                >
-                                    <option value="off">{t('settings.log_level_off')}</option>
-                                    <option value="error">{t('settings.log_level_error')}</option>
-                                    <option value="warn">{t('settings.log_level_warn')}</option>
-                                    <option value="info">{t('settings.log_level_info')}</option>
-                                    <option value="debug">{t('settings.log_level_debug')}</option>
-                                </select>
-                            </div>
                         </div>
                     </div>
                 )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClipboardList, Trash2, ExternalLink, AlertCircle, CheckCircle2, Circle, Clock, Search, MessageSquare, CheckSquare, Square, CalendarClock } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
@@ -37,6 +37,12 @@ interface WorklistItem {
     created_at: string;
     _exists?: boolean;
 }
+type WorklistUpdatePayload = {
+    status?: WorklistStatus;
+    comment?: string;
+    priority?: WorklistPriority;
+    due_at?: string | null;
+};
 
 export const WorklistView: React.FC = () => {
     const { t } = useTranslation();
@@ -62,40 +68,151 @@ export const WorklistView: React.FC = () => {
     const [selectedItem, setSelectedItem] = useState<WorklistItem | null>(null);
     const [sourceData, setSourceData] = useState<Record<string, unknown>[]>([]);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const suppressDbReloadUntilRef = useRef(0);
+    const silentReconcileTimerRef = useRef<number | null>(null);
 
-    const loadWorklist = useCallback(async () => {
-        setLoading(true);
-        const data = await SystemRepository.getWorklist() as unknown as WorklistItem[];
+    const loadWorklist = useCallback(async (options?: { silent?: boolean }) => {
+        if (!options?.silent) {
+            setLoading(true);
+        }
+        try {
+            const data = await SystemRepository.getWorklist() as unknown as WorklistItem[];
+            if (data.length === 0) {
+                setItems([]);
+                return;
+            }
 
-        // Add existence check for each item
-        const enriched = await Promise.all(data.map(async (item) => {
-            const exists = await SystemRepository.checkRecordExists(item.source_table, item.source_id);
-            return { ...item, _exists: exists };
-        }));
+            const groupedByTable = new Map<string, WorklistItem[]>();
+            for (const item of data) {
+                const table = String(item.source_table || '').trim();
+                if (!table) continue;
+                const bucket = groupedByTable.get(table);
+                if (bucket) {
+                    bucket.push(item);
+                } else {
+                    groupedByTable.set(table, [item]);
+                }
+            }
 
-        setItems(enriched);
-        setLoading(false);
+            const existsByItemId = new Map<number, boolean>();
+            await Promise.all(Array.from(groupedByTable.entries()).map(async ([tableName, tableItems]) => {
+                try {
+                    const schema = await SystemRepository.getTableSchema(tableName);
+                    const pk = schema.find((c: TableColumn) => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
+                    const idColumn = pk || 'rowid';
+                    const uniqueSourceIds = Array.from(new Set(tableItems.map((item) => String(item.source_id))));
+                    const foundSourceIds = new Set<string>();
+                    const chunkSize = 200;
+
+                    for (let index = 0; index < uniqueSourceIds.length; index += chunkSize) {
+                        const chunk = uniqueSourceIds.slice(index, index + chunkSize);
+                        if (chunk.length === 0) continue;
+                        const placeholders = chunk.map(() => '?').join(', ');
+                        const rows = await SystemRepository.executeRaw(
+                            `SELECT "${idColumn}" AS _exists_id FROM "${tableName}" WHERE "${idColumn}" IN (${placeholders})`,
+                            chunk
+                        ) as Record<string, unknown>[];
+                        for (const row of rows) {
+                            foundSourceIds.add(String(row._exists_id));
+                        }
+                    }
+
+                    for (const item of tableItems) {
+                        existsByItemId.set(item.id, foundSourceIds.has(String(item.source_id)));
+                    }
+                } catch {
+                    // Keep behavior robust for odd schemas/tables: fallback to per-item check only for this table.
+                    await Promise.all(tableItems.map(async (item) => {
+                        const exists = await SystemRepository.checkRecordExists(item.source_table, item.source_id);
+                        existsByItemId.set(item.id, exists);
+                    }));
+                }
+            }));
+
+            const enriched = data.map((item) => ({
+                ...item,
+                _exists: existsByItemId.get(item.id) ?? false
+            }));
+            setItems(enriched);
+        } finally {
+            if (!options?.silent) {
+                setLoading(false);
+            }
+        }
     }, []);
+    const scheduleSilentReconcile = useCallback(() => {
+        suppressDbReloadUntilRef.current = Date.now() + 900;
+        if (silentReconcileTimerRef.current !== null) {
+            window.clearTimeout(silentReconcileTimerRef.current);
+        }
+        silentReconcileTimerRef.current = window.setTimeout(() => {
+            void loadWorklist({ silent: true });
+            silentReconcileTimerRef.current = null;
+        }, 950);
+    }, [loadWorklist]);
 
     useEffect(() => {
         const initialLoadHandle = window.setTimeout(() => {
             void loadWorklist();
         }, 0);
 
-        window.addEventListener('db-updated', loadWorklist);
-        window.addEventListener('db-changed', loadWorklist);
+        const onDbChanged = () => {
+            if (Date.now() < suppressDbReloadUntilRef.current) return;
+            void loadWorklist({ silent: true });
+        };
+        window.addEventListener('db-updated', onDbChanged);
+        window.addEventListener('db-changed', onDbChanged);
         return () => {
             window.clearTimeout(initialLoadHandle);
-            window.removeEventListener('db-updated', loadWorklist);
-            window.removeEventListener('db-changed', loadWorklist);
+            if (silentReconcileTimerRef.current !== null) {
+                window.clearTimeout(silentReconcileTimerRef.current);
+            }
+            window.removeEventListener('db-updated', onDbChanged);
+            window.removeEventListener('db-changed', onDbChanged);
         };
     }, [loadWorklist]);
 
     const handleRemove = async (id: number) => {
         if (isReadOnly) return;
-        await SystemRepository.removeWorklistItemById(id);
-        await loadWorklist();
+        scheduleSilentReconcile();
+        let snapshot: WorklistItem[] = [];
+        setItems((prev) => {
+            snapshot = prev;
+            return prev.filter((item) => item.id !== id);
+        });
+        setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+        setPreviewItemId((prev) => (prev === id ? null : prev));
+        try {
+            await SystemRepository.removeWorklistItemById(id);
+        } catch (err) {
+            logger.error('Failed to remove worklist item optimistically', err);
+            setItems(snapshot);
+            await loadWorklist();
+        }
     };
+
+    const updateWorklistItemsOptimistically = useCallback(async (ids: number[], data: WorklistUpdatePayload) => {
+        if (ids.length === 0 || isReadOnly) return;
+        scheduleSilentReconcile();
+        const idSet = new Set(ids);
+        let snapshot: WorklistItem[] = [];
+        const nextUpdatedAt = new Date().toISOString();
+        setItems((prev) => {
+            snapshot = prev;
+            return prev.map((item) => (
+                idSet.has(item.id)
+                    ? { ...item, ...data, updated_at: nextUpdatedAt }
+                    : item
+            ));
+        });
+        try {
+            await Promise.all(ids.map((id) => SystemRepository.updateWorklistItem(id, data)));
+        } catch (err) {
+            logger.error('Failed to update worklist item optimistically', err);
+            setItems(snapshot);
+            await loadWorklist();
+        }
+    }, [isReadOnly, loadWorklist, scheduleSilentReconcile]);
 
     const handleOpenDetail = async (item: WorklistItem) => {
         let results: Record<string, unknown>[] = [];
@@ -173,41 +290,56 @@ export const WorklistView: React.FC = () => {
         low: 1
     };
 
-    const filteredItems = items
-        .filter(item => filter === 'all' || item.status === filter)
-        .filter(item => !hideCompleted || (item.status !== 'done' && item.status !== 'closed'))
-        .filter(item => {
-            if (quickFilter === 'none') return true;
-            if (quickFilter === 'overdue') return item.status !== 'done' && item.status !== 'closed' && isOverdue(item.due_at);
-            if (quickFilter === 'today') return isDueToday(item.due_at);
-            if (quickFilter === 'high_priority') return item.priority === 'high' || item.priority === 'critical';
-            return true;
-        })
-        .filter(item =>
-            item.display_label?.toLowerCase().includes(search.toLowerCase()) ||
-            item.source_table?.toLowerCase().includes(search.toLowerCase()) ||
-            item.comment?.toLowerCase().includes(search.toLowerCase())
-        )
-        .sort((a, b) => {
-            const overdueScoreA = isOverdue(a.due_at) && a.status !== 'done' && a.status !== 'closed' ? 1 : 0;
-            const overdueScoreB = isOverdue(b.due_at) && b.status !== 'done' && b.status !== 'closed' ? 1 : 0;
-            if (overdueScoreA !== overdueScoreB) return overdueScoreB - overdueScoreA;
+    const filteredItems = useMemo(() => {
+        const normalizedSearch = search.trim().toLowerCase();
+        return items
+            .filter(item => filter === 'all' || item.status === filter)
+            .filter(item => !hideCompleted || (item.status !== 'done' && item.status !== 'closed'))
+            .filter(item => {
+                if (quickFilter === 'none') return true;
+                if (quickFilter === 'overdue') return item.status !== 'done' && item.status !== 'closed' && isOverdue(item.due_at);
+                if (quickFilter === 'today') return isDueToday(item.due_at);
+                if (quickFilter === 'high_priority') return item.priority === 'high' || item.priority === 'critical';
+                return true;
+            })
+            .filter(item =>
+                !normalizedSearch ||
+                item.display_label?.toLowerCase().includes(normalizedSearch) ||
+                item.source_table?.toLowerCase().includes(normalizedSearch) ||
+                item.comment?.toLowerCase().includes(normalizedSearch)
+            )
+            .sort((a, b) => {
+                const overdueScoreA = isOverdue(a.due_at) && a.status !== 'done' && a.status !== 'closed' ? 1 : 0;
+                const overdueScoreB = isOverdue(b.due_at) && b.status !== 'done' && b.status !== 'closed' ? 1 : 0;
+                if (overdueScoreA !== overdueScoreB) return overdueScoreB - overdueScoreA;
 
-            const priorityA = priorityRank[a.priority || 'normal'];
-            const priorityB = priorityRank[b.priority || 'normal'];
-            if (priorityA !== priorityB) return priorityB - priorityA;
+                const priorityA = priorityRank[a.priority || 'normal'];
+                const priorityB = priorityRank[b.priority || 'normal'];
+                if (priorityA !== priorityB) return priorityB - priorityA;
 
-            const timeA = new Date(a.updated_at || a.created_at).getTime();
-            const timeB = new Date(b.updated_at || b.created_at).getTime();
-            return timeB - timeA;
-        });
+                const timeA = new Date(a.updated_at || a.created_at).getTime();
+                const timeB = new Date(b.updated_at || b.created_at).getTime();
+                return timeB - timeA;
+            });
+    }, [filter, hideCompleted, items, quickFilter, search]);
 
-    const selectedItems = filteredItems.filter(item => selectedIds.includes(item.id));
-    const previewItem =
-        filteredItems.find(item => item.id === previewItemId)
-        || selectedItems[0]
-        || filteredItems[0]
-        || null;
+    const selectedItems = useMemo(
+        () => filteredItems.filter(item => selectedIds.includes(item.id)),
+        [filteredItems, selectedIds]
+    );
+    const previewItem = useMemo(
+        () =>
+            filteredItems.find(item => item.id === previewItemId)
+            || selectedItems[0]
+            || filteredItems[0]
+            || null,
+        [filteredItems, previewItemId, selectedItems]
+    );
+    const focusStats = useMemo(() => ({
+        openCount: items.filter(i => i.status === 'open' || i.status === 'in_progress').length,
+        overdueCount: items.filter(i => (i.status !== 'done' && i.status !== 'closed') && isOverdue(i.due_at)).length,
+        todayCount: items.filter(i => isDueToday(i.due_at)).length
+    }), [items]);
 
     const toggleItemSelection = (id: number) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -223,8 +355,7 @@ export const WorklistView: React.FC = () => {
 
     const runBatchUpdate = async (data: { status?: string; priority?: string; due_at?: string | null }) => {
         if (selectedIds.length === 0 || isReadOnly) return;
-        await Promise.all(selectedIds.map(id => SystemRepository.updateWorklistItem(id, data)));
-        await loadWorklist();
+        await updateWorklistItemsOptimistically(selectedIds, data);
     };
 
     const plusDaysIso = (days: number) => {
@@ -278,15 +409,15 @@ export const WorklistView: React.FC = () => {
                                 <div className="grid grid-cols-3 gap-2">
                                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
                                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('worklist.focus_open', 'Offen')}</div>
-                                        <div className="text-lg font-black text-slate-800 dark:text-slate-100">{items.filter(i => i.status === 'open' || i.status === 'in_progress').length}</div>
+                                        <div className="text-lg font-black text-slate-800 dark:text-slate-100">{focusStats.openCount}</div>
                                     </div>
                                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
                                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('worklist.quick_overdue', 'Ueberfaellig')}</div>
-                                        <div className="text-lg font-black text-rose-600 dark:text-rose-300">{items.filter(i => (i.status !== 'done' && i.status !== 'closed') && isOverdue(i.due_at)).length}</div>
+                                        <div className="text-lg font-black text-rose-600 dark:text-rose-300">{focusStats.overdueCount}</div>
                                     </div>
                                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
                                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('worklist.quick_today', 'Heute')}</div>
-                                        <div className="text-lg font-black text-blue-600 dark:text-blue-300">{items.filter(i => isDueToday(i.due_at)).length}</div>
+                                        <div className="text-lg font-black text-blue-600 dark:text-blue-300">{focusStats.todayCount}</div>
                                     </div>
                                 </div>
                                 <div className="flex-1 min-h-0 rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
@@ -475,8 +606,7 @@ export const WorklistView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         e.stopPropagation();
                                                         if (isReadOnly) return;
-                                                        await SystemRepository.updateWorklistItem(item.id, { status: e.target.value });
-                                                        await loadWorklist();
+                                                        await updateWorklistItemsOptimistically([item.id], { status: e.target.value as WorklistStatus });
                                                     }}
                                                     className="h-9 w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 text-[11px] font-bold outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-300"
                                                 >
@@ -511,8 +641,7 @@ export const WorklistView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         e.stopPropagation();
                                                         if (isReadOnly) return;
-                                                        await SystemRepository.updateWorklistItem(item.id, { priority: e.target.value });
-                                                        await loadWorklist();
+                                                        await updateWorklistItemsOptimistically([item.id], { priority: e.target.value as WorklistPriority });
                                                     }}
                                                     className="h-9 w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 text-[11px] font-bold outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-300"
                                                 >
@@ -530,8 +659,7 @@ export const WorklistView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         e.stopPropagation();
                                                         if (isReadOnly) return;
-                                                        await SystemRepository.updateWorklistItem(item.id, { due_at: e.target.value || null });
-                                                        await loadWorklist();
+                                                        await updateWorklistItemsOptimistically([item.id], { due_at: e.target.value || null });
                                                     }}
                                                     className={`h-9 w-full bg-slate-50 dark:bg-slate-900 border rounded px-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20 ${isOverdue(item.due_at) && item.status !== 'done' && item.status !== 'closed'
                                                         ? 'border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300'
