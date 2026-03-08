@@ -1,7 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen, RefreshCw, Maximize2, Download, FileText, FileSpreadsheet, CircleHelp } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useDashboard } from '../../../lib/context/DashboardContext';
 import { useAsync } from '../../../hooks/useAsync';
@@ -133,7 +132,6 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     rightPanel,
 }) => {
     const { t } = useTranslation();
-    const location = useLocation();
     const { isAdminMode, isReadOnly } = useDashboard();
     const [activeQueries, setActiveQueries] = useState(0);
     const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
@@ -226,8 +224,15 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         '/settings': 'Page-Settings',
         '/about': 'Page-About'
     };
+    const currentPath = (() => {
+        if (typeof window === 'undefined') return '/';
+        const hashPath = window.location.hash?.startsWith('#/')
+            ? window.location.hash.slice(1).split('?')[0]
+            : '';
+        return hashPath || window.location.pathname || '/';
+    })();
     const resolvedHelpHref = header.help?.href
-        || `${wikiBaseUrl}/${wikiPathByRoute[location.pathname] || 'Home'}`;
+        || `${wikiBaseUrl}/${wikiPathByRoute[currentPath] || 'Home'}`;
     const helpDisabled = Boolean(header.help?.disabled) || !resolvedHelpHref;
     const helpTitle = header.help?.title || t('common.help', 'Help');
     const setRightPanelOpen = (open: boolean) => {
