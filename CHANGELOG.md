@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-03-08
+
 ### Added
 - Widget editor toolbar now includes a dedicated `Remove SQL` action to clear SQL source binding for non-data widgets without leaving the current widget.
 - Workspace state persistence was extended:
