@@ -149,14 +149,15 @@ describe('WidgetsView persistence smoke', () => {
         fireEvent.click(tableTab);
 
         await waitFor(() => {
-            expect(screen.getByText(/tab=table/)).toBeInTheDocument();
+            expect(tableTab.className).toContain('bg-blue-50');
         });
 
         rendered.unmount();
         render(<WidgetsView />);
 
         await waitFor(() => {
-            expect(screen.getByText(/tab=table/)).toBeInTheDocument();
+            const restoredTableTab = screen.getByRole('button', { name: 'Tabelle' });
+            expect(restoredTableTab.className).toContain('bg-blue-50');
         });
     });
 
@@ -173,4 +174,3 @@ describe('WidgetsView persistence smoke', () => {
         expect(screen.queryByText('Widget (Smoke Widget) *')).not.toBeInTheDocument();
     });
 });
-
