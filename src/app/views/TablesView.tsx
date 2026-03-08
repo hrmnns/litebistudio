@@ -602,7 +602,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         );
     }, [t]);
 
-    const handleSaveCustomTemplate = async () => {
+    const handleSaveCustomTemplate = useCallback(async () => {
         const trimmedSql = inputSql.trim();
         if (!trimmedSql) return false;
         const activeSqlStatement = activeSqlStatementId
@@ -695,7 +695,20 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         await loadSqlStatements();
         await showSqlSaveSuccess(name);
         return true;
-    };
+    }, [
+        SQL_LIBRARY_SCOPE,
+        activeSqlStatementId,
+        inputSql,
+        loadSqlStatements,
+        loadedSqlTemplateMeta.description,
+        loadedSqlTemplateMeta.name,
+        normalizeSql,
+        setLastSavedSqlTemplateDescription,
+        setLastSavedSqlTemplateName,
+        showSqlSaveSuccess,
+        sqlStatements,
+        t
+    ]);
     const handleSaveSqlAs = useCallback(async () => {
         const trimmedSql = inputSql.trim();
         if (!trimmedSql) return false;
@@ -770,6 +783,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         SQL_LIBRARY_SCOPE,
         setLastSavedSqlTemplateDescription,
         setLastSavedSqlTemplateName,
+        normalizeSql,
         showSqlSaveSuccess,
         t
     ]);
@@ -1617,7 +1631,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
             await executeSqlText(statement.sql_text);
         }
         await loadSqlStatements();
-    }, [executeSqlText, fixedMode, forwardSqlToWorkspace, loadSqlStatements, resetSqlOutputState, setShowSqlAssist]);
+    }, [executeSqlText, fixedMode, forwardSqlToWorkspace, loadSqlStatements, normalizeSql, resetSqlOutputState, setShowSqlAssist]);
     const handleOpenSqlStatement = useCallback(async (statement: SqlStatementRecord, runImmediately: boolean) => {
         const proceed = await confirmSaveBeforeReplaceSql();
         if (!proceed) return;

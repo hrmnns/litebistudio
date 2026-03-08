@@ -372,7 +372,7 @@ export const WidgetsView: React.FC = () => {
         }
     }, [sql, visConfig.xAxis]);
 
-    const loadWidget = async (widget: SavedWidget, navigate = true): Promise<void> => {
+    const loadWidget = useCallback(async (widget: SavedWidget, navigate = true): Promise<void> => {
         setPendingBaselineSync(true);
         let parsedVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
         let parsedVisType: VisualizationType = 'table';
@@ -451,7 +451,7 @@ export const WidgetsView: React.FC = () => {
             currentWidgetName: widget.name,
             currentActiveWidgetId: widget.id
         }));
-    };
+    }, [buildSnapshot, handleRun, setQueryConfig, setSelectedSqlStatementId, sqlStatementByNormalizedSql, sqlStatementsById]);
 
     const handleSaveWidget = useCallback(async (mode: 'update' | 'new' = 'update'): Promise<boolean> => {
         if (isReadOnly) return false;
@@ -590,10 +590,9 @@ export const WidgetsView: React.FC = () => {
         refreshWidgets,
         savedWidgets,
         savedWidgetsById,
+        setPreviewTab,
         selectedSqlStatementId,
         sql,
-        sqlStatements,
-        sqlStatementsById,
         t,
         queryConfig,
         visConfig,
@@ -1017,7 +1016,7 @@ export const WidgetsView: React.FC = () => {
         setResults([]);
         setError('');
         setPreviewTab('sql');
-    }, [setQueryConfig]);
+    }, [setPreviewTab, setQueryConfig, setSelectedSqlStatementId]);
     const confirmSaveOrDiscardBeforeContinue = useCallback(async () => {
         if (!hasUnsavedChanges) return true;
         const choice = await appDialog.confirm3(
@@ -1061,7 +1060,7 @@ export const WidgetsView: React.FC = () => {
         setGuidedStep(1);
         setSidebarTab('visual');
         setSavedSnapshot('');
-    }, [confirmSaveOrDiscardBeforeContinue]);
+    }, [confirmSaveOrDiscardBeforeContinue, setLastOpenWidgetId, setPreviewTab, setQueryConfig, setSelectedSqlStatementId]);
     const openLoadDialog = useCallback((tab: 'widget' | 'sql') => {
         setLoadDialogType(tab);
         setLoadDialogSearch('');
@@ -1197,7 +1196,7 @@ export const WidgetsView: React.FC = () => {
             setWidgetName('');
             setSavedSnapshot('');
         }
-    }, [activeWidgetId, dashboardUsageByWidgetId, refreshWidgets, t]);
+    }, [activeWidgetId, dashboardUsageByWidgetId, refreshWidgets, setLastOpenWidgetId, t]);
     const handleToggleWidgetFavorite = useCallback((widgetId: string) => {
         setPinnedWidgetIds((current) => {
             if (current.includes(widgetId)) return current.filter((entry) => entry !== widgetId);
