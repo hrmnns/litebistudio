@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Changed
+- Standardized page-header action behavior across the app via shared `PageLayout` controls:
+  - `Presentation`, `Export`, `Refresh`, and `Sidebar` now follow a consistent order and button behavior.
+  - Global header actions are now shown consistently and are disabled when not implemented (instead of disappearing).
+- Standardized top tab-strip layout spacing across major pages to remove vertical drift and align first-content positioning:
+  - aligned tab container structure for `Dashboard`, `Data Management`, `Widgets`, `Reporting`, and `Settings`.
+  - removed view-specific spacing offsets that caused inconsistent top padding and visible whitespace.
+- Dashboard and Reporting action placement was normalized:
+  - moved context actions from top header actions into local lower toolbars where they match workflow context.
+  - migrated selected actions to icon-only controls with tooltips for visual consistency.
 
 ## [1.5.0] - 2026-03-08
 
