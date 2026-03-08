@@ -800,10 +800,6 @@ export const WidgetsView: React.FC = () => {
         void loadWidget(saved, false);
     }, [activeWidgetId, lastOpenWidgetId, loadWidget, savedWidgets, savedWidgetsById, setLastOpenWidgetId]);
 
-    const selectedSqlStatement = useMemo(
-        () => (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId),
-        [sqlStatements, selectedSqlStatementId]
-    );
     const hasSelectedSqlStatement = Boolean((selectedSqlStatementId || '').trim());
     const resultColumns = useMemo(
         () => (results.length > 0 ? Object.keys(results[0]) : []),
