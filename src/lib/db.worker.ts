@@ -126,6 +126,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
     if (!databaseInstance) return;
 
     let userVersion = databaseInstance.selectValue('PRAGMA user_version') as number;
+    const finalizeMigration = (targetVersion: number, migrationName: string, ok: boolean): boolean => {
+        if (!ok) {
+            error(`Stopping migrations at ${migrationName}. Schema version remains at ${userVersion}.`);
+            return false;
+        }
+        databaseInstance.exec(`PRAGMA user_version = ${targetVersion}`);
+        userVersion = targetVersion;
+        return true;
+    };
     log(`Current database schema version: ${userVersion} (Target: ${CURRENT_SCHEMA_VERSION})`);
 
     if (userVersion >= CURRENT_SCHEMA_VERSION) {
@@ -136,14 +145,20 @@ function applyMigrations(databaseInstance: DatabaseLike) {
     // Version 1: Initial core tables
     if (userVersion < 1) {
         log('Migration V1: Initializing infrastructure schema...');
-        databaseInstance.exec(schemaSql);
-        databaseInstance.exec('PRAGMA user_version = 1');
-        userVersion = 1;
+        let migrationOk = true;
+        try {
+            databaseInstance.exec(schemaSql);
+        } catch (e) {
+            error('Migration failed for V1', e);
+            migrationOk = false;
+        }
+        if (!finalizeMigration(1, 'V1', migrationOk)) return;
     }
 
     // Version 2: Migration: sys_user_widgets -> visual_builder_config
     if (userVersion < 2) {
         log('Migration V2: Adding visual_builder_config to sys_user_widgets...');
+        let migrationOk = true;
         try {
             const columns: string[] = [];
             databaseInstance.exec({
@@ -156,14 +171,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             }
         } catch (e) {
             error('Migration failed for V2', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 2');
-        userVersion = 2;
+        if (!finalizeMigration(2, 'V2', migrationOk)) return;
     }
 
     // Version 3: Migration: sys_worklist enhancements
     if (userVersion < 3) {
         log('Migration V3: Enhancing sys_worklist...');
+        let migrationOk = true;
         try {
             const columns: string[] = [];
             databaseInstance.exec({
@@ -182,14 +198,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             }
         } catch (e) {
             error('Migration failed for V3', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 3');
-        userVersion = 3;
+        if (!finalizeMigration(3, 'V3', migrationOk)) return;
     }
 
     // Version 4: Migration: sys_report_packs and sys_dashboards
     if (userVersion < 4) {
         log('Migration V4: Adding sys_report_packs and sys_dashboards...');
+        let migrationOk = true;
         try {
             databaseInstance.exec(`
                 CREATE TABLE IF NOT EXISTS sys_report_packs (
@@ -212,27 +229,29 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             `);
         } catch (e) {
             error('Migration failed for V4', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 4');
-        userVersion = 4;
+        if (!finalizeMigration(4, 'V4', migrationOk)) return;
     }
 
     // Version 5: Introduction of the versioning system itself
     if (userVersion < 5) {
         log('Migration V5: Finalizing versioning system...');
+        let migrationOk = true;
         try {
             // Apply views as they might depend on new tables
             databaseInstance.exec(viewsSql);
-        } catch {
-            log('Warning: views.sql execution partially or fully failed');
+        } catch (e) {
+            error('Migration failed for V5', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 5');
-        userVersion = 5;
+        if (!finalizeMigration(5, 'V5', migrationOk)) return;
     }
 
     // Version 6: Migration: Unify sys_worklist statuses
     if (userVersion < 6) {
         log('Migration V6: Unifying sys_worklist statuses...');
+        let migrationOk = true;
         try {
             databaseInstance.exec("UPDATE sys_worklist SET status = 'open' WHERE status = 'pending'");
             databaseInstance.exec("UPDATE sys_worklist SET status = 'closed' WHERE status IN ('error', 'obsolete', 'clarification')");
@@ -240,14 +259,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             // 'in_progress' and 'done' (if already set) remain unchanged
         } catch (e) {
             error('Migration failed for V6', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 6');
-        userVersion = 6;
+        if (!finalizeMigration(6, 'V6', migrationOk)) return;
     }
 
     // Version 7: Migration: Add category to sys_report_packs
     if (userVersion < 7) {
         log('Migration V7: Adding category to sys_report_packs...');
+        let migrationOk = true;
         try {
             const columns: string[] = [];
             databaseInstance.exec({
@@ -261,14 +281,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             databaseInstance.exec("UPDATE sys_report_packs SET category = 'General' WHERE category IS NULL OR TRIM(category) = ''");
         } catch (e) {
             error('Migration failed for V7', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 7');
-        userVersion = 7;
+        if (!finalizeMigration(7, 'V7', migrationOk)) return;
     }
 
     // Version 8: Migration: Add reusable SQL statements library
     if (userVersion < 8) {
         log('Migration V8: Adding sys_sql_statement...');
+        let migrationOk = true;
         try {
             databaseInstance.exec(`
                 CREATE TABLE IF NOT EXISTS sys_sql_statement (
@@ -290,14 +311,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             `);
         } catch (e) {
             error('Migration failed for V8', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 8');
-        userVersion = 8;
+        if (!finalizeMigration(8, 'V8', migrationOk)) return;
     }
 
     // Version 9: Migration: Link widgets to reusable SQL statements
     if (userVersion < 9) {
         log('Migration V9: Adding sql_statement_id to sys_user_widgets...');
+        let migrationOk = true;
         try {
             const columns: string[] = [];
             databaseInstance.exec({
@@ -323,14 +345,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             `);
         } catch (e) {
             error('Migration failed for V9', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 9');
-        userVersion = 9;
+        if (!finalizeMigration(9, 'V9', migrationOk)) return;
     }
 
     // Version 10: Migration: Worklist priority and due date
     if (userVersion < 10) {
         log('Migration V10: Adding priority and due_at to sys_worklist...');
+        let migrationOk = true;
         try {
             const columns: string[] = [];
             databaseInstance.exec({
@@ -349,14 +372,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             }
         } catch (e) {
             error('Migration failed for V10', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 10');
-        userVersion = 10;
+        if (!finalizeMigration(10, 'V10', migrationOk)) return;
     }
 
     // Version 11: Migration: Persisted health snapshots for reporting
     if (userVersion < 11) {
         log('Migration V11: Adding sys_health_snapshot...');
+        let migrationOk = true;
         try {
             databaseInstance.exec(`
                 CREATE TABLE IF NOT EXISTS sys_health_snapshot (
@@ -373,14 +397,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             `);
         } catch (e) {
             error('Migration failed for V11', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 11');
-        userVersion = 11;
+        if (!finalizeMigration(11, 'V11', migrationOk)) return;
     }
 
     // Version 12: Migration: Remove legacy KPI/demo views from old data model
     if (userVersion < 12) {
         log('Migration V12: Removing legacy views from old data model...');
+        let migrationOk = true;
         try {
             databaseInstance.exec(`
                 DROP VIEW IF EXISTS kpi_history;
@@ -390,14 +415,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             `);
         } catch (e) {
             error('Migration failed for V12', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 12');
-        userVersion = 12;
+        if (!finalizeMigration(12, 'V12', migrationOk)) return;
     }
 
     // Version 13: Migration: Ensure sys_report_packs.category exists (self-heal for older backups)
     if (userVersion < 13) {
         log('Migration V13: Ensuring category in sys_report_packs...');
+        let migrationOk = true;
         try {
             const columns: string[] = [];
             databaseInstance.exec({
@@ -411,14 +437,15 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             databaseInstance.exec("UPDATE sys_report_packs SET category = 'General' WHERE category IS NULL OR TRIM(category) = ''");
         } catch (e) {
             error('Migration failed for V13', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 13');
-        userVersion = 13;
+        if (!finalizeMigration(13, 'V13', migrationOk)) return;
     }
 
     // Version 14: Migration: Ensure UNIQUE semantics for sys_sql_statement(name, scope)
     if (userVersion < 14) {
         log('Migration V14: Enforcing UNIQUE sys_sql_statement(name, scope)...');
+        let migrationOk = true;
         try {
             databaseInstance.exec(`
                 DELETE FROM sys_sql_statement
@@ -441,9 +468,9 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             databaseInstance.exec('CREATE INDEX IF NOT EXISTS idx_sys_sql_last_used ON sys_sql_statement(last_used_at DESC)');
         } catch (e) {
             error('Migration failed for V14', e);
+            migrationOk = false;
         }
-        databaseInstance.exec('PRAGMA user_version = 14');
-        userVersion = 14;
+        if (!finalizeMigration(14, 'V14', migrationOk)) return;
     }
 
     log(`Database migrated to version ${userVersion}`);
