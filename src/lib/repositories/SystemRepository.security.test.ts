@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const runQueryMock = vi.fn(async () => []);
-const runUserQueryMock = vi.fn(async () => []);
-const notifyDbChangeMock = vi.fn();
-const callRunQuery = (...args: unknown[]) => (runQueryMock as unknown as (...inner: unknown[]) => unknown)(...args);
-const callRunUserQuery = (...args: unknown[]) => (runUserQueryMock as unknown as (...inner: unknown[]) => unknown)(...args);
-const callNotifyDbChange = (...args: unknown[]) => (notifyDbChangeMock as unknown as (...inner: unknown[]) => unknown)(...args);
+const {
+    runQueryMock,
+    runUserQueryMock,
+    notifyDbChangeMock
+} = vi.hoisted(() => ({
+    runQueryMock: vi.fn(async () => []),
+    runUserQueryMock: vi.fn(async () => []),
+    notifyDbChangeMock: vi.fn()
+}));
 
 let adminMode = false;
 
 vi.mock('../db', () => ({
-    runQuery: callRunQuery,
-    runUserQuery: callRunUserQuery,
-    notifyDbChange: callNotifyDbChange,
+    runQuery: (...args: unknown[]) => (runQueryMock as unknown as (...inner: unknown[]) => unknown)(...args),
+    runUserQuery: (...args: unknown[]) => (runUserQueryMock as unknown as (...inner: unknown[]) => unknown)(...args),
+    notifyDbChange: (...args: unknown[]) => (notifyDbChangeMock as unknown as (...inner: unknown[]) => unknown)(...args),
     getDiagnostics: vi.fn(async () => ({})),
     getDatabaseHealth: vi.fn(async () => ({})),
     getStorageStatus: vi.fn(async () => ({ mode: 'opfs', reason: null })),

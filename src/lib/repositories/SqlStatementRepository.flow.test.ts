@@ -1,17 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSqlStatementRepository } from './SqlStatementRepository';
 
-const runQueryMock = vi.fn(async () => []);
-const runManagedQueryMock = vi.fn(async () => []);
-const notifyDbChangeMock = vi.fn();
-const callRunQuery = (...args: unknown[]) => (runQueryMock as unknown as (...inner: unknown[]) => unknown)(...args);
-const callRunManagedQuery = (...args: unknown[]) => (runManagedQueryMock as unknown as (...inner: unknown[]) => unknown)(...args);
-const callNotifyDbChange = (...args: unknown[]) => (notifyDbChangeMock as unknown as (...inner: unknown[]) => unknown)(...args);
+const {
+    runQueryMock,
+    runManagedQueryMock,
+    notifyDbChangeMock
+} = vi.hoisted(() => ({
+    runQueryMock: vi.fn(async () => []),
+    runManagedQueryMock: vi.fn(async () => []),
+    notifyDbChangeMock: vi.fn()
+}));
 
 vi.mock('../db', () => ({
-    runQuery: callRunQuery,
-    runManagedQuery: callRunManagedQuery,
-    notifyDbChange: callNotifyDbChange
+    runQuery: (...args: unknown[]) => (runQueryMock as unknown as (...inner: unknown[]) => unknown)(...args),
+    runManagedQuery: (...args: unknown[]) => (runManagedQueryMock as unknown as (...inner: unknown[]) => unknown)(...args),
+    notifyDbChange: (...args: unknown[]) => (notifyDbChangeMock as unknown as (...inner: unknown[]) => unknown)(...args)
 }));
 
 describe('SqlStatementRepository save/use flow', () => {

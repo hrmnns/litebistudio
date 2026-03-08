@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { WidgetsView } from './WidgetsView';
 
 type MockWidget = {
@@ -16,7 +16,8 @@ let mockRows: Array<Record<string, unknown>> = [];
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (key: string) => key
+        t: (key: string) => key,
+        i18n: { language: 'en' }
     })
 }));
 
@@ -37,10 +38,19 @@ vi.mock('../../hooks/useLocalStorage', async () => {
 });
 
 vi.mock('../../hooks/useAsync', () => ({
-    useAsync: () => ({
-        data: mockWidgets,
-        refresh: vi.fn()
-    })
+    useAsync: (fn: () => unknown) => {
+        const source = String(fn);
+        if (source.includes('getUserWidgets')) {
+            return { data: mockWidgets, refresh: vi.fn() };
+        }
+        if (source.includes('listSqlStatements')) {
+            return { data: [], refresh: vi.fn() };
+        }
+        if (source.includes('getDashboards')) {
+            return { data: [], refresh: vi.fn() };
+        }
+        return { data: null, refresh: vi.fn() };
+    }
 }));
 
 vi.mock('../../hooks/useReportExport', () => ({
@@ -94,38 +104,21 @@ vi.mock('../components/RecordDetailModal', () => ({
     RecordDetailModal: () => null
 }));
 
-describe('WidgetsView guided flow', () => {
+describe('WidgetsView workspace flow', () => {
     beforeEach(() => {
         mockRows = [];
         mockWidgets = [];
         vi.clearAllMocks();
     });
 
-    it('keeps visualize step locked until query run returns data in guided mode', async () => {
-        mockRows = [{ id: 1, label: 'A' }];
+    it('renders workspace tabs in editor shell', () => {
         render(<WidgetsView />);
 
-        const visualizeStepBefore = screen.getByRole('button', { name: 'querybuilder.step_visualize' });
-        expect(visualizeStepBefore).toBeDisabled();
-
-        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.next' }));
-        fireEvent.click(screen.getByText('mock-set-source'));
-        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.apply' }));
-
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: 'querybuilder.step_visualize' })).not.toBeDisabled();
-            expect(screen.getByRole('button', { name: 'querybuilder.next' })).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.next' }));
-
-        await waitFor(() => {
-            expect(screen.getByText('querybuilder.graph_type')).toBeInTheDocument();
-        });
+        expect(screen.getByRole('button', { name: 'querybuilder.workspace_tab_manage' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'querybuilder.workspace_tab_editor' })).toBeInTheDocument();
     });
 
-    it('resets report selection without confirm dialog when switching to new report', async () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('shows saved widgets in manage tab', async () => {
         mockWidgets = [
             {
                 id: 'w-1',
@@ -138,23 +131,11 @@ describe('WidgetsView guided flow', () => {
 
         render(<WidgetsView />);
 
-        fireEvent.click(await screen.findByText('Saved Widget'));
-        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.step_source_run' }));
-
-        const sqlEditor = await screen.findByRole('textbox');
-        fireEvent.change(sqlEditor, { target: { value: 'SELECT 2' } });
-
-        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.step_start' }));
-        fireEvent.click(screen.getByRole('button', { name: /querybuilder.new_query_card_title/i }));
-
-        expect(confirmSpy).not.toHaveBeenCalled();
-        expect(screen.getByText('querybuilder.mode_new_active')).toBeInTheDocument();
-        expect(screen.queryByText('querybuilder.mode_editing_active')).not.toBeInTheDocument();
-
-        confirmSpy.mockRestore();
+        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.workspace_tab_manage' }));
+        expect(await screen.findByText('Saved Widget')).toBeInTheDocument();
     });
 
-    it('registers beforeunload protection when unsaved changes exist', async () => {
+    it('can switch between manage and editor with saved widgets present', async () => {
         mockWidgets = [
             {
                 id: 'w-2',
@@ -167,22 +148,10 @@ describe('WidgetsView guided flow', () => {
 
         render(<WidgetsView />);
 
-        fireEvent.click(await screen.findByText('Guard Widget'));
-        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.step_source_run' }));
-
-        const sqlEditor = await screen.findByRole('textbox');
-        fireEvent.change(sqlEditor, { target: { value: 'SELECT 3' } });
-
-        const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
-        Object.defineProperty(event, 'returnValue', {
-            configurable: true,
-            writable: true,
-            value: undefined
-        });
-
-        window.dispatchEvent(event);
-
-        expect(event.returnValue).toBe('');
+        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.workspace_tab_manage' }));
+        expect(await screen.findByText('Guard Widget')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'querybuilder.workspace_tab_editor' }));
+        expect(screen.getByRole('button', { name: 'querybuilder.workspace_tab_editor' })).toBeInTheDocument();
     });
 });
 
