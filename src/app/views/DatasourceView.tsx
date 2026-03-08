@@ -55,6 +55,7 @@ interface ViewMetaStatus {
 }
 
 const logger = createLogger('DatasourceView');
+const STRUCTURE_META_BATCH_SIZE = 24;
 
 const FACTORY_RESET_LOCALSTORAGE_PREFIXES = [
     'litebistudio_',
@@ -170,6 +171,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         }
         return 'import';
     });
+    const [visibleUserTablesCount, setVisibleUserTablesCount] = useState(STRUCTURE_META_BATCH_SIZE);
+    const [visibleUserViewsCount, setVisibleUserViewsCount] = useState(STRUCTURE_META_BATCH_SIZE);
 
     useEffect(() => {
         sessionStorage.setItem('litebistudio_datasource_tab', activeTab);
@@ -449,10 +452,20 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const userTables = tables?.filter((t: string) => !isSystemTable(t)) || [];
     const systemTables = tables?.filter((t: string) => isSystemTable(t)) || [];
     const userViews = (dataSources || []).filter((s) => s.type === 'view' && !isSystemView(s.name));
+    useEffect(() => {
+        if (activeTab !== 'structure') return;
+        setVisibleUserTablesCount(Math.min(STRUCTURE_META_BATCH_SIZE, userTables.length));
+    }, [activeTab, userTables.length]);
+    useEffect(() => {
+        if (activeTab !== 'structure') return;
+        setVisibleUserViewsCount(Math.min(STRUCTURE_META_BATCH_SIZE, userViews.length));
+    }, [activeTab, userViews.length]);
+    const visibleUserTables = userTables.slice(0, visibleUserTablesCount);
+    const visibleUserViews = userViews.slice(0, visibleUserViewsCount);
     const { data: tableMetaStats } = useAsync<Record<string, TableMetaStats>>(
         async () => {
-            if (activeTab !== 'structure' || userTables.length === 0) return {};
-            const entries = await Promise.all(userTables.map(async (tableName) => {
+            if (activeTab !== 'structure' || visibleUserTables.length === 0) return {};
+            const entries = await Promise.all(visibleUserTables.map(async (tableName) => {
                 const [rowsResult, indexResult] = await Promise.all([
                     SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(tableName)}`),
                     SystemRepository.executeRaw(
@@ -470,13 +483,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             }));
             return Object.fromEntries(entries);
         },
-        [activeTab, userTables.join('|')],
-        { cacheKey: `datasource-table-meta-${userTables.join('|')}`, ttl: 15000 }
+        [activeTab, visibleUserTables.join('|')],
+        { cacheKey: `datasource-table-meta-${visibleUserTables.join('|')}`, ttl: 15000 }
     );
     const { data: viewMetaStats } = useAsync<Record<string, ViewMetaStatus>>(
         async () => {
-            if (activeTab !== 'structure' || userViews.length === 0) return {};
-            const entries = await Promise.all(userViews.map(async (view) => {
+            if (activeTab !== 'structure' || visibleUserViews.length === 0) return {};
+            const entries = await Promise.all(visibleUserViews.map(async (view) => {
                 try {
                     const rowsResult = await SystemRepository.executeRaw(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(view.name)}`);
                     return [
@@ -498,8 +511,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             }));
             return Object.fromEntries(entries);
         },
-        [activeTab, userViews.map(v => v.name).join('|')],
-        { cacheKey: `datasource-view-meta-${userViews.map(v => v.name).join('|')}`, ttl: 15000 }
+        [activeTab, visibleUserViews.map(v => v.name).join('|')],
+        { cacheKey: `datasource-view-meta-${visibleUserViews.map(v => v.name).join('|')}`, ttl: 15000 }
     );
 
     // Load Schema for selected table (Generic Import)
@@ -873,59 +886,72 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                     <p className="text-slate-400 dark:text-slate-500 text-sm">{t('datasource.no_user_tables')}</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {userTables.map((t_name: string) => (
-                                        <div key={t_name} className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between group">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600 dark:text-blue-400">
-                                                    <TableIcon className="w-4 h-4" />
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {visibleUserTables.map((t_name: string) => (
+                                            <div key={t_name} className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600 dark:text-blue-400">
+                                                        <TableIcon className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{t_name}</span>
+                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                                                            {t('datasource.table_meta_rows', { count: tableMetaStats?.[t_name]?.rows ?? 0 })}
+                                                            {' • '}
+                                                            {t('datasource.table_meta_indexes', { count: tableMetaStats?.[t_name]?.indexes ?? 0 })}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex flex-col min-w-0">
-                                                    <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{t_name}</span>
-                                                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                                                        {t('datasource.table_meta_rows', { count: tableMetaStats?.[t_name]?.rows ?? 0 })}
-                                                        {' • '}
-                                                        {t('datasource.table_meta_indexes', { count: tableMetaStats?.[t_name]?.indexes ?? 0 })}
-                                                    </span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => { setSelectedTable(t_name); setIsSchemaOpen(true); }}
+                                                        className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                                        title={t('datasource.show_schema')}
+                                                    >
+                                                        <Info className="w-4 h-4" />
+                                                    </button>
+                                                    {!isReadOnly && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => { void openCreateIndexModal(t_name); }}
+                                                                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors"
+                                                                title={t('datasource.create_index_title', 'Index erstellen')}
+                                                            >
+                                                                <ListPlus className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { setSelectedTable(t_name); setActiveTab('import'); }}
+                                                                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
+                                                                title={t('datasource.append_data_short')}
+                                                            >
+                                                                <Upload className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDropTable(t_name)}
+                                                                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                                                title={t('common.delete')}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => { setSelectedTable(t_name); setIsSchemaOpen(true); }}
-                                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
-                                                    title={t('datasource.show_schema')}
-                                                >
-                                                    <Info className="w-4 h-4" />
-                                                </button>
-                                                {!isReadOnly && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => { void openCreateIndexModal(t_name); }}
-                                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors"
-                                                            title={t('datasource.create_index_title', 'Index erstellen')}
-                                                        >
-                                                            <ListPlus className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => { setSelectedTable(t_name); setActiveTab('import'); }}
-                                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
-                                                            title={t('datasource.append_data_short')}
-                                                        >
-                                                            <Upload className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDropTable(t_name)}
-                                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                                            title={t('common.delete')}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
+                                        ))}
+                                    </div>
+                                    {visibleUserTables.length < userTables.length && (
+                                        <div className="mt-4 flex justify-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => setVisibleUserTablesCount((prev) => Math.min(prev + STRUCTURE_META_BATCH_SIZE, userTables.length))}
+                                                className="px-3 py-2 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                            >
+                                                {t('common.load_more', 'Mehr laden')} ({visibleUserTables.length}/{userTables.length})
+                                            </button>
                                         </div>
-                                    ))}
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
@@ -947,57 +973,70 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                     <p className="text-slate-400 dark:text-slate-500 text-sm">{t('datasource.no_user_views', 'No views available.')}</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {userViews.map((view) => (
-                                        <div key={view.name} className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between group">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-indigo-600 dark:text-indigo-400">
-                                                    <TableIcon className="w-4 h-4" />
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {visibleUserViews.map((view) => (
+                                            <div key={view.name} className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between group">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-indigo-600 dark:text-indigo-400">
+                                                        <TableIcon className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="font-bold text-slate-700 dark:text-slate-200 block truncate">{view.name}</span>
+                                                        {viewMetaStats?.[view.name]?.valid === false ? (
+                                                            <span
+                                                                className="text-[10px] text-rose-500 block"
+                                                                title={viewMetaStats?.[view.name]?.error}
+                                                            >
+                                                                {t('datasource.view_invalid', 'Defekter View')}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+                                                                {t('datasource.table_meta_rows', { count: viewMetaStats?.[view.name]?.rows ?? 0 })}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <span className="font-bold text-slate-700 dark:text-slate-200 block truncate">{view.name}</span>
-                                                    {viewMetaStats?.[view.name]?.valid === false ? (
-                                                        <span
-                                                            className="text-[10px] text-rose-500 block"
-                                                            title={viewMetaStats?.[view.name]?.error}
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => { setSelectedTable(view.name); setIsSchemaOpen(true); }}
+                                                        disabled={viewMetaStats?.[view.name]?.valid === false}
+                                                        className={`p-1.5 rounded transition-colors ${
+                                                            viewMetaStats?.[view.name]?.valid === false
+                                                                ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                                                : 'text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                                        }`}
+                                                        title={viewMetaStats?.[view.name]?.valid === false
+                                                            ? t('datasource.view_invalid', 'Defekter View')
+                                                            : t('datasource.show_schema')}
+                                                    >
+                                                        <Info className="w-4 h-4" />
+                                                    </button>
+                                                    {!isReadOnly && (
+                                                        <button
+                                                            onClick={() => handleDropView(view.name)}
+                                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                                            title={t('datasource.drop_view_title', 'Delete view')}
                                                         >
-                                                            {t('datasource.view_invalid', 'Defekter View')}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-                                                            {t('datasource.table_meta_rows', { count: viewMetaStats?.[view.name]?.rows ?? 0 })}
-                                                        </span>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => { setSelectedTable(view.name); setIsSchemaOpen(true); }}
-                                                    disabled={viewMetaStats?.[view.name]?.valid === false}
-                                                    className={`p-1.5 rounded transition-colors ${
-                                                        viewMetaStats?.[view.name]?.valid === false
-                                                            ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                                                            : 'text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                                                    }`}
-                                                    title={viewMetaStats?.[view.name]?.valid === false
-                                                        ? t('datasource.view_invalid', 'Defekter View')
-                                                        : t('datasource.show_schema')}
-                                                >
-                                                    <Info className="w-4 h-4" />
-                                                </button>
-                                                {!isReadOnly && (
-                                                    <button
-                                                        onClick={() => handleDropView(view.name)}
-                                                        className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                                        title={t('datasource.drop_view_title', 'Delete view')}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
+                                        ))}
+                                    </div>
+                                    {visibleUserViews.length < userViews.length && (
+                                        <div className="mt-4 flex justify-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => setVisibleUserViewsCount((prev) => Math.min(prev + STRUCTURE_META_BATCH_SIZE, userViews.length))}
+                                                className="px-3 py-2 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                            >
+                                                {t('common.load_more', 'Mehr laden')} ({visibleUserViews.length}/{userViews.length})
+                                            </button>
                                         </div>
-                                    ))}
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
