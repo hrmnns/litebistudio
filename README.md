@@ -5,7 +5,7 @@ A high-performance, browser-based business intelligence platform with local SQLi
 ## Key Features
 
 - **Multi-Dashboard Support**: Create, manage, and arrange multiple dashboards with a drag-and-drop grid system.
-- **Visual & SQL Query Builder**:
+- **Visual & SQL Workspace**:
   - **Visual Mode**: Drag-and-drop interface for table selection, filtering, and aggregation.
   - **SQL Mode**: Full SQL editor for advanced users with real-time preview and charting.
   - **SQL Copilot**: Integrated snippet assistant and schema-aware templates for rapid query development.
@@ -41,7 +41,7 @@ A high-performance, browser-based business intelligence platform with local SQLi
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18.x or later)
+- [Node.js](https://nodejs.org/) (v20.x or later, recommended)
 - [npm](https://www.npmjs.com/)
 
 ### Installation & Development
@@ -68,8 +68,25 @@ A high-performance, browser-based business intelligence platform with local SQLi
 For local quality gates before release:
 
 - `npm run lint`
-- `npx tsc -b`
-- `npm run build` (includes `compile:schemas`)
+- `npm run check:i18n`
+- `npm run check:encoding`
+- `npm run build`
+- `npm run test`
+
+## CI & Branch Protection
+
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Job name: `quality-gates`
+- Trigger: push/PR to `main`
+- Required branch check (recommended): `CI / quality-gates (pull_request)`
+
+Recommended local pre-push sequence:
+
+- `npm run lint`
+- `npm run check:i18n`
+- `npm run check:encoding`
+- `npm run build`
+- `npm run test`
 
 ## Releases and Changelog
 
@@ -79,7 +96,7 @@ For local quality gates before release:
 
 ## Project Architecture
 
-- `src/app/`: Primary UI layer including views (Dashboard, Query Builder, Report Packs).
+- `src/app/`: Primary UI layer including views (Dashboard, Tables, SQL Workspace, Widgets, Report Packs).
 - `src/hooks/`: Unified infrastructure hooks (Database, Export, i18n).
 - `src/lib/`: Core system logic (DB Worker, Repositories, Cryptography utilities).
 - `src/config/`: Component definitions and system registry.

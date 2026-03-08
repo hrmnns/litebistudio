@@ -41,7 +41,7 @@ export const RightOverlayPanel: React.FC<RightOverlayPanelProps> = ({
     children,
     width = 'md',
     noScroll,
-    backdropStyle = 'default',
+    backdropStyle = 'subtle',
     contentClassName
 }) => {
     useEffect(() => {
@@ -66,7 +66,7 @@ export const RightOverlayPanel: React.FC<RightOverlayPanelProps> = ({
                 className={cn(
                     'absolute inset-0 animate-in fade-in duration-200',
                     backdropStyle === 'subtle'
-                        ? 'bg-slate-900/35 backdrop-blur-[1px]'
+                        ? 'overlay-backdrop-subtle'
                         : 'bg-slate-900/60 backdrop-blur-sm'
                 )}
                 onClick={onClose}

@@ -16,6 +16,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Dashboard and Reporting action placement was normalized:
   - moved context actions from top header actions into local lower toolbars where they match workflow context.
   - migrated selected actions to icon-only controls with tooltips for visual consistency.
+- Overlay/backdrop intensity was standardized across modal/panel surfaces:
+  - introduced a shared subtle overlay backdrop style (`bg-slate-900/35` + minimal blur) and aligned modal defaults to the same visual baseline as Widgets/Sidebar overlays.
+  - `RightOverlayPanel` now defaults to subtle backdrop behavior for consistent perceived depth.
+- Widget editor configuration flow was streamlined:
+  - opening `Konfiguration` now automatically activates the `Grafisch` preview tab so visualization adjustments are immediately visible.
+- SQL Workspace run flow was refined for clearer execution feedback:
+  - after `Ausführen`, split view is auto-enabled (if disabled) and focus switches to `Ergebnisse`.
+
+### Fixed
+- SQL Workspace run controls now stay disabled when no executable SQL command exists:
+  - `Aktualisieren` and `Ausführen` no longer activate for empty/comment-only editor content.
+  - executable-state checks now require at least one classified SQL statement (read/write), reducing false-positive button enablement.
+- SQL Workspace export behavior was hardened:
+  - Excel export is now disabled until actual result rows are available from a completed run.
+- Header export dropdown layering was fixed globally:
+  - export menu now renders above content panes/tables in all views (z-index/stacking context alignment in `PageLayout`).
+
+### Documentation
+- Updated `README.md` for current release/CI reality:
+  - aligned terminology with current app structure (`Tables`, `SQL Workspace`, `Widgets`)
+  - corrected local quality-gate commands (`check:i18n`, `check:encoding`, `build`, `test`)
+  - removed outdated `compile:schemas` note
+  - added `CI & Branch Protection` section including required check `CI / quality-gates (pull_request)`.
 
 ## [1.5.0] - 2026-03-08
 

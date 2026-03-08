@@ -551,15 +551,20 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         }
 
         setSqlOutputView('result');
+        if (!sqlWorkspaceSplitView) {
+            setSqlWorkspaceSplitView(true);
+        }
+        setSqlWorkspaceView('result');
         setSqlExecutionSql(executionSql);
         setSqlRunToken((prev) => prev + 1);
         setSqlHistory((prev: string[]) => [trimmed, ...prev.filter((q: string) => q !== trimmed)].slice(0, 12));
         if (statementAnalysis.some((statement) => statement.isSelectLike)) {
             localStorage.setItem(TABLES_LAST_SELECT_SQL_KEY, trimmed);
         }
-    }, [setSqlHistory, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, t]);
+    }, [setSqlHistory, setSqlWorkspaceSplitView, setSqlWorkspaceView, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, sqlWorkspaceSplitView, t]);
 
     const handleRunSql = async () => {
+        if (!canRunSqlWorkspace) return;
         await executeSqlText(inputSql);
     };
     const handleClearSqlWorkspace = useCallback(() => {
@@ -1420,6 +1425,14 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     ]);
 
     const assistantSqlPreview = buildAssistantSql();
+    const hasExecutableSqlCommand = useCallback(
+        (sqlText: string) => analyzeSqlStatements(sqlText).some((statement) => statement.kind !== 'unknown'),
+        []
+    );
+    const canRunAssistantSql = React.useMemo(
+        () => hasExecutableSqlCommand(assistantSqlPreview) && !loading,
+        [assistantSqlPreview, hasExecutableSqlCommand, loading]
+    );
 
     const applyAssistantSql = useCallback(async (mode: 'replace' | 'run') => {
         const sql = assistantSqlPreview.trim();
@@ -1470,6 +1483,10 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         return normalizeSql(activeSqlStatement.sql_text) !== normalizedCurrent;
     }, [activeSqlStatement, activeSqlStatementId, inputSql, normalizeSql, sqlSavedSnapshot]);
     const canSaveCurrentSql = inputSql.trim().length > 0 && hasUnsavedSqlChanges;
+    const canRunSqlWorkspace = React.useMemo(
+        () => hasExecutableSqlCommand(inputSql) && !loading,
+        [hasExecutableSqlCommand, inputSql, loading]
+    );
     const filteredSqlStatements = React.useMemo(() => {
         const query = sqlLibrarySearch.trim().toLowerCase();
         const filtered = !query ? sqlStatements : sqlStatements.filter(stmt =>
@@ -1747,6 +1764,11 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         });
         exportToExcel(exportRows, `export_${timestamp}`, 'Export');
     }, [items]);
+    const canExportCurrentRows = React.useMemo(() => {
+        if (loading || !items || items.length === 0) return false;
+        if (mode === 'sql') return Boolean(sqlExecutionSql.trim());
+        return true;
+    }, [items, loading, mode, sqlExecutionSql]);
 
     const applyTableSideFilter = useCallback(() => {
         const column = tableFilterColumn.trim();
@@ -2134,12 +2156,23 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     mode: mode === 'table' ? selectedTable : t('datainspector.sql_mode')
                 }),
                 refresh: {
-                    onClick: () => { void execute(); },
+                    onClick: () => {
+                        if (mode === 'sql') {
+                            void handleRunSql();
+                            return;
+                        }
+                        void execute();
+                    },
                     title: t('datainspector.refresh_title'),
+                    disabled: mode === 'sql' ? !canRunSqlWorkspace : false,
                     loading
                 },
                 export: {
-                    onExcelExport: handleExportCurrentRows
+                    onExcelExport: handleExportCurrentRows,
+                    excelDisabled: !canExportCurrentRows,
+                    excelTitle: canExportCurrentRows
+                        ? t('common.export_excel', 'Export Excel')
+                        : t('common.not_available', 'Not available')
                 },
                 onBack,
                 actions: (
@@ -2939,7 +2972,11 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                 <button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('run'); }}
-                                    className="px-3 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                                    disabled={!canRunAssistantSql}
+                                    className={`px-3 py-1.5 rounded-md border text-xs transition-colors ${canRunAssistantSql
+                                        ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                                        : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                                        }`}
                                 >
                                     {t('datainspector.run_sql')}
                                 </button>
@@ -3063,7 +3100,12 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                     <button
                                         type="button"
                                         onClick={() => { void handleRunSql(); }}
-                                        className="px-2 py-1.5 rounded text-[10px] font-bold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
+                                        disabled={!canRunSqlWorkspace}
+                                        title={canRunSqlWorkspace ? t('datainspector.run_sql', 'Ausführen') : t('common.not_available', 'Not available')}
+                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${canRunSqlWorkspace
+                                            ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                                            : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                                            }`}
                                     >
                                         {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
                                         {t('datainspector.run_sql', 'Ausführen')}

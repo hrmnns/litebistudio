@@ -158,6 +158,10 @@ export const WidgetsView: React.FC = () => {
     const { isExporting, exportToPdf } = useReportExport();
     const { togglePresentationMode, isReadOnly } = useDashboard();
     const hasRestoredLastWidgetRef = useRef(false);
+    const openConfigPanel = useCallback(() => {
+        setPreviewTab('graphic');
+        setIsConfigPanelOpen(true);
+    }, [setPreviewTab]);
 
     // Fetch saved widgets
     const { data: savedWidgets, refresh: refreshWidgets } = useAsync<SavedWidget[]>(
@@ -1546,7 +1550,13 @@ export const WidgetsView: React.FC = () => {
                 content: null,
                 enabled: workspaceTab === 'editor',
                 isOpen: isConfigPanelOpen,
-                onOpenChange: (open) => setIsConfigPanelOpen(open),
+                onOpenChange: (open) => {
+                    if (open) {
+                        openConfigPanel();
+                        return;
+                    }
+                    setIsConfigPanelOpen(false);
+                },
                 triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration öffnen')
             }}
             fillHeight
@@ -2232,7 +2242,7 @@ export const WidgetsView: React.FC = () => {
                                         <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                         <button
                                             type="button"
-                                            onClick={() => setIsConfigPanelOpen(true)}
+                                            onClick={openConfigPanel}
                                             className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${
                                                 isConfigPanelOpen
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'

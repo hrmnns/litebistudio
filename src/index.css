@@ -45,6 +45,10 @@ body,
 }
 
 @layer utilities {
+    .overlay-backdrop-subtle {
+        @apply bg-slate-900/35 backdrop-blur-[1px];
+    }
+
     .glass {
         @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-white/20 dark:border-slate-700/30 shadow-xl;
     }

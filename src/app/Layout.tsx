@@ -60,7 +60,7 @@ export const Layout: React.FC = () => {
             {/* Overlay for mobile */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden glass"
+                    className="fixed inset-0 z-40 md:hidden overlay-backdrop-subtle"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}

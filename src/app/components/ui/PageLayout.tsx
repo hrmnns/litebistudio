@@ -216,7 +216,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
-            <header className="flex-shrink-0 px-6 md:px-8 py-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+            <header className="relative z-[70] flex-shrink-0 overflow-visible px-6 md:px-8 py-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div>
@@ -272,7 +272,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                 <Download className={cn('w-4 h-4', header.export?.loading && 'animate-pulse')} />
                             </button>
                             {isExportMenuOpen && !exportButtonDisabled && (
-                                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-50 p-1">
+                                <div className="absolute right-0 z-[90] mt-2 w-48 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg p-1">
                                     <button
                                         type="button"
                                         onClick={() => {
