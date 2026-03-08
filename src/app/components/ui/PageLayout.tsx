@@ -18,7 +18,7 @@ export interface PageAlert {
 
 /* ─── Sub-component Props ─── */
 interface PageHeaderProps {
-    title: string;
+    title: React.ReactNode;
     subtitle?: string;
     onBack?: () => void;
     actions?: React.ReactNode;

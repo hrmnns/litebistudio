@@ -4,11 +4,14 @@ import { createSqlStatementRepository } from './SqlStatementRepository';
 const runQueryMock = vi.fn(async () => []);
 const runManagedQueryMock = vi.fn(async () => []);
 const notifyDbChangeMock = vi.fn();
+const callRunQuery = (...args: unknown[]) => (runQueryMock as unknown as (...inner: unknown[]) => unknown)(...args);
+const callRunManagedQuery = (...args: unknown[]) => (runManagedQueryMock as unknown as (...inner: unknown[]) => unknown)(...args);
+const callNotifyDbChange = (...args: unknown[]) => (notifyDbChangeMock as unknown as (...inner: unknown[]) => unknown)(...args);
 
 vi.mock('../db', () => ({
-    runQuery: (...args: unknown[]) => runQueryMock(...args),
-    runManagedQuery: (...args: unknown[]) => runManagedQueryMock(...args),
-    notifyDbChange: (...args: unknown[]) => notifyDbChangeMock(...args)
+    runQuery: callRunQuery,
+    runManagedQuery: callRunManagedQuery,
+    notifyDbChange: callNotifyDbChange
 }));
 
 describe('SqlStatementRepository save/use flow', () => {
@@ -19,7 +22,7 @@ describe('SqlStatementRepository save/use flow', () => {
     });
 
     it('inserts a new sql statement when id does not exist', async () => {
-        runQueryMock.mockResolvedValueOnce([]);
+        (runQueryMock as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce([]);
         const repo = createSqlStatementRepository();
 
         await repo.saveSqlStatement({
@@ -30,12 +33,13 @@ describe('SqlStatementRepository save/use flow', () => {
         });
 
         expect(runManagedQueryMock).toHaveBeenCalledTimes(1);
-        expect(String(runManagedQueryMock.mock.calls[0][0])).toContain('INSERT INTO sys_sql_statement');
+        const firstSql = (runManagedQueryMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0];
+        expect(String(firstSql)).toContain('INSERT INTO sys_sql_statement');
         expect(notifyDbChangeMock).toHaveBeenCalledTimes(1);
     });
 
     it('updates existing sql statement when id already exists', async () => {
-        runQueryMock.mockResolvedValueOnce([{ id: 'stmt-1' }]);
+        (runQueryMock as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce([{ id: 'stmt-1' }]);
         const repo = createSqlStatementRepository();
 
         await repo.saveSqlStatement({
@@ -46,7 +50,8 @@ describe('SqlStatementRepository save/use flow', () => {
         });
 
         expect(runManagedQueryMock).toHaveBeenCalledTimes(1);
-        expect(String(runManagedQueryMock.mock.calls[0][0])).toContain('UPDATE sys_sql_statement');
+        const firstSql = (runManagedQueryMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0];
+        expect(String(firstSql)).toContain('UPDATE sys_sql_statement');
         expect(notifyDbChangeMock).toHaveBeenCalledTimes(1);
     });
 
@@ -55,8 +60,8 @@ describe('SqlStatementRepository save/use flow', () => {
         await repo.markSqlStatementUsed('stmt-9');
 
         expect(runManagedQueryMock).toHaveBeenCalledTimes(1);
-        expect(String(runManagedQueryMock.mock.calls[0][0])).toContain('SET use_count = COALESCE(use_count, 0) + 1');
+        const firstSql = (runManagedQueryMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0];
+        expect(String(firstSql)).toContain('SET use_count = COALESCE(use_count, 0) + 1');
         expect(notifyDbChangeMock).toHaveBeenCalledTimes(1);
     });
 });
-

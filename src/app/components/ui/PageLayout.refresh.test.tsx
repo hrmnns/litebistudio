@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PageLayout } from './PageLayout';
@@ -64,4 +63,3 @@ describe('PageLayout header refresh placement', () => {
         expect(followsRefresh).toBe(true);
     });
 });
-
