@@ -1462,21 +1462,21 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 title={t('datasource.create_index_title', 'Index erstellen')}
             >
                 <div className="space-y-4">
-                    <div className="text-xs text-slate-500">
-                        {t('datasource.index_create_for_table', 'Tabelle')}: <span className="font-mono font-semibold text-slate-700">{indexTableName}</span>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {t('datasource.index_create_for_table', 'Tabelle')}: <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{indexTableName}</span>
                     </div>
 
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_name', 'Indexname')}</label>
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_name', 'Indexname')}</label>
                         <input
                             value={indexName}
                             onChange={(e) => setIndexName(e.target.value)}
-                            className="w-full p-2 border border-slate-200 rounded text-sm"
+                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
                             placeholder={`idx_${indexTableName}_...`}
                         />
                     </div>
 
-                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                         <input
                             type="checkbox"
                             checked={indexUnique}
@@ -1487,10 +1487,10 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     </label>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_columns', 'Spalten')}</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-auto border border-slate-200 rounded p-2 bg-slate-50">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_columns', 'Spalten')}</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-auto border border-slate-200 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-900/40">
                             {availableIndexColumns.map((col) => (
-                                <label key={col} className="flex items-center gap-2 text-sm text-slate-700">
+                                <label key={col} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                                     <input
                                         type="checkbox"
                                         checked={indexColumns.includes(col)}
@@ -1505,17 +1505,17 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
                     {indexColumns.length > 0 && (
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_order', 'Spaltenreihenfolge')}</label>
-                            <div className="space-y-1 border border-slate-200 rounded p-2 bg-white">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_order', 'Spaltenreihenfolge')}</label>
+                            <div className="space-y-1 border border-slate-200 dark:border-slate-700 rounded p-2 bg-white dark:bg-slate-900">
                                 {indexColumns.map((col, idx) => (
                                     <div key={col} className="flex items-center justify-between text-sm">
-                                        <span className="font-mono text-slate-700">{idx + 1}. {col}</span>
+                                        <span className="font-mono text-slate-700 dark:text-slate-200">{idx + 1}. {col}</span>
                                         <div className="flex items-center gap-1">
                                             <button
                                                 type="button"
                                                 onClick={() => moveIndexColumn(col, 'up')}
                                                 disabled={idx === 0}
-                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
+                                                className="px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
                                             >
                                                 â†‘
                                             </button>
@@ -1523,7 +1523,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                 type="button"
                                                 onClick={() => moveIndexColumn(col, 'down')}
                                                 disabled={idx === indexColumns.length - 1}
-                                                className="px-2 py-0.5 text-xs border border-slate-200 rounded disabled:opacity-40"
+                                                className="px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
                                             >
                                                 â†“
                                             </button>
@@ -1535,11 +1535,11 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     )}
 
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">{t('datasource.index_where_optional', 'WHERE (optional)')}</label>
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_where_optional', 'WHERE (optional)')}</label>
                         <input
                             value={indexWhere}
                             onChange={(e) => setIndexWhere(e.target.value)}
-                            className="w-full p-2 border border-slate-200 rounded text-sm font-mono"
+                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-sm font-mono bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
                             placeholder="status = 'open'"
                         />
                     </div>
@@ -1547,7 +1547,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                     <div className="flex justify-end gap-2 pt-2">
                         <button
                             onClick={() => setIsCreateIndexOpen(false)}
-                            className="px-4 py-2 border border-slate-200 rounded-lg text-sm"
+                            className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                         >
                             {t('common.cancel')}
                         </button>

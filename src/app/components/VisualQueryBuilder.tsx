@@ -426,7 +426,7 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
                                 type="number"
                                 value={config.limit}
                                 onChange={e => setConfig({ ...config, limit: parseInt(e.target.value, 10) || 0 })}
-                                className="w-full p-1.5 text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full p-1.5 text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded outline-none focus:ring-1 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                         </div>
                         <div className="flex-1">

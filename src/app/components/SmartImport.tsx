@@ -135,7 +135,7 @@ export const SmartImport: React.FC = () => {
                 {step === 1 && (
                     <div
                         onClick={() => fileInputRef.current?.click()}
-                        className="group relative border-2 border-dashed border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 rounded-2xl p-12 transition-all cursor-pointer text-center"
+                        className="group relative border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 rounded-2xl p-12 transition-all cursor-pointer text-center"
                     >
                         <input
                             type="file"
@@ -145,16 +145,16 @@ export const SmartImport: React.FC = () => {
                             className="hidden"
                         />
                         <div className="flex flex-col items-center gap-4">
-                            <div className="p-4 bg-blue-50 group-hover:bg-blue-100 rounded-2xl text-blue-600 transition-colors">
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 rounded-2xl text-blue-600 dark:text-blue-300 transition-colors">
                                 <Upload className="w-8 h-8" />
                             </div>
                             <div>
-                                <p className="text-sm font-bold text-slate-700">{t('datasource.smart_import.upload_label')}</p>
-                                <p className="text-xs text-slate-400 mt-1">{t('datasource.smart_import.upload_hint')}</p>
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{t('datasource.smart_import.upload_label')}</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('datasource.smart_import.upload_hint')}</p>
                             </div>
                         </div>
                         {isAnalyzing && (
-                            <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-2xl z-10">
+                            <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center rounded-2xl z-10">
                                 <div className="flex items-center gap-3 text-blue-600">
                                     <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                     <span className="text-xs font-bold">{t('common.loading')}</span>
@@ -168,8 +168,8 @@ export const SmartImport: React.FC = () => {
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="flex items-center justify-between mb-2">
                             <div>
-                                <h4 className="text-sm font-bold text-slate-700">{t('datasource.smart_import.found_tables')}</h4>
-                                <p className="text-[10px] text-slate-400">{t('datasource.smart_import.found_tables_hint')}</p>
+                                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">{t('datasource.smart_import.found_tables')}</h4>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500">{t('datasource.smart_import.found_tables_hint')}</p>
                                 <p className="text-[10px] text-blue-600 mt-1">
                                     {t('datasource.smart_import.prefix_hint', {
                                         prefix: effectiveImportPrefix || t('datasource.smart_import.no_prefix')
@@ -185,12 +185,12 @@ export const SmartImport: React.FC = () => {
 
                         <div className="space-y-3">
                             {previews.map((preview, idx) => (
-                                <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${preview.isValid ? 'bg-white border-slate-100 shadow-sm' : 'bg-red-50 border-red-100'}`}>
+                                <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${preview.isValid ? 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-700 shadow-sm' : 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/60'}`}>
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="flex-1 space-y-3">
                                             <div className="flex items-center gap-4">
                                                 <div className="flex-1">
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase">{t('datasource.smart_import.sheet_label')} {preview.sheetName}</span>
+                                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase">{t('datasource.smart_import.sheet_label')} {preview.sheetName}</span>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <TableIcon className="w-4 h-4 text-blue-500" />
                                                         <input
@@ -228,19 +228,19 @@ export const SmartImport: React.FC = () => {
                                             {/* Preview Pill Chips */}
                                             <div className="flex flex-wrap gap-1">
                                                 {preview.columns.slice(0, 5).map(col => (
-                                                    <span key={col.name} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-medium">
+                                                    <span key={col.name} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded text-[9px] font-medium">
                                                         {col.name} <span className="opacity-50 font-mono">({col.type})</span>
                                                     </span>
                                                 ))}
                                                 {preview.columns.length > 5 && (
-                                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-medium">{t('datasource.smart_import.more_columns', { count: preview.columns.length - 5 })}</span>
+                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded text-[9px] font-medium">{t('datasource.smart_import.more_columns', { count: preview.columns.length - 5 })}</span>
                                                 )}
                                             </div>
                                         </div>
 
                                         <button
                                             onClick={() => setPreviews(previews.filter((_, i) => i !== idx))}
-                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                            className="p-2 text-slate-300 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -249,10 +249,10 @@ export const SmartImport: React.FC = () => {
                             ))}
                         </div>
 
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                             <button
                                 onClick={() => setStep(1)}
-                                className="px-4 py-2 text-slate-500 font-bold text-xs hover:bg-slate-100 rounded-lg transition-colors"
+                                className="px-4 py-2 text-slate-500 dark:text-slate-400 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                             >
                                 {t('datasource.smart_import.back_btn')}
                             </button>
@@ -276,33 +276,33 @@ export const SmartImport: React.FC = () => {
                             </div>
                         </div>
                         <div>
-                            <h4 className="text-sm font-bold text-slate-700">{t('datasource.smart_import.import_running')}</h4>
-                            <p className="text-xs text-slate-400 mt-1">{t('common.loading')}</p>
+                            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">{t('datasource.smart_import.import_running')}</h4>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('common.loading')}</p>
                         </div>
                     </div>
                 )}
 
                 {step === 4 && (
                     <div className="flex flex-col items-center justify-center p-12 text-center space-y-6 animate-in zoom-in-95 duration-500">
-                        <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center shadow-inner ring-8 ring-emerald-50/50">
+                        <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-300 rounded-full flex items-center justify-center shadow-inner ring-8 ring-emerald-50/50 dark:ring-emerald-900/30">
                             <CheckIcon className="w-10 h-10" />
                         </div>
                         <div className="space-y-2">
-                            <h4 className="text-xl font-black text-slate-800 tracking-tight">{t('datasource.smart_import.import_success_title')}</h4>
-                            <p className="text-sm text-slate-500 max-w-[280px] leading-relaxed">
+                            <h4 className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{t('datasource.smart_import.import_success_title')}</h4>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-[280px] leading-relaxed">
                                 {t('datasource.smart_import.import_success_hint', { count: importedStats.tables })}
                             </p>
                         </div>
 
-                        <div className="flex items-center gap-8 py-4 px-8 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-8 py-4 px-8 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-700">
                             <div className="text-center">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('datasource.smart_import.found_tables')}</p>
-                                <p className="text-lg font-black text-slate-700">{importedStats.tables}</p>
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{t('datasource.smart_import.found_tables')}</p>
+                                <p className="text-lg font-black text-slate-700 dark:text-slate-200">{importedStats.tables}</p>
                             </div>
-                            <div className="w-px h-8 bg-slate-200" />
+                            <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
                             <div className="text-center">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('datasource.smart_import.rows_count', { count: 0 }).replace('0', '').trim()}</p>
-                                <p className="text-lg font-black text-slate-700">{importedStats.records}</p>
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{t('datasource.smart_import.rows_count', { count: 0 }).replace('0', '').trim()}</p>
+                                <p className="text-lg font-black text-slate-700 dark:text-slate-200">{importedStats.records}</p>
                             </div>
                         </div>
 

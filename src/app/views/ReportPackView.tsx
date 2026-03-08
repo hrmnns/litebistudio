@@ -932,7 +932,7 @@ const ReportPackView: React.FC = () => {
                                 >
                                     <Check className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => { setIsCreatingCategory(false); setNewCategoryName(''); }} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded"><X className="w-4 h-4" /></button>
+                                <button onClick={() => { setIsCreatingCategory(false); setNewCategoryName(''); }} className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"><X className="w-4 h-4" /></button>
                             </div>
                         </div>
                     )}
@@ -988,12 +988,12 @@ const ReportPackView: React.FC = () => {
                                                     <ArrowRightLeft className="w-4 h-4" />
                                                 </button>
                                                 {moveMenuPackId === pack.id && moveTargets.length > 0 && (
-                                                    <div className="absolute right-0 top-10 z-20 min-w-[170px] rounded-xl border border-slate-200 bg-white shadow-lg p-1">
+                                                    <div className="absolute right-0 top-10 z-20 min-w-[170px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1">
                                                         {moveTargets.map(target => (
                                                             <button
                                                                 key={`${pack.id}-move-${target}`}
                                                                 onClick={() => void movePackToCategory(pack, target)}
-                                                                className="w-full text-left px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+                                                                className="w-full text-left px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                                                             >
                                                                 {target}
                                                             </button>

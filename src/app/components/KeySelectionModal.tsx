@@ -79,7 +79,7 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
                                     type="checkbox"
                                     checked={selectedFields.includes(field)}
                                     onChange={() => toggleField(field)}
-                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
                                 />
                                 <span className={`text-sm font-medium ${selectedFields.includes(field) ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>
                                     {field}
