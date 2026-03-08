@@ -1,0 +1,1 @@
+import{b as u}from"./index-B9cYM8-o.js";const c=()=>{const{lastBackup:a,changeCount:e,markBackupComplete:t}=u();return{lastBackup:a?new Date(a):null,changeCount:e,isBackupRecommended:e>0,markBackupComplete:t}};export{c as u};
