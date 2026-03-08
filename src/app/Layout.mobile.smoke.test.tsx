@@ -1,6 +1,5 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Layout } from './Layout';
 
@@ -62,6 +61,7 @@ describe('Layout mobile sidebar smoke', () => {
 
         const mobileMenuButton = container.querySelector('header button');
         expect(mobileMenuButton).toBeInTheDocument();
+        if (!mobileMenuButton) throw new Error('Missing mobile menu button');
         fireEvent.click(mobileMenuButton);
 
         await waitFor(() => {
@@ -71,7 +71,8 @@ describe('Layout mobile sidebar smoke', () => {
         const overlay = container.querySelector('div.overlay-backdrop-subtle');
 
         expect(overlay).toBeInTheDocument();
-        fireEvent.click(overlay!);
+        if (!overlay) throw new Error('Missing sidebar overlay');
+        fireEvent.click(overlay);
 
         await waitFor(() => {
             expect(sidebar?.className).toContain('-translate-x-full');

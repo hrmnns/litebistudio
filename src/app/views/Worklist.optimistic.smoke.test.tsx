@@ -1,4 +1,3 @@
-import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -18,8 +17,9 @@ type MockItem = {
 };
 
 let mockItems: MockItem[] = [];
-const getWorklistMock = vi.fn(async () => mockItems);
-const updateWorklistItemMock = vi.fn(async () => undefined);
+const { updateWorklistItemMock } = vi.hoisted(() => ({
+    updateWorklistItemMock: vi.fn(async () => undefined)
+}));
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -50,11 +50,11 @@ vi.mock('../components/RecordDetailModal', () => ({
 
 vi.mock('../../lib/repositories/SystemRepository', () => ({
     SystemRepository: {
-        getWorklist: (...args: unknown[]) => getWorklistMock(...args),
+        getWorklist: vi.fn(async () => mockItems),
         getTableSchema: vi.fn(async () => [{ name: 'id', pk: 1 }]),
         executeRaw: vi.fn(async () => []),
         checkRecordExists: vi.fn(async () => true),
-        updateWorklistItem: (...args: unknown[]) => updateWorklistItemMock(...args),
+        updateWorklistItem: updateWorklistItemMock,
         removeWorklistItemById: vi.fn(async () => undefined)
     }
 }));
