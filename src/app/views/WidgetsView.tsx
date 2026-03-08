@@ -1663,7 +1663,7 @@ export const WidgetsView: React.FC = () => {
         >
             <div className="flex flex-col gap-4 h-full min-h-0">
                 <div className="border-b border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center gap-8 px-1">
+                    <div className="flex items-center gap-6 px-1 overflow-x-auto whitespace-nowrap no-scrollbar">
                     <button
                         type="button"
                         onClick={() => {

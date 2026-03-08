@@ -463,7 +463,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                     {isInWorklist && (
                         <div className="shrink-0 px-6 py-4 bg-amber-50/30 dark:bg-amber-900/5 border-b border-slate-200 dark:border-slate-700 space-y-3">
                             <div className="flex items-start gap-4 flex-wrap">
-                                <div className="w-48 shrink-0">
+                                <div className="w-full sm:w-48 sm:shrink-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.status_label')}</label>
                                     <select
                                         value={typeof worklistItem?.status === 'string' ? worklistItem.status : 'open'}
@@ -487,7 +487,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         <option value="closed">{t('worklist.status_closed', 'Geschlossen')}</option>
                                     </select>
                                 </div>
-                                <div className="w-48 shrink-0">
+                                <div className="w-full sm:w-48 sm:shrink-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('worklist.priority_label', 'Prioritaet')}</label>
                                     <select
                                         value={typeof worklistItem?.priority === 'string' ? worklistItem.priority : 'normal'}
@@ -510,7 +510,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         <option value="critical">{t('worklist.priority_critical', 'Kritisch')}</option>
                                     </select>
                                 </div>
-                                <div className="w-48 shrink-0">
+                                <div className="w-full sm:w-48 sm:shrink-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('worklist.due_label', 'Faellig')}</label>
                                     <input
                                         type="date"
@@ -529,7 +529,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                         className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
                                     />
                                 </div>
-                                <div className="flex-1 min-w-[320px]">
+                                <div className="flex-1 min-w-0">
                                     <label className="block text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 mb-1.5 px-1">{t('record_detail.comment_label')}</label>
                                     <textarea
                                         value={typeof worklistItem?.comment === 'string' ? worklistItem.comment : ''}

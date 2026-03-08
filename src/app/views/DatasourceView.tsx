@@ -759,7 +759,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         >
             <div className={`max-w-4xl space-y-6 ${isReadOnly ? 'opacity-80' : ''}`}>
                 <div className="border-b border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center gap-8 px-1">
+                    <div className="flex items-center gap-6 px-1 overflow-x-auto whitespace-nowrap no-scrollbar">
                         <button
                             onClick={() => setActiveTab('import')}
                             className={`relative py-3 text-sm font-bold transition-colors ${activeTab === 'import' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}

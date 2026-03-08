@@ -258,7 +258,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="w-full md:w-auto flex items-center justify-end gap-2 flex-shrink-0 max-w-full overflow-x-auto overflow-y-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 -mb-1">
                         {header.actions}
                         <button
                             type="button"
@@ -270,7 +270,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             aria-label={helpDisabled ? t('common.not_available', 'Not available') : helpTitle}
                             disabled={helpDisabled}
                             className={cn(
-                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
                                 helpDisabled
                                     ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
                                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -288,7 +288,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             aria-label={presentationDisabled ? t('common.not_available', 'Not available') : presentationTitle}
                             disabled={presentationDisabled}
                             className={cn(
-                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
                                 presentationDisabled
                                     ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
                                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700',
@@ -308,7 +308,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                 aria-label={exportButtonDisabled ? t('common.not_available', 'Not available') : exportButtonTitle}
                                 disabled={exportButtonDisabled}
                                 className={cn(
-                                    'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                    'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
                                     exportButtonDisabled
                                         ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
                                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700',
@@ -370,7 +370,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             aria-label={refreshDisabled ? t('common.not_available', 'Not available') : refreshTitle}
                             disabled={refreshDisabled}
                             className={cn(
-                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
                                 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
                                 'hover:bg-slate-50 dark:hover:bg-slate-700',
                                 'disabled:bg-slate-100 dark:disabled:bg-slate-800/60 disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed'
@@ -392,7 +392,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                 : t('common.not_available', 'Not available')}
                             disabled={!isRightPanelEnabled}
                             className={cn(
-                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
                                 isRightPanelEnabled
                                     ? 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
                                     : 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed',

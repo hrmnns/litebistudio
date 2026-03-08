@@ -367,7 +367,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
         >
             <div className="h-[70vh] min-h-0 max-h-[760px] flex flex-col">
                 {/* Tabs */}
-                <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6 sticky top-0 bg-white dark:bg-slate-800 z-10 -mx-6 px-6 pt-2">
+                <div className="flex overflow-x-auto whitespace-nowrap border-b border-slate-200 dark:border-slate-700 mb-6 sticky top-0 bg-white dark:bg-slate-800 z-10 -mx-6 px-4 sm:px-6 pt-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     <button
                         onClick={() => setActiveTab('overview')}
                         className={`pb-3 px-4 text-sm font-medium transition-colors relative ${activeTab === 'overview' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -427,7 +427,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
                                     <div className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase mb-1">{t('widgets.system_health.cpu_cores')}</div>
                                     <div className="text-2xl font-black text-blue-700 dark:text-blue-300">

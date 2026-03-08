@@ -61,6 +61,9 @@ export const WorklistView: React.FC = () => {
     const [worklistToolsTab, setWorklistToolsTab] = useState<WorklistToolsTab>('focus');
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [previewItemId, setPreviewItemId] = useState<number | null>(null);
+    const [isMobileLayout, setIsMobileLayout] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
     const { isReadOnly } = useDashboard();
     const [hideCompleted] = useLocalStorage<boolean>('worklist_hide_completed', false);
 
@@ -70,6 +73,13 @@ export const WorklistView: React.FC = () => {
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const suppressDbReloadUntilRef = useRef(0);
     const silentReconcileTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        const onResize = () => setIsMobileLayout(window.innerWidth < 768);
+        onResize();
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     const loadWorklist = useCallback(async (options?: { silent?: boolean }) => {
         if (!options?.silent) {
@@ -562,8 +572,150 @@ export const WorklistView: React.FC = () => {
                         </p>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
+                    <>
+                        {isMobileLayout && (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                    {selectedIds.length}/{filteredItems.length} {t('common.selected', 'ausgewaehlt')}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setAllSelection(selectedIds.length !== filteredItems.length || filteredItems.length === 0)}
+                                    className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300"
+                                >
+                                    {selectedIds.length === filteredItems.length && filteredItems.length > 0 ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                                    {t('common.select_all', 'Alle waehlen')}
+                                </button>
+                            </div>
+
+                            {filteredItems.map(item => (
+                                <article
+                                    key={item.id}
+                                    onClick={() => setPreviewItemId(item.id)}
+                                    className={`rounded-xl border p-3 bg-white dark:bg-slate-800 shadow-sm transition-colors ${selectedIds.includes(item.id)
+                                        ? 'border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-900/10'
+                                        : 'border-slate-200 dark:border-slate-700'
+                                        } ${!item._exists ? 'border-red-300/60 dark:border-red-800/60' : ''}`}
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); toggleItemSelection(item.id); }}
+                                            className="inline-flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 mt-0.5"
+                                        >
+                                            {selectedIds.includes(item.id) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                        </button>
+                                        <div className="min-w-0 flex-1">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); handleOpenDetail(item); }}
+                                                className="w-full text-left"
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    {getStatusIcon(item.status)}
+                                                    <span className="font-bold text-slate-900 dark:text-white truncate">
+                                                        {item.display_label || t('worklist.entry_id', { id: item.source_id })}
+                                                    </span>
+                                                </div>
+                                            </button>
+                                            <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700/50 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 rounded">
+                                                    {item.source_table}
+                                                </span>
+                                                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                                    {new Date(item.created_at).toLocaleDateString()}
+                                                </span>
+                                                {!item._exists && (
+                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-[9px] font-black text-red-600 dark:text-red-400 rounded uppercase tracking-tighter shadow-sm">
+                                                        <AlertCircle className="w-2.5 h-2.5" /> {t('common.deleted')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 grid grid-cols-1 gap-2">
+                                        <select
+                                            value={item.status}
+                                            disabled={isReadOnly}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={async (e) => {
+                                                e.stopPropagation();
+                                                if (isReadOnly) return;
+                                                await updateWorklistItemsOptimistically([item.id], { status: e.target.value as WorklistStatus });
+                                            }}
+                                            className="h-9 w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 text-[11px] font-bold outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-300"
+                                        >
+                                            <option value="open">{t('worklist.status_open', 'Neu / Offen')}</option>
+                                            <option value="in_progress">{t('worklist.status_in_progress', 'In Bearbeitung')}</option>
+                                            <option value="done">{t('worklist.status_done', 'Erledigt')}</option>
+                                            <option value="closed">{t('worklist.status_closed', 'Geschlossen')}</option>
+                                        </select>
+                                        <select
+                                            value={item.priority || 'normal'}
+                                            disabled={isReadOnly}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={async (e) => {
+                                                e.stopPropagation();
+                                                if (isReadOnly) return;
+                                                await updateWorklistItemsOptimistically([item.id], { priority: e.target.value as WorklistPriority });
+                                            }}
+                                            className="h-9 w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 text-[11px] font-bold outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-300"
+                                        >
+                                            <option value="low">{t('worklist.priority_low', 'Niedrig')}</option>
+                                            <option value="normal">{t('worklist.priority_normal', 'Normal')}</option>
+                                            <option value="high">{t('worklist.priority_high', 'Hoch')}</option>
+                                            <option value="critical">{t('worklist.priority_critical', 'Kritisch')}</option>
+                                        </select>
+                                        <input
+                                            type="date"
+                                            value={item.due_at ? String(item.due_at).slice(0, 10) : ''}
+                                            disabled={isReadOnly}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={async (e) => {
+                                                e.stopPropagation();
+                                                if (isReadOnly) return;
+                                                await updateWorklistItemsOptimistically([item.id], { due_at: e.target.value || null });
+                                            }}
+                                            className={`h-9 w-full bg-slate-50 dark:bg-slate-900 border rounded px-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20 ${isOverdue(item.due_at) && item.status !== 'done' && item.status !== 'closed'
+                                                ? 'border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300'
+                                                : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                                                }`}
+                                        />
+                                    </div>
+
+                                    <div className="mt-3 flex items-center justify-between gap-2">
+                                        <div className="min-w-0 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                            {item.comment || '-'}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleOpenDetail(item); }}
+                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-all"
+                                                title={t('worklist.details_btn')}
+                                            >
+                                                <ExternalLink className="w-4 h-4" />
+                                            </button>
+                                            {!isReadOnly && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleRemove(item.id); }}
+                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
+                                                    title={t('worklist.remove_btn')}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                        )}
+
+                        {!isMobileLayout && (
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 uppercase text-[11px] font-black tracking-wider">
                                     <tr>
@@ -706,8 +858,10 @@ export const WorklistView: React.FC = () => {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
-                    </div>
+                        )}
+                    </>
                 )}
             </div>
 
