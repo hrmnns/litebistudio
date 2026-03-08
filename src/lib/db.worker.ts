@@ -708,7 +708,7 @@ async function handleMessage(e: MessageEvent) {
                         callback: (row: SqliteRow) => tables.push(getRowString(row, 'name'))
                     });
                     for (const t of tables) {
-                        database.exec(`DELETE FROM ${t};`);
+                        database.exec(`DELETE FROM "${escapeIdentifier(t)}";`);
                     }
                     database.exec('COMMIT');
                     log('Database cleared (all user tables)');
@@ -747,7 +747,7 @@ async function handleMessage(e: MessageEvent) {
                 if (!/^[a-z0-9_]+$/i.test(cleanTableName)) {
                     throw new Error(`Invalid table name: ${cleanTableName}`);
                 }
-                database.exec(`DELETE FROM ${cleanTableName};`);
+                database.exec(`DELETE FROM "${escapeIdentifier(cleanTableName)}";`);
                 result = true;
                 break;
             }
@@ -775,7 +775,7 @@ async function handleMessage(e: MessageEvent) {
                 for (const t of tables) {
                     const rows: SqliteRow[] = [];
                     database.exec({
-                        sql: `SELECT * FROM ${t}`,
+                        sql: `SELECT * FROM "${escapeIdentifier(t)}"`,
                         rowMode: 'object',
                         callback: (row: SqliteRow) => rows.push(row)
                     });

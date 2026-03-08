@@ -26,9 +26,13 @@ function getSearchableColumns(schema: TableColumn[]): TableColumn[] {
     );
 }
 
+function escapeIdentifier(identifier: string): string {
+    return identifier.replace(/"/g, '""');
+}
+
 function buildSearchClause(searchColumns: TableColumn[], searchTerm?: string): { clause: string; params: BindValue[] } {
     if (!searchTerm || !searchColumns.length) return { clause: '', params: [] };
-    const clause = searchColumns.map((col) => `${col.name} LIKE '%' || ? || '%'`).join(' OR ');
+    const clause = searchColumns.map((col) => `"${escapeIdentifier(col.name)}" LIKE '%' || ? || '%'`).join(' OR ');
     const params: BindValue[] = Array(searchColumns.length).fill(searchTerm);
     return { clause, params };
 }
