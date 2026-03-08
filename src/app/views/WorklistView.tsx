@@ -358,7 +358,7 @@ export const WorklistView: React.FC = () => {
                 )
             }}
         >
-            <div className="max-w-5xl space-y-6">
+            <div className="w-full space-y-6">
                 {/* Filters & Search */}
                 <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="flex items-center gap-2">
@@ -542,7 +542,7 @@ export const WorklistView: React.FC = () => {
                                             <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
                                                 <div className="flex items-center gap-3 text-[11px]">
                                                     {item.comment ? (
-                                                        <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 w-full max-w-[200px] truncate" title={item.comment}>
+                                                        <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 w-full truncate" title={item.comment}>
                                                             <MessageSquare className="w-3 h-3 opacity-60 shrink-0" />
                                                             <span className="truncate">{item.comment}</span>
                                                         </span>

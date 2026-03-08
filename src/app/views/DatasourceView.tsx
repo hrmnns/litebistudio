@@ -1481,7 +1481,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                             type="checkbox"
                             checked={indexUnique}
                             onChange={() => setIndexUnique(!indexUnique)}
-                            className="h-4 w-4"
+                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
                         />
                         {t('datasource.index_unique', 'Unique Index')}
                     </label>
@@ -1495,7 +1495,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         type="checkbox"
                                         checked={indexColumns.includes(col)}
                                         onChange={() => toggleIndexColumn(col)}
-                                        className="h-4 w-4"
+                                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
                                     />
                                     <span className="font-mono">{col}</span>
                                 </label>

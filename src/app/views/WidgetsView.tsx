@@ -2194,7 +2194,7 @@ export const WidgetsView: React.FC = () => {
                             </div>
                             <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
                                 <div className="pt-2 flex items-center justify-between gap-2">
-                                    <div className="inline-flex items-center gap-1">
+                                    <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pr-1">
                                         <button
                                             type="button"
                                             onClick={() => { void resetToNewWidget(); }}
@@ -2202,42 +2202,46 @@ export const WidgetsView: React.FC = () => {
                                             title={t('querybuilder.new_widget', 'Neues Widget')}
                                         >
                                             <Plus className="w-3 h-3" />
-                                            {t('common.new', 'Neu')}
+                                            <span className="hidden xl:inline">{t('common.new', 'Neu')}</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => { void openLoadDialog('widget'); }}
+                                            title={t('common.open', 'Öffnen')}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <Folder className="w-3 h-3" />
-                                            {t('common.open', 'Öffnen')}
+                                            <span className="hidden xl:inline">{t('common.open', 'Öffnen')}</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => { void handleSaveWidget(activeWidgetId ? 'update' : 'new'); }}
                                             disabled={!canSaveCurrentWidget}
+                                            title={t('common.save', 'Speichern')}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
                                             <Save className="w-3 h-3" />
-                                            {t('common.save', 'Speichern')}
+                                            <span className="hidden xl:inline">{t('common.save', 'Speichern')}</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => { void handleSaveWidget('new'); }}
                                             disabled={isReadOnly || !canPersistWidget}
+                                            title={t('querybuilder.save_widget_as', 'Speichern unter')}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
                                             <Download className="w-3 h-3" />
-                                            {t('querybuilder.save_widget_as', 'Speichern unter')}
+                                            <span className="hidden xl:inline">{t('querybuilder.save_widget_as', 'Speichern unter')}</span>
                                         </button>
                                         <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                         <button
                                             type="button"
                                             onClick={() => { void openLoadDialog('sql'); }}
+                                            title={t('querybuilder.sql_statement', 'SQL-Statement')}
                                             className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
                                         >
                                             <FileCode2 className="w-3 h-3" />
-                                            {t('querybuilder.sql_statement', 'SQL-Statement')}
+                                            <span className="hidden xl:inline">{t('querybuilder.sql_statement', 'SQL-Statement')}</span>
                                         </button>
                                         <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                                         <button
@@ -2251,44 +2255,47 @@ export const WidgetsView: React.FC = () => {
                                             title={t('querybuilder.open_config_panel', 'Konfiguration öffnen')}
                                         >
                                             <SlidersHorizontal className="w-3 h-3" />
-                                            {t('querybuilder.tab_config', 'Konfiguration')}
+                                            <span className="hidden xl:inline">{t('querybuilder.tab_config', 'Konfiguration')}</span>
                                         </button>
                                     </div>
-                                    <div className="inline-flex items-center gap-1">
+                                    <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pl-1">
                                         <button
                                             type="button"
                                             onClick={() => setPreviewTab('graphic')}
+                                            title={t('querybuilder.preview_tab_graphic', 'Grafisch')}
                                             className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${previewTab === 'graphic'
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
                                                 : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                                             }`}
                                         >
                                             <BarChart2 className="w-3 h-3" />
-                                            {t('querybuilder.preview_tab_graphic', 'Grafisch')}
+                                            <span className="hidden xl:inline">{t('querybuilder.preview_tab_graphic', 'Grafisch')}</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => { if (!isContentWidget) setPreviewTab('table'); }}
                                             disabled={isContentWidget}
+                                            title={isContentWidget ? t('common.not_available', 'Not available') : t('querybuilder.preview_tab_table', 'Tabelle')}
                                             className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${previewTab === 'table'
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
                                                 : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                                             } disabled:opacity-40 disabled:cursor-not-allowed`}
                                         >
                                             <TableIcon className="w-3 h-3" />
-                                            {t('querybuilder.preview_tab_table', 'Tabelle')}
+                                            <span className="hidden xl:inline">{t('querybuilder.preview_tab_table', 'Tabelle')}</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => { if (!isContentWidget) setPreviewTab('sql'); }}
                                             disabled={isContentWidget}
+                                            title={isContentWidget ? t('common.not_available', 'Not available') : t('querybuilder.preview_tab_sql', 'SQL')}
                                             className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${previewTab === 'sql'
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
                                                 : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                                             } disabled:opacity-40 disabled:cursor-not-allowed`}
                                         >
                                             <FileCode2 className="w-3 h-3" />
-                                            {t('querybuilder.preview_tab_sql', 'SQL')}
+                                            <span className="hidden xl:inline">{t('querybuilder.preview_tab_sql', 'SQL')}</span>
                                         </button>
                                     </div>
                                 </div>

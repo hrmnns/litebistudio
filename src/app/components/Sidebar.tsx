@@ -119,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     return (
         <aside className={`
-            fixed inset-y-0 left-0 z-50 bg-white dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 transform transition-all duration-300 ease-in-out
+            fixed inset-y-0 left-0 z-[80] bg-white dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 transform transition-all duration-300 ease-in-out
             ${isCollapsed ? 'md:w-20' : 'md:w-64'}
             ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
         `}>
