@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen, RefreshCw } from 'lucide-react';
+import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen, RefreshCw, Maximize2, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useDashboard } from '../../../lib/context/DashboardContext';
 import { useAsync } from '../../../hooks/useAsync';
@@ -22,6 +22,23 @@ interface PageHeaderProps {
     subtitle?: string;
     onBack?: () => void;
     actions?: React.ReactNode;
+    presentation?: {
+        onClick?: () => void;
+        title?: string;
+        disabled?: boolean;
+        active?: boolean;
+    };
+    export?: {
+        onPdfExport?: () => void;
+        onExcelExport?: () => void;
+        title?: string;
+        disabled?: boolean;
+        loading?: boolean;
+        pdfTitle?: string;
+        excelTitle?: string;
+        pdfDisabled?: boolean;
+        excelDisabled?: boolean;
+    };
     refresh?: {
         onClick: () => void;
         title?: string;
@@ -114,6 +131,8 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     const [activeQueries, setActiveQueries] = useState(0);
     const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
     const [internalRightPanelOpen, setInternalRightPanelOpen] = useState(Boolean(rightPanel?.defaultOpen));
+    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+    const exportMenuRef = React.useRef<HTMLDivElement | null>(null);
     const { data: storageStatus } = useAsync(
         () => SystemRepository.getStorageStatus(),
         [],
@@ -138,6 +157,24 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         };
     }, []);
 
+    useEffect(() => {
+        if (!isExportMenuOpen) return;
+        const onMouseDown = (event: MouseEvent) => {
+            if (!exportMenuRef.current) return;
+            if (event.target instanceof Node && exportMenuRef.current.contains(event.target)) return;
+            setIsExportMenuOpen(false);
+        };
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setIsExportMenuOpen(false);
+        };
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [isExportMenuOpen]);
+
     const mergedAlerts: PageAlert[] = [...(alerts ?? [])];
     if (storageStatus?.mode === 'memory') {
         const reasonText = storageStatus.reason
@@ -159,6 +196,17 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         : false;
     const isRightPanelEnabled = Boolean(rightPanel && (rightPanel.enabled ?? true));
     const isRightPanelOpenEffective = isRightPanelEnabled && isRightPanelOpen;
+    const hasAnyExportAction = Boolean(header.export?.onPdfExport || header.export?.onExcelExport);
+    const presentationDisabled = Boolean(header.presentation?.disabled) || !header.presentation?.onClick;
+    const presentationTitle = header.presentation?.title || t('common.presentation_mode', 'Presentation Mode');
+    const exportButtonDisabled = Boolean(header.export?.disabled) || !hasAnyExportAction;
+    const exportButtonTitle = header.export?.title || t('common.export', 'Export');
+    const canRunPdfExport = Boolean(header.export?.onPdfExport) && !header.export?.pdfDisabled;
+    const canRunExcelExport = Boolean(header.export?.onExcelExport) && !header.export?.excelDisabled;
+    const exportPdfTitle = header.export?.pdfTitle || t('common.export_pdf', 'PDF');
+    const exportExcelTitle = header.export?.excelTitle || t('common.export_excel', 'Export Excel');
+    const refreshDisabled = Boolean(header.refresh?.disabled) || !header.refresh?.onClick;
+    const refreshTitle = header.refresh?.title || t('common.refresh', 'Refresh');
     const setRightPanelOpen = (open: boolean) => {
         if (!rightPanel) return;
         if (!isRightPanelControlled) setInternalRightPanelOpen(open);
@@ -184,23 +232,106 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {header.actions}
-                        {header.refresh && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (!header.presentation?.onClick || presentationDisabled) return;
+                                header.presentation.onClick();
+                            }}
+                            title={presentationDisabled ? t('common.not_available', 'Not available') : presentationTitle}
+                            aria-label={presentationDisabled ? t('common.not_available', 'Not available') : presentationTitle}
+                            disabled={presentationDisabled}
+                            className={cn(
+                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                presentationDisabled
+                                    ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700',
+                                header.presentation?.active && !presentationDisabled && 'ring-2 ring-blue-500/30'
+                            )}
+                        >
+                            <Maximize2 className="w-4 h-4" />
+                        </button>
+                        <div className="relative" ref={exportMenuRef}>
                             <button
                                 type="button"
-                                onClick={header.refresh.onClick}
-                                title={header.refresh.title || t('common.refresh', 'Refresh')}
-                                aria-label={header.refresh.title || t('common.refresh', 'Refresh')}
-                                disabled={Boolean(header.refresh.disabled)}
+                                onClick={() => {
+                                    if (exportButtonDisabled) return;
+                                    setIsExportMenuOpen(open => !open);
+                                }}
+                                title={exportButtonDisabled ? t('common.not_available', 'Not available') : exportButtonTitle}
+                                aria-label={exportButtonDisabled ? t('common.not_available', 'Not available') : exportButtonTitle}
+                                disabled={exportButtonDisabled}
                                 className={cn(
                                     'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
-                                    'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
-                                    'hover:bg-slate-50 dark:hover:bg-slate-700',
-                                    'disabled:bg-slate-100 dark:disabled:bg-slate-800/60 disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed'
+                                    exportButtonDisabled
+                                        ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700',
+                                    isExportMenuOpen && !exportButtonDisabled && 'ring-2 ring-blue-500/30'
                                 )}
                             >
-                                <RefreshCw className={cn('w-4 h-4', header.refresh.loading && 'animate-spin')} />
+                                <Download className={cn('w-4 h-4', header.export?.loading && 'animate-pulse')} />
                             </button>
-                        )}
+                            {isExportMenuOpen && !exportButtonDisabled && (
+                                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-50 p-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!header.export?.onPdfExport || !canRunPdfExport) return;
+                                            header.export.onPdfExport();
+                                            setIsExportMenuOpen(false);
+                                        }}
+                                        disabled={!canRunPdfExport}
+                                        title={canRunPdfExport ? exportPdfTitle : t('common.not_available', 'Not available')}
+                                        className={cn(
+                                            'w-full h-9 px-2 rounded-md text-sm flex items-center gap-2 transition-colors',
+                                            canRunPdfExport
+                                                ? 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                                : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                        )}
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        <span>{t('common.export_pdf', 'PDF')}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!header.export?.onExcelExport || !canRunExcelExport) return;
+                                            header.export.onExcelExport();
+                                            setIsExportMenuOpen(false);
+                                        }}
+                                        disabled={!canRunExcelExport}
+                                        title={canRunExcelExport ? exportExcelTitle : t('common.not_available', 'Not available')}
+                                        className={cn(
+                                            'w-full h-9 px-2 rounded-md text-sm flex items-center gap-2 transition-colors',
+                                            canRunExcelExport
+                                                ? 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                                : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                        )}
+                                    >
+                                        <FileSpreadsheet className="w-4 h-4" />
+                                        <span>{t('common.export_excel', 'Export Excel')}</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (!header.refresh?.onClick || refreshDisabled) return;
+                                header.refresh.onClick();
+                            }}
+                            title={refreshDisabled ? t('common.not_available', 'Not available') : refreshTitle}
+                            aria-label={refreshDisabled ? t('common.not_available', 'Not available') : refreshTitle}
+                            disabled={refreshDisabled}
+                            className={cn(
+                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+                                'hover:bg-slate-50 dark:hover:bg-slate-700',
+                                'disabled:bg-slate-100 dark:disabled:bg-slate-800/60 disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed'
+                            )}
+                        >
+                            <RefreshCw className={cn('w-4 h-4', header.refresh?.loading && 'animate-spin')} />
+                        </button>
                         <button
                             type="button"
                             onClick={() => {

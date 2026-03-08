@@ -744,18 +744,7 @@ const ReportPackView: React.FC = () => {
         <PageLayout
             header={{
                 title: t('reports.title', 'Reporting'),
-                subtitle: t('reports.subtitle', 'Build and export multi-page management reports.'),
-                actions: (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => { void createPack(); }}
-                            disabled={isReadOnly}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Plus className="w-4 h-4" /> {t('common.add')}
-                        </button>
-                    </div>
-                )
+                subtitle: t('reports.subtitle', 'Build and export multi-page management reports.')
             }}
             rightPanel={{
                 title: t('reports.panel_title', 'Reporting Assistant'),
@@ -847,10 +836,11 @@ const ReportPackView: React.FC = () => {
                 )
             }}
         >
-            <div className={`h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar p-1 ${isReadOnly ? 'pointer-events-none opacity-80' : ''}`}>
-                <div className="space-y-5">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
+            <div className={`h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar ${isReadOnly ? 'pointer-events-none opacity-80' : ''}`}>
+                <div className="space-y-6">
+                    <div className="border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
                             <button
                                 onClick={() => setActiveCategory(allCategoriesTab)}
                                 className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${currentCategory === allCategoriesTab
@@ -881,8 +871,8 @@ const ReportPackView: React.FC = () => {
                                     <Plus className="w-4 h-4" />
                                 </button>
                             )}
-                        </div>
-                        <div className="flex items-center gap-1">
+                            </div>
+                            <div className="flex items-center gap-1 pb-px">
                             <button
                                 onClick={() => setAllPacksExpanded(true)}
                                 className="p-2 text-slate-400 hover:text-slate-600"
@@ -897,15 +887,25 @@ const ReportPackView: React.FC = () => {
                             >
                                 <Minimize2 className="w-4 h-4" />
                             </button>
-                            {!isReadOnly && (
-                                <button
-                                    onClick={() => setIsCategoryManagerOpen(true)}
-                                    className="p-2 text-slate-400 hover:text-slate-600"
-                                    title={t('reports.manage_categories', 'Manage categories')}
-                                >
-                                    <Settings className="w-4 h-4" />
-                                </button>
-                            )}
+                            <button
+                                onClick={() => { void createPack(); }}
+                                disabled={isReadOnly}
+                                className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={t('common.add')}
+                                aria-label={t('common.add')}
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setIsCategoryManagerOpen(true)}
+                                disabled={isReadOnly}
+                                className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={t('reports.manage_categories', 'Manage categories')}
+                                aria-label={t('reports.manage_categories', 'Manage categories')}
+                            >
+                                <Settings className="w-4 h-4" />
+                            </button>
+                            </div>
                         </div>
                     </div>
 

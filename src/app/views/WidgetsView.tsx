@@ -10,7 +10,7 @@ import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
     Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
-    Layout, Maximize2, Folder, Gauge, Image as ImageIcon,
+    Layout, Folder, Gauge, Image as ImageIcon,
     Edit3, X, Download, Search, FileCode2, Save, SlidersHorizontal, Plus, Trash2, Copy, FolderOpen, Star, Database, FileText
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
@@ -1529,26 +1529,17 @@ export const WidgetsView: React.FC = () => {
                         : isGlobalRefreshing,
                     loading: loading || isGlobalRefreshing
                 },
-                actions: (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={togglePresentationMode}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                            title={t('dashboard.presentation_mode')}
-                        >
-                            <Maximize2 className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => exportToPdf('query-visualization', `report-${widgetName || 'query'}`)}
-                            disabled={exportDisabled}
-                            title={exportDisabled ? exportDisabledReason : t('querybuilder.hint_export_shortcut')}
-                            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
-                        >
-                            <Download className="w-4 h-4" />
-                            {isExporting ? t('common.exporting') : t('common.export_pdf')}
-                        </button>
-                    </div>
-                )
+                presentation: {
+                    onClick: togglePresentationMode,
+                    title: t('dashboard.presentation_mode')
+                },
+                export: {
+                    onPdfExport: () => exportToPdf('query-visualization', `report-${widgetName || 'query'}`),
+                    disabled: exportDisabled,
+                    loading: isExporting,
+                    title: exportDisabled ? exportDisabledReason : t('querybuilder.hint_export_shortcut'),
+                    pdfTitle: exportDisabled ? exportDisabledReason : t('querybuilder.hint_export_shortcut')
+                }
             }}
             rightPanel={{
                 title: t('querybuilder.config_panel_title', 'Widget-Konfiguration'),

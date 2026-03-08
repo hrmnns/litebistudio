@@ -239,27 +239,29 @@ export const SettingsView: React.FC = () => {
             ]}
         >
             <div className="max-w-3xl space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center overflow-x-auto">
-                        {[
-                            { id: 'appearance', label: t('settings.tab_appearance') },
-                            { id: 'security', label: t('settings.tab_security') },
-                            { id: 'apps', label: t('settings.tab_apps', 'Apps') },
-                            { id: 'controls', label: t('settings.tab_controls', 'Controls') },
-                            { id: 'about', label: t('settings.tab_about') }
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as SettingsTab)}
-                                className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
-                                    activeTab === tab.id
-                                        ? 'text-blue-600 border-blue-600'
-                                        : 'text-slate-400 hover:text-blue-600 border-transparent'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
+                <div className="border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center overflow-x-auto">
+                            {[
+                                { id: 'appearance', label: t('settings.tab_appearance') },
+                                { id: 'security', label: t('settings.tab_security') },
+                                { id: 'apps', label: t('settings.tab_apps', 'Apps') },
+                                { id: 'controls', label: t('settings.tab_controls', 'Controls') },
+                                { id: 'about', label: t('settings.tab_about') }
+                            ].map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as SettingsTab)}
+                                    className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+                                        activeTab === tab.id
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-slate-400 hover:text-blue-600 border-transparent'
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 

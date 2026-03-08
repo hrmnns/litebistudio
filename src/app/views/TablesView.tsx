@@ -2138,6 +2138,9 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     title: t('datainspector.refresh_title'),
                     loading
                 },
+                export: {
+                    onExcelExport: handleExportCurrentRows
+                },
                 onBack,
                 actions: (
                     <>
@@ -2177,14 +2180,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                             </div>
                         )}
 
-                        {/* Export */}
-                        <button
-                            onClick={handleExportCurrentRows}
-                            className="h-10 flex items-center gap-2 px-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
-                        >
-                            <Download className="w-4 h-4" />
-                            <span className="hidden sm:inline">{t('datainspector.export_excel')}</span>
-                        </button>
                     </>
                 ),
             }}

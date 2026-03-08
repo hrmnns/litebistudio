@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useAsync } from '../../hooks/useAsync';
-import { Plus, Layout, Trash2, Database, Star, Settings, Edit2, Download, Maximize2, Minimize2, Filter, ArrowUp, ArrowDown, ArrowRightLeft, FolderOpen } from 'lucide-react';
+import { Plus, Layout, Trash2, Database, Star, Settings, Edit2, Maximize2, Minimize2, Filter, ArrowUp, ArrowDown, ArrowRightLeft, FolderOpen } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -713,44 +713,14 @@ export const CustomDashboardView: React.FC = () => {
             header={{
                 title: t('dashboard.title'),
                 subtitle: t('dashboard.subtitle'),
-                actions: (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={togglePresentationMode}
-                            className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-transparent hover:border-blue-100 dark:hover:border-blue-800/40"
-                            title={t('dashboard.presentation_mode')}
-                        >
-                            <Maximize2 className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => exportToPdf('dashboard-grid', `dashboard-${activeDashboard?.name || 'export'}`)}
-                            disabled={isExporting}
-                            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm font-medium text-sm disabled:opacity-50"
-                        >
-                            <Download className="w-4 h-4" />
-                            {isExporting ? t('common.exporting') : t('common.export_pdf')}
-                        </button>
-                        <button
-                            onClick={() => {
-                                setDashboardToolsTab('filters');
-                                setShowDashboardTools(true);
-                            }}
-                            className={`p-2 rounded-lg transition-colors border ${(showDashboardTools && dashboardToolsTab === 'filters') ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-transparent hover:border-blue-100 dark:hover:border-blue-800/40'}`}
-                            title={t('querybuilder.filter')}
-                        >
-                            <Filter className="w-5 h-5" />
-                        </button>
-                        {!isReadOnly && (
-                            <button
-                                onClick={() => setIsAddModalOpen(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                {t('dashboard.add_title')}
-                            </button>
-                        )}
-                    </div>
-                )
+                presentation: {
+                    onClick: togglePresentationMode,
+                    title: t('dashboard.presentation_mode')
+                },
+                export: {
+                    onPdfExport: () => exportToPdf('dashboard-grid', `dashboard-${activeDashboard?.name || 'export'}`),
+                    loading: isExporting
+                }
             }}
             rightPanel={{
                 title: t('dashboard.tools_title', 'Dashboard Tools'),
@@ -1109,49 +1079,78 @@ export const CustomDashboardView: React.FC = () => {
                 )
             }}
         >
-            <datalist id="suggested-columns">
-                {suggestedColumns.map(col => <option key={col} value={col} />)}
-            </datalist>
             {/* Dashboard Tabs */}
-            <div className="mb-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
-                    {orderedDashboards.map(d => (
-                        <button
-                            key={d.id}
-                            onClick={() => setActiveDashboardId(d.id)}
-                            className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeDashboardId === d.id
-                                ? 'text-blue-600 border-blue-600'
-                                : 'text-slate-400 border-transparent hover:text-slate-600'
-                                }`}
-                        >
-                            {d.name}
-                        </button>
-                    ))}
+            <div className="border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
+                        {orderedDashboards.map(d => (
+                            <button
+                                key={d.id}
+                                onClick={() => setActiveDashboardId(d.id)}
+                                className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeDashboardId === d.id
+                                    ? 'text-blue-600 border-blue-600'
+                                    : 'text-slate-400 border-transparent hover:text-slate-600'
+                                    }`}
+                            >
+                                {d.name}
+                            </button>
+                        ))}
+                        {!isReadOnly && (
+                            <button
+                                onClick={() => { void createDashboard(); }}
+                                className="px-4 py-2.5 text-slate-400 hover:text-blue-600 transition-all border-b-2 border-transparent"
+                                title={t('dashboard.new_dashboard_title')}
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2 pb-px">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setDashboardToolsTab('filters');
+                            setShowDashboardTools(true);
+                        }}
+                        className={`p-2 transition-colors ${
+                            showDashboardTools && dashboardToolsTab === 'filters'
+                                ? 'text-blue-600 dark:text-blue-300'
+                                : 'text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                        title={t('querybuilder.filter')}
+                        aria-label={t('querybuilder.filter')}
+                    >
+                        <Filter className="w-4 h-4" />
+                    </button>
                     {!isReadOnly && (
                         <button
-                            onClick={() => { void createDashboard(); }}
-                            className="px-4 py-2.5 text-slate-400 hover:text-blue-600 transition-all border-b-2 border-transparent"
-                            title={t('dashboard.new_dashboard_title')}
+                            type="button"
+                            onClick={() => setIsAddModalOpen(true)}
+                            className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                            title={t('dashboard.add_title')}
+                            aria-label={t('dashboard.add_title')}
                         >
                             <Plus className="w-4 h-4" />
                         </button>
                     )}
+                    {!isReadOnly && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setDashboardToolsTab('dashboards');
+                                setShowDashboardTools(true);
+                            }}
+                            className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                            title={t('dashboard.manage_title')}
+                            aria-label={t('dashboard.manage_title')}
+                        >
+                            <Settings className="w-4 h-4" />
+                        </button>
+                    )}
+                    </div>
                 </div>
-
-                {!isReadOnly && (
-                    <button
-                        onClick={() => {
-                            setDashboardToolsTab('dashboards');
-                            setShowDashboardTools(true);
-                        }}
-                        className="p-2 text-slate-400 hover:text-slate-600"
-                        title={t('dashboard.manage_title')}
-                    >
-                        <Settings className="w-4 h-4" />
-                    </button>
-                )}
             </div>
-
             {
                 activeDashboard && activeDashboard.layout.length === 0 ? (
                     <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500">
@@ -1325,6 +1324,10 @@ export const CustomDashboardView: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <datalist id="suggested-columns">
+                {suggestedColumns.map(col => <option key={col} value={col} />)}
+            </datalist>
 
             {/* Add Widget Modal (Customized for active dashboard) */}
             <Modal
