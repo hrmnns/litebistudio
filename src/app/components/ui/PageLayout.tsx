@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen, RefreshCw, Maximize2, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen, RefreshCw, Maximize2, Download, FileText, FileSpreadsheet, CircleHelp } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useDashboard } from '../../../lib/context/DashboardContext';
 import { useAsync } from '../../../hooks/useAsync';
@@ -44,6 +45,11 @@ interface PageHeaderProps {
         title?: string;
         disabled?: boolean;
         loading?: boolean;
+    };
+    help?: {
+        href?: string;
+        title?: string;
+        disabled?: boolean;
     };
 }
 
@@ -127,6 +133,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     rightPanel,
 }) => {
     const { t } = useTranslation();
+    const location = useLocation();
     const { isAdminMode, isReadOnly } = useDashboard();
     const [activeQueries, setActiveQueries] = useState(0);
     const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
@@ -207,6 +214,22 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     const exportExcelTitle = header.export?.excelTitle || t('common.export_excel', 'Export Excel');
     const refreshDisabled = Boolean(header.refresh?.disabled) || !header.refresh?.onClick;
     const refreshTitle = header.refresh?.title || t('common.refresh', 'Refresh');
+    const wikiBaseUrl = 'https://github.com/hrmnns/litebistudio/wiki';
+    const wikiPathByRoute: Record<string, string> = {
+        '/': 'Page-Dashboard',
+        '/datasource': 'Page-Data-Management',
+        '/tables': 'Page-Tables',
+        '/sql-workspace': 'Page-SQL-Workspace',
+        '/widgets': 'Page-Widgets',
+        '/reports': 'Page-Reports',
+        '/worklist': 'Page-Worklist',
+        '/settings': 'Page-Settings',
+        '/about': 'Page-About'
+    };
+    const resolvedHelpHref = header.help?.href
+        || `${wikiBaseUrl}/${wikiPathByRoute[location.pathname] || 'Home'}`;
+    const helpDisabled = Boolean(header.help?.disabled) || !resolvedHelpHref;
+    const helpTitle = header.help?.title || t('common.help', 'Help');
     const setRightPanelOpen = (open: boolean) => {
         if (!rightPanel) return;
         if (!isRightPanelControlled) setInternalRightPanelOpen(open);
@@ -232,6 +255,24 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {header.actions}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (helpDisabled) return;
+                                window.open(resolvedHelpHref, '_blank', 'noopener,noreferrer');
+                            }}
+                            title={helpDisabled ? t('common.not_available', 'Not available') : helpTitle}
+                            aria-label={helpDisabled ? t('common.not_available', 'Not available') : helpTitle}
+                            disabled={helpDisabled}
+                            className={cn(
+                                'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                helpDisabled
+                                    ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                            )}
+                        >
+                            <CircleHelp className="w-4 h-4" />
+                        </button>
                         <button
                             type="button"
                             onClick={() => {
