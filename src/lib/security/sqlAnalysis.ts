@@ -39,6 +39,20 @@ function isWordChar(ch: string): boolean {
     return /[A-Za-z0-9_]/.test(ch);
 }
 
+function pushIdentifierWords(content: string, tokens: string[]): void {
+    let i = 0;
+    while (i < content.length) {
+        if (!isWordChar(content[i])) {
+            i += 1;
+            continue;
+        }
+        let j = i + 1;
+        while (j < content.length && isWordChar(content[j])) j += 1;
+        tokens.push(content.slice(i, j).toUpperCase());
+        i = j;
+    }
+}
+
 function tokenizeSql(sql: string): string[] {
     const tokens: string[] = [];
     const length = sql.length;
@@ -61,7 +75,7 @@ function tokenizeSql(sql: string): string[] {
             continue;
         }
 
-        if (ch === '\'' || ch === '"' || ch === '`') {
+        if (ch === '\'') {
             const quote = ch;
             i += 1;
             while (i < length) {
@@ -79,6 +93,36 @@ function tokenizeSql(sql: string): string[] {
                 }
                 i += 1;
             }
+            continue;
+        }
+
+        if (ch === '"' || ch === '`') {
+            const quote = ch;
+            i += 1;
+            const start = i;
+            while (i < length) {
+                if (sql[i] === quote) {
+                    if (i + 1 < length && sql[i + 1] === quote) {
+                        i += 2;
+                        continue;
+                    }
+                    const content = sql.slice(start, i);
+                    pushIdentifierWords(content, tokens);
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+
+        if (ch === '[') {
+            i += 1;
+            const start = i;
+            while (i < length && sql[i] !== ']') i += 1;
+            const content = sql.slice(start, i);
+            pushIdentifierWords(content, tokens);
+            if (i < length && sql[i] === ']') i += 1;
             continue;
         }
 
@@ -240,4 +284,3 @@ export function getSystemTableWriteBlockedMessage(language: string): string {
     }
     return 'Write access to system tables (sys_*) is only allowed in admin mode.';
 }
-
