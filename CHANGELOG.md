@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - enforces unique SQL statement names per scope via `UNIQUE(name, scope)`
   - deduplicates legacy `sys_sql_statement` entries before constraint/index creation
   - adds explicit unique index `uq_sys_sql_statement_name_scope`.
+- Audit-driven quality gates were expanded:
+  - added `check:i18n` to validate DE/EN locale key parity and value-type consistency
+  - hardened `check:encoding` with additional mojibake pattern detection
+  - added focused repository-level no-regression tests for SQL statement save/use flows
+  - added focused security tests for non-admin `sys_*` write protection (including quoted identifier variants).
 
 ### Changed
 - Widget load/apply behavior in `Widget erstellen` was refined:
@@ -78,6 +83,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Data Inspector SQL execution flow was stabilized:
   - deterministic rerun trigger token (`sqlRunToken`) replaces fragile refresh timing around SQL execution state updates
   - split-resize listener lifecycle now removes stale handlers before/after drag and on unmount.
+- SQL write governance was consolidated:
+  - introduced managed repository write execution with explicit allowlists for internal `sys_*` write paths
+  - reduced policy drift between generic worker query paths and repository-level write flows.
+- Schema migration execution now fails safely:
+  - migration version is advanced only after successful migration completion
+  - migration chain now stops on failure instead of silently continuing with a newer `user_version`.
+- Datasource structure performance was improved for large datasets:
+  - table/view metadata loading is now batched to visible items
+  - `Mehr laden` controls progressively fetch additional metadata instead of eager full-list scans.
+- Hook lifecycle stability in core workspaces was improved:
+  - `WidgetsView` and `TablesView` callback dependencies were normalized to remove stale-closure risk and lint drift.
 
 ### Fixed
 - Removed redundant unsaved-changes confirmation when applying a new SQL statement from the SQL selection dialog.
@@ -94,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed SQL Manager reset consistency in Data Management danger zone:
   - clears `sys_user_widgets.sql_statement_id` before deleting SQL statements to avoid orphan references.
 - Fixed factory-reset environment cleanup robustness by guarding storage cleanup operations with fail-safe handling/logging.
+- Fixed a security gap in SQL system-table detection where quoted identifiers could bypass non-admin `sys_*` write blocking.
+- Fixed dynamic SQL identifier handling in worker/repository hotspots (`CLEAR`, `CLEAR_TABLE`, demo export, table search clause) by consistently quoting escaped identifiers.
 
 ## [1.4.0] - 2026-03-01
 
