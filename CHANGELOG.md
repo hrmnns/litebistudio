@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Widget editor now remembers and restores the last opened widget when returning from other app areas.
   - SQL Workspace now remembers and restores the last opened SQL statement when returning from other app areas.
 - Widget editor now persists the selected SQL statement ID, so footer metadata remains stable across navigation.
+- Database self-healing was extended with schema migration `V14`:
+  - enforces unique SQL statement names per scope via `UNIQUE(name, scope)`
+  - deduplicates legacy `sys_sql_statement` entries before constraint/index creation
+  - adds explicit unique index `uq_sys_sql_statement_name_scope`.
 
 ### Changed
 - Widget load/apply behavior in `Widget erstellen` was refined:
@@ -63,6 +67,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - added speaking tooltips for both states:
     - data-driven (`Database` icon)
     - no-data (`FileText` icon).
+- SQL safety checks were consolidated around shared SQL analysis logic:
+  - read-only mode now validates statements via tokenizer/splitter-based analysis instead of simple prefix heuristics
+  - SQL execution policy now carries runtime admin-mode/language context into worker execution
+  - Data Inspector SQL run flow now uses statement-aware write/limit checks.
+- SQL system-table protection is now enforced centrally in the DB worker execution path, reducing drift between repository-level and transport-level guards.
+- Performance and render stability were improved in dashboard/widget workspaces:
+  - `CustomDashboardView` now uses memoized maps for widget lookup/config parsing (instead of repeated `find + JSON.parse` in hot render paths)
+  - `WidgetsView` now uses memoized statement/widget lookup maps in save/open flows.
+- Data Inspector SQL execution flow was stabilized:
+  - deterministic rerun trigger token (`sqlRunToken`) replaces fragile refresh timing around SQL execution state updates
+  - split-resize listener lifecycle now removes stale handlers before/after drag and on unmount.
 
 ### Fixed
 - Removed redundant unsaved-changes confirmation when applying a new SQL statement from the SQL selection dialog.
@@ -73,6 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Opening or applying a different SQL statement now resets stale SQL output state so previous `Ergebnisse`/`Explain` data is not shown for the newly loaded statement.
 - Repaired corrupted German locale encoding (`de.json`) that caused broken umlaut rendering in navigation/sidebar labels (for example `Übersicht`, `Über`).
 - Fixed remaining dark-mode inconsistencies in Data Inspector profiling/footer inputs and badges (number spinners, pattern/issue badges, and page-jump controls now render with dark-compatible styling).
+- Fixed Diagnostics false-positive risk after factory reset/legacy imports by enforcing `sys_sql_statement(name, scope)` uniqueness through migration repair.
+- Fixed possible stale-result race in `WidgetsView` SQL runs (older async responses no longer overwrite newer run state).
+- Fixed potential drag-listener leaks in Data Inspector split view by adding robust mouse handler cleanup.
+- Fixed SQL Manager reset consistency in Data Management danger zone:
+  - clears `sys_user_widgets.sql_statement_id` before deleting SQL statements to avoid orphan references.
+- Fixed factory-reset environment cleanup robustness by guarding storage cleanup operations with fail-safe handling/logging.
 
 ## [1.4.0] - 2026-03-01
 

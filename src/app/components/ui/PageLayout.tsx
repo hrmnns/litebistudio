@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen } from 'lucide-react';
+import { Loader2, Activity, ShieldAlert, User, Lock, PanelRightOpen, RefreshCw } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useDashboard } from '../../../lib/context/DashboardContext';
 import { useAsync } from '../../../hooks/useAsync';
@@ -22,6 +22,12 @@ interface PageHeaderProps {
     subtitle?: string;
     onBack?: () => void;
     actions?: React.ReactNode;
+    refresh?: {
+        onClick: () => void;
+        title?: string;
+        disabled?: boolean;
+        loading?: boolean;
+    };
 }
 
 export interface PageBreadcrumb {
@@ -178,6 +184,23 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {header.actions}
+                        {header.refresh && (
+                            <button
+                                type="button"
+                                onClick={header.refresh.onClick}
+                                title={header.refresh.title || t('common.refresh', 'Refresh')}
+                                aria-label={header.refresh.title || t('common.refresh', 'Refresh')}
+                                disabled={Boolean(header.refresh.disabled)}
+                                className={cn(
+                                    'h-10 w-10 flex items-center justify-center rounded-lg border transition-all',
+                                    'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+                                    'hover:bg-slate-50 dark:hover:bg-slate-700',
+                                    'disabled:bg-slate-100 dark:disabled:bg-slate-800/60 disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed'
+                                )}
+                            >
+                                <RefreshCw className={cn('w-4 h-4', header.refresh.loading && 'animate-spin')} />
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => {

@@ -43,6 +43,8 @@ const DEFAULT_SQL = '';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const logger = createLogger('WidgetsView');
+const WIDGET_QUERY_TIMEOUT_MS = 15_000;
+const WIDGET_RUN_ERR_UNKNOWN = '__WIDGET_RUN_UNKNOWN__';
 const CONTENT_VIS_TYPES = new Set<VisualizationType>(['text', 'markdown', 'status', 'section', 'kpi_manual', 'image']);
 const QUERY_VIS_OPTIONS: Array<{ id: VisualizationType; icon: React.ComponentType<{ className?: string }>; labelKey: string; fallback: string }> = [
     { id: 'table', icon: TableIcon, labelKey: 'querybuilder.table', fallback: 'Table' },
@@ -80,7 +82,11 @@ interface SavedWidget {
     updated_at?: string | null;
 }
 
-const normalizeSqlText = (value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase();
+const normalizeSqlText = (value: string) => value
+    .replace(/;+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 const parseMaybeJson = (value: unknown): unknown => {
     if (typeof value !== 'string') return value ?? null;
     try {
@@ -97,8 +103,9 @@ export const WidgetsView: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [lastRunSql, setLastRunSql] = useState('');
     const [previewRenderVersion, setPreviewRenderVersion] = useState(0);
-    const [previewTab, setPreviewTab] = useState<'graphic' | 'table' | 'sql'>('graphic');
+    const [previewTab, setPreviewTab] = useLocalStorage<'graphic' | 'table' | 'sql'>('widgets_preview_tab', 'graphic');
     const [savedSnapshot, setSavedSnapshot] = useState('');
+    const [pendingBaselineSync, setPendingBaselineSync] = useState(false);
 
     // Mode State
     const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
@@ -137,6 +144,7 @@ export const WidgetsView: React.FC = () => {
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [activeSchema, setActiveSchema] = useState<SchemaDefinition | null>(null);
+    const [isGlobalRefreshing, setIsGlobalRefreshing] = useState(false);
     const [sqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
     const [sqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
     const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
@@ -268,6 +276,29 @@ export const WidgetsView: React.FC = () => {
         }
         return exts;
     }, [sqlEditorLineWrap, sqlEditorSyntaxHighlight, sqlEditorTabSize, sqlPreviewHighlightStyle, sqlPreviewTheme]);
+    const savedWidgetsById = useMemo(() => {
+        const map = new Map<string, SavedWidget>();
+        for (const widget of savedWidgets || []) {
+            map.set(widget.id, widget);
+        }
+        return map;
+    }, [savedWidgets]);
+    const sqlStatementsById = useMemo(() => {
+        const map = new Map<string, SqlStatementRecord>();
+        for (const statement of sqlStatements || []) {
+            map.set(statement.id, statement);
+        }
+        return map;
+    }, [sqlStatements]);
+    const sqlStatementByNormalizedSql = useMemo(() => {
+        const map = new Map<string, SqlStatementRecord>();
+        for (const statement of sqlStatements || []) {
+            const normalized = normalizeSqlText(statement.sql_text);
+            if (!normalized || map.has(normalized)) continue;
+            map.set(normalized, statement);
+        }
+        return map;
+    }, [sqlStatements]);
 
     const buildSnapshot = useCallback((overrides?: {
         currentSql?: string;
@@ -278,7 +309,7 @@ export const WidgetsView: React.FC = () => {
         currentWidgetName?: string;
         currentActiveWidgetId?: string | null;
     }) => JSON.stringify({
-        sql: (overrides?.currentSql ?? sql).trim(),
+        sql: normalizeSqlText(overrides?.currentSql ?? sql),
         builderMode: overrides?.currentBuilderMode ?? builderMode,
         queryConfig: overrides?.currentQueryConfig ?? queryConfig ?? null,
         visType: overrides?.currentVisType ?? visType,
@@ -289,13 +320,30 @@ export const WidgetsView: React.FC = () => {
 
     const handleRun = useCallback(async (
         overrideSql?: string,
-        options?: { preserveVisualization?: boolean }
+        options?: { preserveVisualization?: boolean; onError?: (message: string) => void }
     ): Promise<boolean> => {
         setLoading(true);
         setError('');
         try {
             const sqlToExecute = overrideSql || sql;
-            const data = await SystemRepository.executeRaw(sqlToExecute);
+            let timeoutHandle: number | null = null;
+            const timeoutPromise = new Promise<DbRow[]>((_, reject) => {
+                timeoutHandle = window.setTimeout(() => {
+                    void SystemRepository.abortActiveQueries();
+                    reject(new Error(`SQL execution timed out after ${Math.floor(WIDGET_QUERY_TIMEOUT_MS / 1000)}s`));
+                }, WIDGET_QUERY_TIMEOUT_MS);
+            });
+            let data: DbRow[] = [];
+            try {
+                data = await Promise.race([
+                    SystemRepository.executeRaw(sqlToExecute),
+                    timeoutPromise
+                ]) as DbRow[];
+            } finally {
+                if (timeoutHandle !== null) {
+                    window.clearTimeout(timeoutHandle);
+                }
+            }
             setResults(data);
             setLastRunSql(sqlToExecute);
             if (!options?.preserveVisualization && data.length > 0) {
@@ -312,31 +360,38 @@ export const WidgetsView: React.FC = () => {
             }
             return true;
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err));
+            const rawMessage = err instanceof Error ? err.message : String(err);
+            const message = rawMessage && rawMessage.trim().length > 0
+                ? rawMessage
+                : WIDGET_RUN_ERR_UNKNOWN;
+            setError(message);
+            options?.onError?.(message);
             return false;
         } finally {
             setLoading(false);
         }
     }, [sql, visConfig.xAxis]);
 
-    const loadWidget = (widget: SavedWidget, navigate = true) => {
+    const loadWidget = async (widget: SavedWidget, navigate = true): Promise<void> => {
+        setPendingBaselineSync(true);
         let parsedVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
         let parsedVisType: VisualizationType = 'table';
         let parsedBuilderMode: 'sql' | 'visual' = 'sql';
-        const linkedStatement = widget.sql_statement_id
-            ? (sqlStatements || []).find(stmt => stmt.id === widget.sql_statement_id)
-            : undefined;
+        const linkedStatement = widget.sql_statement_id ? sqlStatementsById.get(widget.sql_statement_id) : undefined;
         const widgetSql = (linkedStatement?.sql_text || widget.sql_query || '').trim() || DEFAULT_SQL;
 
         setActiveWidgetId(widget.id);
         setWidgetName(widget.name);
         setSql(widgetSql);
-        const matchedBySql = (sqlStatements || []).find(stmt => normalizeSqlText(stmt.sql_text) === normalizeSqlText(widgetSql));
-        setSelectedSqlStatementId(linkedStatement?.id || matchedBySql?.id || '');
+        const matchedBySql = sqlStatementByNormalizedSql.get(normalizeSqlText(widgetSql));
+        setSelectedSqlStatementId(
+            (typeof widget.sql_statement_id === 'string' && widget.sql_statement_id.trim().length > 0
+                ? widget.sql_statement_id.trim()
+                : (linkedStatement?.id || matchedBySql?.id || ''))
+        );
         setLastRunSql('');
         setResults([]);
         setError('');
-        setPreviewTab('graphic');
         setQueryConfig(undefined);
         setBuilderMode('sql');
         setVisType('table');
@@ -381,7 +436,7 @@ export const WidgetsView: React.FC = () => {
             }
         } else {
             setSql(widgetSql);
-            setTimeout(() => { void handleRun(widgetSql, { preserveVisualization: true }); }, 100);
+            await handleRun(widgetSql, { preserveVisualization: true });
             if (navigate) {
                 setGuidedStep(3);
                 setSidebarTab('visual');
@@ -403,12 +458,11 @@ export const WidgetsView: React.FC = () => {
         const saveAsContentWidget = CONTENT_VIS_TYPES.has(visType);
         const persistWidget = async (targetId: string, name: string, description: string): Promise<boolean> => {
             try {
-                const linkedStatement = (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId);
                 const sqlText = saveAsContentWidget ? '' : sql.trim();
-                const linkedStatementId =
-                    !saveAsContentWidget && linkedStatement && normalizeSqlText(linkedStatement.sql_text) === normalizeSqlText(sqlText)
-                        ? linkedStatement.id
-                        : null;
+                const selectedStatementId = (selectedSqlStatementId || '').trim();
+                const linkedStatementId = !saveAsContentWidget
+                    ? (selectedStatementId || null)
+                    : null;
                 const widget = {
                     id: targetId,
                     name,
@@ -449,7 +503,7 @@ export const WidgetsView: React.FC = () => {
 
         // Standard Save: update current widget directly (no prompt), like SQL workspace save.
         if (mode === 'update' && activeWidgetId) {
-            const current = (savedWidgets || []).find((w) => w.id === activeWidgetId);
+            const current = savedWidgetsById.get(activeWidgetId);
             const name = (current?.name || widgetName).trim();
             if (!name) return false;
             const description = (current?.description || '').trim();
@@ -468,7 +522,7 @@ export const WidgetsView: React.FC = () => {
         // Save as / new: prompt for name + description, overwrite by name with explicit confirm.
         let suggestedName = (widgetName || '').trim();
         let suggestedDescription = '';
-        const current = activeWidgetId ? (savedWidgets || []).find((w) => w.id === activeWidgetId) : undefined;
+        const current = activeWidgetId ? savedWidgetsById.get(activeWidgetId) : undefined;
         if (current) {
             suggestedName = current.name.trim();
             suggestedDescription = (current.description || '').trim();
@@ -535,9 +589,11 @@ export const WidgetsView: React.FC = () => {
         isReadOnly,
         refreshWidgets,
         savedWidgets,
+        savedWidgetsById,
         selectedSqlStatementId,
         sql,
         sqlStatements,
+        sqlStatementsById,
         t,
         queryConfig,
         visConfig,
@@ -717,10 +773,7 @@ export const WidgetsView: React.FC = () => {
         return rows;
     }, [filteredManageWidgets, manageSort, dashboardUsageByWidgetId, isWidgetPinned]);
     useEffect(() => {
-        if (!activeWidgetId) {
-            setLastOpenWidgetId('');
-            return;
-        }
+        if (!activeWidgetId) return;
         if (lastOpenWidgetId === activeWidgetId) return;
         setLastOpenWidgetId(activeWidgetId);
     }, [activeWidgetId, lastOpenWidgetId, setLastOpenWidgetId]);
@@ -728,22 +781,30 @@ export const WidgetsView: React.FC = () => {
     useEffect(() => {
         if (hasRestoredLastWidgetRef.current) return;
         if (!savedWidgets || savedWidgets.length === 0) return;
+        if (!lastOpenWidgetId) {
+            hasRestoredLastWidgetRef.current = true;
+            return;
+        }
+        if (activeWidgetId) {
+            hasRestoredLastWidgetRef.current = true;
+            return;
+        }
+        const saved = savedWidgetsById.get(lastOpenWidgetId);
+        if (!saved) {
+            setLastOpenWidgetId('');
+            hasRestoredLastWidgetRef.current = true;
+            return;
+        }
         hasRestoredLastWidgetRef.current = true;
-        if (!lastOpenWidgetId || activeWidgetId) return;
-        const saved = savedWidgets.find((widget) => widget.id === lastOpenWidgetId);
-        if (!saved) return;
         setSourceSelectTab('widget');
-        loadWidget(saved, false);
-    }, [activeWidgetId, lastOpenWidgetId, loadWidget, savedWidgets]);
+        void loadWidget(saved, false);
+    }, [activeWidgetId, lastOpenWidgetId, loadWidget, savedWidgets, savedWidgetsById, setLastOpenWidgetId]);
 
     const selectedSqlStatement = useMemo(
         () => (sqlStatements || []).find(stmt => stmt.id === selectedSqlStatementId),
         [sqlStatements, selectedSqlStatementId]
     );
-    const sqlMatchesSelectedStatement = useMemo(
-        () => Boolean(selectedSqlStatement && normalizeSqlText(selectedSqlStatement.sql_text) === normalizeSqlText(sql)),
-        [selectedSqlStatement, sql]
-    );
+    const hasSelectedSqlStatement = Boolean((selectedSqlStatementId || '').trim());
     const resultColumns = useMemo(
         () => (results.length > 0 ? Object.keys(results[0]) : []),
         [results]
@@ -800,12 +861,12 @@ export const WidgetsView: React.FC = () => {
     const isGraphicCapableType = previewVisType !== 'table' && previewVisType !== 'pivot' && previewVisType !== 'text' && previewVisType !== 'markdown' && previewVisType !== 'status' && previewVisType !== 'section' && previewVisType !== 'kpi_manual' && previewVisType !== 'image';
     const canPersistWidget = isContentWidget || results.length > 0;
     const exportDisabled = isExporting || (!isContentWidget && results.length === 0);
-    const saveDisabled = !canPersistWidget || isReadOnly || (!isContentWidget && !sqlMatchesSelectedStatement);
+    const saveDisabled = !canPersistWidget || isReadOnly || (!isContentWidget && !hasSelectedSqlStatement);
     const saveBlockedHint = isReadOnly
         ? t('common.read_only')
         : (!canPersistWidget
             ? t('querybuilder.hint_run_query_before_save')
-            : (!isContentWidget && !sqlMatchesSelectedStatement
+            : (!isContentWidget && !hasSelectedSqlStatement
                 ? t('querybuilder.hint_select_sql_statement_before_save', 'Bitte ein SQL-Statement aus dem SQL-Manager auswaehlen.')
                 : ''));
     const exportDisabledReason = isExporting
@@ -814,11 +875,11 @@ export const WidgetsView: React.FC = () => {
     const hasEntrySelection = true;
     const canProceedFromStart = sourceSelectTab === 'none'
         ? true
-        : (sourceSelectTab === 'query' ? sqlMatchesSelectedStatement : Boolean(activeWidgetId));
-    const hasSourceConfig = isContentWidget || sqlMatchesSelectedStatement;
+        : (sourceSelectTab === 'query' ? hasSelectedSqlStatement : Boolean(activeWidgetId));
+    const hasSourceConfig = isContentWidget || hasSelectedSqlStatement;
     const hasRunOutput = isContentWidget || (results.length > 0 && !error && lastRunSql.trim() === sql.trim());
     const hasVisualizationConfig = useMemo(() => {
-        if (!sqlMatchesSelectedStatement) {
+        if (!hasSelectedSqlStatement) {
             if (!isContentWidget) return false;
             if (isMarkdownWidget) return Boolean((visConfig.markdownContent || '').trim());
             if (isStatusWidget) return Boolean((visConfig.statusTitle || '').trim() || (visConfig.statusMessage || '').trim());
@@ -870,7 +931,7 @@ export const WidgetsView: React.FC = () => {
             });
         });
         return hasRenderableData;
-    }, [isContentWidget, isImageWidget, isKpiManualWidget, isMarkdownWidget, isSectionWidget, isStatusWidget, isTextWidget, visType, visConfig, numericColumns, scatterData.length, scatterXKey, scatterYKey, results, sqlMatchesSelectedStatement]);
+    }, [hasSelectedSqlStatement, isContentWidget, isImageWidget, isKpiManualWidget, isMarkdownWidget, isSectionWidget, isStatusWidget, isTextWidget, visType, visConfig, numericColumns, scatterData.length, scatterXKey, scatterYKey, results]);
     const previewVisualizationInvalid = !isContentWidget
         && results.length > 0
         && previewVisType !== 'table'
@@ -882,7 +943,7 @@ export const WidgetsView: React.FC = () => {
             return isContentWidget && hasVisualizationConfig ? 4 : 3;
         }
         if (sourceSelectTab === 'query') {
-            if (!sqlMatchesSelectedStatement) return 1;
+            if (!hasSelectedSqlStatement) return 1;
             if (!hasRunOutput) return 2;
             return hasVisualizationConfig ? 4 : 3;
         }
@@ -920,7 +981,7 @@ export const WidgetsView: React.FC = () => {
         : t('querybuilder.step_run');
     const guidedBlockedHint = (() => {
         if (guidedStep === 1) {
-            if (sourceSelectTab === 'query' && !sqlMatchesSelectedStatement) {
+            if (sourceSelectTab === 'query' && !hasSelectedSqlStatement) {
                 return t('querybuilder.hint_select_sql_statement_for_widget', 'Bitte zuerst ein SQL-Statement im SQL-Manager auswaehlen.');
             }
             if (sourceSelectTab === 'widget' && !activeWidgetId) {
@@ -929,7 +990,7 @@ export const WidgetsView: React.FC = () => {
             return '';
         }
         if (guidedStep === 2) {
-            if (!sqlMatchesSelectedStatement) {
+            if (!hasSelectedSqlStatement) {
                 return t('querybuilder.hint_select_sql_statement_for_widget', 'Bitte zuerst ein SQL-Statement im SQL-Manager auswaehlen.');
             }
             if (!hasRunOutput) {
@@ -988,6 +1049,7 @@ export const WidgetsView: React.FC = () => {
 
         const defaultVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
         setActiveWidgetId(null);
+        setLastOpenWidgetId('');
         setWidgetName('');
         setSelectedSqlStatementId('');
         setSourceSelectTab('none');
@@ -1016,26 +1078,42 @@ export const WidgetsView: React.FC = () => {
         if (!canContinue) return false;
         setSourceSelectTab('widget');
         setWorkspaceTab('editor');
-        loadWidget(widget, true);
+        await loadWidget(widget, true);
         if (closeLoadDialog) setIsLoadDialogOpen(false);
         return true;
     }, [confirmSaveOrDiscardBeforeContinue, loadWidget, setWorkspaceTab]);
     const applyLoadSelection = async () => {
         if (loadDialogType === 'widget') {
             if (!selectedLoadWidgetId) return;
-            const nextWidget = (savedWidgets || []).find((w) => w.id === selectedLoadWidgetId);
+            const nextWidget = savedWidgetsById.get(selectedLoadWidgetId);
             if (!nextWidget) return;
             await openWidgetWithUnsavedGuard(nextWidget, true);
             return;
         }
         if (!selectedLoadSqlId) return;
-        const nextStatement = (sqlStatements || []).find((stmt) => stmt.id === selectedLoadSqlId);
+        const nextStatement = sqlStatementsById.get(selectedLoadSqlId);
         if (!nextStatement) return;
         const allow = await confirmSaveOrDiscardBeforeContinue();
         if (!allow) return;
         setSourceSelectTab(activeWidgetId ? 'widget' : 'query');
         applySqlStatementSource(nextStatement);
-        await handleRun(nextStatement.sql_text);
+        let runError = '';
+        const finalExecuted = await handleRun(nextStatement.sql_text, {
+            onError: (message) => { runError = message; }
+        });
+        if (finalExecuted) {
+            setPreviewTab('table');
+        } else {
+            const resolvedRunError = runError && runError.trim().length > 0 ? runError : WIDGET_RUN_ERR_UNKNOWN;
+            setError(resolvedRunError);
+            await appDialog.error(
+                `${t(
+                    'querybuilder.sql_statement_execute_failed_after_select',
+                    'Das ausgewaehlte SQL-Statement konnte nicht ausgefuehrt werden. Bitte pruefe Syntax und Datenquelle.'
+                )}\n\n${resolvedRunError}`
+            );
+            setPreviewTab('sql');
+        }
         setIsLoadDialogOpen(false);
     };
     const handleToggleLoadItemPin = useCallback(async (id: string) => {
@@ -1046,11 +1124,11 @@ export const WidgetsView: React.FC = () => {
             });
             return;
         }
-        const current = (sqlStatements || []).find((stmt) => stmt.id === id);
+        const current = sqlStatementsById.get(id);
         if (!current) return;
         await SystemRepository.setSqlStatementFavorite(id, Number(current.is_favorite) !== 1);
         refreshSqlStatements();
-    }, [loadDialogType, pinnedWidgetIds, refreshSqlStatements, setPinnedWidgetIds, sqlStatements]);
+    }, [loadDialogType, refreshSqlStatements, setPinnedWidgetIds, sqlStatementsById]);
     const formatTimestamp = useCallback((raw?: string | null) => {
         if (!raw) return '-';
         const date = new Date(raw);
@@ -1119,6 +1197,7 @@ export const WidgetsView: React.FC = () => {
         refreshWidgets();
         if (activeWidgetId === widget.id) {
             setActiveWidgetId(null);
+            setLastOpenWidgetId('');
             setWidgetName('');
             setSavedSnapshot('');
         }
@@ -1229,8 +1308,8 @@ export const WidgetsView: React.FC = () => {
     const previewHeaderTitle = `Widget (${activeWidgetLabel})`;
     const previewHeaderTitleWithDirty = hasUnsavedChanges ? `${previewHeaderTitle} *` : previewHeaderTitle;
     const activeWidgetRecord = useMemo(
-        () => (savedWidgets || []).find((widget) => widget.id === activeWidgetId) || null,
-        [activeWidgetId, savedWidgets]
+        () => (activeWidgetId ? (savedWidgetsById.get(activeWidgetId) || null) : null),
+        [activeWidgetId, savedWidgetsById]
     );
     const activeWidgetDbId = activeWidgetId || '-';
     const activeSqlStatementDbId = selectedSqlStatementId || '-';
@@ -1241,6 +1320,24 @@ export const WidgetsView: React.FC = () => {
         if (Number.isNaN(date.getTime())) return '-';
         return date.toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-US');
     }, [activeWidgetId, activeWidgetRecord?.created_at, activeWidgetRecord?.updated_at, i18n.language, localWidgetSavedAtById]);
+    const widgetDebugSummary = useMemo(() => {
+        const sqlTrimmed = sql.trim();
+        const lastRunTrimmed = lastRunSql.trim();
+        const errorShort = (error || '').trim();
+        const normalizedMatch = sqlTrimmed.length > 0 && lastRunTrimmed.length > 0 && sqlTrimmed === lastRunTrimmed;
+        return [
+            `src=${sourceSelectTab}`,
+            `rows=${results.length}`,
+            `stmt=${selectedSqlStatementId || '-'}`,
+            `sql=${sqlTrimmed.length}`,
+            `last=${lastRunTrimmed.length}`,
+            `match=${normalizedMatch ? 'yes' : 'no'}`,
+            `loading=${loading ? 'yes' : 'no'}`,
+            `tab=${previewTab}`,
+            `type=${visType}`,
+            `err=${errorShort ? 'yes' : 'no'}`
+        ].join(' | ');
+    }, [error, lastRunSql, loading, previewTab, results.length, selectedSqlStatementId, sourceSelectTab, sql, visType]);
     const previewTooltipContentStyle: React.CSSProperties = {
         borderRadius: '12px',
         border: isDarkSqlPreview ? '1px solid #334155' : '1px solid #e2e8f0',
@@ -1283,7 +1380,7 @@ export const WidgetsView: React.FC = () => {
                 return;
             }
             if (sourceSelectTab === 'query') {
-                if (!sqlMatchesSelectedStatement) return;
+                if (!hasSelectedSqlStatement) return;
                 setVisType('table');
                 const executed = await handleRun();
                 if (!executed) return;
@@ -1339,6 +1436,16 @@ export const WidgetsView: React.FC = () => {
             setSavedSnapshot(currentSnapshot);
         }
     }, [savedSnapshot, currentSnapshot]);
+
+    useEffect(() => {
+        if (!pendingBaselineSync) return;
+        if (loading) return;
+        const timer = window.setTimeout(() => {
+            setSavedSnapshot(currentSnapshot);
+            setPendingBaselineSync(false);
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [pendingBaselineSync, loading, currentSnapshot]);
 
     useEffect(() => {
         const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1399,11 +1506,34 @@ export const WidgetsView: React.FC = () => {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [loading, canSaveCurrentWidget, handleRun, handleSaveWidget]);
 
+    const handleGlobalRefresh = useCallback(async () => {
+        if (workspaceTab === 'editor') {
+            if (loading || !hasSelectedSqlStatement || !sql.trim()) return;
+            await handleRun();
+            return;
+        }
+        if (isGlobalRefreshing) return;
+        setIsGlobalRefreshing(true);
+        try {
+            await Promise.all([refreshWidgets(), refreshSqlStatements()]);
+        } finally {
+            setIsGlobalRefreshing(false);
+        }
+    }, [workspaceTab, loading, hasSelectedSqlStatement, sql, handleRun, isGlobalRefreshing, refreshWidgets, refreshSqlStatements]);
+
     return (
         <PageLayout
             header={{
                 title: t('sidebar.query_builder'),
                 subtitle: t('querybuilder.subtitle'),
+                refresh: {
+                    onClick: () => { void handleGlobalRefresh(); },
+                    title: t('querybuilder.refresh_data', 'Aktualisieren'),
+                    disabled: workspaceTab === 'editor'
+                        ? (loading || !hasSelectedSqlStatement || !sql.trim())
+                        : isGlobalRefreshing,
+                    loading: loading || isGlobalRefreshing
+                },
                 actions: (
                     <div className="flex items-center gap-2">
                         <button
@@ -1481,14 +1611,14 @@ export const WidgetsView: React.FC = () => {
                                 <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-3 animate-in slide-in-from-right-4 duration-300">
                                     <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><Layout className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.graph_type')}</h3>
                                     <div className="grid grid-cols-3 gap-2">
-                                            {(sqlMatchesSelectedStatement ? QUERY_VIS_OPTIONS : CONTENT_VIS_OPTIONS).map(type => (
-                                            <button key={type.id} onClick={() => setVisType(type.id)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
-                                                <type.icon className="w-4 h-4" />
-                                                <span className="text-[9px] uppercase font-black">{t(type.labelKey, type.fallback)}</span>
-                                            </button>
-                                        ))}
+                                            {(hasSelectedSqlStatement ? QUERY_VIS_OPTIONS : CONTENT_VIS_OPTIONS).map(type => (
+                                                <button key={type.id} onClick={() => setVisType(type.id)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
+                                                    <type.icon className="w-4 h-4" />
+                                                    <span className="text-[9px] uppercase font-black">{t(type.labelKey, type.fallback)}</span>
+                                                </button>
+                                            ))}
                                     </div>
-                                    {!sqlMatchesSelectedStatement && (
+                                    {!hasSelectedSqlStatement && (
                                         <p className="text-[10px] text-slate-500">
                                             {t('querybuilder.visual_text_only_hint', 'Ohne ausgewaehlte Abfrage sind nur Text-, Markdown-, Status-, Section-, KPI-Manual- oder Image-Widgets verfuegbar.')}
                                         </p>
@@ -2395,6 +2525,14 @@ export const WidgetsView: React.FC = () => {
                                         <BarChart2 className="w-10 h-10 mb-3 opacity-40" />
                                         <p className="text-xs font-bold text-center">{t('querybuilder.preview_graphic_no_query_hint', 'Keine Abfrage vorhanden. Fuer Text/Markdown/Status/Section/KPI-Manual/Image-Widgets steht nur die Inhaltsvorschau zur Verfuegung.')}</p>
                                     </div>
+                                ) : error ? (
+                                    <div className="h-full min-h-[260px] flex items-center justify-center p-6">
+                                        <div className="max-w-xl w-full rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-900 dark:text-rose-100 px-4 py-4">
+                                            <div className="text-xs font-black uppercase tracking-wide text-rose-700 dark:text-rose-300">{t('common.error', 'Fehler')}</div>
+                                            <p className="text-sm font-semibold mt-1">{t('querybuilder.sql_execution_failed', 'SQL-Ausfuehrung fehlgeschlagen')}</p>
+                                            <p className="text-xs mt-2 whitespace-pre-wrap break-words">{error}</p>
+                                        </div>
+                                    </div>
                                 ) : results.length === 0 ? (
                                     <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-300">
                                         <Play className="w-12 h-12 mb-4 opacity-10" />
@@ -2700,6 +2838,14 @@ export const WidgetsView: React.FC = () => {
                                         <TableIcon className="w-10 h-10 mb-3 opacity-40" />
                                         <p className="text-xs font-bold text-center">{t('querybuilder.preview_no_data_source', 'Keine Datenquelle ausgewaehlt.')}</p>
                                     </div>
+                                ) : error ? (
+                                    <div className="h-full min-h-[260px] flex items-center justify-center p-6">
+                                        <div className="max-w-xl w-full rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-900 dark:text-rose-100 px-4 py-4">
+                                            <div className="text-xs font-black uppercase tracking-wide text-rose-700 dark:text-rose-300">{t('common.error', 'Fehler')}</div>
+                                            <p className="text-sm font-semibold mt-1">{t('querybuilder.sql_execution_failed', 'SQL-Ausfuehrung fehlgeschlagen')}</p>
+                                            <p className="text-xs mt-2 whitespace-pre-wrap break-words">{error}</p>
+                                        </div>
+                                    </div>
                                 ) : results.length === 0 ? (
                                     <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-300">
                                         <Play className="w-12 h-12 mb-4 opacity-10" />
@@ -2753,6 +2899,10 @@ export const WidgetsView: React.FC = () => {
                                     <span className="inline-flex items-center gap-1">
                                         <span className="font-semibold uppercase tracking-wide">{t('datainspector.last_saved_at', 'Letzte Speicherung')}:</span>
                                         <code className="font-mono text-[10px]" title={activeWidgetLastSaved}>{activeWidgetLastSaved}</code>
+                                    </span>
+                                    <span className="inline-flex items-center gap-1">
+                                        <span className="font-semibold uppercase tracking-wide">Debug:</span>
+                                        <code className="font-mono text-[10px]" title={widgetDebugSummary}>{widgetDebugSummary}</code>
                                     </span>
                                 </div>
                             </div>

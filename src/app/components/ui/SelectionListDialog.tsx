@@ -123,16 +123,23 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                         </div>
                     ) : (
                             items.map((item) => (
-                                <button
+                                <div
                                     key={item.id}
-                                    type="button"
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => onSelect(item.id)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter' || event.key === ' ') {
+                                            event.preventDefault();
+                                            onSelect(item.id);
+                                        }
+                                    }}
                                     className={`w-full text-left p-2 rounded-lg border transition-colors ${
                                         selectedId === item.id
                                             ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700'
                                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700'
                                     }`}
-                            >
+                                >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
                                         <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{item.title}</div>
@@ -180,7 +187,7 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                                         ))}
                                     </div>
                                 )}
-                            </button>
+                                </div>
                         ))
                     )}
                 </div>

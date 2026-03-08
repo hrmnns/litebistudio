@@ -27,6 +27,7 @@ import { TABLES_LAST_SELECT_SQL_KEY, TABLES_PENDING_SQL_KEY, TABLES_PENDING_SQL_
 import { appDialog } from '../../lib/appDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SelectionListDialog } from '../components/ui/SelectionListDialog';
+import { analyzeSqlStatements } from '../../lib/security/sqlAnalysis';
 
 interface TablesViewProps {
     onBack: () => void;
@@ -187,6 +188,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         'editor'
     );
     const [sqlExecutionSql, setSqlExecutionSql] = useState('');
+    const [sqlRunToken, setSqlRunToken] = useState(0);
     const [sqlLimitNotice, setSqlLimitNotice] = useState('');
     const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('tables_sql_limit_notice_dismissed', false);
     const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
@@ -236,6 +238,8 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     });
     const sqlEditorPaneRef = useRef<HTMLDivElement | null>(null);
     const sqlSplitContainerRef = useRef<HTMLDivElement | null>(null);
+    const sqlSplitMouseMoveHandlerRef = useRef<((event: MouseEvent) => void) | null>(null);
+    const sqlSplitMouseUpHandlerRef = useRef<(() => void) | null>(null);
     const [inspectorReturnHash, setInspectorReturnHash] = useState<string | null>(null);
     const modeLocked = Boolean(fixedMode);
     const pageTitle = t(titleKey || 'sidebar.data_inspector');
@@ -451,7 +455,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 return await SystemRepository.executeRaw(sqlExecutionSql);
             }
         },
-        [mode, selectedTable, selectedSourceType, pageSize, currentPage, sqlExecutionSql] // Auto-run when mode/source/page changes
+        [mode, selectedTable, selectedSourceType, pageSize, currentPage, sqlExecutionSql, sqlRunToken] // Auto-run when mode/source/page changes
     );
 
     const { data: tableTotalRows } = useAsync<number>(
@@ -527,18 +531,18 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         const trimmed = sqlText.trim();
         if (!trimmed) return;
 
-        const upper = trimmed.toUpperCase();
-        const isPotentialWriteQuery = /^(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|REPLACE|TRUNCATE|VACUUM|ATTACH|DETACH)\b/.test(upper);
+        const statementAnalysis = analyzeSqlStatements(trimmed);
+        const isPotentialWriteQuery = statementAnalysis.some((statement) => statement.kind === 'write');
         if (isPotentialWriteQuery && !(await appDialog.confirm(t('datainspector.write_confirm')))) return;
 
-        const isSelect = /^\s*SELECT\b/i.test(trimmed);
-        const hasLimitClause = /\bLIMIT\b/i.test(trimmed);
-        if (isSelect && !hasLimitClause && sqlRequireLimitConfirm) {
+        const hasSelectWithoutLimit = statementAnalysis.some((statement) => statement.isSelectLike && !statement.hasLimit);
+        if (hasSelectWithoutLimit && sqlRequireLimitConfirm) {
             if (!(await appDialog.confirm(t('datainspector.limit_confirm_prompt', { limit: sqlMaxRows })))) return;
         }
 
         let executionSql = trimmed.replace(/;\s*$/, '');
-        if (isSelect) {
+        const canApplyGuardedLimit = statementAnalysis.length === 1 && statementAnalysis[0].isSelectLike;
+        if (canApplyGuardedLimit) {
             const cappedLimit = Math.max(1, Math.floor(sqlMaxRows || 1));
             executionSql = `SELECT * FROM (${executionSql}) AS __litebi_guard LIMIT ${cappedLimit}`;
             setSqlLimitNotice(sqlLimitNoticeDismissed ? '' : t('datainspector.limit_applied_notice', { limit: cappedLimit }));
@@ -548,12 +552,12 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
         setSqlOutputView('result');
         setSqlExecutionSql(executionSql);
-        execute();
+        setSqlRunToken((prev) => prev + 1);
         setSqlHistory((prev: string[]) => [trimmed, ...prev.filter((q: string) => q !== trimmed)].slice(0, 12));
-        if (isSelect) {
+        if (statementAnalysis.some((statement) => statement.isSelectLike)) {
             localStorage.setItem(TABLES_LAST_SELECT_SQL_KEY, trimmed);
         }
-    }, [execute, setSqlHistory, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, t]);
+    }, [setSqlHistory, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, t]);
 
     const handleRunSql = async () => {
         await executeSqlText(inputSql);
@@ -1554,6 +1558,14 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         const startHeight = sqlSplitTopHeight;
         const minPaneHeight = 140;
         const dividerHeight = 10;
+        if (sqlSplitMouseMoveHandlerRef.current) {
+            window.removeEventListener('mousemove', sqlSplitMouseMoveHandlerRef.current);
+            sqlSplitMouseMoveHandlerRef.current = null;
+        }
+        if (sqlSplitMouseUpHandlerRef.current) {
+            window.removeEventListener('mouseup', sqlSplitMouseUpHandlerRef.current);
+            sqlSplitMouseUpHandlerRef.current = null;
+        }
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const delta = moveEvent.clientY - startY;
             const totalHeight = container.clientHeight;
@@ -1564,10 +1576,26 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         const handleMouseUp = () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
+            sqlSplitMouseMoveHandlerRef.current = null;
+            sqlSplitMouseUpHandlerRef.current = null;
         };
+        sqlSplitMouseMoveHandlerRef.current = handleMouseMove;
+        sqlSplitMouseUpHandlerRef.current = handleMouseUp;
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
     }, [sqlSplitTopHeight, sqlWorkspaceSplitView, setSqlSplitTopHeight]);
+    useEffect(() => {
+        return () => {
+            if (sqlSplitMouseMoveHandlerRef.current) {
+                window.removeEventListener('mousemove', sqlSplitMouseMoveHandlerRef.current);
+                sqlSplitMouseMoveHandlerRef.current = null;
+            }
+            if (sqlSplitMouseUpHandlerRef.current) {
+                window.removeEventListener('mouseup', sqlSplitMouseUpHandlerRef.current);
+                sqlSplitMouseUpHandlerRef.current = null;
+            }
+        };
+    }, []);
     const applySqlStatement = useCallback(async (statement: SqlStatementRecord, runImmediately: boolean) => {
         if (fixedMode === 'table') {
             forwardSqlToWorkspace(statement.sql_text);
@@ -2091,6 +2119,11 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                             : (items?.length || 0),
                     mode: mode === 'table' ? selectedTable : t('datainspector.sql_mode')
                 }),
+                refresh: {
+                    onClick: () => { void execute(); },
+                    title: t('datainspector.refresh_title'),
+                    loading
+                },
                 onBack,
                 actions: (
                     <>
@@ -2129,15 +2162,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                 </button>
                             </div>
                         )}
-
-                        {/* Refresh */}
-                        <button
-                            onClick={execute}
-                            className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-all"
-                            title={t('datainspector.refresh_title')}
-                        >
-                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                        </button>
 
                         {/* Export */}
                         <button

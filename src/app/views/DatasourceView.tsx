@@ -117,21 +117,37 @@ const isWeakBackupPassword = (password: string): boolean => {
 };
 
 const resetEnvironmentSettings = (): void => {
-    const localKeys = Object.keys(window.localStorage);
-    for (const key of localKeys) {
-        if (
-            FACTORY_RESET_LOCALSTORAGE_KEYS.has(key) ||
-            FACTORY_RESET_LOCALSTORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))
-        ) {
-            window.localStorage.removeItem(key);
+    try {
+        const localKeys = Object.keys(window.localStorage);
+        for (const key of localKeys) {
+            if (
+                FACTORY_RESET_LOCALSTORAGE_KEYS.has(key) ||
+                FACTORY_RESET_LOCALSTORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))
+            ) {
+                window.localStorage.removeItem(key);
+            }
         }
+    } catch (error) {
+        logger.warn('Failed to clear localStorage during factory reset cleanup', error);
     }
 
-    const sessionKeys = Object.keys(window.sessionStorage);
-    for (const key of sessionKeys) {
-        if (FACTORY_RESET_SESSIONSTORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
-            window.sessionStorage.removeItem(key);
+    try {
+        const sessionKeys = Object.keys(window.sessionStorage);
+        for (const key of sessionKeys) {
+            if (FACTORY_RESET_SESSIONSTORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+                window.sessionStorage.removeItem(key);
+            }
         }
+    } catch (error) {
+        logger.warn('Failed to clear sessionStorage during factory reset cleanup', error);
+    }
+};
+
+const shouldConfirmDestructiveActions = (): boolean => {
+    try {
+        return localStorage.getItem('notifications_confirm_destructive') !== 'false';
+    } catch {
+        return true;
     }
 };
 
@@ -596,7 +612,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     };
 
     const handleDropTable = async (tableName: string) => {
-        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        const shouldConfirm = shouldConfirmDestructiveActions();
         if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_confirm', { name: tableName })))) return;
         try {
             await SystemRepository.executeRaw(`DROP TABLE ${quoteIdentifier(tableName)}`);
@@ -609,7 +625,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     };
 
     const handleDropView = async (viewName: string) => {
-        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        const shouldConfirm = shouldConfirmDestructiveActions();
         if (shouldConfirm && !(await appDialog.confirm(t('datasource.drop_view_confirm', `View "${viewName}" löschen?`, { name: viewName })))) return;
         try {
             await SystemRepository.executeRaw(`DROP VIEW ${quoteIdentifier(viewName)}`);
@@ -622,7 +638,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     };
 
     const handleClearTable = async (tableName: string) => {
-        const shouldConfirm = localStorage.getItem('notifications_confirm_destructive') !== 'false';
+        const shouldConfirm = shouldConfirmDestructiveActions();
         if (shouldConfirm && !(await appDialog.confirm(t('datasource.clear_confirm', { name: tableName })))) return;
         try {
             await SystemRepository.executeRaw(`DELETE FROM ${quoteIdentifier(tableName)}`);
@@ -645,7 +661,12 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         }
         try {
             setIsResettingSqlManager(true);
-            await SystemRepository.executeRaw('DELETE FROM sys_sql_statement;');
+            await SystemRepository.executeRaw(`
+                UPDATE sys_user_widgets
+                SET sql_statement_id = NULL
+                WHERE COALESCE(TRIM(sql_statement_id), '') <> '';
+                DELETE FROM sys_sql_statement;
+            `);
             await appDialog.info(t('datasource.sql_manager_reset_success', 'SQL Manager was reset.'));
         } catch (error: unknown) {
             await appDialog.error(t('common.error') + ': ' + getErrorMessage(error));

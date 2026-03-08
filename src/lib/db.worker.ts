@@ -3,6 +3,7 @@ import schemaSql from '../datasets/schema.sql?raw';
 import viewsSql from '../datasets/views.sql?raw';
 import { DEFAULT_LOG_LEVEL, normalizeLogLevel, shouldLog, type AppLogLevel } from './logging';
 import { resetDatabaseObjectsInPlace } from './dbFactoryReset';
+import { getSystemTableWriteBlockedMessage, hasSystemWriteWithoutAdmin } from './security/sqlAnalysis';
 
 type SqliteRow = Record<string, unknown>;
 
@@ -86,7 +87,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 13;
+const CURRENT_SCHEMA_VERSION = 14;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -415,6 +416,36 @@ function applyMigrations(databaseInstance: DatabaseLike) {
         userVersion = 13;
     }
 
+    // Version 14: Migration: Ensure UNIQUE semantics for sys_sql_statement(name, scope)
+    if (userVersion < 14) {
+        log('Migration V14: Enforcing UNIQUE sys_sql_statement(name, scope)...');
+        try {
+            databaseInstance.exec(`
+                DELETE FROM sys_sql_statement
+                WHERE rowid NOT IN (
+                    SELECT rowid
+                    FROM (
+                        SELECT
+                            rowid,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY name, scope
+                                ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC, rowid DESC
+                            ) AS rn
+                        FROM sys_sql_statement
+                    ) ranked
+                    WHERE rn = 1
+                );
+            `);
+            databaseInstance.exec('CREATE UNIQUE INDEX IF NOT EXISTS uq_sys_sql_statement_name_scope ON sys_sql_statement(name, scope)');
+            databaseInstance.exec('CREATE INDEX IF NOT EXISTS idx_sys_sql_scope_name ON sys_sql_statement(scope, name)');
+            databaseInstance.exec('CREATE INDEX IF NOT EXISTS idx_sys_sql_last_used ON sys_sql_statement(last_used_at DESC)');
+        } catch (e) {
+            error('Migration failed for V14', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 14');
+        userVersion = 14;
+    }
+
     log(`Database migrated to version ${userVersion}`);
 }
 
@@ -578,6 +609,14 @@ async function handleMessage(e: MessageEvent) {
                 const payloadObj = isRecord(payload) ? payload : {};
                 const sql = typeof payloadObj.sql === 'string' ? payloadObj.sql : '';
                 const bind = Array.isArray(payloadObj.bind) ? payloadObj.bind : undefined;
+                const enforceSystemWriteGuard = Boolean(payloadObj.enforceSystemWriteGuard);
+                if (enforceSystemWriteGuard) {
+                    const adminMode = Boolean(payloadObj.adminMode);
+                    const language = typeof payloadObj.language === 'string' ? payloadObj.language : 'en';
+                    if (hasSystemWriteWithoutAdmin(sql, adminMode)) {
+                        throw new Error(getSystemTableWriteBlockedMessage(language));
+                    }
+                }
                 const rows: SqliteRow[] = [];
                 database.exec({
                     sql,

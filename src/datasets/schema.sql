@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS sys_sql_statement (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sys_sql_scope_name ON sys_sql_statement(scope, name);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sys_sql_statement_name_scope ON sys_sql_statement(name, scope);
 CREATE INDEX IF NOT EXISTS idx_sys_sql_last_used ON sys_sql_statement(last_used_at DESC);
 
 CREATE TABLE IF NOT EXISTS sys_health_snapshot (

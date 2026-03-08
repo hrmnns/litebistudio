@@ -248,6 +248,24 @@ export const CustomDashboardView: React.FC = () => {
         const missing = dashboards.filter(d => !dashboardOrderIds.includes(d.id));
         return [...orderedFromConfig, ...missing];
     }, [dashboards, dashboardOrderIds]);
+    const customWidgetById = React.useMemo(() => {
+        const map = new Map<string, CustomWidgetRecord>();
+        for (const widget of customWidgets || []) {
+            map.set(widget.id, widget);
+        }
+        return map;
+    }, [customWidgets]);
+    const customWidgetConfigById = React.useMemo(() => {
+        const map = new Map<string, WidgetConfig>();
+        for (const widget of customWidgets || []) {
+            try {
+                map.set(widget.id, JSON.parse(widget.visualization_config) as WidgetConfig);
+            } catch {
+                map.set(widget.id, { type: 'table' });
+            }
+        }
+        return map;
+    }, [customWidgets]);
     const activeDashboard = orderedDashboards.find(d => d.id === activeDashboardId);
     const targetDashboards = React.useMemo(
         () => orderedDashboards.filter(d => d.id !== activeDashboardId),
@@ -462,7 +480,7 @@ export const CustomDashboardView: React.FC = () => {
             const meta = SYSTEM_WIDGETS.find(w => w.id === widget.id);
             return meta ? t(meta.titleKey) : widget.id;
         }
-        return customWidgets?.find(w => w.id === widget.id)?.name || widget.id;
+        return customWidgetById.get(widget.id)?.name || widget.id;
     };
     const getWidgetSize = (widget: SavedWidget): WidgetTileSize => {
         if (widget.size && WIDGET_TILE_SIZE_OPTIONS.includes(widget.size)) return widget.size;
@@ -806,7 +824,7 @@ export const CustomDashboardView: React.FC = () => {
                                     ) : (
                                         activeDashboard.layout.map((widget, index) => {
                                             const customWidgetRecord = widget.type === 'custom'
-                                                ? customWidgets?.find(w => w.id === widget.id)
+                                                ? customWidgetById.get(widget.id)
                                                 : undefined;
                                             const currentSize = getWidgetSize(widget);
                                             return (
@@ -1198,15 +1216,9 @@ export const CustomDashboardView: React.FC = () => {
                             }
 
                             // Render Custom Widget
-                            const dbWidget = customWidgets?.find(w => w.id === widgetRef.id);
+                            const dbWidget = customWidgetById.get(widgetRef.id);
                             if (!dbWidget) return null;
-
-                            let config: WidgetConfig;
-                            try {
-                                config = JSON.parse(dbWidget.visualization_config) as WidgetConfig;
-                            } catch {
-                                config = { type: 'table' };
-                            }
+                            const config = customWidgetConfigById.get(widgetRef.id) || { type: 'table' };
                             const widgetClassName = getWidgetSizeClassName(getWidgetSize(widgetRef));
                             const widgetKey = getWidgetRefKey(widgetRef);
 
@@ -1291,14 +1303,9 @@ export const CustomDashboardView: React.FC = () => {
                                 })()
                             ) : (
                                 (() => {
-                                    const dbWidget = customWidgets?.find(w => w.id === zoomedWidgetRef.id);
+                                    const dbWidget = customWidgetById.get(zoomedWidgetRef.id);
                                     if (!dbWidget) return null;
-                                    let config: WidgetConfig;
-                                    try {
-                                        config = JSON.parse(dbWidget.visualization_config) as WidgetConfig;
-                                    } catch {
-                                        config = { type: 'table' };
-                                    }
+                                    const config = customWidgetConfigById.get(zoomedWidgetRef.id) || { type: 'table' };
                                     return (
                                         <div className="h-full">
                                             <WidgetRenderer
@@ -1397,17 +1404,8 @@ export const CustomDashboardView: React.FC = () => {
                         <div className="grid grid-cols-1 gap-2">
                             {customWidgets && customWidgets.length > 0 ? customWidgets.map(w => {
                                 const isAdded = activeDashboard?.layout.some(dw => dw.id === w.id);
-                                const widgetDescription = (() => {
-                                    const direct = (typeof w.description === 'string' ? w.description : '').trim();
-                                    if (direct) return direct;
-                                    if (typeof w.visualization_config !== 'string') return '';
-                                    try {
-                                        const parsed = JSON.parse(w.visualization_config) as { widgetDescription?: string };
-                                        return (parsed.widgetDescription || '').trim();
-                                    } catch {
-                                        return '';
-                                    }
-                                })();
+                                const widgetDescription = ((typeof w.description === 'string' ? w.description : '').trim())
+                                    || String(customWidgetConfigById.get(w.id)?.widgetDescription || '').trim();
                                 return (
                                     <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                         <div className="flex items-center gap-3">

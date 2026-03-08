@@ -1,6 +1,8 @@
 import DBWorker from './db.worker?worker';
 import type { DbRow } from '../types';
 import { getActiveLogLevel, createLogger } from './logger';
+import { isReadOnlySql } from './security/sqlAnalysis';
+import { isAdminModeRuntimeActive } from './security/runtimeFlags';
 
 let worker: Worker | null = null;
 let msgId = 0;
@@ -113,6 +115,13 @@ function isExecPayload(payload: unknown): payload is { sql: string } {
         && payload !== null
         && 'sql' in payload
         && typeof (payload as { sql?: unknown }).sql === 'string';
+}
+
+function getCurrentLanguage(): string {
+    if (typeof window !== 'undefined') {
+        return String(window.localStorage.getItem('i18nextLng') || navigator.language || 'en');
+    }
+    return 'en';
 }
 
 async function hasExternalLifecycleLockHolder(): Promise<boolean> {
@@ -431,8 +440,7 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
         // we restrict destructive actions.
         if (isReadOnlyMode) {
             if (type === 'EXEC' && isExecPayload(payload)) {
-                const sql = payload.sql.toUpperCase().trimStart();
-                if (!sql.startsWith('SELECT') && !sql.startsWith('PRAGMA')) {
+                if (!isReadOnlySql(payload.sql)) {
                     return Promise.reject(new Error(`Action ${type} (WRITE) not permitted in Read-Only mode.`));
                 }
             } else if (
@@ -539,6 +547,17 @@ export function initDB() {
 export async function runQuery(sql: string, bind?: (string | number | null | undefined)[]): Promise<DbRow[]> {
     await initDB();
     return send<DbRow[]>('EXEC', { sql, bind });
+}
+
+export async function runUserQuery(sql: string, bind?: (string | number | null | undefined)[]): Promise<DbRow[]> {
+    await initDB();
+    return send<DbRow[]>('EXEC', {
+        sql,
+        bind,
+        enforceSystemWriteGuard: true,
+        adminMode: isAdminModeRuntimeActive(),
+        language: getCurrentLanguage()
+    });
 }
 
 export async function clearDatabase() {
