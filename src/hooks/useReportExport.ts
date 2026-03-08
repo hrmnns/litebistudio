@@ -1,9 +1,28 @@
 import { useState } from 'react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { useTranslation } from 'react-i18next';
 import { createLogger } from '../lib/logger';
 import { appDialog } from '../lib/appDialog';
+
+type Html2CanvasFn = typeof import('html2canvas').default;
+type JsPdfCtor = typeof import('jspdf').jsPDF;
+type JsPdfInstance = InstanceType<JsPdfCtor>;
+
+let html2canvasPromise: Promise<Html2CanvasFn> | null = null;
+let jsPdfPromise: Promise<JsPdfCtor> | null = null;
+
+const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
+    if (!html2canvasPromise) {
+        html2canvasPromise = import('html2canvas').then((m) => m.default);
+    }
+    return await html2canvasPromise;
+};
+
+const loadJsPdf = async (): Promise<JsPdfCtor> => {
+    if (!jsPdfPromise) {
+        jsPdfPromise = import('jspdf').then((m) => m.jsPDF);
+    }
+    return await jsPdfPromise;
+};
 
 interface ExportItem {
     elementId: string;
@@ -106,7 +125,7 @@ export const useReportExport = (): UseReportExportResult => {
     };
 
     const drawHeaderFooter = (
-        pdf: jsPDF,
+        pdf: JsPdfInstance,
         item: ExportItem,
         pageNumber: number,
         totalPages: number,
@@ -143,6 +162,7 @@ export const useReportExport = (): UseReportExportResult => {
     };
 
     const captureElement = async (elementId: string, cloneWidth?: number): Promise<{ imgData: string; width: number; height: number } | null> => {
+        const html2canvas = await loadHtml2Canvas();
         const element = document.getElementById(elementId);
         if (!element) return null;
 
@@ -207,6 +227,7 @@ export const useReportExport = (): UseReportExportResult => {
         setIsExporting(true);
         setExportProgress(0);
         try {
+            const jsPDF = await loadJsPdf();
             const captured = await captureElement(elementId);
             if (!captured) return;
 
@@ -229,6 +250,7 @@ export const useReportExport = (): UseReportExportResult => {
     const exportPackageToPdf = async (filename: string, items: ExportItem[], coverData?: CoverData, options?: ExportPackageOptions, auditMeta?: ExportAuditMeta) => {
         setIsExporting(true);
         setExportProgress(0);
+        const jsPDF = await loadJsPdf();
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
         try {
@@ -541,6 +563,7 @@ export const useReportExport = (): UseReportExportResult => {
     const exportToImage = async (elementId: string, filename: string) => {
         setIsExporting(true);
         try {
+            const html2canvas = await loadHtml2Canvas();
             const element = document.getElementById(elementId);
             if (!element) return;
             await new Promise(resolve => setTimeout(resolve, 500));

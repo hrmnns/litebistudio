@@ -2,8 +2,7 @@
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { Layout } from './app/Layout';
 // import { ComponentGridPage } from './app/pages/ComponentGridPage';
-import { SettingsPage } from './app/pages/SettingsPage';
-
+const SettingsPage = React.lazy(() => import('./app/pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const DatasourceView = React.lazy(() => import('./app/views/DatasourceView').then(m => ({ default: m.DatasourceView })));
 const TablesView = React.lazy(() => import('./app/views/TablesView').then(m => ({ default: m.TablesView })));
 const WidgetsView = React.lazy(() => import('./app/views/WidgetsView').then(m => ({ default: m.WidgetsView })));

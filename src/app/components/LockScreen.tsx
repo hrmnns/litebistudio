@@ -3,23 +3,44 @@ import { Lock, Unlock, AlertCircle } from 'lucide-react';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { hashPin } from '../../lib/utils/crypto';
 
+const PIN_ATTEMPTS_KEY = 'litebistudio_pin_failed_attempts';
+const PIN_LOCK_UNTIL_KEY = 'litebistudio_pin_lock_until';
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_BASE_LOCK_MS = 15_000;
+
 export const LockScreen: React.FC = () => {
     const { isLocked, unlockApp } = useDashboard();
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
     const [shake, setShake] = useState(false);
+    const [failedAttempts, setFailedAttempts] = useState<number>(() => {
+        const raw = localStorage.getItem(PIN_ATTEMPTS_KEY);
+        const parsed = Number(raw || '0');
+        return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    });
+    const [lockedUntil, setLockedUntil] = useState<number>(() => {
+        const raw = localStorage.getItem(PIN_LOCK_UNTIL_KEY);
+        const parsed = Number(raw || '0');
+        return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    });
 
-    // If not locked, don't render anything
+    const now = Date.now();
+    const isTemporarilyLocked = lockedUntil > now;
+    const remainingSeconds = Math.max(0, Math.ceil((lockedUntil - now) / 1000));
+
     if (!isLocked) return null;
 
     const handleUnlock = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if (isTemporarilyLocked) {
+            setError(`Zu viele Fehlversuche. Bitte in ${remainingSeconds}s erneut versuchen.`);
+            return;
+        }
 
         const storedHash = localStorage.getItem('litebistudio_app_pin');
-        const salt = localStorage.getItem('litebistudio_app_pin_salt') || ''; // Default to empty for backward compatibility (pre-1.0 unsalted)
+        const salt = localStorage.getItem('litebistudio_app_pin_salt') || '';
 
         if (!storedHash) {
-            // Should not happen if isLocked is true, but safe fallback
             unlockApp();
             return;
         }
@@ -29,12 +50,29 @@ export const LockScreen: React.FC = () => {
             unlockApp();
             setPin('');
             setError('');
-        } else {
-            setError('Falsche PIN');
-            setShake(true);
-            setTimeout(() => setShake(false), 500);
-            setPin('');
+            setFailedAttempts(0);
+            setLockedUntil(0);
+            localStorage.removeItem(PIN_ATTEMPTS_KEY);
+            localStorage.removeItem(PIN_LOCK_UNTIL_KEY);
+            return;
         }
+
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+        localStorage.setItem(PIN_ATTEMPTS_KEY, String(nextAttempts));
+        if (nextAttempts >= PIN_MAX_ATTEMPTS) {
+            const multiplier = Math.max(1, nextAttempts - PIN_MAX_ATTEMPTS + 1);
+            const lockUntilTs = Date.now() + (PIN_BASE_LOCK_MS * multiplier);
+            setLockedUntil(lockUntilTs);
+            localStorage.setItem(PIN_LOCK_UNTIL_KEY, String(lockUntilTs));
+            setError(`Zu viele Fehlversuche. Bitte in ${Math.ceil((lockUntilTs - Date.now()) / 1000)}s erneut versuchen.`);
+        } else {
+            const remaining = PIN_MAX_ATTEMPTS - nextAttempts;
+            setError(`Falsche PIN. Verbleibende Versuche: ${remaining}`);
+        }
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+        setPin('');
     };
 
     return (
@@ -58,12 +96,13 @@ export const LockScreen: React.FC = () => {
                             autoFocus
                             maxLength={6}
                             value={pin}
+                            disabled={isTemporarilyLocked}
                             onChange={(e) => {
                                 setError('');
                                 setPin(e.target.value);
                             }}
                             className="w-full bg-slate-900 border border-slate-700 text-white text-center text-3xl tracking-[1em] py-4 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder:tracking-normal font-mono"
-                            placeholder="••••"
+                            placeholder="****"
                         />
                     </div>
 
@@ -76,13 +115,12 @@ export const LockScreen: React.FC = () => {
 
                     <button
                         type="submit"
-                        disabled={pin.length < 4}
+                        disabled={pin.length < 4 || isTemporarilyLocked}
                         className="w-full py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         <Unlock className="w-4 h-4" />
                         Entsperren
                     </button>
-
                 </form>
 
                 <div className="text-xs text-slate-500 mt-4">

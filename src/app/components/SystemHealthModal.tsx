@@ -365,7 +365,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
             onClose={onClose}
             title={t('widgets.system_health.title')}
         >
-            <div className="h-[70vh] min-h-[520px] max-h-[760px] flex flex-col">
+            <div className="h-[70vh] min-h-0 max-h-[760px] flex flex-col">
                 {/* Tabs */}
                 <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6 sticky top-0 bg-white dark:bg-slate-800 z-10 -mx-6 px-6 pt-2">
                     <button
@@ -394,7 +394,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
                 <div className="flex-1 min-h-0 overflow-hidden">
                     {/* OVERVIEW TAB */}
                     {activeTab === 'overview' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
                                 <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
                                     <Cpu className="w-4 h-4 text-indigo-500" />
@@ -656,7 +656,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
 
                     {/* DATABASE TAB */}
                     {activeTab === 'database' && (
-                        <div className="h-full min-h-0 flex flex-col space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="h-full min-h-0 overflow-y-auto pr-1 flex flex-col space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             {diagLoading || healthLoading ? (
                                 <div className="flex-1 flex flex-col items-center justify-center py-12 text-slate-400">
                                     <RotateCw className="w-8 h-8 animate-spin mb-2" />
