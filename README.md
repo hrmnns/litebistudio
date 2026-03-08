@@ -94,6 +94,12 @@ Recommended local pre-push sequence:
 - The project follows [Semantic Versioning](https://semver.org/).
 - New changes should be added to the `Unreleased` section first, then moved into a versioned section at release time.
 
+## Wiki Maintenance
+
+- Source of truth for wiki pages: `docs/wiki/`
+- GitHub Wiki is synchronized from repository content via `.github/workflows/wiki-sync.yml`.
+- Preferred workflow: edit wiki pages in-repo, review via PR, merge to `main`, then let automation publish.
+
 ## Project Architecture
 
 - `src/app/`: Primary UI layer including views (Dashboard, Tables, SQL Workspace, Widgets, Report Packs).
