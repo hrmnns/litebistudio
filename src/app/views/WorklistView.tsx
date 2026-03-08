@@ -353,7 +353,7 @@ export const WorklistView: React.FC = () => {
         }
     };
 
-    const runBatchUpdate = async (data: { status?: string; priority?: string; due_at?: string | null }) => {
+    const runBatchUpdate = async (data: WorklistUpdatePayload) => {
         if (selectedIds.length === 0 || isReadOnly) return;
         await updateWorklistItemsOptimistically(selectedIds, data);
     };

@@ -1763,7 +1763,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
             finishSqlHeaderHydration();
             return;
         }
-        const currentSqlNormalized = normalizeSql(inputSql);
         const statementSqlNormalized = normalizeSql(statement.sql_text);
         if (!inputSql.trim()) {
             void applySqlStatement(statement, false).finally(() => {
