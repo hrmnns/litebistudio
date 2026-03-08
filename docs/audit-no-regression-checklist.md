@@ -32,9 +32,10 @@ Run these checks manually (or via E2E) for each audit PR:
 ## 2) Mandatory automated checks (CI)
 
 1. `npm run check:encoding`
-2. `npx tsc --noEmit -p tsconfig.json`
-3. `npm run lint`
-4. `npm run test:smoke`
+2. `npm run check:i18n`
+3. `npx tsc --noEmit -p tsconfig.json`
+4. `npm run lint`
+5. `npm run test:smoke`
 
 ## 3) Change-scope safety rules for audit PRs
 
@@ -65,4 +66,3 @@ Audit PR is not releasable unless:
    - SQL statement loading failures
    - missing persisted state after navigation
 2. Keep temporary debug markers behind a dev flag only and remove after stabilization.
-

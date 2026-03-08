@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "check:encoding": "node scripts/check-encoding.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "hooks:install": "git config core.hooksPath .githooks"
   },
   "dependencies": {

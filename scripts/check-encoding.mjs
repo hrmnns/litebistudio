@@ -21,6 +21,9 @@ const mojibakeNeedles = [
   '\u001e',
   '\u001c'
 ];
+const mojibakeRegexes = [
+  /Ã[\u0080-\u00BF]/g
+];
 
 function walk(dir, out = []) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -57,6 +60,17 @@ for (const file of files) {
       file: relativePath,
       type: 'mojibake',
       details: `Found suspicious sequence(s): ${hits.join(', ')}`
+    });
+  }
+  const regexHits = mojibakeRegexes
+    .flatMap((rx) => Array.from(content.matchAll(rx)).map((m) => m[0]))
+    .filter(Boolean);
+  if (regexHits.length) {
+    const unique = Array.from(new Set(regexHits)).slice(0, 8);
+    issues.push({
+      file: relativePath,
+      type: 'mojibake-regex',
+      details: `Found suspicious pattern matches: ${unique.join(', ')}`
     });
   }
 
