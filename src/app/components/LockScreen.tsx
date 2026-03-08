@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Lock, Unlock, AlertCircle } from 'lucide-react';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { hashPin } from '../../lib/utils/crypto';
@@ -23,12 +23,13 @@ export const LockScreen: React.FC = () => {
         const parsed = Number(raw || '0');
         return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
     });
-
-    const now = Date.now();
-    const isTemporarilyLocked = lockedUntil > now;
-    const remainingSeconds = Math.max(0, Math.ceil((lockedUntil - now) / 1000));
-
-    if (!isLocked) return null;
+    const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
+        const raw = localStorage.getItem(PIN_LOCK_UNTIL_KEY);
+        const parsed = Number(raw || '0');
+        if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+        return Math.max(0, Math.ceil((parsed - Date.now()) / 1000));
+    });
+    const isTemporarilyLocked = lockedUntil > 0 && remainingSeconds > 0;
 
     const handleUnlock = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -52,6 +53,7 @@ export const LockScreen: React.FC = () => {
             setError('');
             setFailedAttempts(0);
             setLockedUntil(0);
+            setRemainingSeconds(0);
             localStorage.removeItem(PIN_ATTEMPTS_KEY);
             localStorage.removeItem(PIN_LOCK_UNTIL_KEY);
             return;
@@ -64,6 +66,7 @@ export const LockScreen: React.FC = () => {
             const multiplier = Math.max(1, nextAttempts - PIN_MAX_ATTEMPTS + 1);
             const lockUntilTs = Date.now() + (PIN_BASE_LOCK_MS * multiplier);
             setLockedUntil(lockUntilTs);
+            setRemainingSeconds(Math.max(1, Math.ceil((lockUntilTs - Date.now()) / 1000)));
             localStorage.setItem(PIN_LOCK_UNTIL_KEY, String(lockUntilTs));
             setError(`Zu viele Fehlversuche. Bitte in ${Math.ceil((lockUntilTs - Date.now()) / 1000)}s erneut versuchen.`);
         } else {
@@ -74,6 +77,22 @@ export const LockScreen: React.FC = () => {
         setTimeout(() => setShake(false), 500);
         setPin('');
     };
+
+    useEffect(() => {
+        if (lockedUntil <= 0) return;
+        const timer = window.setInterval(() => {
+            const next = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+            setRemainingSeconds(next);
+            if (next <= 0) {
+                setLockedUntil(0);
+                localStorage.removeItem(PIN_LOCK_UNTIL_KEY);
+                window.clearInterval(timer);
+            }
+        }, 250);
+        return () => window.clearInterval(timer);
+    }, [lockedUntil]);
+
+    if (!isLocked) return null;
 
     return (
         <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4">
