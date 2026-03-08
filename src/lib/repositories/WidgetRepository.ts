@@ -1,4 +1,4 @@
-import { runQuery, notifyDbChange } from '../db';
+import { runQuery, runManagedQuery, notifyDbChange } from '../db';
 import type { DbRow } from '../../types';
 
 interface UserWidgetInput {
@@ -27,21 +27,27 @@ export function createWidgetRepository() {
         async saveUserWidget(widget: UserWidgetInput): Promise<void> {
             const existing = await runQuery('SELECT id FROM sys_user_widgets WHERE id = ?', [widget.id]);
             if (existing.length > 0) {
-                await runQuery(
+                await runManagedQuery(
                     'UPDATE sys_user_widgets SET name = ?, description = ?, sql_statement_id = ?, sql_query = ?, visualization_config = ?, visual_builder_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    [widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config), widget.id]
+                    [widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config), widget.id],
+                    { allowedSystemWriteTables: ['sys_user_widgets'] }
                 );
             } else {
-                await runQuery(
+                await runManagedQuery(
                     'INSERT INTO sys_user_widgets (id, name, description, sql_statement_id, sql_query, visualization_config, visual_builder_config) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [widget.id, widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config)]
+                    [widget.id, widget.name, widget.description, widget.sql_statement_id || null, widget.sql_query, JSON.stringify(widget.visualization_config), JSON.stringify(widget.visual_builder_config)],
+                    { allowedSystemWriteTables: ['sys_user_widgets'] }
                 );
             }
             notifyDbChange();
         },
 
         async deleteUserWidget(id: string): Promise<void> {
-            await runQuery('DELETE FROM sys_user_widgets WHERE id = ?', [id]);
+            await runManagedQuery(
+                'DELETE FROM sys_user_widgets WHERE id = ?',
+                [id],
+                { allowedSystemWriteTables: ['sys_user_widgets'] }
+            );
             notifyDbChange();
         },
 
@@ -56,21 +62,27 @@ export function createWidgetRepository() {
         async saveDashboard(dashboard: DashboardInput, silent: boolean = false): Promise<void> {
             const existing = await runQuery('SELECT id FROM sys_dashboards WHERE id = ?', [dashboard.id]);
             if (existing.length > 0) {
-                await runQuery(
+                await runManagedQuery(
                     'UPDATE sys_dashboards SET name = ?, layout = ?, is_default = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    [dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0, dashboard.id]
+                    [dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0, dashboard.id],
+                    { allowedSystemWriteTables: ['sys_dashboards'] }
                 );
             } else {
-                await runQuery(
+                await runManagedQuery(
                     'INSERT INTO sys_dashboards (id, name, layout, is_default) VALUES (?, ?, ?, ?)',
-                    [dashboard.id, dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0]
+                    [dashboard.id, dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0],
+                    { allowedSystemWriteTables: ['sys_dashboards'] }
                 );
             }
             if (!silent) notifyDbChange();
         },
 
         async deleteDashboard(id: string): Promise<void> {
-            await runQuery('DELETE FROM sys_dashboards WHERE id = ?', [id]);
+            await runManagedQuery(
+                'DELETE FROM sys_dashboards WHERE id = ?',
+                [id],
+                { allowedSystemWriteTables: ['sys_dashboards'] }
+            );
             notifyDbChange();
         }
     };

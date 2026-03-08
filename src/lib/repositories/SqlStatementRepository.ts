@@ -1,4 +1,4 @@
-import { runQuery, notifyDbChange } from '../db';
+import { runQuery, runManagedQuery, notifyDbChange } from '../db';
 
 export interface SqlStatementRecord {
     id: string;
@@ -41,7 +41,7 @@ export function createSqlStatementRepository() {
             const scope = (statement.scope || 'global').trim() || 'global';
             const existing = await runQuery('SELECT id FROM sys_sql_statement WHERE id = ?', [statement.id]);
             if (existing.length > 0) {
-                await runQuery(
+                await runManagedQuery(
                     `UPDATE sys_sql_statement
                      SET name = ?, sql_text = ?, description = ?, scope = ?, tags = ?, is_favorite = ?, updated_at = CURRENT_TIMESTAMP
                      WHERE id = ?`,
@@ -53,10 +53,11 @@ export function createSqlStatementRepository() {
                         statement.tags || '',
                         statement.is_favorite ? 1 : 0,
                         statement.id
-                    ]
+                    ],
+                    { allowedSystemWriteTables: ['sys_sql_statement'] }
                 );
             } else {
-                await runQuery(
+                await runManagedQuery(
                     `INSERT INTO sys_sql_statement (id, name, sql_text, description, scope, tags, is_favorite)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [
@@ -67,32 +68,39 @@ export function createSqlStatementRepository() {
                         scope,
                         statement.tags || '',
                         statement.is_favorite ? 1 : 0
-                    ]
+                    ],
+                    { allowedSystemWriteTables: ['sys_sql_statement'] }
                 );
             }
             notifyDbChange();
         },
 
         async deleteSqlStatement(id: string): Promise<void> {
-            await runQuery('DELETE FROM sys_sql_statement WHERE id = ?', [id]);
+            await runManagedQuery(
+                'DELETE FROM sys_sql_statement WHERE id = ?',
+                [id],
+                { allowedSystemWriteTables: ['sys_sql_statement'] }
+            );
             notifyDbChange();
         },
 
         async setSqlStatementFavorite(id: string, isFavorite: boolean): Promise<void> {
-            await runQuery(
+            await runManagedQuery(
                 'UPDATE sys_sql_statement SET is_favorite = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [isFavorite ? 1 : 0, id]
+                [isFavorite ? 1 : 0, id],
+                { allowedSystemWriteTables: ['sys_sql_statement'] }
             );
             notifyDbChange();
         },
 
         async markSqlStatementUsed(id: string): Promise<void> {
-            await runQuery(
+            await runManagedQuery(
                 `UPDATE sys_sql_statement
                  SET use_count = COALESCE(use_count, 0) + 1,
                      last_used_at = CURRENT_TIMESTAMP
                  WHERE id = ?`,
-                [id]
+                [id],
+                { allowedSystemWriteTables: ['sys_sql_statement'] }
             );
             notifyDbChange();
         }

@@ -1,4 +1,4 @@
-import { runQuery, notifyDbChange } from '../db';
+import { runQuery, runManagedQuery, notifyDbChange } from '../db';
 import type { DbRow, TableColumn } from '../../types';
 import { isValidIdentifier } from '../utils';
 
@@ -26,7 +26,7 @@ export function createWorklistRepository(deps: WorklistRepositoryDeps) {
             priority?: string;
             due_at?: string | null;
         }): Promise<void> {
-            await runQuery(
+            await runManagedQuery(
                 'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context, priority, due_at) VALUES (?, ?, ?, ?, ?, ?)',
                 [
                     data.source_table,
@@ -35,23 +35,26 @@ export function createWorklistRepository(deps: WorklistRepositoryDeps) {
                     data.display_context,
                     data.priority ?? 'normal',
                     data.due_at ?? null
-                ]
+                ],
+                { allowedSystemWriteTables: ['sys_worklist'] }
             );
             notifyDbChange();
         },
 
         async removeWorklistItem(sourceTable: string, sourceId: string | number): Promise<void> {
-            await runQuery(
+            await runManagedQuery(
                 'DELETE FROM sys_worklist WHERE source_table = ? AND source_id = ?',
-                [sourceTable, sourceId]
+                [sourceTable, sourceId],
+                { allowedSystemWriteTables: ['sys_worklist'] }
             );
             notifyDbChange();
         },
 
         async removeWorklistItemById(id: number | string): Promise<void> {
-            await runQuery(
+            await runManagedQuery(
                 'DELETE FROM sys_worklist WHERE id = ?',
-                [Number(id)]
+                [Number(id)],
+                { allowedSystemWriteTables: ['sys_worklist'] }
             );
             notifyDbChange();
         },
@@ -83,7 +86,7 @@ export function createWorklistRepository(deps: WorklistRepositoryDeps) {
             params.push(Number(id));
 
             const sql = `UPDATE sys_worklist SET ${fields.join(', ')} WHERE id = ?`;
-            await runQuery(sql, params);
+            await runManagedQuery(sql, params, { allowedSystemWriteTables: ['sys_worklist'] });
             notifyDbChange();
         },
 

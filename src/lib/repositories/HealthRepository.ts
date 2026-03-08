@@ -1,4 +1,4 @@
-import { runQuery, notifyDbChange } from '../db';
+import { runQuery, runManagedQuery, notifyDbChange } from '../db';
 
 export interface HealthSnapshotInput {
     id?: string;
@@ -21,7 +21,7 @@ export function createHealthRepository(deps: HealthRepositoryDeps) {
             const id = input.id || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
                 ? crypto.randomUUID()
                 : `health_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
-            await runQuery(
+            await runManagedQuery(
                 `INSERT INTO sys_health_snapshot
                     (id, scope, status, score, checks_run, findings_json, metadata_json)
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -33,7 +33,8 @@ export function createHealthRepository(deps: HealthRepositoryDeps) {
                     Math.max(0, Math.round(Number(input.checksRun) || 0)),
                     JSON.stringify(Array.isArray(input.findings) ? input.findings : []),
                     input.metadata ? JSON.stringify(input.metadata) : null
-                ]
+                ],
+                { allowedSystemWriteTables: ['sys_health_snapshot'] }
             );
             notifyDbChange();
         },
@@ -47,7 +48,7 @@ export function createHealthRepository(deps: HealthRepositoryDeps) {
             const keepLatest = Math.max(0, Math.floor(Number(params?.keepLatest ?? 200)));
             const olderThanModifier = `-${olderThanDays} days`;
 
-            await runQuery(
+            await runManagedQuery(
                 `
                 DELETE FROM sys_health_snapshot
                 WHERE id NOT IN (
@@ -58,7 +59,8 @@ export function createHealthRepository(deps: HealthRepositoryDeps) {
                 )
                 AND datetime(created_at) < datetime('now', ?)
                 `,
-                [keepLatest, olderThanModifier]
+                [keepLatest, olderThanModifier],
+                { allowedSystemWriteTables: ['sys_health_snapshot'] }
             );
             const result = await runQuery('SELECT changes() AS count');
             const count = Number(result[0]?.count || 0);

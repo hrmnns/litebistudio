@@ -1,4 +1,4 @@
-import { runQuery, notifyDbChange } from '../db';
+import { runQuery, runManagedQuery, notifyDbChange } from '../db';
 import type { DbRow } from '../../types';
 
 interface ReportPackInput {
@@ -23,21 +23,27 @@ export function createReportPackRepository() {
         async saveReportPack(pack: ReportPackInput): Promise<void> {
             const existing = await runQuery('SELECT id FROM sys_report_packs WHERE id = ?', [pack.id]);
             if (existing.length > 0) {
-                await runQuery(
+                await runManagedQuery(
                     'UPDATE sys_report_packs SET name = ?, category = ?, description = ?, config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    [pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config), pack.id]
+                    [pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config), pack.id],
+                    { allowedSystemWriteTables: ['sys_report_packs'] }
                 );
             } else {
-                await runQuery(
+                await runManagedQuery(
                     'INSERT INTO sys_report_packs (id, name, category, description, config) VALUES (?, ?, ?, ?, ?)',
-                    [pack.id, pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config)]
+                    [pack.id, pack.name, pack.category || 'General', pack.description, JSON.stringify(pack.config)],
+                    { allowedSystemWriteTables: ['sys_report_packs'] }
                 );
             }
             notifyDbChange();
         },
 
         async deleteReportPack(id: string): Promise<void> {
-            await runQuery('DELETE FROM sys_report_packs WHERE id = ?', [id]);
+            await runManagedQuery(
+                'DELETE FROM sys_report_packs WHERE id = ?',
+                [id],
+                { allowedSystemWriteTables: ['sys_report_packs'] }
+            );
             notifyDbChange();
         }
     };

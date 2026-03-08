@@ -1,7 +1,7 @@
 import DBWorker from './db.worker?worker';
 import type { DbRow } from '../types';
 import { getActiveLogLevel, createLogger } from './logger';
-import { isReadOnlySql } from './security/sqlAnalysis';
+import { analyzeSqlStatements, isReadOnlySql } from './security/sqlAnalysis';
 import { isAdminModeRuntimeActive } from './security/runtimeFlags';
 
 let worker: Worker | null = null;
@@ -558,6 +558,39 @@ export async function runUserQuery(sql: string, bind?: (string | number | null |
         adminMode: isAdminModeRuntimeActive(),
         language: getCurrentLanguage()
     });
+}
+
+function getSystemWriteTables(sql: string): Set<string> {
+    const tables = new Set<string>();
+    const analysis = analyzeSqlStatements(sql);
+    for (const statement of analysis) {
+        if (statement.kind !== 'write') continue;
+        for (const token of statement.tokens) {
+            if (token.startsWith('SYS_')) {
+                tables.add(token.toLowerCase());
+            }
+        }
+    }
+    return tables;
+}
+
+export async function runManagedQuery(
+    sql: string,
+    bind?: (string | number | null | undefined)[],
+    options?: { allowedSystemWriteTables?: string[] }
+): Promise<DbRow[]> {
+    await initDB();
+    if (!isAdminModeRuntimeActive()) {
+        const touched = getSystemWriteTables(sql);
+        if (touched.size > 0) {
+            const allowed = new Set((options?.allowedSystemWriteTables || []).map((table) => table.toLowerCase()));
+            const blocked = Array.from(touched).filter((table) => !allowed.has(table));
+            if (blocked.length > 0) {
+                throw new Error(`Managed query blocked. Non-admin system writes are not allowed for: ${blocked.join(', ')}`);
+            }
+        }
+    }
+    return send<DbRow[]>('EXEC', { sql, bind });
 }
 
 export async function clearDatabase() {

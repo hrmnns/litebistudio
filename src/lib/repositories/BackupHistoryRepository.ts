@@ -1,4 +1,4 @@
-import { runQuery, notifyDbChange } from '../db';
+import { runQuery, runManagedQuery, notifyDbChange } from '../db';
 import type { DbRow } from '../../types';
 
 const BACKUP_HISTORY_KEY = 'backup_history_v1';
@@ -69,9 +69,10 @@ async function readHistory(): Promise<BackupHistoryEntry[]> {
 }
 
 async function writeHistory(entries: BackupHistoryEntry[]): Promise<void> {
-    await runQuery(
+    await runManagedQuery(
         'INSERT OR REPLACE INTO sys_settings (key, value) VALUES (?, ?)',
-        [BACKUP_HISTORY_KEY, JSON.stringify(entries)]
+        [BACKUP_HISTORY_KEY, JSON.stringify(entries)],
+        { allowedSystemWriteTables: ['sys_settings'] }
     );
     notifyDbChange();
 }
