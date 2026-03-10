@@ -26,3 +26,22 @@ SQL Workspace is the place for writing, running, and saving SQL statements.
 - Keep statements named by business intent, not only technical detail.
 - Save reusable queries early to avoid rework.
 - If no executable SQL is present, run actions are intentionally disabled.
+
+## Related Settings
+
+Open `Settings > Apps > SQL Workspace`:
+
+- `Explain mode`
+- `SQL assistant open by default`
+- `Confirm query without LIMIT`
+- `SQL max rows`
+- `Reset SQL Workspace layout`
+- `Clear SQL Workspace memory`
+
+Open `Settings > Controls > SQL Editor`:
+
+- Syntax/Autocomplete behavior
+- Line wrap/line numbers/active line highlight
+- Font and tab size
+- Theme intensity and keyword formatting
+- Preview highlighting and remembered editor height

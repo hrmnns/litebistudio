@@ -26,3 +26,24 @@ The Tables page is for fast inspection of table data, profiling, paging, and qui
 - Start broad, then narrow filters to avoid missing context.
 - Use profiling to detect null-heavy or inconsistent columns early.
 - Move to SQL Workspace when you need custom joins or transformations.
+
+## Related Settings
+
+Open `Settings > Apps > Tables`:
+
+- `Default page size`
+- `Show profiling by default`
+- `Explain mode`
+- `SQL assistant open by default`
+- `Confirm query without LIMIT`
+- `SQL max rows`
+- `Profiling thresholds`
+- `Reset inspector layout`
+
+Open `Settings > Controls > Data Table`:
+
+- `Table density`
+- `Wrap cells`
+- `Show filters by default`
+
+Open `Settings > Controls > SQL Editor` for editor behavior shared with table SQL areas.

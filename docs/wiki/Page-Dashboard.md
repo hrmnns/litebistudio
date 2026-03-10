@@ -26,3 +26,13 @@ The Dashboard page is your main overview. It combines widgets into one visual wo
 - Keep one dashboard focused per topic (operations, finance, quality, etc.).
 - Use clear widget names so dashboard content is self-explanatory.
 - Use global filters only when they improve cross-widget comparability.
+
+## Related Settings
+
+Dashboard currently has no dedicated app-specific settings block in `Settings`.
+
+Still relevant:
+
+- `Settings > Appearance` (theme/language/sidebar visibility)
+- `Settings > Controls > Data Table` (affects table-style rendering in shared components)
+- `Settings > Apps > Widgets` (widget memory/state behavior impacts dashboard editing workflows)

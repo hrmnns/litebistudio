@@ -26,3 +26,14 @@ Reporting lets you compose structured report packages from dashboards and widget
 - Use consistent naming for report categories and packages.
 - Keep export-ready reports small and modular to simplify updates.
 - Re-run key source queries before final export.
+
+## Related Settings
+
+Open `Settings > Apps > Reports`:
+
+- `Default author`
+- `Default theme color`
+- `Show header/footer by default`
+- `Include audit appendix by default`
+
+These defaults are applied when creating or exporting report packages.

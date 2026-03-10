@@ -25,3 +25,18 @@ Data Management is used to import, structure, and maintain your local database c
 - Prefer stable, meaningful table names.
 - Keep structure changes small and test them incrementally.
 - After major structural changes, verify affected widgets and reports.
+
+## Related Settings
+
+Open `Settings > Apps > Data Management`:
+
+- `Import default mode` (append/overwrite)
+- `Import table prefix`
+- `Auto-save mappings`
+- `Backup filename pattern`
+- `Use saved backup folder`
+- `Health snapshot retention`
+
+Also relevant:
+
+- `Settings > Controls > Notifications > Confirm destructive actions`

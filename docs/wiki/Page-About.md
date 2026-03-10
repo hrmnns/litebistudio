@@ -22,3 +22,12 @@ The About page provides product context, version transparency, and quick orienta
 
 - Include version information from this page in bug reports.
 - Link new users from About to this wiki Home page.
+
+## Related Settings
+
+No dedicated About-specific settings are available.
+
+For global behavior shown here, use:
+
+- `Settings > Appearance` (theme/language)
+- `Settings > Security` (logging/PIN/admin mode)

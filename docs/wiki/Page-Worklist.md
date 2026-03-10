@@ -25,3 +25,16 @@ Worklist is used to track and prioritize records that need action.
 - Keep statuses consistent across teams.
 - Use priorities and due dates for transparent triage.
 - Clean up completed items regularly to keep focus.
+
+## Related Settings
+
+Open `Settings > Apps > Worklist`:
+
+- `Default view`
+- `Hide completed by default`
+- `Default priority`
+- `Default due days`
+
+Also relevant:
+
+- `Settings > Controls > Notifications > Confirm destructive actions`

@@ -26,3 +26,17 @@ Widgets turns query results into reusable visual components for dashboards and r
 - Keep widget names concise and outcome-focused.
 - Use configuration preview while editing to validate visual changes quickly.
 - Recheck widgets after upstream SQL or schema changes.
+
+## Related Settings
+
+Open `Settings > Apps > Widgets`:
+
+- `Clear widget workspace memory` (header cache and last-open widget state)
+
+Open `Settings > Controls > SQL Editor`:
+
+- SQL editing and preview behavior used in widget source/query areas.
+
+Related defaults in other sections:
+
+- `Settings > Apps > Reports` influences report export defaults when widgets are reused in reporting.
