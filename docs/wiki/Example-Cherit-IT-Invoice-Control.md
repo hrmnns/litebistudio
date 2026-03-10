@@ -154,23 +154,112 @@ In **Widgets**:
 2. Add chart/table configuration.
 3. Save and verify no dirty marker remains.
 
+### Widget Build Steps (recommended)
+
+Use the same flow for every widget to keep behavior consistent:
+
+1. Open **Widgets -> Widget erstellen**.
+2. Click **SQL-Statement auswählen** and pick the statement number from `queries.sql`.
+3. Click **Ausführen** once to validate result columns.
+4. Open **Konfiguration** and set:
+   - chart type
+   - category/x field
+   - value/y field(s)
+   - sorting and limit (if needed)
+   - number format (currency/percent)
+5. In **Finalize**, set:
+   - widget name (prefix with statement number, for example `#7 Budget vs Actual by Cost Center`)
+   - short description (business meaning, not technical SQL detail)
+6. Save and confirm:
+   - dirty marker (`*`) disappears
+   - widget appears in **Widgets verwalten**
+   - preview looks correct in both chart and table tabs
+
 Recommended starter widgets:
 
-- `Monthly IT Spend`
-- `Top 10 Vendors`
-- `Spend by Service Category`
-- `Open Invoices (status != paid)`
-- `Budget vs Actual by Cost Center`
-- `Top Overruns`
+- `Monthly IT Spend` (SQL statement `#1`)
+- `Top 10 Vendors` (SQL statement `#2`)
+- `Spend by Service Category` (SQL statement `#3`)
+- `Open Invoices (status != paid)` (SQL statement `#5`)
+- `Budget vs Actual by Cost Center` (SQL statement `#7`)
+- `Top Overruns` (SQL statement `#8`)
+
+### Suggested Visualization per Statement
+
+Use these defaults as a starting point:
+
+- SQL statement `#1` -> **Line chart**
+  - X: `year_month`
+  - Y: `total_spend`
+- SQL statement `#2` -> **Bar chart**
+  - X: `vendor_name`
+  - Y: `total_spend`
+  - Sort descending
+- SQL statement `#3` -> **Donut or Bar**
+  - Category: `service_category`
+  - Value: `amount_net`
+- SQL statement `#5` -> **Table**
+  - Show: `invoice_id`, `vendor_name`, `invoice_date`, `status`, `gross_total`
+- SQL statement `#7` -> **Grouped Bar** (or Line with two series)
+  - X: `year_month` (or `cost_center_code` for a monthly snapshot)
+  - Series/Values: `budget_amount`, `actual_amount`
+- SQL statement `#8` -> **Table or Bar**
+  - Category: `cost_center_code` (or vendor, depending on query shape)
+  - Value: `variance_abs`
+  - Focus on positive variance only
+
+Naming convention tip:
+
+- Use `P2 - #<statement> - <business name>` to simplify dashboard maintenance (for example `P2 - #10 - Variance Traffic Light`).
 
 ## 5) Build an Executive Dashboard
 
 In **Dashboard**:
 
-1. Add the four widgets.
+1. Add the core widgets.
 2. Arrange by decision flow:
    - trend first, then contributors, then operational backlog.
 3. Save layout and test reload behavior.
+
+### Phase 2 Dashboard Blueprint (Budget and Variance)
+
+Use this structure for a practical management dashboard:
+
+1. KPI row (top):
+   - `Actual IT Spend (current month)`
+   - `Budget (current month)`
+   - `Variance % (current month)`
+   - `Cost Centers in Red/Yellow`
+2. Main analysis row:
+   - `Actual vs Budget by Month` (line chart, two series)
+   - `Actual by Cost Center` (bar chart, monthly filtered)
+3. Risk/operations row:
+   - `Variance Traffic-Light by Cost Center` (table with status colors)
+   - `Top Overruns` (table or bar chart, highest positive variance)
+
+Suggested SQL mapping (from `queries.sql`):
+
+- KPI row:
+  - SQL statement `#7` (budget vs actual baseline)
+  - SQL statement `#10` (variance status and percentage)
+- Main analysis:
+  - SQL statement `#7` (trend and cost center variance base)
+  - SQL statement `#9` (coverage signal as optional KPI)
+- Risk/operations:
+  - SQL statement `#8` (top overruns)
+  - SQL statement `#10` (traffic-light status)
+
+Recommended dashboard filters:
+
+- `year_month`
+- `cost_center_code`
+- optional `vendor_name` (for investigation views)
+
+Recommended drilldown behavior:
+
+1. Click a cost center in variance widgets.
+2. Open related detail widget/table (invoice-level rows).
+3. Escalate suspicious rows into **Worklist** for follow-up.
 
 ## 6) Add Operational Follow-up
 
