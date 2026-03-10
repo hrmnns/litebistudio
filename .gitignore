@@ -29,5 +29,6 @@ dist-ssr
 *.xlsx
 *.xls
 *.csv
+!docs/examples/cherit-systems-it-invoice-control/*.csv
 src/datasets/*.sqlite3
 src/datasets/*.db

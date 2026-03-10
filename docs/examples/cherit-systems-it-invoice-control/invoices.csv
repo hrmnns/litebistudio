@@ -1,0 +1,25 @@
+invoice_id,vendor_id,invoice_number,invoice_date,due_date,currency,status,gross_total,department,notes
+INV-2026-001,V001,CCS-2026-0101,2026-01-05,2026-02-04,EUR,approved,18445.00,IT Operations,Monthly cloud baseline
+INV-2026-002,V002,SNO-2026-2007,2026-01-07,2026-01-21,EUR,approved,9720.00,IT Security,SOC and endpoint services
+INV-2026-003,V004,OSE-2026-1140,2026-01-10,2026-02-09,EUR,paid,11985.00,Digital Workplace,Office subscriptions Jan
+INV-2026-004,V003,DFA-2026-0310,2026-01-12,2026-02-11,EUR,in_review,16450.00,Data Platform,Usage and storage spike
+INV-2026-005,V006,TLK-2026-4101,2026-01-14,2026-02-13,EUR,approved,8340.00,IT Operations,WAN and MPLS services
+INV-2026-006,V005,ICP-2026-0084,2026-01-18,2026-02-01,EUR,in_review,6250.00,IT Program Management,Migration workshop package
+INV-2026-007,V001,CCS-2026-0202,2026-02-05,2026-03-07,EUR,approved,19880.00,IT Operations,Monthly cloud baseline
+INV-2026-008,V002,SNO-2026-2142,2026-02-08,2026-02-22,EUR,in_review,12540.00,IT Security,Incident response retainer
+INV-2026-009,V004,OSE-2026-1289,2026-02-10,2026-03-12,EUR,approved,12210.00,Digital Workplace,Office subscriptions Feb
+INV-2026-010,V003,DFA-2026-0402,2026-02-12,2026-03-14,EUR,approved,17190.00,Data Platform,ETL runtime increase
+INV-2026-011,V006,TLK-2026-4250,2026-02-15,2026-03-17,EUR,paid,8590.00,IT Operations,Carrier services Feb
+INV-2026-012,V005,ICP-2026-0110,2026-02-21,2026-03-07,EUR,in_review,5520.00,IT Program Management,Process optimization sprint
+INV-2026-013,V001,CCS-2026-0303,2026-03-05,2026-04-04,EUR,approved,20560.00,IT Operations,Monthly cloud baseline
+INV-2026-014,V002,SNO-2026-2275,2026-03-08,2026-03-22,EUR,approved,10890.00,IT Security,SOC and endpoint services Mar
+INV-2026-015,V004,OSE-2026-1421,2026-03-10,2026-04-09,EUR,paid,12380.00,Digital Workplace,Office subscriptions Mar
+INV-2026-016,V003,DFA-2026-0520,2026-03-13,2026-04-12,EUR,in_review,18840.00,Data Platform,Storage burst and transformation load
+INV-2026-017,V006,TLK-2026-4391,2026-03-15,2026-04-14,EUR,approved,9025.00,IT Operations,Carrier services Mar
+INV-2026-018,V005,ICP-2026-0148,2026-03-21,2026-04-04,EUR,in_review,6840.00,IT Program Management,Security architecture workshop
+INV-2026-019,V001,CCS-2026-0404,2026-04-05,2026-05-05,EUR,approved,21120.00,IT Operations,Monthly cloud baseline
+INV-2026-020,V002,SNO-2026-2399,2026-04-08,2026-04-22,EUR,in_review,13480.00,IT Security,Incident response plus forensics
+INV-2026-021,V004,OSE-2026-1570,2026-04-10,2026-05-10,EUR,approved,12640.00,Digital Workplace,Office subscriptions Apr
+INV-2026-022,V003,DFA-2026-0617,2026-04-13,2026-05-13,EUR,approved,17990.00,Data Platform,Pipeline optimization package
+INV-2026-023,V006,TLK-2026-4522,2026-04-16,2026-05-16,EUR,paid,9340.00,IT Operations,Carrier services Apr
+INV-2026-024,V005,ICP-2026-0182,2026-04-22,2026-05-06,EUR,in_review,5980.00,IT Program Management,Vendor consolidation support

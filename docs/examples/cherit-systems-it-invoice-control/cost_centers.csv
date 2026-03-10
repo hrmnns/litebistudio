@@ -1,0 +1,6 @@
+cost_center_id,cost_center_code,cost_center_name,owner_team
+CC100,IT-OPS,IT Operations,Operations
+CC110,IT-SEC,IT Security,Security
+CC120,IT-DATA,Data Platform,Data Engineering
+CC130,IT-WORK,Digital Workplace,Workplace Services
+CC140,IT-PMO,IT Program Management,PMO

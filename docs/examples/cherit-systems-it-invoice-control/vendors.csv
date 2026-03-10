@@ -1,0 +1,7 @@
+vendor_id,vendor_name,vendor_type,contract_model,country,payment_terms_days
+V001,CloudCore Services GmbH,Cloud,Subscription,DE,30
+V002,SecureNet Operations AG,Security,Managed Service,DE,14
+V003,DataForge Analytics GmbH,Data Platform,Consumption,DE,30
+V004,OfficeSuite Europe Ltd,SaaS,Per Seat,IE,30
+V005,InfraConsult Partner GmbH,Consulting,Time and Material,DE,14
+V006,TeleLink Carrier GmbH,Network,Framework Contract,DE,30
