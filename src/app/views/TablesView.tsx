@@ -1714,7 +1714,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const startSqlSplitResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
         if (!sqlWorkspaceSplitView || !sqlSplitContainerRef.current) return;
         event.preventDefault();
-        const container = sqlSplitContainerRef.current;
         const startY = event.clientY;
         const startHeight = sqlSplitTopHeight;
         if (sqlSplitMouseMoveHandlerRef.current) {
