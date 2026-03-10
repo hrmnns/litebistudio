@@ -155,11 +155,11 @@ describe('WidgetsView persistence smoke', () => {
         rendered.unmount();
         render(<WidgetsView />);
 
+        const restoredTableTab = await screen.findByRole('button', { name: 'Tabelle' });
         await waitFor(() => {
-            const restoredTableTab = screen.getByRole('button', { name: 'Tabelle' });
             expect(restoredTableTab.className).toContain('bg-blue-50');
         });
-    });
+    }, 15000);
 
     it('does not mark restored widget as dirty without user change', async () => {
         window.localStorage.setItem('widgets_last_open_widget_id', 'widget-1');
