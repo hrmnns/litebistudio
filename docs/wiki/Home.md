@@ -9,12 +9,14 @@ This wiki is maintained from the repository source folder:
 ## Start Here
 
 - [User Guide](Getting-Started)
+- [Examples](Examples)
 - [Concept Guide](Concept-Guide)
 - [Admin / Technical Appendix](Admin-Technical-Appendix)
 
 ## How This Wiki Is Organized
 
 - **User Guide**: What the tool can do and how to use each page
+- **Examples**: End-to-end business scenarios with sample data and SQL
 - **Concept Guide**: How the platform is designed and why
 - **Admin / Technical Appendix**: Operational and release details for maintainers
 

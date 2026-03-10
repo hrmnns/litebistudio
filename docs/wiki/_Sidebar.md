@@ -5,7 +5,6 @@
 ## User Guide
 
 - [Getting Started](Getting-Started)
-- [Example: Cherit IT Invoice Control](Example-Cherit-IT-Invoice-Control)
 - [Dashboard](Page-Dashboard)
 - [Data Management](Page-Data-Management)
 - [Tables](Page-Tables)
@@ -15,6 +14,11 @@
 - [Worklist](Page-Worklist)
 - [Settings](Page-Settings)
 - [About](Page-About)
+
+## Examples
+
+- [Examples Overview](Examples)
+- [Cherit IT Invoice Control](Example-Cherit-IT-Invoice-Control)
 
 ## Concept Guide
 

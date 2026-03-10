@@ -27,3 +27,4 @@ This folder contains a compact, realistic starter dataset for the wiki scenario:
 - Currency is `EUR`.
 - Tax values are stored per line item (`tax_rate`).
 - A mix of `approved`, `paid`, and `in_review` status is intentional for dashboard/worklist examples.
+- Data currently spans `2026-01` to `2026-04` for trend and MoM analysis.
