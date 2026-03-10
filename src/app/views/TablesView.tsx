@@ -145,7 +145,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [sqlEditorUppercaseKeywords] = useLocalStorage<boolean>('sql_editor_uppercase_keywords', false);
     const [sqlEditorSchemaHints] = useLocalStorage<boolean>('sql_editor_schema_hints', true);
     const [sqlEditorRememberHeight] = useLocalStorage<boolean>('sql_editor_remember_height', true);
-    const [sqlRequireLimitConfirm] = useLocalStorage<boolean>('tables_sql_require_limit_confirm', true);
+    const [sqlRequireLimitConfirm, setSqlRequireLimitConfirm] = useLocalStorage<boolean>('tables_sql_require_limit_confirm', true);
     const [sqlMaxRows] = useLocalStorage<number>('tables_sql_max_rows', 5000);
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
     const [sqlStatementsLoaded, setSqlStatementsLoaded] = useState(false);
@@ -300,6 +300,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         cardinalityRate: 95
     });
     const sqlEditorPaneRef = useRef<HTMLDivElement | null>(null);
+    const sqlEditorViewRef = useRef<EditorView | null>(null);
     const sqlSplitContainerRef = useRef<HTMLDivElement | null>(null);
     const sqlSplitMouseMoveHandlerRef = useRef<((event: MouseEvent) => void) | null>(null);
     const sqlSplitMouseUpHandlerRef = useRef<(() => void) | null>(null);
@@ -608,7 +609,24 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
         const hasSelectWithoutLimit = statementAnalysis.some((statement) => statement.isSelectLike && !statement.hasLimit);
         if (hasSelectWithoutLimit && sqlRequireLimitConfirm) {
-            if (!(await appDialog.confirm(t('datainspector.limit_confirm_prompt', { limit: sqlMaxRows })))) return;
+            const decision = await appDialog.confirmWithRemember(
+                t('datainspector.limit_confirm_prompt', { limit: sqlMaxRows }),
+                {
+                    title: t('datainspector.limit_confirm_title', 'SELECT without LIMIT'),
+                    confirmLabel: t('datainspector.run_sql', 'Run'),
+                    cancelLabel: t('common.cancel', 'Cancel'),
+                    rememberLabel: t('datainspector.limit_confirm_do_not_show_again', 'Do not show this confirmation again'),
+                    rememberHint: t(
+                        'datainspector.limit_confirm_settings_hint',
+                        'You can enable this confirmation again in Settings > Apps > SQL Workspace.'
+                    ),
+                    rememberChecked: false
+                }
+            );
+            if (!decision.confirmed) return;
+            if (decision.rememberChoice) {
+                setSqlRequireLimitConfirm(false);
+            }
         }
 
         let executionSql = trimmed.replace(/;\s*$/, '');
@@ -632,7 +650,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         if (statementAnalysis.some((statement) => statement.isSelectLike)) {
             localStorage.setItem(TABLES_LAST_SELECT_SQL_KEY, trimmed);
         }
-    }, [setSqlHistory, setSqlWorkspaceSplitView, setSqlWorkspaceView, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, sqlWorkspaceSplitView, t]);
+    }, [setSqlHistory, setSqlRequireLimitConfirm, setSqlWorkspaceSplitView, setSqlWorkspaceView, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, sqlWorkspaceSplitView, t]);
 
     const handleRunSql = async () => {
         if (!canRunSqlWorkspace) return;
@@ -1665,14 +1683,40 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const canResetSqlWorkspace = Boolean(activeSqlStatementId) || hasUnsavedSqlChanges || Boolean((activeSqlTemplateMeta.name || '').trim());
     const showSqlEditorPane = sqlWorkspaceSplitView || sqlWorkspaceView === 'sql';
     const showSqlOutputPane = sqlWorkspaceSplitView || sqlWorkspaceView !== 'sql';
+    const clampSqlSplitTopHeight = useCallback((height: number) => {
+        const container = sqlSplitContainerRef.current;
+        if (!container) return height;
+        const minPaneHeight = 140;
+        const dividerHeight = 10;
+        const totalHeight = container.clientHeight;
+        const maxTop = Math.max(minPaneHeight, totalHeight - minPaneHeight - dividerHeight);
+        return Math.max(minPaneHeight, Math.min(maxTop, height));
+    }, []);
+
+    useEffect(() => {
+        if (!sqlWorkspaceSplitView) return;
+        let rafId = 0;
+        const syncSplitHeight = () => {
+            const next = clampSqlSplitTopHeight(sqlSplitTopHeight);
+            if (Math.abs(next - sqlSplitTopHeight) > 1) {
+                setSqlSplitTopHeight(next);
+            }
+        };
+        const onResize = () => syncSplitHeight();
+        rafId = window.requestAnimationFrame(syncSplitHeight);
+        window.addEventListener('resize', onResize);
+        return () => {
+            if (rafId) window.cancelAnimationFrame(rafId);
+            window.removeEventListener('resize', onResize);
+        };
+    }, [clampSqlSplitTopHeight, setSqlSplitTopHeight, sqlSplitTopHeight, sqlWorkspaceSplitView]);
+
     const startSqlSplitResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
         if (!sqlWorkspaceSplitView || !sqlSplitContainerRef.current) return;
         event.preventDefault();
         const container = sqlSplitContainerRef.current;
         const startY = event.clientY;
         const startHeight = sqlSplitTopHeight;
-        const minPaneHeight = 140;
-        const dividerHeight = 10;
         if (sqlSplitMouseMoveHandlerRef.current) {
             window.removeEventListener('mousemove', sqlSplitMouseMoveHandlerRef.current);
             sqlSplitMouseMoveHandlerRef.current = null;
@@ -1683,9 +1727,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         }
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const delta = moveEvent.clientY - startY;
-            const totalHeight = container.clientHeight;
-            const maxTop = Math.max(minPaneHeight, totalHeight - minPaneHeight - dividerHeight);
-            const next = Math.max(minPaneHeight, Math.min(maxTop, startHeight + delta));
+            const next = clampSqlSplitTopHeight(startHeight + delta);
             setSqlSplitTopHeight(next);
         };
         const handleMouseUp = () => {
@@ -1698,7 +1740,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         sqlSplitMouseUpHandlerRef.current = handleMouseUp;
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
-    }, [sqlSplitTopHeight, sqlWorkspaceSplitView, setSqlSplitTopHeight]);
+    }, [clampSqlSplitTopHeight, sqlSplitTopHeight, sqlWorkspaceSplitView, setSqlSplitTopHeight]);
     useEffect(() => {
         return () => {
             if (sqlSplitMouseMoveHandlerRef.current) {
@@ -1975,7 +2017,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
             const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.34)' : 'rgba(59, 130, 246, 0.25)';
             return EditorView.theme({
                 '&': {
-                    height: '100%',
                     fontSize: `${Math.max(12, Math.min(15, sqlEditorFontSize))}px`,
                     borderRadius: '0.5rem',
                     backgroundColor: isDarkEditor ? '#0b1220' : '#f8fafc',
@@ -1986,8 +2027,14 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     color: isDarkEditor ? '#e2e8f0' : '#0f172a'
                 },
                 '.cm-scroller': {
-                    overflow: 'auto',
+                    overflowY: 'scroll',
+                    overflowX: 'auto',
+                    overscrollBehavior: 'contain',
+                    scrollbarWidth: 'auto',
+                    scrollbarColor: isDarkEditor ? '#38bdf8 #0f172a' : '#38bdf8 #1e293b',
+                    scrollbarGutter: 'stable both-edges',
                     backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,
+                    paddingRight: '2px',
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
                 },
                 '.cm-content': {
@@ -2038,6 +2085,30 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         },
         [isDarkEditor, sqlEditorFontSize, sqlEditorHighlightActiveLine, sqlEditorThemeIntensity]
     );
+
+    const resetSqlEditorScroll = useCallback(() => {
+        const view = sqlEditorViewRef.current;
+        if (!view) return;
+        view.scrollDOM.scrollTop = 0;
+        view.scrollDOM.scrollLeft = 0;
+    }, []);
+
+    const clampSqlEditorHeight = useCallback((height: number) => {
+        if (typeof window === 'undefined') return Math.max(120, height);
+        const viewportMax = Math.max(180, Math.floor(window.innerHeight * 0.55));
+        return Math.max(120, Math.min(viewportMax, height));
+    }, []);
+
+    useEffect(() => {
+        const view = sqlEditorViewRef.current;
+        if (!view) return;
+        if (view.hasFocus) return;
+        const rafId = window.requestAnimationFrame(() => {
+            resetSqlEditorScroll();
+            view.requestMeasure();
+        });
+        return () => window.cancelAnimationFrame(rafId);
+    }, [activeSqlStatementId, inputSql, resetSqlEditorScroll]);
 
     const sqlCompletionSource = useCallback(
         (context: CompletionContext) => {
@@ -2150,18 +2221,47 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         sqlHighlightStyle
     ]);
 
+    const sqlEditorBasicSetup = React.useMemo(() => ({
+        lineNumbers: sqlEditorLineNumbers,
+        foldGutter: false,
+        highlightActiveLine: sqlEditorHighlightActiveLine,
+        highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorHighlightActiveLine
+    }), [sqlEditorHighlightActiveLine, sqlEditorLineNumbers]);
+
+    const readonlySqlPreviewBasicSetup = React.useMemo(() => ({
+        lineNumbers: false,
+        foldGutter: false,
+        highlightActiveLine: false,
+        highlightActiveLineGutter: false
+    }), []);
+
+    const handleSqlEditorChange = useCallback((value: string) => {
+        setInputSql(value);
+        setSqlOutputView((prev) => (prev === 'explain' ? prev : 'explain'));
+    }, [setInputSql]);
+
     useEffect(() => {
-        setSqlEditorHeight(sqlEditorRememberHeight ? storedSqlEditorHeight : 160);
-    }, [sqlEditorRememberHeight, storedSqlEditorHeight]);
+        const next = sqlEditorRememberHeight ? storedSqlEditorHeight : 160;
+        setSqlEditorHeight(clampSqlEditorHeight(next));
+    }, [clampSqlEditorHeight, sqlEditorRememberHeight, storedSqlEditorHeight]);
+
+    useEffect(() => {
+        const syncHeight = () => {
+            setSqlEditorHeight((prev) => clampSqlEditorHeight(prev));
+        };
+        syncHeight();
+        window.addEventListener('resize', syncHeight);
+        return () => window.removeEventListener('resize', syncHeight);
+    }, [clampSqlEditorHeight]);
 
     useEffect(() => {
         if (!sqlEditorRememberHeight) return;
         if (sqlEditorHeight === storedSqlEditorHeight) return;
         const persistTimer = window.setTimeout(() => {
-            setStoredSqlEditorHeight(sqlEditorHeight);
+            setStoredSqlEditorHeight(clampSqlEditorHeight(sqlEditorHeight));
         }, 180);
         return () => window.clearTimeout(persistTimer);
-    }, [sqlEditorHeight, sqlEditorRememberHeight, storedSqlEditorHeight, setStoredSqlEditorHeight]);
+    }, [clampSqlEditorHeight, sqlEditorHeight, sqlEditorRememberHeight, storedSqlEditorHeight, setStoredSqlEditorHeight]);
 
     const profiling = React.useMemo(() => {
         if (mode !== 'table' || !items || items.length === 0) return [];
@@ -3058,12 +3158,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                             value={assistantSqlPreview}
                                             height="128px"
                                             editable={false}
-                                            basicSetup={{
-                                                lineNumbers: false,
-                                                foldGutter: false,
-                                                highlightActiveLine: false,
-                                                highlightActiveLineGutter: false
-                                            }}
+                                            basicSetup={readonlySqlPreviewBasicSetup}
                                             extensions={sqlEditorExtensions}
                                         />
                                     </div>
@@ -3312,28 +3407,30 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     {showSqlEditorPane && (
                         <div
                             ref={sqlEditorPaneRef}
-                            className={`overflow-hidden flex flex-col relative min-h-0 ${sqlWorkspaceSplitView ? 'shrink-0' : 'flex-1'}`}
+                            className={`overflow-visible flex flex-col relative min-h-0 ${sqlWorkspaceSplitView ? 'shrink-0' : 'flex-1'}`}
                             style={sqlWorkspaceSplitView ? { height: `${sqlSplitTopHeight}px` } : undefined}
                         >
                             <div
-                                className="w-full flex-1 bg-slate-50 dark:bg-[#0b1220] overflow-hidden text-slate-800 dark:text-slate-200 min-h-0"
-                                style={{ minHeight: `${Math.max(120, sqlEditorHeight)}px` }}
+                                className="w-full flex-1 bg-slate-50 dark:bg-[#0b1220] overflow-visible text-slate-800 dark:text-slate-200 min-h-0 pr-1"
+                                style={
+                                    sqlWorkspaceSplitView
+                                        ? { height: '100%', minHeight: 0 }
+                                        : { height: '100%', minHeight: `${Math.max(120, sqlEditorHeight)}px` }
+                                }
                             >
                                 <CodeMirror
+                                    className="sql-editor-cm"
                                     value={inputSql}
-                                    height="100%"
-                                    basicSetup={{
-                                        lineNumbers: sqlEditorLineNumbers,
-                                        foldGutter: false,
-                                        highlightActiveLine: sqlEditorHighlightActiveLine,
-                                        highlightActiveLineGutter: sqlEditorLineNumbers && sqlEditorHighlightActiveLine
+                                    height={`${Math.max(120, sqlWorkspaceSplitView ? sqlSplitTopHeight : sqlEditorHeight)}px`}
+                                    onCreateEditor={(view) => {
+                                        sqlEditorViewRef.current = view;
+                                        view.scrollDOM.classList.add('custom-scrollbar');
+                                        view.scrollDOM.classList.add('container-scrollbar');
                                     }}
+                                    basicSetup={sqlEditorBasicSetup}
                                     extensions={sqlEditorExtensions}
                                     placeholder={t('datainspector.sql_placeholder')}
-                                    onChange={(value) => {
-                                        setInputSql(value);
-                                        setSqlOutputView('explain');
-                                    }}
+                                    onChange={handleSqlEditorChange}
                                 />
                             </div>
                         </div>
@@ -4218,12 +4315,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         value={manualIndexPreviewSql}
                                         height="112px"
                                         editable={false}
-                                        basicSetup={{
-                                            lineNumbers: false,
-                                            foldGutter: false,
-                                            highlightActiveLine: false,
-                                            highlightActiveLineGutter: false
-                                        }}
+                                        basicSetup={readonlySqlPreviewBasicSetup}
                                         extensions={sqlEditorExtensions}
                                     />
                                 </div>

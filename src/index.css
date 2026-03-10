@@ -44,6 +44,51 @@ body,
     /* slate-500 */
 }
 
+/* Ensure CodeMirror editor scrollbar stays visible and usable */
+.sql-editor-cm .cm-editor,
+.sql-editor-cm .cm-scroller {
+    height: 100%;
+}
+
+.sql-editor-cm {
+    height: 100%;
+}
+
+.sql-editor-cm .cm-editor {
+    overflow: visible;
+}
+
+.sql-editor-cm .cm-scroller {
+    overflow-y: scroll !important;
+    overflow-x: auto !important;
+    scrollbar-width: auto;
+    scrollbar-color: #38bdf8 #1e293b;
+    scrollbar-gutter: stable both-edges;
+}
+
+.dark .sql-editor-cm .cm-scroller {
+    scrollbar-color: #38bdf8 #0f172a;
+}
+
+.sql-editor-cm .cm-scroller::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.sql-editor-cm .cm-scroller::-webkit-scrollbar-track {
+    background: #1e293b;
+    border-radius: 99px;
+}
+
+.sql-editor-cm .cm-scroller::-webkit-scrollbar-thumb {
+    background: #38bdf8;
+    border-radius: 99px;
+}
+
+.dark .sql-editor-cm .cm-scroller::-webkit-scrollbar-thumb {
+    background: #38bdf8;
+}
+
 @layer utilities {
     .overlay-backdrop-subtle {
         @apply bg-slate-900/35 backdrop-blur-[1px];

@@ -1,4 +1,4 @@
-export type AppDialogKind = 'info' | 'warning' | 'error' | 'confirm' | 'confirm3' | 'prompt' | 'prompt2';
+export type AppDialogKind = 'info' | 'warning' | 'error' | 'confirm' | 'confirm3' | 'confirmRemember' | 'prompt' | 'prompt2';
 
 export interface AppDialogRequest {
     kind: AppDialogKind;
@@ -12,6 +12,9 @@ export interface AppDialogRequest {
     secondMessage?: string;
     secondDefaultValue?: string;
     secondPlaceholder?: string;
+    rememberLabel?: string;
+    rememberHint?: string;
+    rememberChecked?: boolean;
 }
 
 export interface AppDialogResponse {
@@ -19,6 +22,7 @@ export interface AppDialogResponse {
     choice?: 'confirm' | 'secondary' | 'cancel';
     value?: string;
     secondValue?: string;
+    rememberChoice?: boolean;
 }
 
 type DialogPresenter = (request: AppDialogRequest) => Promise<AppDialogResponse>;
@@ -44,6 +48,9 @@ export function registerDialogPresenter(nextPresenter: DialogPresenter) {
 function fallback(request: AppDialogRequest): AppDialogResponse {
     if (request.kind === 'confirm') {
         return { confirmed: window.confirm(request.message) };
+    }
+    if (request.kind === 'confirmRemember') {
+        return { confirmed: window.confirm(request.message), rememberChoice: false };
     }
     if (request.kind === 'confirm3') {
         const confirmed = window.confirm(request.message);
@@ -91,6 +98,29 @@ export const appDialog = {
         const cancelLabel = typeof options === 'string' ? undefined : options?.cancelLabel;
         const result = await open({ kind: 'confirm', title, message, confirmLabel, cancelLabel });
         return result.confirmed;
+    },
+    async confirmWithRemember(
+        message: string,
+        options?: {
+            title?: string;
+            confirmLabel?: string;
+            cancelLabel?: string;
+            rememberLabel?: string;
+            rememberHint?: string;
+            rememberChecked?: boolean;
+        }
+    ): Promise<{ confirmed: boolean; rememberChoice: boolean }> {
+        const result = await open({
+            kind: 'confirmRemember',
+            title: options?.title,
+            message,
+            confirmLabel: options?.confirmLabel,
+            cancelLabel: options?.cancelLabel,
+            rememberLabel: options?.rememberLabel,
+            rememberHint: options?.rememberHint,
+            rememberChecked: options?.rememberChecked
+        });
+        return { confirmed: result.confirmed, rememberChoice: Boolean(result.rememberChoice) };
     },
     async confirm3(
         message: string,

@@ -66,3 +66,130 @@ LEFT JOIN vendor_month prev
   ON prev.vendor_name = cur.vendor_name
   AND prev.year_month = strftime('%Y-%m', date(cur.year_month || '-01', '-1 month'))
 ORDER BY ABS(delta_abs) DESC;
+
+-- 7) Budget vs actual by month and cost center
+-- Requires table: budget_monthly(year_month, cost_center_id, budget_amount, ...)
+WITH actuals AS (
+  SELECT
+    strftime('%Y-%m', i.invoice_date) AS year_month,
+    it.cost_center_id,
+    ROUND(SUM(it.amount_net), 2) AS actual_amount
+  FROM invoice_items it
+  JOIN invoices i ON i.invoice_id = it.invoice_id
+  GROUP BY strftime('%Y-%m', i.invoice_date), it.cost_center_id
+)
+SELECT
+  b.year_month,
+  cc.cost_center_code,
+  b.budget_amount,
+  COALESCE(a.actual_amount, 0) AS actual_amount,
+  ROUND(COALESCE(a.actual_amount, 0) - b.budget_amount, 2) AS variance_abs,
+  ROUND(
+    CASE
+      WHEN b.budget_amount = 0 THEN NULL
+      ELSE ((COALESCE(a.actual_amount, 0) - b.budget_amount) / b.budget_amount) * 100
+    END
+  , 2) AS variance_pct
+FROM budget_monthly b
+LEFT JOIN actuals a
+  ON a.year_month = b.year_month
+  AND a.cost_center_id = b.cost_center_id
+LEFT JOIN cost_centers cc ON cc.cost_center_id = b.cost_center_id
+ORDER BY b.year_month, cc.cost_center_code;
+
+-- 8) Top budget overruns
+WITH variance AS (
+  SELECT
+    b.year_month,
+    cc.cost_center_code,
+    b.budget_amount,
+    COALESCE(SUM(it.amount_net), 0) AS actual_amount
+  FROM budget_monthly b
+  LEFT JOIN cost_centers cc ON cc.cost_center_id = b.cost_center_id
+  LEFT JOIN invoices i ON strftime('%Y-%m', i.invoice_date) = b.year_month
+  LEFT JOIN invoice_items it
+    ON it.invoice_id = i.invoice_id
+    AND it.cost_center_id = b.cost_center_id
+  GROUP BY b.year_month, cc.cost_center_code, b.budget_amount
+)
+SELECT
+  year_month,
+  cost_center_code,
+  ROUND(actual_amount, 2) AS actual_amount,
+  ROUND(budget_amount, 2) AS budget_amount,
+  ROUND(actual_amount - budget_amount, 2) AS variance_abs,
+  ROUND(
+    CASE
+      WHEN budget_amount = 0 THEN NULL
+      ELSE ((actual_amount - budget_amount) / budget_amount) * 100
+    END
+  , 2) AS variance_pct
+FROM variance
+WHERE actual_amount > budget_amount
+ORDER BY variance_abs DESC
+LIMIT 10;
+
+-- 9) Monthly total budget coverage
+WITH actual_month AS (
+  SELECT
+    strftime('%Y-%m', i.invoice_date) AS year_month,
+    ROUND(SUM(it.amount_net), 2) AS actual_amount
+  FROM invoice_items it
+  JOIN invoices i ON i.invoice_id = it.invoice_id
+  GROUP BY strftime('%Y-%m', i.invoice_date)
+),
+budget_month AS (
+  SELECT
+    year_month,
+    ROUND(SUM(budget_amount), 2) AS budget_amount
+  FROM budget_monthly
+  GROUP BY year_month
+)
+SELECT
+  b.year_month,
+  b.budget_amount,
+  COALESCE(a.actual_amount, 0) AS actual_amount,
+  ROUND(COALESCE(a.actual_amount, 0) - b.budget_amount, 2) AS variance_abs,
+  ROUND(
+    CASE
+      WHEN b.budget_amount = 0 THEN NULL
+      ELSE ((COALESCE(a.actual_amount, 0) - b.budget_amount) / b.budget_amount) * 100
+    END
+  , 2) AS variance_pct
+FROM budget_month b
+LEFT JOIN actual_month a ON a.year_month = b.year_month
+ORDER BY b.year_month;
+
+-- 10) Variance with traffic-light indicator
+WITH variance AS (
+  SELECT
+    b.year_month,
+    cc.cost_center_code,
+    b.budget_amount,
+    COALESCE(SUM(it.amount_net), 0) AS actual_amount
+  FROM budget_monthly b
+  LEFT JOIN cost_centers cc ON cc.cost_center_id = b.cost_center_id
+  LEFT JOIN invoices i ON strftime('%Y-%m', i.invoice_date) = b.year_month
+  LEFT JOIN invoice_items it
+    ON it.invoice_id = i.invoice_id
+    AND it.cost_center_id = b.cost_center_id
+  GROUP BY b.year_month, cc.cost_center_code, b.budget_amount
+)
+SELECT
+  year_month,
+  cost_center_code,
+  ROUND(actual_amount - budget_amount, 2) AS variance_abs,
+  ROUND(
+    CASE
+      WHEN budget_amount = 0 THEN NULL
+      ELSE ((actual_amount - budget_amount) / budget_amount) * 100
+    END
+  , 2) AS variance_pct,
+  CASE
+    WHEN budget_amount = 0 THEN 'n/a'
+    WHEN ((actual_amount - budget_amount) / budget_amount) > 0.10 THEN 'red'
+    WHEN ((actual_amount - budget_amount) / budget_amount) > 0.03 THEN 'yellow'
+    ELSE 'green'
+  END AS variance_status
+FROM variance
+ORDER BY year_month, cost_center_code;

@@ -1,0 +1,21 @@
+year_month,cost_center_id,budget_amount,currency,budget_owner,comment
+2026-01,CC100,19000.00,EUR,Operations,Core operations baseline
+2026-01,CC110,9000.00,EUR,Security,Security monthly baseline
+2026-01,CC120,17000.00,EUR,Data Engineering,Data platform baseline
+2026-01,CC130,11000.00,EUR,Workplace Services,Workplace licenses baseline
+2026-01,CC140,6000.00,EUR,PMO,Project support baseline
+2026-02,CC100,20000.00,EUR,Operations,Cloud and network growth
+2026-02,CC110,10000.00,EUR,Security,Extended monitoring capacity
+2026-02,CC120,18000.00,EUR,Data Engineering,Warehouse scale-up
+2026-02,CC130,11500.00,EUR,Workplace Services,Seat growth
+2026-02,CC140,6500.00,EUR,PMO,Transformation support
+2026-03,CC100,20500.00,EUR,Operations,Cloud seasonality reserve
+2026-03,CC110,11000.00,EUR,Security,Incident preparedness
+2026-03,CC120,19000.00,EUR,Data Engineering,Pipeline expansion
+2026-03,CC130,12000.00,EUR,Workplace Services,License adjustments
+2026-03,CC140,7000.00,EUR,PMO,Architecture initiatives
+2026-04,CC100,21000.00,EUR,Operations,Operations stabilization
+2026-04,CC110,12000.00,EUR,Security,Security hardening month
+2026-04,CC120,19500.00,EUR,Data Engineering,Optimization sprint
+2026-04,CC130,12200.00,EUR,Workplace Services,Workplace continuity
+2026-04,CC140,6800.00,EUR,PMO,Vendor consolidation support

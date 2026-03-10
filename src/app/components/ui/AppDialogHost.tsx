@@ -13,17 +13,20 @@ export const AppDialogHost: React.FC = () => {
     const [active, setActive] = React.useState<ActiveDialog | null>(null);
     const [inputValue, setInputValue] = React.useState('');
     const [inputValueSecond, setInputValueSecond] = React.useState('');
+    const [rememberChoice, setRememberChoice] = React.useState(false);
 
     React.useEffect(() => {
         return registerDialogPresenter((request) => new Promise<AppDialogResponse>((resolve) => {
             setInputValue(request.defaultValue || '');
             setInputValueSecond(request.secondDefaultValue || '');
+            setRememberChoice(Boolean(request.rememberChecked));
             setActive({ ...request, resolve });
         }));
     }, []);
 
     if (!active) return null;
     const isPrompt2 = active.kind === 'prompt2';
+    const isConfirmRemember = active.kind === 'confirmRemember';
     const requiresPrimaryInput = active.kind === 'prompt' || active.kind === 'prompt2';
     const isConfirmDisabled = requiresPrimaryInput && !inputValue.trim();
 
@@ -32,6 +35,8 @@ export const AppDialogHost: React.FC = () => {
             active.resolve({ confirmed: false, value: undefined });
         } else if (active.kind === 'confirm3') {
             active.resolve({ confirmed: false, choice: 'cancel' });
+        } else if (active.kind === 'confirmRemember') {
+            active.resolve({ confirmed: false, rememberChoice });
         } else if (active.kind === 'confirm') {
             active.resolve({ confirmed: false });
         } else {
@@ -54,6 +59,8 @@ export const AppDialogHost: React.FC = () => {
             active.resolve({ confirmed: true, value: inputValue, secondValue: inputValueSecond });
         } else if (active.kind === 'confirm3') {
             active.resolve({ confirmed: true, choice: 'confirm' });
+        } else if (active.kind === 'confirmRemember') {
+            active.resolve({ confirmed: true, rememberChoice });
         } else {
             active.resolve({ confirmed: true });
         }
@@ -67,6 +74,8 @@ export const AppDialogHost: React.FC = () => {
             : active.kind === 'warning'
                 ? t('common.warning', 'Warning')
                 : active.kind === 'confirm'
+                    ? t('common.confirm_title')
+                    : active.kind === 'confirmRemember'
                     ? t('common.confirm_title')
                     : active.kind === 'prompt'
                         ? t('common.input', 'Input')
@@ -103,6 +112,25 @@ export const AppDialogHost: React.FC = () => {
                             <div className="pt-0.5 pl-[5px]">
                                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</div>
                                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{active.message}</p>
+
+                                {isConfirmRemember && (
+                                    <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 px-3 py-3 space-y-2">
+                                        <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+                                            <input
+                                                type="checkbox"
+                                                checked={rememberChoice}
+                                                onChange={(e) => setRememberChoice(e.target.checked)}
+                                                className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
+                                            />
+                                            <span>{active.rememberLabel || t('common.do_not_show_again', 'Do not show again')}</span>
+                                        </label>
+                                        {active.rememberHint && (
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 pl-6">
+                                                {active.rememberHint}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {active.kind === 'prompt' && (
@@ -159,7 +187,7 @@ export const AppDialogHost: React.FC = () => {
 
                 <div className="mt-auto border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-3">
                     <div className="flex justify-end gap-2">
-                        {(active.kind === 'confirm' || active.kind === 'confirm3' || active.kind === 'prompt' || active.kind === 'prompt2') && (
+                        {(active.kind === 'confirm' || active.kind === 'confirm3' || active.kind === 'confirmRemember' || active.kind === 'prompt' || active.kind === 'prompt2') && (
                             <button
                                 type="button"
                                 onClick={onCancel}

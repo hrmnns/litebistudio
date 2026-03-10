@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
  
 ## [Unreleased]
+### Added
+- Added a new end-to-end example scenario for documentation and onboarding: `Cherit Systems GmbH - IT Invoice Control`.
+- Added a dedicated example package under `docs/examples/cherit-systems-it-invoice-control/` with:
+  - reusable sample datasets (`invoices`, `invoice_items`, `cost_centers`, `budget_monthly`)
+  - stepwise SQL queries for KPI creation and analysis (including budget/variance phase)
+  - a scenario README for guided execution in LiteBI Studio.
+- Added and linked a dedicated wiki page for the example so users can follow the scenario as a practical walkthrough.
+
 ### Changed 
 - Standardized page-header action behavior across the app via shared `PageLayout` controls:
   - `Presentation`, `Export`, `Refresh`, and `Sidebar` now follow a consistent order and button behavior.

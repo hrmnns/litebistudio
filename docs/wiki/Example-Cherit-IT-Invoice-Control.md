@@ -49,6 +49,7 @@ Included files:
 - `cost_centers.csv`
 - `invoices.csv`
 - `invoice_items.csv`
+- `budget_monthly.csv` (phase 2: budget baseline per month and cost center)
 - `queries.sql` (copy/paste starter analysis into SQL Workspace)
 
 Recommended import order:
@@ -57,6 +58,7 @@ Recommended import order:
 2. `cost_centers.csv`
 3. `invoices.csv`
 4. `invoice_items.csv`
+5. `budget_monthly.csv`
 
 ## Step-by-Step in LiteBI Studio
 
@@ -133,6 +135,17 @@ GROUP BY service_category
 ORDER BY amount_net DESC;
 ```
 
+## 3b) Add Budget and Variance (Phase 2)
+
+Import `budget_monthly.csv` into table `budget_monthly`.
+
+Then use queries `7` to `10` in `queries.sql` for:
+
+- Budget vs actual per month and cost center
+- Top budget overruns
+- Monthly budget coverage
+- Traffic-light variance status (`green/yellow/red`)
+
 ## 4) Create Reusable Widgets
 
 In **Widgets**:
@@ -147,6 +160,8 @@ Recommended starter widgets:
 - `Top 10 Vendors`
 - `Spend by Service Category`
 - `Open Invoices (status != paid)`
+- `Budget vs Actual by Cost Center`
+- `Top Overruns`
 
 ## 5) Build an Executive Dashboard
 
@@ -169,8 +184,11 @@ Use **Worklist** for approval/clarification tasks:
 
 ## Phase 2: Budget and Variance
 
-- Add monthly budget table per cost center.
-- Add variance KPIs (`actual - budget`) and alerts.
+- Included in this example:
+  - `budget_monthly.csv`
+  - Variance queries (`7-10`) in `queries.sql`
+- Next optional step:
+  - Add automatic alert rules for `variance_status = 'red'`
 
 ## Phase 3: Forecasting
 
