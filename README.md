@@ -39,12 +39,29 @@ A high-performance, browser-based business intelligence platform with local SQLi
 
 ## Getting Started
 
+### Try Instantly (No Installation)
+
+You can use LiteBI Studio directly in your browser:
+
+- https://hrmnns.github.io/litebistudio/
+
+Fastest path:
+
+1. Open the URL.
+2. Go to **Data Management**.
+3. Start with **Excel import** and load your first dataset.
+
+Privacy note:
+
+- Your data stays local in your browser.
+- No dataset is uploaded to an external server during normal app usage.
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v20.x or later, recommended)
 - [npm](https://www.npmjs.com/)
 
-### Installation & Development
+### Local Installation & Development
 
 1.  **Clone & Install**:
     ```bash
@@ -57,6 +74,14 @@ A high-performance, browser-based business intelligence platform with local SQLi
     ```bash
     npm run dev
     ```
+
+Optional (recommended once per clone):
+
+```bash
+npm run hooks:install
+```
+
+This enables repository git hooks (`.githooks/`) so `build` and `test` run automatically on push.
 
 3.  **Build Phase**:
     ```bash

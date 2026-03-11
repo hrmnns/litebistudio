@@ -74,9 +74,9 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                 className="flex min-h-0 flex-1 flex-col"
                 style={{ height: '32rem', maxHeight: 'calc(90vh - 11rem)' }}
             >
-                <div className="flex min-h-0 flex-1 flex-col gap-4 px-4">
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-2 py-1.5">
-                        <div className="relative w-full max-w-xs">
+                <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-900/45 px-4 py-2">
+                        <div className="relative w-full min-w-0 max-w-xs md:max-w-sm">
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                             <input
                                 value={searchValue}
@@ -116,7 +116,8 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                             )}
                         </div>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 space-y-1">
+                    <div className="min-h-0 flex-1 px-4 pt-3 pb-0">
+                    <div className="min-h-0 h-full overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 space-y-1">
                     {items.length === 0 ? (
                         <div className="p-3 text-xs text-slate-500 text-center">
                             {emptyLabel}
@@ -209,6 +210,7 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                         {applyLabel}
                     </button>
                 </div>
+            </div>
             </div>
         </Modal>
     );
