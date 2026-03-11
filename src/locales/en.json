@@ -168,7 +168,7 @@
         "tools_selected_count": "{{count}} selected"
     },
     "datainspector": {
-        "subtitle": "{{count}} Results | {{mode}}",
+        "subtitle": "{{count}} results · {{mode}}",
         "table_mode": "Table",
         "sql_mode": "SQL",
         "output_results": "Results",
@@ -815,7 +815,7 @@
     },
     "settings": {
         "title": "Settings",
-        "subtitle": "{{count}} Results | {{mode}}",
+        "subtitle": "Dashboard configuration and notifications",
         "tab_appearance": "General",
         "tab_security": "Security",
         "tab_apps": "Apps",
@@ -841,6 +841,14 @@
         "theme_light": "Light",
         "theme_dark": "Dark",
         "theme_system": "System",
+        "light_variant_title": "Light style",
+        "light_variant_hint": "Applies to light mode and system mode when your device is in light mode.",
+        "light_variant_classic": "Classic",
+        "light_variant_classic_hint": "Balanced neutral blue accents.",
+        "light_variant_ocean": "Ocean",
+        "light_variant_ocean_hint": "Fresh blue-cyan contrast, more vivid.",
+        "light_variant_aurora": "Aurora",
+        "light_variant_aurora_hint": "Cool teal-petrol accents with clear, elegant contrast.",
         "inspector_title": "Tables",
         "inspector_hint": "Central defaults for Tables behavior.",
         "inspector_autocomplete": "SQL autocomplete",
@@ -1089,6 +1097,8 @@
             "step_success": "Completed",
             "import_success_title": "Import successful!",
             "import_success_hint": "{{count}} tables have been successfully created and populated.",
+            "table_exists_badge": "Existing table",
+            "import_mode_append_hint": "Import mode: Append to existing table",
             "finish_btn": "Finish"
         },
         "excel_import": {
@@ -1109,7 +1119,7 @@
     "about": {
         "title": "About LiteBI Studio",
         "subtitle": "Project and system information",
-        "tagline": "The lightweight business intelligence platform directly in your browser.",
+        "tagline": "The lightweight self-service business intelligence platform directly in your browser.",
         "status_stable": "Stable (Local)",
         "philosophy_title": "Our Philosophy",
         "philosophy_description": "LiteBI Studio was developed with the goal of making data analysis as simple and secure as possible. Unlike traditional BI tools, your data never leaves your browser with LiteBI Studio.",

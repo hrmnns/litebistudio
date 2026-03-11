@@ -189,7 +189,7 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                     )}
                 </div>
                 </div>
-                <div className="mt-2 px-5 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-end gap-3">
+                <div className="mt-2 px-5 py-4 ui-surface-footer flex items-center justify-end gap-3">
                     <Button variant="secondary" size="md" onClick={onClose} className="rounded-xl">
                         {cancelLabel}
                     </Button>

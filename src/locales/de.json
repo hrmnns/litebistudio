@@ -841,6 +841,14 @@
         "theme_light": "Hell",
         "theme_dark": "Dunkel",
         "theme_system": "System",
+        "light_variant_title": "Light-Stil",
+        "light_variant_hint": "Gilt fuer den hellen Modus und fuer Systemmodus bei hellem Geraete-Theme.",
+        "light_variant_classic": "Klassisch",
+        "light_variant_classic_hint": "Ausgewogene neutrale Blau-Akzente.",
+        "light_variant_ocean": "Ocean",
+        "light_variant_ocean_hint": "Frischer Blau-Cyan-Kontrast, sichtbar lebendiger.",
+        "light_variant_aurora": "Aurora",
+        "light_variant_aurora_hint": "Kuehle Teal-Petrol-Akzente mit klarer, eleganter Abgrenzung.",
         "inspector_title": "Tabellen",
         "inspector_hint": "Zentrale Standardwerte fuer den Tabellenbereich.",
         "inspector_autocomplete": "SQL Autocomplete",
@@ -1089,6 +1097,8 @@
             "step_success": "Abgeschlossen",
             "import_success_title": "Import erfolgreich!",
             "import_success_hint": "{{count}} Tabellen wurden erfolgreich angelegt und befüllt.",
+            "table_exists_badge": "Bestehende Tabelle",
+            "import_mode_append_hint": "Import-Modus: An bestehende Tabelle anhaengen",
             "finish_btn": "Abschliessen"
         },
         "excel_import": {

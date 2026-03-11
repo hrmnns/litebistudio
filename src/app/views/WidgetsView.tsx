@@ -200,7 +200,7 @@ export const WidgetsView: React.FC = () => {
         typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
     );
     const { isExporting, exportToPdf } = useReportExport();
-    const { togglePresentationMode, isReadOnly } = useDashboard();
+    const { togglePresentationMode, isPresentationMode, isReadOnly } = useDashboard();
     const hasRestoredLastWidgetRef = useRef(false);
     const bypassUnsavedGuardRef = useRef(false);
     const pendingBaselineSnapshotRef = useRef<string | null>(null);
@@ -881,6 +881,7 @@ export const WidgetsView: React.FC = () => {
         setLastOpenWidgetId(activeWidgetId);
     }, [activeWidgetId, lastOpenWidgetId, setLastOpenWidgetId]);
     useEffect(() => {
+        if (pendingBaselineSync) return;
         if (!activeWidgetId) return;
         if (CONTENT_VIS_TYPES.has(visType)) {
             setWidgetSqlDraftById((prev) => {
@@ -907,7 +908,7 @@ export const WidgetsView: React.FC = () => {
                 ? prev
                 : { ...prev, [activeWidgetId]: selectedSqlStatementId }
         ));
-    }, [activeWidgetId, selectedSqlStatementId, sql, visType, setWidgetSqlDraftById, setWidgetSqlStatementDraftById]);
+    }, [activeWidgetId, selectedSqlStatementId, sql, visType, pendingBaselineSync, setWidgetSqlDraftById, setWidgetSqlStatementDraftById]);
 
     useEffect(() => {
         if (hasRestoredLastWidgetRef.current) return;
@@ -1025,6 +1026,7 @@ export const WidgetsView: React.FC = () => {
         : (sourceSelectTab === 'query' ? hasSelectedSqlStatement : Boolean(activeWidgetId));
     const hasSourceConfig = isContentWidget || hasSelectedSqlStatement;
     const hasRunOutput = isContentWidget || (results.length > 0 && !error && lastRunSql.trim() === sql.trim());
+    const isFullscreenEditorPanel = isPresentationMode && workspaceTab === 'editor';
     const hasVisualizationConfig = useMemo(() => {
         if (!hasSelectedSqlStatement) {
             if (!isContentWidget) return false;
@@ -1696,7 +1698,8 @@ export const WidgetsView: React.FC = () => {
                 },
                 presentation: {
                     onClick: togglePresentationMode,
-                    title: t('dashboard.presentation_mode')
+                    title: t('dashboard.presentation_mode'),
+                    active: isPresentationMode
                 },
                 export: {
                     onPdfExport: () => exportToPdf('query-visualization', `report-${widgetName || 'query'}`),
@@ -1753,7 +1756,7 @@ export const WidgetsView: React.FC = () => {
                     </div>
                 </div>
                 {workspaceTab === 'editor' ? (
-                <div className="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6 min-h-0 overflow-hidden relative">
+                <div className={`flex flex-col lg:flex-row min-h-0 overflow-hidden relative ${isFullscreenEditorPanel ? 'fixed inset-0 z-[90] gap-4 lg:gap-6 p-4 lg:p-6 bg-[rgb(var(--ui-bg-subtle))] dark:bg-slate-900' : 'flex-1 gap-4 lg:gap-6'}`}>
                     <RightOverlayPanel
                         isOpen={isConfigPanelOpen}
                         onClose={() => setIsConfigPanelOpen(false)}
@@ -2339,7 +2342,7 @@ export const WidgetsView: React.FC = () => {
 
                     {/* Preview Area */}
                     <div id="query-visualization" className="w-full min-w-0 flex-1 min-h-0 bg-white dark:bg-[#0b1220] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col relative">
-                        <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                        <div className="ui-surface-header">
                             <div className="p-3 flex items-center justify-between gap-2">
                                 <h3 className="text-sm text-slate-800 dark:text-slate-100 truncate">
                                     <span className="font-bold">Widget</span>
@@ -2355,7 +2358,7 @@ export const WidgetsView: React.FC = () => {
                                     </p>
                                 )}
                             </div>
-                            <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
+                            <div className="px-3 pb-2 ui-surface-inset-top">
                                 <div className="pt-2 flex items-center justify-between gap-2">
                                     <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pr-1">
                                         <Button
@@ -3047,7 +3050,7 @@ export const WidgetsView: React.FC = () => {
                                 )
                             )}
                         </div>
-                        <div className="px-3 py-2 border-t border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90">
+                        <div className="px-3 py-2 ui-surface-footer">
                             <div className="flex items-end justify-between gap-3">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
                                     <span className="inline-flex items-center gap-1">
@@ -3074,7 +3077,7 @@ export const WidgetsView: React.FC = () => {
                 ) : (
                     <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent shadow-sm">
                         <div className="h-full min-h-0 flex flex-col">
-                            <div className="shrink-0 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                            <div className="shrink-0 ui-surface-header">
                                 <div className="p-3">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="relative w-full max-w-sm">
@@ -3232,7 +3235,7 @@ export const WidgetsView: React.FC = () => {
                                     })
                                 )}
                             </div>
-                            <div className="shrink-0 px-3 py-2 border-t border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90">
+                            <div className="shrink-0 px-3 py-2 ui-surface-footer">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
                                     <span className="inline-flex items-center gap-1">
                                         <span className="font-semibold uppercase tracking-wide">{t('querybuilder.manage_widgets_total', 'Vorhandene Widgets')}:</span>

@@ -44,10 +44,10 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, headerActi
                 variant === 'dialog' ? "max-w-xl rounded-xl" : "max-w-4xl rounded-2xl"
             )}>
                 <div className={cn(
-                    "flex items-center justify-between border-b border-slate-200 dark:border-slate-700 shrink-0",
+                    "ui-surface-header flex items-center justify-between shrink-0",
                     variant === 'dialog'
-                        ? "px-4 py-3 bg-slate-50 dark:bg-slate-900/60"
-                        : "p-6 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-800/90"
+                        ? "px-4 py-3"
+                        : "p-6"
                 )}>
                     <h3 className={cn(
                         "text-slate-900 dark:text-white",

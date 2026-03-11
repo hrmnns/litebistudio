@@ -23,6 +23,24 @@ export async function analyzeExcelFile(file: File): Promise<SheetAnalysis[]> {
                 const data = new Uint8Array(e.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                 const analyses: SheetAnalysis[] = [];
+                const isCsvFile = /\.csv$/i.test(file.name);
+                const csvBaseName = file.name.replace(/\.[^/.]+$/, '');
+                const sanitizeIdentifier = (rawName: string): string => {
+                    let normalized = rawName.toLowerCase()
+                        .replace(/[^a-z0-9_]/g, '_')
+                        .replace(/^_+|_+$/g, '')
+                        .replace(/_+/g, '_');
+
+                    if (!/^[a-z][a-z0-9_]*$/.test(normalized)) {
+                        if (/^[0-9]/.test(normalized)) {
+                            normalized = 'tbl_' + normalized;
+                        } else if (normalized === '') {
+                            normalized = 'tbl_unnamed';
+                        }
+                    }
+
+                    return normalized;
+                };
 
                 for (const sheetName of workbook.SheetNames) {
                     const sheet = workbook.Sheets[sheetName];
@@ -36,26 +54,14 @@ export async function analyzeExcelFile(file: File): Promise<SheetAnalysis[]> {
                     const headers = (jsonData[0] as unknown[]).map(h => String(h).trim());
                     const rows = jsonData.slice(1) as unknown[][];
 
-                    // Sanitize Table Name
-                    let suggestedTableName = sheetName.toLowerCase()
-                        .replace(/[^a-z0-9_]/g, '_')
-                        .replace(/^_+|_+$/g, '')
-                        .replace(/_+/g, '_');
+                    // For CSV use file name as table name suggestion; for Excel keep sheet name.
+                    const rawSuggestedName = isCsvFile ? csvBaseName : sheetName;
+                    const suggestedTableName = sanitizeIdentifier(rawSuggestedName);
 
                     let validationError: string | undefined = undefined;
                     let isValid = true;
 
-                    // 1. Validate Identifier compliance
-                    if (!/^[a-z][a-z0-9_]*$/.test(suggestedTableName)) {
-                        // Fix: prepending 'tbl_' if it starts with digit or is empty
-                        if (/^[0-9]/.test(suggestedTableName)) {
-                            suggestedTableName = 'tbl_' + suggestedTableName;
-                        } else if (suggestedTableName === '') {
-                            suggestedTableName = 'tbl_unnamed';
-                        }
-                    }
-
-                    // 2. Validate Reserved Prefix
+                    // Validate reserved prefix
                     if (suggestedTableName.startsWith('sys_')) {
                         isValid = false;
                         validationError = "Tabellennamen dürfen nicht mit 'sys_' beginnen (reserviert).";

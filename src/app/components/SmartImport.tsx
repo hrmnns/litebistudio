@@ -23,6 +23,7 @@ export const SmartImport: React.FC = () => {
     const [importTablePrefix] = useLocalStorage<string>('import_table_prefix', 'usr_');
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
     const [previews, setPreviews] = useState<TablePreview[]>([]);
+    const [existingTableNames, setExistingTableNames] = useState<string[]>([]);
     const [importedStats, setImportedStats] = useState<{ tables: number; records: number }>({ tables: 0, records: 0 });
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -54,6 +55,8 @@ export const SmartImport: React.FC = () => {
         setIsAnalyzing(true);
         try {
             const results = await analyzeExcelFile(file);
+            const existingTables = await SystemRepository.getTables();
+            setExistingTableNames(existingTables.map((name) => name.toLowerCase()));
             const initialPreviews: TablePreview[] = results.map(res => ({
                 sheetName: res.sheetName,
                 tableName: applyConfiguredPrefix(res.suggestedTableName),
@@ -67,6 +70,7 @@ export const SmartImport: React.FC = () => {
         } catch (error) {
             logger.error('Analysis failed', error);
             await appDialog.error(t('datasource.smart_import.error_analyzing'));
+            setExistingTableNames([]);
         } finally {
             setIsAnalyzing(false);
         }
@@ -102,6 +106,7 @@ export const SmartImport: React.FC = () => {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             await appDialog.error(t('common.error') + ': ' + message);
+            setStep(2);
         } finally {
             setIsImporting(false);
         }
@@ -214,6 +219,17 @@ export const SmartImport: React.FC = () => {
                                                 </div>
                                             </div>
 
+                                            {existingTableNames.includes(preview.tableName.trim().toLowerCase()) && (
+                                                <div className="flex items-center gap-2 text-[10px]">
+                                                    <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold">
+                                                        {t('datasource.smart_import.table_exists_badge')}
+                                                    </span>
+                                                    <span className="text-slate-500 dark:text-slate-400">
+                                                        {t('datasource.smart_import.import_mode_append_hint')}
+                                                    </span>
+                                                </div>
+                                            )}
+
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
                                                     <Database className="w-3 h-3" />
@@ -225,7 +241,6 @@ export const SmartImport: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Preview Pill Chips */}
                                             <div className="flex flex-wrap gap-1">
                                                 {preview.columns.slice(0, 5).map(col => (
                                                     <span key={col.name} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded text-[9px] font-medium">

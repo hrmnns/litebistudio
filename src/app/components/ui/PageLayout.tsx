@@ -245,8 +245,8 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
-            <header className="relative z-[70] flex-shrink-0 overflow-visible px-6 md:px-8 py-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <header className="ui-page-header relative z-[70] flex-shrink-0 overflow-visible px-6 md:px-8 py-4 md:py-0 md:h-[var(--app-shell-header-h)]">
+                <div className="flex flex-col md:flex-row md:h-full md:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div>
                             <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
@@ -259,7 +259,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             )}
                         </div>
                     </div>
-                    <div className="w-full md:w-auto flex items-center justify-end gap-2 flex-shrink-0 max-w-full overflow-x-auto overflow-y-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 -mb-1">
+                    <div className="w-full md:w-auto flex items-center justify-end gap-2 flex-shrink-0 max-w-full md:max-w-none overflow-x-auto md:overflow-x-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 -mb-1">
                         {header.actions}
                         <Button
                             type="button"
@@ -308,7 +308,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                 <Download className={cn('w-4 h-4', header.export?.loading && 'animate-pulse')} />
                             </Button>
                             {isExportMenuOpen && !exportButtonDisabled && (
-                                <div className="absolute right-0 z-[90] mt-2 w-48 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg p-1">
+                                <div className="absolute right-0 z-[120] mt-2 w-48 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg p-1">
                                     <Button
                                         type="button"
                                         onClick={() => {

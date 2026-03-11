@@ -82,7 +82,7 @@ export const RightOverlayPanel: React.FC<RightOverlayPanelProps> = ({
                 style={resolveWidthStyle(width)}
             >
                 <div className="h-full min-h-0 flex flex-col">
-                    <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                    <div className="px-5 py-4 ui-surface-header flex items-center justify-between gap-3">
                         <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{title}</h3>
                         <button
                             onClick={onClose}

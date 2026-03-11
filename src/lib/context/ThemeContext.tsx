@@ -3,19 +3,25 @@ import React, { createContext, useContext, useEffect, type ReactNode } from 'rea
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+export type LightThemeVariant = 'classic' | 'ocean' | 'aurora';
 
 interface ThemeContextType {
     theme: ThemeMode;
     setTheme: (theme: ThemeMode) => void;
+    lightThemeVariant: LightThemeVariant;
+    setLightThemeVariant: (variant: LightThemeVariant) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [theme, setTheme] = useLocalStorage<ThemeMode>('theme', 'system');
+    const [lightThemeVariant, setLightThemeVariant] = useLocalStorage<LightThemeVariant>('ui_light_theme_variant', 'classic');
 
     useEffect(() => {
         const root = window.document.documentElement;
+        const lightVariantClasses = ['light-variant-classic', 'light-variant-ocean', 'light-variant-aurora', 'light-variant-slate'];
+        const effectiveLightVariant = lightThemeVariant === 'slate' ? 'aurora' : lightThemeVariant;
 
         const removeOldTheme = () => {
             root.classList.remove('light', 'dark');
@@ -26,9 +32,12 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (t === 'system') {
                 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                 root.classList.add(systemTheme);
-                return;
+            } else {
+                root.classList.add(t);
             }
-            root.classList.add(t);
+
+            root.classList.remove(...lightVariantClasses);
+            root.classList.add(`light-variant-${effectiveLightVariant}`);
         };
 
         applyTheme(theme);
@@ -39,10 +48,10 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             mediaQuery.addEventListener('change', handleChange);
             return () => mediaQuery.removeEventListener('change', handleChange);
         }
-    }, [theme]);
+    }, [theme, lightThemeVariant]);
 
     return (
-        <ThemeContext.Provider value={{ theme, setTheme }}>
+        <ThemeContext.Provider value={{ theme, setTheme, lightThemeVariant, setLightThemeVariant }}>
             {children}
         </ThemeContext.Provider>
     );

@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const staticBottomItems: NavItem[] = [
         { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.datasource') },
-        { to: '/sql-workspace', icon: <Code2 className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.sql_workspace') },
+        { to: '/sql-workspace', icon: <Code2 className="w-[18px] h-[18px] flex-shrink-0" />, label: t('sidebar.sql_workspace') },
         { to: '/widgets', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.query_builder') },
         { to: '/reports', icon: <FileText className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.reports') },
         { to: '/about', icon: <Info className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.about') },
@@ -119,11 +119,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     return (
         <aside className={`
-            fixed inset-y-0 left-0 z-[80] bg-white dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 transform transition-all duration-300 ease-in-out
+            fixed inset-y-0 left-0 z-[80] border-r transform transition-all duration-300 ease-in-out flex flex-col
+            bg-[rgb(var(--ui-bg))] dark:bg-slate-800 border-[rgb(var(--ui-border))] dark:border-slate-700
             ${isCollapsed ? 'md:w-20' : 'md:w-64'}
             ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
         `}>
-            <div className={`p-6 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between ${isCollapsed ? 'md:p-4 md:justify-center' : ''}`}>
+            <div className={`h-[var(--app-shell-header-h)] px-4 md:px-6 py-4 border-b flex items-center justify-between border-[rgb(var(--ui-border))] dark:border-slate-700 ${isCollapsed ? 'md:px-4 md:justify-center' : ''}`}>
                 <div className={`flex items-center overflow-hidden ${isCollapsed ? 'md:gap-0' : 'gap-2.5'}`}>
                     <AppBrandIcon size={32} className="flex-shrink-0" />
                     <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100 flex flex-col'}`}>
@@ -141,13 +142,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* PC Collapse Toggle */}
                 <button
                     onClick={onToggleCollapse}
-                    className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-full items-center justify-center shadow-md hover:text-blue-600 transition-colors z-50"
+                    className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 border rounded-full items-center justify-center shadow-md hover:text-blue-600 transition-colors z-50 bg-[rgb(var(--ui-bg))] dark:bg-slate-800 border-[rgb(var(--ui-border))] dark:border-slate-700"
                 >
                     {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                 </button>
             </div>
 
-            <div className="flex flex-col h-[calc(100%-80px)] justify-between">
+            <div className="flex flex-col flex-1 min-h-0 justify-between">
                 <div>
                     {isReadOnly && (
                         <div className={`bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/50 px-4 py-3 flex items-start gap-3 text-amber-800 dark:text-amber-400 overflow-hidden ${isCollapsed ? 'md:px-0 md:justify-center' : ''}`}>
@@ -167,18 +168,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 end={to === '/'}
                                 onClick={onCloseMobile}
                                 className={({ isActive }) =>
-                                    `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0 md:gap-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`
+                                    `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:justify-center md:px-0 md:gap-0 md:h-11' : ''} ${isActive ? 'bg-[rgb(var(--ui-nav-active-bg))] text-[rgb(var(--ui-nav-active-text))] dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-[rgb(var(--ui-nav-hover-bg))] dark:text-slate-200 dark:hover:bg-slate-800'}`
                                 }
                                 title={isCollapsed ? label : ''}
                             >
-                                {icon}
+                                <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                    {icon}
+                                </span>
                                 <span className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>{label}</span>
                             </NavLink>
                         ))}
                     </nav>
                 </div>
 
-                <div className={`p-4 border-t border-slate-300 dark:border-slate-700 transition-all space-y-1 ${isCollapsed ? 'md:px-0 md:py-3 md:flex md:flex-col md:items-center md:gap-2 md:space-y-0' : ''}`}>
+                <div className={`p-4 border-t transition-all space-y-1 border-[rgb(var(--ui-border))] dark:border-slate-700 ${isCollapsed ? 'md:px-0 md:py-3 md:flex md:flex-col md:items-center md:gap-2 md:space-y-0' : ''}`}>
                     {showLanguageSwitch && (
                         <button
                             onClick={toggleLanguage}
@@ -195,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         to="/settings"
                         onClick={onCloseMobile}
                         className={({ isActive }) =>
-                            `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:w-11 md:h-11 md:mx-auto md:justify-center md:px-0 md:py-0 md:gap-0' : ''} ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                            `w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isCollapsed ? 'md:w-11 md:h-11 md:mx-auto md:justify-center md:px-0 md:py-0 md:gap-0' : ''} ${isActive ? 'bg-[rgb(var(--ui-nav-active-bg))] text-[rgb(var(--ui-nav-active-text))] dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-600 dark:text-slate-400 hover:bg-[rgb(var(--ui-nav-hover-bg))] dark:hover:bg-slate-800'}`
                         }
                         title={isCollapsed ? t('sidebar.settings') : ''}
                     >

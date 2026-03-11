@@ -25,7 +25,7 @@ export const Layout: React.FC = () => {
     }, [setIsReadOnly]);
 
     return (
-        <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
+        <div className="h-screen overflow-hidden text-slate-900 dark:text-slate-100 flex flex-col md:flex-row bg-[rgb(var(--ui-bg-subtle))] dark:bg-slate-900">
             {!isPresentationMode && (
                 <Sidebar
                     isCollapsed={isSidebarCollapsed}
@@ -40,7 +40,7 @@ export const Layout: React.FC = () => {
             <main className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${isPresentationMode ? 'ml-0' : (isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64')}`}>
                 {/* Mobile Header */}
                 {!isPresentationMode && (
-                    <header className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4">
+                    <header className="md:hidden border-b p-4 flex items-center gap-4 bg-[rgb(var(--ui-bg))] dark:bg-slate-800 border-[rgb(var(--ui-border))] dark:border-slate-700">
                         <button onClick={() => setSidebarOpen(true)} className="p-1 text-slate-500 hover:text-slate-700">
                             <Menu className="w-6 h-6" />
                         </button>
@@ -75,7 +75,7 @@ export const Layout: React.FC = () => {
             {isPresentationMode && (
                 <button
                     onClick={togglePresentationMode}
-                    className="fixed bottom-6 right-6 z-50 p-4 bg-slate-900 text-white rounded-full shadow-2xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group"
+                    className="fixed bottom-6 right-6 z-[120] p-4 bg-slate-900 text-white rounded-full shadow-2xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group"
                     title="Präsentationsmodus beenden"
                 >
                     <Minimize2 className="w-6 h-6" />

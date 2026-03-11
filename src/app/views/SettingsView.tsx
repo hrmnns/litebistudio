@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext';
+import { useThemeContext, type ThemeMode, type LightThemeVariant } from '../../lib/context/ThemeContext';
 import { PageLayout } from '../components/ui/PageLayout';
 import { Lock, Shield, Trash2, Check, X, Info, ChevronRight, Palette, SlidersHorizontal, Bell, Table2, Globe, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -20,7 +20,7 @@ export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
     const version = __APP_VERSION__;
     const buildNumber = __BUILD_NUMBER__;
-    const { theme, setTheme } = useThemeContext();
+    const { theme, setTheme, lightThemeVariant, setLightThemeVariant } = useThemeContext();
     const { isReadOnly, isAdminMode, setIsAdminMode } = useDashboard();
     const [activeTab, setActiveTab] = React.useState<SettingsTab>('appearance');
     const [appsSubTab, setAppsSubTab] = React.useState<AppsSubTab>('datamanagement');
@@ -31,6 +31,11 @@ export const SettingsView: React.FC = () => {
         { value: 'light', label: t('settings.theme_light') },
         { value: 'dark', label: t('settings.theme_dark') },
         { value: 'system', label: t('settings.theme_system') }
+    ];
+    const lightThemeVariantOptions: { value: LightThemeVariant; label: string; hint: string }[] = [
+        { value: 'classic', label: t('settings.light_variant_classic'), hint: t('settings.light_variant_classic_hint') },
+        { value: 'ocean', label: t('settings.light_variant_ocean'), hint: t('settings.light_variant_ocean_hint') },
+        { value: 'aurora', label: t('settings.light_variant_aurora'), hint: t('settings.light_variant_aurora_hint') }
     ];
 
     const [hasPin, setHasPin] = React.useState(!!localStorage.getItem('litebistudio_app_pin'));
@@ -359,6 +364,30 @@ export const SettingsView: React.FC = () => {
                                             <span className="text-sm font-medium">{label}</span>
                                         </button>
                                     ))}
+                                </div>
+                                <div className="pt-2">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                                        {t('settings.light_variant_title')}
+                                    </label>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                                        {t('settings.light_variant_hint')}
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {lightThemeVariantOptions.map(({ value, label, hint }) => (
+                                            <button
+                                                key={value}
+                                                onClick={() => setLightThemeVariant(value)}
+                                                className={`p-3 rounded-xl border text-left transition-all ${
+                                                    lightThemeVariant === value
+                                                        ? 'bg-blue-50 border-blue-300 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800'
+                                                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'
+                                                }`}
+                                            >
+                                                <div className="text-sm font-semibold">{label}</div>
+                                                <div className="text-xs mt-1 opacity-80">{hint}</div>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>

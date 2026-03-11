@@ -122,7 +122,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
-    const { isAdminMode } = useDashboard();
+    const { isAdminMode, isPresentationMode, togglePresentationMode } = useDashboard();
     const SQL_LIBRARY_SCOPE = 'global';
     const SQL_LIBRARY_MIGRATION_KEY = 'tables_sql_library_migrated_v1';
     const sqlEditorHeightStorageKey = fixedMode === 'sql'
@@ -1688,6 +1688,9 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const canResetSqlWorkspace = Boolean(activeSqlStatementId) || hasUnsavedSqlChanges || Boolean((activeSqlTemplateMeta.name || '').trim());
     const showSqlEditorPane = sqlWorkspaceSplitView || sqlWorkspaceView === 'sql';
     const showSqlOutputPane = sqlWorkspaceSplitView || sqlWorkspaceView !== 'sql';
+    const isFullscreenWorkPanel = isPresentationMode && (
+        mode === 'table' || (mode === 'sql' && sqlWorkspaceTab === 'editor')
+    );
     const clampSqlSplitTopHeight = useCallback((height: number) => {
         const container = sqlSplitContainerRef.current;
         if (!container) return height;
@@ -2397,6 +2400,11 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     excelTitle: canExportCurrentRows
                         ? t('common.export_excel', 'Export Excel')
                         : t('common.not_available', 'Not available')
+                },
+                presentation: {
+                    onClick: togglePresentationMode,
+                    title: t('dashboard.presentation_mode', 'Presentation mode'),
+                    active: isPresentationMode
                 },
                 onBack,
                 actions: (
@@ -3284,8 +3292,8 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
             {/* SQL Workspace main panels */}
             {mode === 'sql' && (sqlWorkspaceTab === 'editor' ? (
-                <div className="-mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-                    <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0 ${isFullscreenWorkPanel ? 'fixed inset-0 z-[90] rounded-none border-0 shadow-none m-0' : '-mt-2 rounded-xl'}`}>
+                    <div className="ui-surface-header">
                         <div className="p-3 flex items-center justify-between gap-2">
                             <h3 className="text-sm text-slate-800 dark:text-slate-100 truncate">
                                 <span className="font-bold">{sqlWorkspaceTitlePrefix}</span>
@@ -3301,7 +3309,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                 </p>
                             )}
                         </div>
-                        <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
+                        <div className="px-3 pb-2 ui-surface-inset-top">
                             <div className="pt-2 flex items-center justify-between gap-2">
                                 <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pr-1">
                                     <Button
@@ -3558,7 +3566,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         onRowClick={(item) => setSelectedItem(item)}
                                         rounded={false}
                                         bordered={false}
-                                        headerContainerClassName="bg-slate-100 dark:bg-slate-700/90 border-b border-slate-300 dark:border-slate-600"
+                                        headerContainerClassName="ui-surface-subheader"
                                         headerTextClassName="text-slate-500 dark:text-slate-100"
                                         bodyContainerClassName="dark:bg-slate-900"
                                     />
@@ -3568,7 +3576,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     )}
                     </div>
 
-                    <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/90">
+                    <div className="px-3 py-2 ui-surface-footer">
                         <div className="flex items-center justify-between gap-3 flex-wrap text-[10px] text-slate-500 dark:text-slate-400">
                             <div className="min-w-0 inline-flex items-center gap-1 text-left">
                                 <span className="font-semibold uppercase tracking-wide">{t('datainspector.active_sql_statement', 'SQL-Statement')}:</span>
@@ -3610,7 +3618,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
             ) : (
                 <div className="-mt-2 flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
                     <div className="h-full min-h-0 flex flex-col">
-                        <div className="shrink-0 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
+                        <div className="shrink-0 ui-surface-header">
                             <div className="p-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="relative w-full max-w-sm">
@@ -3744,7 +3752,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                 ))
                             )}
                         </div>
-                        <div className="shrink-0 px-3 py-2 border-t border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/90">
+                        <div className="shrink-0 px-3 py-2 ui-surface-footer">
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
                                 <span className="inline-flex items-center gap-1">
                                     <span className="font-semibold uppercase tracking-wide">{t('datainspector.sql_statements_label', 'SQL-Statements')}:</span>
@@ -3762,7 +3770,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
             {mode === 'table' && (
             <div
-                className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative"
+                className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0 relative ${isFullscreenWorkPanel ? 'fixed inset-0 z-[90] rounded-none border-0 shadow-none m-0 flex-1' : 'flex-1 rounded-xl'}`}
             >
                 {/* Opaque loading overlay when refreshing results */}
                 {loading && items && items.length > 0 && (
@@ -3774,7 +3782,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 )}
 
                 {mode === 'table' && (
-                    <div className="px-4 py-2 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85 flex items-center justify-between gap-3">
+                    <div className="px-4 py-2 ui-surface-header flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                             <div className="relative min-w-[220px] max-w-[320px] w-full">
                                 <select
@@ -3844,7 +3852,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 )}
 
                 {mode === 'table' && tableResultTab === 'profiling' && (
-                    <div className="px-4 py-2 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90 flex items-center justify-between gap-3 text-[11px]">
+                    <div className="px-4 py-2 ui-surface-subheader flex items-center justify-between gap-3 text-[11px]">
                         <div className="font-semibold uppercase tracking-wider text-slate-500">
                             {t('datainspector.profiling_settings', 'Profiling Settings')}
                         </div>
@@ -3892,7 +3900,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 )}
 
                 {mode === 'table' && tableResultTab === 'data' && (
-                    <div className="px-4 py-2 border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/90 flex items-center justify-between gap-3 text-[11px]">
+                    <div className="px-4 py-2 ui-surface-subheader flex items-center justify-between gap-3 text-[11px]">
                         <div className="inline-flex max-w-full items-center gap-2 overflow-x-auto whitespace-nowrap pr-1">
                             <button
                                 onClick={() => openTableToolsTab('tables')}
@@ -4074,13 +4082,13 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                             onColumnWidthsChange={mode === 'table' ? handleColumnWidthsChange : undefined}
                             rounded={false}
                             bordered={false}
-                            headerContainerClassName="bg-slate-50 dark:bg-slate-800/90 border-b border-slate-300 dark:border-slate-600 dark:[&_th:first-child]:bg-slate-800/95"
+                            headerContainerClassName="ui-surface-subheader dark:[&_th:first-child]:bg-slate-800/95"
                             headerTextClassName="text-slate-500 dark:text-slate-100"
                             bodyContainerClassName="bg-white dark:bg-[#0b1220] text-slate-700 dark:text-slate-100"
                         />
                     )}
                 </div>
-                <div className="px-4 py-2 border-t border-slate-300 dark:border-slate-600 text-[10px] flex justify-between items-center text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/90">
+                <div className="px-4 py-2 ui-surface-footer text-[10px] flex justify-between items-center text-slate-500 dark:text-slate-400">
                     <div className="font-medium">
                         {mode === 'table' ? (
                             tableResultTab === 'profiling' ? (

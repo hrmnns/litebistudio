@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+    --app-shell-header-h: 92px;
     --ui-bg: 255 255 255;
     --ui-bg-muted: 248 250 252;
     --ui-bg-subtle: 241 245 249;
@@ -11,6 +12,73 @@
     --ui-text-muted: 100 116 139;
     --ui-primary: 37 99 235;
     --ui-primary-hover: 29 78 216;
+    --ui-elev-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    --ui-nav-active-bg: 219 234 254;
+    --ui-nav-active-text: 29 78 216;
+    --ui-nav-hover-bg: 241 245 249;
+    --ui-surface-header-bg: 248 250 252;
+    --ui-surface-header-bg-to: 241 245 249;
+    --ui-surface-subheader-bg: 244 247 251;
+    --ui-surface-footer-bg: 248 250 252;
+    --ui-surface-footer-bg-to: 243 247 251;
+    --ui-surface-separator: 200 214 232;
+}
+
+:root.light.light-variant-classic {
+    --ui-bg: 255 255 255;
+    --ui-bg-muted: 248 250 252;
+    --ui-bg-subtle: 241 245 249;
+    --ui-border: 226 232 240;
+    --ui-primary: 37 99 235;
+    --ui-primary-hover: 29 78 216;
+    --ui-elev-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    --ui-nav-active-bg: 219 234 254;
+    --ui-nav-active-text: 29 78 216;
+    --ui-nav-hover-bg: 241 245 249;
+    --ui-surface-header-bg: 236 240 246;
+    --ui-surface-header-bg-to: 228 234 242;
+    --ui-surface-subheader-bg: 240 244 249;
+    --ui-surface-footer-bg: 236 240 246;
+    --ui-surface-footer-bg-to: 230 235 243;
+    --ui-surface-separator: 186 201 221;
+}
+
+:root.light.light-variant-ocean {
+    --ui-bg: 247 252 255;
+    --ui-bg-muted: 226 242 255;
+    --ui-bg-subtle: 205 229 248;
+    --ui-border: 140 186 223;
+    --ui-primary: 2 132 199;
+    --ui-primary-hover: 3 105 161;
+    --ui-elev-shadow: 0 12px 30px rgba(2, 132, 199, 0.16);
+    --ui-nav-active-bg: 196 226 247;
+    --ui-nav-active-text: 3 105 161;
+    --ui-nav-hover-bg: 218 238 252;
+    --ui-surface-header-bg: 191 222 246;
+    --ui-surface-header-bg-to: 177 211 239;
+    --ui-surface-subheader-bg: 214 236 252;
+    --ui-surface-footer-bg: 188 219 244;
+    --ui-surface-footer-bg-to: 176 209 236;
+    --ui-surface-separator: 124 173 214;
+}
+
+:root.light.light-variant-aurora {
+    --ui-bg: 247 252 252;
+    --ui-bg-muted: 236 247 247;
+    --ui-bg-subtle: 224 240 240;
+    --ui-border: 153 195 197;
+    --ui-primary: 13 148 136;
+    --ui-primary-hover: 15 118 110;
+    --ui-elev-shadow: 0 12px 28px rgba(13, 148, 136, 0.14);
+    --ui-nav-active-bg: 209 235 233;
+    --ui-nav-active-text: 17 94 89;
+    --ui-nav-hover-bg: 225 242 241;
+    --ui-surface-header-bg: 191 226 224;
+    --ui-surface-header-bg-to: 176 214 211;
+    --ui-surface-subheader-bg: 213 235 234;
+    --ui-surface-footer-bg: 199 226 224;
+    --ui-surface-footer-bg-to: 186 215 213;
+    --ui-surface-separator: 123 172 173;
 }
 
 .dark {
@@ -22,6 +90,13 @@
     --ui-text-muted: 148 163 184;
     --ui-primary: 59 130 246;
     --ui-primary-hover: 96 165 250;
+    --ui-elev-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+    --ui-surface-header-bg: 30 41 59;
+    --ui-surface-header-bg-to: 30 41 59;
+    --ui-surface-subheader-bg: 30 41 59;
+    --ui-surface-footer-bg: 30 41 59;
+    --ui-surface-footer-bg-to: 30 41 59;
+    --ui-surface-separator: 51 65 85;
 }
 
 html,
@@ -124,13 +199,65 @@ body,
     .ui-toolbar {
         @apply border-b px-4 py-2;
         border-color: rgb(var(--ui-border));
-        background-color: rgb(var(--ui-bg-muted) / 0.9);
+        background-color: rgb(var(--ui-bg-muted) / 0.92);
+        background-image: linear-gradient(180deg, rgb(var(--ui-bg)) 0%, rgb(var(--ui-bg-muted)) 100%);
     }
 
     .ui-panel {
         @apply rounded-lg border;
         border-color: rgb(var(--ui-border));
         background-color: rgb(var(--ui-bg));
+        background-image: linear-gradient(180deg, rgb(var(--ui-bg)) 0%, rgb(var(--ui-bg-muted) / 0.42) 100%);
+        box-shadow: var(--ui-elev-shadow);
+    }
+
+    .ui-surface-header {
+        @apply border-b;
+        border-color: rgb(var(--ui-surface-separator));
+        background-color: rgb(var(--ui-surface-header-bg));
+        background-image: linear-gradient(180deg, rgb(var(--ui-surface-header-bg)) 0%, rgb(var(--ui-surface-header-bg-to)) 100%);
+        box-shadow: inset 0 -1px 0 rgb(var(--ui-surface-separator) / 0.9);
+    }
+
+    .ui-surface-subheader {
+        @apply border-b;
+        border-color: rgb(var(--ui-surface-separator));
+        background-color: rgb(var(--ui-surface-subheader-bg));
+    }
+
+    .ui-surface-inset-top {
+        @apply border-t;
+        border-color: rgb(var(--ui-surface-separator));
+        background-color: rgb(var(--ui-surface-subheader-bg));
+    }
+
+    .ui-surface-footer {
+        @apply border-t;
+        border-color: rgb(var(--ui-surface-separator));
+        background-color: rgb(var(--ui-surface-footer-bg));
+        background-image: linear-gradient(180deg, rgb(var(--ui-surface-footer-bg)) 0%, rgb(var(--ui-surface-footer-bg-to)) 100%);
+        box-shadow: inset 0 1px 0 rgb(var(--ui-surface-separator) / 0.9), 0 -1px 0 rgb(var(--ui-surface-separator) / 0.35);
+    }
+
+    .ui-page-header {
+        @apply border-b backdrop-blur-sm;
+        border-top: 1px solid rgb(var(--ui-primary) / 0.28);
+        border-bottom-color: rgb(var(--ui-border));
+        background-color: rgb(var(--ui-bg) / 0.92);
+        background-image:
+            linear-gradient(180deg, rgb(var(--ui-bg) / 0.98) 0%, rgb(var(--ui-bg-muted) / 0.92) 100%),
+            linear-gradient(90deg, rgb(var(--ui-primary) / 0.12) 0%, transparent 38%);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6), inset 0 -1px 0 rgb(var(--ui-border) / 0.65);
+    }
+
+    .dark .ui-page-header {
+        border-top-color: rgb(var(--ui-primary) / 0.3);
+        border-bottom-color: rgb(var(--ui-border));
+        background-color: rgb(var(--ui-bg) / 0.88);
+        background-image:
+            linear-gradient(180deg, rgb(var(--ui-bg) / 0.92) 0%, rgb(var(--ui-bg-muted) / 0.9) 100%),
+            linear-gradient(90deg, rgb(var(--ui-primary) / 0.18) 0%, transparent 42%);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03), inset 0 -1px 0 rgb(var(--ui-border) / 0.75);
     }
 
     .overlay-backdrop-subtle {

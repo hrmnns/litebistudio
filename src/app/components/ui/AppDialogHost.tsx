@@ -185,7 +185,7 @@ export const AppDialogHost: React.FC = () => {
                     )}
                 </div>
 
-                <div className="mt-auto border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-3">
+                <div className="mt-auto ui-surface-footer px-4 py-3">
                     <div className="flex justify-end gap-2">
                         {(active.kind === 'confirm' || active.kind === 'confirm3' || active.kind === 'confirmRemember' || active.kind === 'prompt' || active.kind === 'prompt2') && (
                             <button

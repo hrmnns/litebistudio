@@ -41,12 +41,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - optimized client-side filtering/sorting/stat derivations via memoization to reduce repeated render work.
   - introduced optimistic updates for status/priority/due-date/batch/remove operations and reduced full-list reload churn.
   - added silent reconcile/debounced self-update handling for DB change events to reduce visible table flicker after local updates.
+- Presentation mode behavior was extended for workspace-heavy pages:
+  - `Tables` main panel and `SQL Workspace` editor panel now open as fullscreen overlays in presentation mode.
+  - `Widgets` editor workspace now opens as fullscreen overlay in presentation mode.
+  - presentation-mode action state is now reflected consistently in header controls.
 
 ### Fixed
 - Removed temporary widget debug footer output from the widget editor preview footer.
 - Fixed SQL Workspace restore behavior where dirty statements could temporarily show as `Unbenannt *` instead of restoring the last opened statement metadata.
 - Fixed header dirty-state presentation in Widget/SQL workspaces during initial hydration:
   - dirty marker and save affordance now wait until hydration is complete, avoiding misleading short-lived state transitions.
+- Fixed widget dirty-state carryover when opening another widget:
+  - switching from an unsaved widget to a different widget no longer incorrectly marks the newly opened widget as modified.
+- Fixed presentation overlay layering issues:
+  - SQL/Widget editor command bars remain visible in fullscreen presentation mode.
+  - the global `Exit presentation mode` floating action is now always visible/clickable above fullscreen overlays.
 
 ## [1.5.0] - 2026-03-08
 
