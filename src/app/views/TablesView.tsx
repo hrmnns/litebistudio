@@ -229,6 +229,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [, setCachedSqlHeaderDirty] = useLocalStorage<boolean>('tables_sql_header_dirty_cache_v1', false);
     const [, setCachedSqlHeaderStatementId] = useLocalStorage<string>('tables_sql_header_statement_id_cache_v1', '');
     const [sqlExecutionSql, setSqlExecutionSql] = useLocalStorage<string>('tables_sql_workspace_execution_sql_v1', '');
+    const [lastSqlRunHasSelect, setLastSqlRunHasSelect] = useState<boolean | null>(null);
     const [sqlRunToken, setSqlRunToken] = useState(0);
     const [sqlLimitNotice, setSqlLimitNotice] = useState('');
     const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('tables_sql_limit_notice_dismissed', false);
@@ -630,6 +631,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         }
 
         let executionSql = trimmed.replace(/;\s*$/, '');
+        const hasSelectStatement = statementAnalysis.some((statement) => statement.isSelectLike);
         const canApplyGuardedLimit = statementAnalysis.length === 1 && statementAnalysis[0].isSelectLike;
         if (canApplyGuardedLimit) {
             const cappedLimit = Math.max(1, Math.floor(sqlMaxRows || 1));
@@ -645,9 +647,10 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         }
         setSqlWorkspaceView('result');
         setSqlExecutionSql(executionSql);
+        setLastSqlRunHasSelect(hasSelectStatement);
         setSqlRunToken((prev) => prev + 1);
         setSqlHistory((prev: string[]) => [trimmed, ...prev.filter((q: string) => q !== trimmed)].slice(0, 12));
-        if (statementAnalysis.some((statement) => statement.isSelectLike)) {
+        if (hasSelectStatement) {
             localStorage.setItem(TABLES_LAST_SELECT_SQL_KEY, trimmed);
         }
     }, [setSqlHistory, setSqlRequireLimitConfirm, setSqlWorkspaceSplitView, setSqlWorkspaceView, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, sqlWorkspaceSplitView, t]);
@@ -662,6 +665,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         setActiveSqlStatementId('');
         setSqlSavedSnapshot({ id: '', normalizedSql: '' });
         setSqlLimitNotice('');
+        setLastSqlRunHasSelect(null);
         setSqlOutputView('result');
         setLoadedSqlTemplateMeta({ name: '', description: '' });
         localStorage.removeItem(TABLES_LAST_SELECT_SQL_KEY);
@@ -1920,6 +1924,16 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         if (mode === 'sql') return Boolean(sqlExecutionSql.trim());
         return true;
     }, [items, loading, mode, sqlExecutionSql]);
+
+    const sqlWorkspaceEmptyMessage = React.useMemo(() => {
+        if (!sqlExecutionSql.trim()) {
+            return t('datainspector.sql_empty_before_run', 'Noch keine Abfrage ausgeführt. Bitte SQL ausführen, um Ergebnisse zu sehen.');
+        }
+        if (lastSqlRunHasSelect === false) {
+            return t('datainspector.sql_empty_non_select', 'Abfrage erfolgreich ausgeführt. Für diesen Befehl gibt es kein tabellarisches Ergebnis.');
+        }
+        return t('datainspector.sql_empty_select_no_rows', 'Abfrage ausgeführt, aber keine Daten gefunden. Prüfe Filter, JOINs oder WHERE-Bedingungen.');
+    }, [lastSqlRunHasSelect, sqlExecutionSql, t]);
 
     const applyTableSideFilter = useCallback(() => {
         const column = tableFilterColumn.trim();
@@ -3512,7 +3526,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         data={items || []}
                                         columns={columns}
                                         searchTerm=""
-                                        emptyMessage={t('common.no_data')}
+                                        emptyMessage={sqlWorkspaceEmptyMessage}
                                         onRowClick={(item) => setSelectedItem(item)}
                                         rounded={false}
                                         bordered={false}
