@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, Pin, Search } from 'lucide-react';
 import { Modal } from '../Modal';
+import { Button } from './Button';
 
 export interface SelectionListMetaItem {
     label: string;
@@ -75,7 +76,7 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                 style={{ height: '32rem', maxHeight: 'calc(90vh - 11rem)' }}
             >
                 <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-900/45 px-4 py-2">
+                    <div className="ui-toolbar flex items-center justify-between gap-2">
                         <div className="relative w-full min-w-0 max-w-xs md:max-w-sm">
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                             <input
@@ -101,23 +102,20 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                                 </label>
                             )}
                             {showPinnedOnlyToggle && onPinnedOnlyToggle && (
-                                <button
-                                    type="button"
+                                <Button
+                                    size="sm"
+                                    variant="toggle"
+                                    active={Boolean(pinnedOnly)}
                                     onClick={() => onPinnedOnlyToggle(!pinnedOnly)}
-                                    className={`h-7 px-2 rounded-md border text-[11px] font-semibold transition-colors inline-flex items-center gap-1 ${
-                                        pinnedOnly
-                                            ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200'
-                                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
-                                    }`}
                                 >
                                     <Pin className="w-3 h-3" />
                                     {pinnedOnlyLabel || 'Pinned only'}
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>
                     <div className="min-h-0 flex-1 px-4 pt-3 pb-0">
-                    <div className="min-h-0 h-full overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 space-y-1">
+                    <div className="ui-panel min-h-0 h-full overflow-auto p-2 space-y-1">
                     {items.length === 0 ? (
                         <div className="p-3 text-xs text-slate-500 text-center">
                             {emptyLabel}
@@ -150,21 +148,19 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                         {onToggleItemPin && (
-                                            <button
-                                                type="button"
+                                            <Button
+                                                size="icon"
+                                                variant="toggle"
+                                                active={Boolean(isItemPinned?.(item.id))}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
                                                     onToggleItemPin(item.id);
                                                 }}
-                                                className={`inline-flex items-center justify-center h-5 w-5 rounded-full border ${
-                                                    isItemPinned?.(item.id)
-                                                        ? 'border-blue-500 text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30'
-                                                        : 'border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-                                                }`}
                                                 title="Pin"
+                                                className="h-5 w-5 rounded-full"
                                             >
                                                 <Pin className="w-3 h-3" />
-                                            </button>
+                                            </Button>
                                         )}
                                         {selectedId === item.id && (
                                             <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-600 text-white">
@@ -194,21 +190,12 @@ export const SelectionListDialog: React.FC<SelectionListDialogProps> = ({
                 </div>
                 </div>
                 <div className="mt-2 px-5 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-end gap-3">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="min-w-[128px] px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                    >
+                    <Button variant="secondary" size="md" onClick={onClose} className="rounded-xl">
                         {cancelLabel}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onApply}
-                        disabled={applyDisabled}
-                        className="min-w-[128px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
+                    </Button>
+                    <Button variant="primary" size="md" onClick={onApply} disabled={applyDisabled} className="rounded-xl">
                         {applyLabel}
-                    </button>
+                    </Button>
                 </div>
             </div>
             </div>

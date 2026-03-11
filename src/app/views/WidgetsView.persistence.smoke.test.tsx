@@ -168,9 +168,9 @@ describe('WidgetsView persistence smoke', () => {
         render(<WidgetsView />);
 
         await waitFor(() => {
-            expect(screen.getByText('Widget (Smoke Widget)')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Widget\s*-\s*Smoke Widget/ })).toBeInTheDocument();
         });
 
-        expect(screen.queryByText('Widget (Smoke Widget) *')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: /Widget\s*-\s*Smoke Widget\s*\*/ })).not.toBeInTheDocument();
     });
 });

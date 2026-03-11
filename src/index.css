@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    --ui-bg: 255 255 255;
+    --ui-bg-muted: 248 250 252;
+    --ui-bg-subtle: 241 245 249;
+    --ui-border: 226 232 240;
+    --ui-text: 15 23 42;
+    --ui-text-muted: 100 116 139;
+    --ui-primary: 37 99 235;
+    --ui-primary-hover: 29 78 216;
+}
+
+.dark {
+    --ui-bg: 30 41 59;
+    --ui-bg-muted: 15 23 42;
+    --ui-bg-subtle: 15 23 42;
+    --ui-border: 51 65 85;
+    --ui-text: 248 250 252;
+    --ui-text-muted: 148 163 184;
+    --ui-primary: 59 130 246;
+    --ui-primary-hover: 96 165 250;
+}
+
 html,
 body,
 #root {
@@ -90,6 +112,27 @@ body,
 }
 
 @layer utilities {
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .ui-toolbar {
+        @apply border-b px-4 py-2;
+        border-color: rgb(var(--ui-border));
+        background-color: rgb(var(--ui-bg-muted) / 0.9);
+    }
+
+    .ui-panel {
+        @apply rounded-lg border;
+        border-color: rgb(var(--ui-border));
+        background-color: rgb(var(--ui-bg));
+    }
+
     .overlay-backdrop-subtle {
         @apply bg-slate-900/35 backdrop-blur-[1px];
     }

@@ -6,6 +6,7 @@ import { useDashboard } from '../../../lib/context/DashboardContext';
 import { useAsync } from '../../../hooks/useAsync';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { RightOverlayPanel, type RightOverlayPanelWidth } from './RightOverlayPanel';
+import { Button } from './Button';
 
 /* ─── Alert Types ─── */
 export type AlertLevel = 'error' | 'warning' | 'info' | 'success';
@@ -260,7 +261,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                     </div>
                     <div className="w-full md:w-auto flex items-center justify-end gap-2 flex-shrink-0 max-w-full overflow-x-auto overflow-y-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 -mb-1">
                         {header.actions}
-                        <button
+                        <Button
                             type="button"
                             onClick={() => {
                                 if (helpDisabled) return;
@@ -269,16 +270,13 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             title={helpDisabled ? t('common.not_available', 'Not available') : helpTitle}
                             aria-label={helpDisabled ? t('common.not_available', 'Not available') : helpTitle}
                             disabled={helpDisabled}
-                            className={cn(
-                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
-                                helpDisabled
-                                    ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-                            )}
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 flex-shrink-0 rounded-lg"
                         >
                             <CircleHelp className="w-4 h-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
                             onClick={() => {
                                 if (!header.presentation?.onClick || presentationDisabled) return;
@@ -287,18 +285,14 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             title={presentationDisabled ? t('common.not_available', 'Not available') : presentationTitle}
                             aria-label={presentationDisabled ? t('common.not_available', 'Not available') : presentationTitle}
                             disabled={presentationDisabled}
-                            className={cn(
-                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
-                                presentationDisabled
-                                    ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700',
-                                header.presentation?.active && !presentationDisabled && 'ring-2 ring-blue-500/30'
-                            )}
+                            variant="ghost"
+                            size="icon"
+                            className={cn('h-10 w-10 flex-shrink-0 rounded-lg', header.presentation?.active && !presentationDisabled && 'ring-2 ring-blue-500/30')}
                         >
                             <Maximize2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                         <div className="relative" ref={exportMenuRef}>
-                            <button
+                            <Button
                                 type="button"
                                 onClick={() => {
                                     if (exportButtonDisabled) return;
@@ -307,19 +301,15 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                 title={exportButtonDisabled ? t('common.not_available', 'Not available') : exportButtonTitle}
                                 aria-label={exportButtonDisabled ? t('common.not_available', 'Not available') : exportButtonTitle}
                                 disabled={exportButtonDisabled}
-                                className={cn(
-                                    'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
-                                    exportButtonDisabled
-                                        ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-                                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700',
-                                    isExportMenuOpen && !exportButtonDisabled && 'ring-2 ring-blue-500/30'
-                                )}
+                                variant="ghost"
+                                size="icon"
+                                className={cn('h-10 w-10 flex-shrink-0 rounded-lg', isExportMenuOpen && !exportButtonDisabled && 'ring-2 ring-blue-500/30')}
                             >
                                 <Download className={cn('w-4 h-4', header.export?.loading && 'animate-pulse')} />
-                            </button>
+                            </Button>
                             {isExportMenuOpen && !exportButtonDisabled && (
                                 <div className="absolute right-0 z-[90] mt-2 w-48 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg p-1">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             if (!header.export?.onPdfExport || !canRunPdfExport) return;
@@ -328,17 +318,13 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                         }}
                                         disabled={!canRunPdfExport}
                                         title={canRunPdfExport ? exportPdfTitle : t('common.not_available', 'Not available')}
-                                        className={cn(
-                                            'w-full h-9 px-2 rounded-md text-sm flex items-center gap-2 transition-colors',
-                                            canRunPdfExport
-                                                ? 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                                : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                                        )}
+                                        variant="ghost"
+                                        className={cn('w-full h-9 justify-start text-sm', !canRunPdfExport && 'text-slate-300 dark:text-slate-600')}
                                     >
                                         <FileText className="w-4 h-4" />
                                         <span>{t('common.export_pdf', 'PDF')}</span>
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             if (!header.export?.onExcelExport || !canRunExcelExport) return;
@@ -347,20 +333,16 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                         }}
                                         disabled={!canRunExcelExport}
                                         title={canRunExcelExport ? exportExcelTitle : t('common.not_available', 'Not available')}
-                                        className={cn(
-                                            'w-full h-9 px-2 rounded-md text-sm flex items-center gap-2 transition-colors',
-                                            canRunExcelExport
-                                                ? 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                                : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                                        )}
+                                        variant="ghost"
+                                        className={cn('w-full h-9 justify-start text-sm', !canRunExcelExport && 'text-slate-300 dark:text-slate-600')}
                                     >
                                         <FileSpreadsheet className="w-4 h-4" />
                                         <span>{t('common.export_excel', 'Export Excel')}</span>
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
                         </div>
-                        <button
+                        <Button
                             type="button"
                             onClick={() => {
                                 if (!header.refresh?.onClick || refreshDisabled) return;
@@ -369,16 +351,13 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                             title={refreshDisabled ? t('common.not_available', 'Not available') : refreshTitle}
                             aria-label={refreshDisabled ? t('common.not_available', 'Not available') : refreshTitle}
                             disabled={refreshDisabled}
-                            className={cn(
-                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
-                                'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
-                                'hover:bg-slate-50 dark:hover:bg-slate-700',
-                                'disabled:bg-slate-100 dark:disabled:bg-slate-800/60 disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed'
-                            )}
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 flex-shrink-0 rounded-lg"
                         >
                             <RefreshCw className={cn('w-4 h-4', header.refresh?.loading && 'animate-spin')} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
                             onClick={() => {
                                 if (!isRightPanelEnabled) return;
@@ -391,17 +370,12 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                 ? (rightPanel?.triggerTitle || t('common.open', 'Open'))
                                 : t('common.not_available', 'Not available')}
                             disabled={!isRightPanelEnabled}
-                            className={cn(
-                                'h-10 w-10 flex flex-shrink-0 items-center justify-center rounded-lg border transition-all',
-                                isRightPanelEnabled
-                                    ? 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                    : 'bg-slate-100 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed',
-                                isRightPanelEnabled && isRightPanelOpenEffective && 'ring-2 ring-blue-500/30',
-                                rightPanel?.triggerClassName
-                            )}
+                            variant="ghost"
+                            size="icon"
+                            className={cn('h-10 w-10 flex-shrink-0 rounded-lg', isRightPanelEnabled && isRightPanelOpenEffective && 'ring-2 ring-blue-500/30', rightPanel?.triggerClassName)}
                         >
                             <PanelRightOpen className="w-4 h-4" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </header>

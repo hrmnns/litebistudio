@@ -28,6 +28,7 @@ import { appDialog } from '../../lib/appDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SelectionListDialog } from '../components/ui/SelectionListDialog';
 import { analyzeSqlStatements } from '../../lib/security/sqlAnalysis';
+import { Button } from '../components/ui/Button';
 
 interface TablesViewProps {
     onBack: () => void;
@@ -1674,7 +1675,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         || (isSqlHeaderHydrating ? (cachedSqlHeaderName || '').trim() : '')
         || t('datainspector.sql_statement_unnamed', 'Unbenannt');
     const showSqlHeaderDirty = !isSqlHeaderHydrating && hasUnsavedSqlChanges;
-    const sqlWorkspaceHeaderTitle = `${t('datainspector.sql_statement_title_prefix', 'SQL-Statement')} (${sqlWorkspaceStatementName})${showSqlHeaderDirty ? ' *' : ''}`;
+    const sqlWorkspaceTitlePrefix = t('datainspector.sql_statement_title_prefix', 'SQL-Statement');
     useEffect(() => {
         if (isSqlHeaderHydrating) return;
         const label = (activeSqlTemplateMeta.name || '').trim();
@@ -2637,22 +2638,26 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                     <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">{col.type || '-'}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
-                                                    <button
+                                                    <Button
                                                         type="button"
                                                         onClick={() => setTableSortConfig({ key: col.name, direction: 'asc' })}
-                                                        className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'asc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                                        variant="toggle"
+                                                        size="sm"
+                                                        active={isSortedColumn && sortDirection === 'asc'}
                                                         title={t('datainspector.table_tools_sort_asc', 'Sort ascending')}
                                                     >
                                                         ASC
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
                                                         type="button"
                                                         onClick={() => setTableSortConfig({ key: col.name, direction: 'desc' })}
-                                                        className={`h-7 px-2 text-[11px] rounded border ${isSortedColumn && sortDirection === 'desc' ? 'border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                                        variant="toggle"
+                                                        size="sm"
+                                                        active={isSortedColumn && sortDirection === 'desc'}
                                                         title={t('datainspector.table_tools_sort_desc', 'Sort descending')}
                                                     >
                                                         DESC
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </div>
                                         );
@@ -2695,13 +2700,15 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                             className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={applyTableSideFilter}
-                                        className="h-9 px-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                                        variant="primary"
+                                        size="sm"
+                                        className="h-9 px-3 rounded-lg text-xs"
                                     >
                                         {t('datainspector.table_tools_filter_apply', 'Apply')}
-                                    </button>
+                                    </Button>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
@@ -2712,13 +2719,14 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         />
                                         {t('datainspector.table_tools_toggle_filter_row', 'Show filter row in table')}
                                     </label>
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={clearAllTableSideFilters}
-                                        className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                        variant="ghost"
+                                        size="sm"
                                     >
                                         {t('datainspector.table_tools_clear_all', 'Clear all')}
-                                    </button>
+                                    </Button>
                                 </div>
                                 <div className="flex-1 min-h-0 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
                                     {Object.keys(tableFilters).length === 0 ? (
@@ -2730,13 +2738,14 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                     <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{col}</div>
                                                     <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{val || '-'}</div>
                                                 </div>
-                                                <button
+                                                <Button
                                                     type="button"
                                                     onClick={() => clearTableSideFilter(col)}
-                                                    className="h-7 px-2 text-[11px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                                    variant="ghost"
+                                                    size="sm"
                                                 >
                                                     {t('common.remove', 'Remove')}
-                                                </button>
+                                                </Button>
                                             </div>
                                         ))
                                     )}
@@ -2751,14 +2760,15 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                             <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-3">
                             <div className="flex items-center justify-between gap-2">
                                 <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.assistant_hint', 'Build SQL by selecting table, columns and optional aggregation.')}</p>
-                                <button
+                                <Button
                                     type="button"
                                     onClick={resetAssistantBuilder}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                                    variant="ghost"
+                                    size="sm"
                                 >
                                     <Eraser className="w-3 h-3" />
                                     {t('datainspector.assistant_reset', 'Reset')}
-                                </button>
+                                </Button>
                             </div>
                                 <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
                                     <button
@@ -2794,20 +2804,22 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                     {assistantPanels.columns && (
                                     <>
                                         <div className="flex items-center justify-end gap-2">
-                                            <button
+                                            <Button
                                                 type="button"
                                                 onClick={() => setAssistantSelectedColumns(assistantColumns)}
-                                                className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                                variant="ghost"
+                                                size="sm"
                                             >
                                                 {t('datainspector.assistant_select_all', 'Select all')}
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
                                                 type="button"
                                                 onClick={() => setAssistantSelectedColumns([])}
-                                                className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                                variant="ghost"
+                                                size="sm"
                                             >
                                                 {t('datainspector.assistant_clear_all', 'Clear')}
-                                            </button>
+                                            </Button>
                                         </div>
                                         <input
                                             type="text"
@@ -2934,25 +2946,28 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                 </div>
 
                                 <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('filter')}
-                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-between text-left rounded-md px-1 py-1 h-auto border-transparent bg-transparent hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                                     >
                                         <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_filter', 'Filter')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.filter ? 'rotate-180' : ''}`} />
-                                    </button>
+                                    </Button>
                                     {assistantPanels.filter && (
                                     <>
                                         <div className="flex items-center justify-end">
-                                            <button
+                                            <Button
                                                 type="button"
                                                 onClick={addAssistantFilter}
-                                                className="h-7 px-2 inline-flex items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                                                variant="ghost"
+                                                size="sm"
                                             >
                                                 <Plus className="w-3 h-3" />
                                                 {t('datainspector.assistant_add_filter', 'Add filter')}
-                                            </button>
+                                            </Button>
                                         </div>
                                         <div className="space-y-2">
                                             {assistantFilters.map((filter, index) => (
@@ -3007,32 +3022,38 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                             className="h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none disabled:opacity-40"
                                                         />
                                                         <div className="h-9 flex items-center gap-1">
-                                                            <button
+                                                            <Button
                                                                 type="button"
                                                                 onClick={() => moveAssistantFilter(filter.id, 'up')}
                                                                 disabled={index === 0}
-                                                                className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-9 w-7 rounded-lg"
                                                                 title={t('common.move_up', 'Move up')}
                                                             >
                                                                 <ArrowUp className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
+                                                            </Button>
+                                                            <Button
                                                                 type="button"
                                                                 onClick={() => moveAssistantFilter(filter.id, 'down')}
                                                                 disabled={index === assistantFilters.length - 1}
-                                                                className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-9 w-7 rounded-lg"
                                                                 title={t('common.move_down', 'Move down')}
                                                             >
                                                                 <ArrowDown className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
+                                                            </Button>
+                                                            <Button
                                                                 type="button"
                                                                 onClick={() => removeAssistantFilter(filter.id)}
-                                                                className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-9 w-7 rounded-lg"
                                                                 title={t('datainspector.assistant_clear_all', 'Clear')}
                                                             >
                                                                 <Eraser className="w-3.5 h-3.5" />
-                                                            </button>
+                                                            </Button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -3064,25 +3085,28 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                 </div>
 
                                 <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('sorting')}
-                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-between text-left rounded-md px-1 py-1 h-auto border-transparent bg-transparent hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                                     >
                                         <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_order_by', 'Order by')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.sorting ? 'rotate-180' : ''}`} />
-                                    </button>
+                                    </Button>
                                     {assistantPanels.sorting && (
                                     <>
                                         <div className="flex items-center justify-end">
-                                            <button
+                                            <Button
                                                 type="button"
                                                 onClick={addAssistantSort}
-                                                className="h-7 px-2 inline-flex items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                                                variant="ghost"
+                                                size="sm"
                                             >
                                                 <Plus className="w-3 h-3" />
                                                 {t('datainspector.assistant_add_sort', 'Add sort')}
-                                            </button>
+                                            </Button>
                                         </div>
                                         <div className="space-y-2">
                                             {assistantSorts.map((sort, index) => (
@@ -3109,32 +3133,38 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                         <option value="ASC">ASC</option>
                                                     </select>
                                                     <div className="h-9 flex items-center gap-1">
-                                                        <button
+                                                        <Button
                                                             type="button"
                                                             onClick={() => moveAssistantSort(sort.id, 'up')}
                                                             disabled={index === 0}
-                                                            className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-9 w-7 rounded-lg"
                                                             title={t('common.move_up', 'Move up')}
                                                         >
                                                             <ArrowUp className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
                                                             type="button"
                                                             onClick={() => moveAssistantSort(sort.id, 'down')}
                                                             disabled={index === assistantSorts.length - 1}
-                                                            className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-9 w-7 rounded-lg"
                                                             title={t('common.move_down', 'Move down')}
                                                         >
                                                             <ArrowDown className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
                                                             type="button"
                                                             onClick={() => removeAssistantSort(sort.id)}
-                                                            className="h-9 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-9 w-7 rounded-lg"
                                                             title={t('datainspector.assistant_clear_all', 'Clear')}
                                                         >
                                                             <Eraser className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -3157,14 +3187,16 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                 </div>
 
                                 <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('preview')}
-                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-between text-left rounded-md px-1 py-1 h-auto border-transparent bg-transparent hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
                                     >
                                         <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_generated_sql', 'Generated SQL')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.preview ? 'rotate-180' : ''}`} />
-                                    </button>
+                                    </Button>
                                     {assistantPanels.preview && (
                                     <div className="h-32 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                                         <CodeMirror
@@ -3182,24 +3214,25 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
                             <div className="mt-3 -mx-5 -mb-5 px-5 py-3 border-t border-slate-200 dark:border-slate-700 bg-blue-50/40 dark:bg-blue-950/20">
                             <div className="flex flex-wrap justify-center gap-2">
-                                <button
+                                <Button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('replace'); }}
-                                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="px-3 py-1.5 text-xs"
                                 >
                                     {t('datainspector.assistant_replace_editor', 'Replace Editor')}
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('run'); }}
                                     disabled={!canRunAssistantSql}
-                                    className={`px-3 py-1.5 rounded-md border text-xs transition-colors ${canRunAssistantSql
-                                        ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30'
-                                        : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-                                        }`}
+                                    variant={canRunAssistantSql ? 'primary' : 'secondary'}
+                                    size="sm"
+                                    className="px-3 py-1.5 text-xs"
                                 >
                                     {t('datainspector.run_sql')}
-                                </button>
+                                </Button>
                             </div>
                             </div>
                         </div>
@@ -3254,8 +3287,10 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 <div className="-mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
                     <div className="border-b border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800/95 dark:to-slate-800/85">
                         <div className="p-3 flex items-center justify-between gap-2">
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                                {sqlWorkspaceHeaderTitle}
+                            <h3 className="text-sm text-slate-800 dark:text-slate-100 truncate">
+                                <span className="font-bold">{sqlWorkspaceTitlePrefix}</span>
+                                <span className="font-normal"> - {sqlWorkspaceStatementName}</span>
+                                {showSqlHeaderDirty && <span className="font-normal"> *</span>}
                             </h3>
                             {activeSqlTemplateMeta.description && (
                                 <p
@@ -3269,7 +3304,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                         <div className="px-3 pb-2 border-t border-slate-300 dark:border-slate-600/90">
                             <div className="pt-2 flex items-center justify-between gap-2">
                                 <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pr-1">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={async () => {
                                             const proceed = await confirmSaveBeforeReplaceSql();
@@ -3278,77 +3313,74 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         }}
                                         disabled={!canResetSqlWorkspace}
                                         title={t('common.new', 'Neu')}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${canResetSqlWorkspace
-                                            ? 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100'
-                                            : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-                                            }`}
+                                        variant="ghost"
+                                        size="sm"
                                     >
                                         <Plus className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('common.new', 'Neu')}</span>
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             setSelectedOpenSqlId(activeSqlStatementId || '');
                                             setIsSqlOpenDialogOpen(true);
                                         }}
                                         title={t('common.open', 'Öffnen')}
-                                        className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
+                                        variant="ghost"
+                                        size="sm"
                                     >
                                         <FolderOpen className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('common.open', 'Öffnen')}</span>
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={handleSaveCustomTemplate}
                                         disabled={!canSaveCurrentSql}
                                         title={t('common.save', 'Speichern')}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${canSaveCurrentSql
-                                            ? 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100'
-                                            : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-                                            }`}
+                                        variant="ghost"
+                                        size="sm"
                                     >
                                         <Save className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('common.save', 'Speichern')}</span>
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={() => { void handleSaveSqlAs(); }}
                                         title={t('datainspector.save_as', 'Speichern unter')}
-                                        className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
+                                        variant="ghost"
+                                        size="sm"
                                     >
                                         <Download className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('datainspector.save_as', 'Speichern unter')}</span>
-                                    </button>
+                                    </Button>
                                     <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => { void handleRunSql(); }}
                                         disabled={!canRunSqlWorkspace}
                                         title={canRunSqlWorkspace ? t('datainspector.run_sql', 'Ausführen') : t('common.not_available', 'Not available')}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${canRunSqlWorkspace
-                                            ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30'
-                                            : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-                                            }`}
+                                        variant={canRunSqlWorkspace ? 'primary' : 'secondary'}
+                                        size="sm"
                                     >
                                         {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
                                         <span className="hidden xl:inline">{t('datainspector.run_sql', 'Ausführen')}</span>
-                                    </button>
+                                    </Button>
                                     <div className="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             setShowSqlAssist(true);
                                         }}
                                         title={t('datainspector.assistant_tab', 'SQL Builder')}
-                                        className="px-2 py-1.5 rounded text-[10px] font-bold border bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-700 dark:hover:text-slate-100 transition-colors flex items-center justify-center gap-1"
+                                        variant="ghost"
+                                        size="sm"
                                     >
                                         <Code className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('datainspector.assistant_tab', 'SQL Builder')}</span>
-                                    </button>
+                                    </Button>
                                 </div>
                                 <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pl-1">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             const next = !sqlWorkspaceSplitView;
@@ -3357,60 +3389,56 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                 setSqlWorkspaceView(sqlOutputView === 'explain' ? 'explain' : 'result');
                                             }
                                         }}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${sqlWorkspaceSplitView
-                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
-                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                                            }`}
+                                        variant="toggle"
+                                        size="sm"
+                                        active={sqlWorkspaceSplitView}
                                         title={t('datainspector.sql_split_view_toggle', 'Split-Ansicht')}
                                     >
                                         <PanelsTopBottom className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('datainspector.sql_split_view_short', 'Split')}</span>
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             if (sqlWorkspaceSplitView) setSqlWorkspaceSplitView(false);
                                             setSqlWorkspaceView('sql');
                                         }}
                                         title={t('datainspector.sql_mode', 'SQL')}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${!sqlWorkspaceSplitView && sqlWorkspaceView === 'sql'
-                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
-                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                                            }`}
+                                        variant="toggle"
+                                        size="sm"
+                                        active={!sqlWorkspaceSplitView && sqlWorkspaceView === 'sql'}
                                     >
                                         <Code className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('datainspector.sql_mode', 'SQL')}</span>
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             setSqlOutputView('result');
                                             setSqlWorkspaceView('result');
                                         }}
                                         title={t('datainspector.output_results', 'Ergebnisse')}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${sqlWorkspaceView === 'result'
-                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
-                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                                            }`}
+                                        variant="toggle"
+                                        size="sm"
+                                        active={sqlWorkspaceView === 'result'}
                                     >
                                         <TableIcon className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('datainspector.output_results', 'Ergebnisse')}</span>
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             setSqlOutputView('explain');
                                             setSqlWorkspaceView('explain');
                                         }}
                                         title={t('datainspector.output_explain', 'Explain')}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-bold border transition-colors flex items-center justify-center gap-1 ${sqlWorkspaceView === 'explain'
-                                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
-                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                                            }`}
+                                        variant="toggle"
+                                        size="sm"
+                                        active={sqlWorkspaceView === 'explain'}
                                     >
                                         <Search className="w-3 h-3" />
                                         <span className="hidden xl:inline">{t('datainspector.output_explain', 'Explain')}</span>
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         </div>
