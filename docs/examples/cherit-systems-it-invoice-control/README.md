@@ -15,7 +15,7 @@ This folder contains a compact, realistic starter dataset for the wiki scenario:
 2. `cost_centers.csv`
 3. `invoices.csv`
 4. `invoice_items.csv`
-5. `budget_monthly.csv` (for phase 2: budget vs actual)
+5. `budget_monthly.csv` (required for integrated budget vs actual and variance analysis)
 
 ## Recommended Table Names
 

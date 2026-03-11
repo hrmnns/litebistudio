@@ -49,7 +49,7 @@ Included files:
 - `cost_centers.csv`
 - `invoices.csv`
 - `invoice_items.csv`
-- `budget_monthly.csv` (phase 2: budget baseline per month and cost center)
+- `budget_monthly.csv` (budget baseline per month and cost center)
 - `queries.sql` (copy/paste starter analysis into SQL Workspace)
 
 Recommended import order:
@@ -61,6 +61,11 @@ Recommended import order:
 5. `budget_monthly.csv`
 
 ## Step-by-Step in LiteBI Studio
+
+Note:
+
+- Budget and variance analysis is fully integrated in this base walkthrough (not an optional future phase).
+- The core budget/variance statements are SQL `#7` to `#10` and are used directly in the dashboard build steps below.
 
 ## 1) Import Data
 
@@ -255,15 +260,26 @@ When analysts detect suspicious findings, create follow-up tasks in **Worklist**
 - Unusual amount delta vs previous month
 - Repeated overrun in same cost center
 
+## Budget and Variance Dashboard Mapping
+
+Use this mapping as a compact implementation reference:
+
+| Widget | SQL statement | Visualization | Target dashboard | Purpose |
+|---|---|---|---|---|
+| W05 - Budget vs Actual Trend | #7 | Line chart (2 series) | Executive Management | Monthly budget compliance trend |
+| W06 - Budget vs Actual by Cost Center | #7 | Grouped bar | Executive Management (optional) / Operational Invoice Control | Compare budget vs actual by cost center |
+| W07 - Top Overruns | #8 | Table or Bar | Executive Management + Operational Invoice Control | Identify largest positive variances |
+| W08 - Monthly Budget Coverage | #9 | KPI or Line | Executive Management | High-level budget coverage signal |
+| W09 - Variance Traffic Light | #10 | Table (status-focused) | Executive Management + Operational Invoice Control | Highlight red/yellow risk cost centers |
+
+Recommended build order for Budget/Variance:
+
+1. Create `W05`, `W08`, and `W09` first (management baseline).
+2. Add `W07` for overrun prioritization.
+3. Add `W06` if cost-center comparison is needed in chart form.
+4. Reuse the same widgets in the operational dashboard to avoid duplication.
+
 ## Suggested Expansion Roadmap
-
-## Phase 2: Budget and Variance
-
-- Included in this example:
-  - `budget_monthly.csv`
-  - variance queries (`#7-#10`) in `queries.sql`
-- Next optional step:
-  - automatic alert rule for `variance_status = 'red'`
 
 ## Phase 3: Forecasting
 
