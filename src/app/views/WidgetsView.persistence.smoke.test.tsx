@@ -149,7 +149,10 @@ describe('WidgetsView persistence smoke', () => {
         fireEvent.click(tableTab);
 
         await waitFor(() => {
-            expect(tableTab.className).toContain('bg-blue-50');
+            expect(
+                tableTab.className.includes('bg-blue-50')
+                || tableTab.className.includes('bg-[rgb(var(--ui-primary))/0.12]')
+            ).toBe(true);
         });
 
         rendered.unmount();
@@ -157,7 +160,10 @@ describe('WidgetsView persistence smoke', () => {
 
         const restoredTableTab = await screen.findByRole('button', { name: 'Tabelle' });
         await waitFor(() => {
-            expect(restoredTableTab.className).toContain('bg-blue-50');
+            expect(
+                restoredTableTab.className.includes('bg-blue-50')
+                || restoredTableTab.className.includes('bg-[rgb(var(--ui-primary))/0.12]')
+            ).toBe(true);
         });
     }, 15000);
 
