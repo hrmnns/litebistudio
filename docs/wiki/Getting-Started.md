@@ -1,6 +1,25 @@
 # Getting Started
 
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-11_
+
+## Try Instantly (No Installation)
+
+You can use LiteBI Studio directly in your browser without installing anything:
+
+- https://hrmnns.github.io/litebistudio/
+
+Fastest path to first value:
+
+1. Open the URL.
+2. Go to **Data Management**.
+3. Start with **Excel import** and load your first dataset.
+
+This is the recommended entry point for new users who want to evaluate the tool quickly.
+
+Privacy note:
+
+- Your data stays local in your browser.
+- No dataset is uploaded to an external server during normal app usage.
 
 ## Prerequisites
 
