@@ -65,7 +65,7 @@ Recommended import order:
 Note:
 
 - Budget and variance analysis is fully integrated in this base walkthrough (not an optional future phase).
-- The core budget/variance statements are SQL `#7` to `#10` and are used directly in the dashboard build steps below.
+- The core budget/variance statements are SQL `Q07` to `Q10` and are used directly in the dashboard build steps below.
 
 ## 1) Import Data
 
@@ -134,7 +134,7 @@ What this validates:
 Expected result:
 
 - **No rows returned**.
-- If rows appear, these positions need mapping correction before budget/variance analysis (SQL `#7-#10`).
+- If rows appear, these positions need mapping correction before budget/variance analysis (SQL `Q07-Q10`).
 
 ## 3) Save SQL Statements from `queries.sql`
 
@@ -142,19 +142,26 @@ Open `docs/examples/cherit-systems-it-invoice-control/queries.sql` and save reus
 
 Use this naming pattern:
 
-- `P1 - #<statement> - <name>` for baseline analytics
-- `P2 - #<statement> - <name>` for budget and variance analytics
+- Query names: `Q01 - <name>`, `Q02 - <name>`, ...
+- Widget names: `W01 - <name>`, `W02 - <name>`, ...
 
-For this walkthrough, save at least:
+For this walkthrough, use this SQL catalog:
 
-- `#1` Monthly total spend
-- `#2` Top vendors by spend
-- `#3` Spend by service category
-- `#5` Open invoices
-- `#7` Budget vs actual by month and cost center
-- `#8` Top overruns
-- `#9` Monthly budget coverage
-- `#10` Variance traffic-light indicator
+- `Q01` Monthly total spend
+- `Q02` Top vendors by spend
+- `Q03` Spend by service category
+- `Q04` Open invoice volume (status overview)
+- `Q05` Cost center split
+- `Q06` Month-over-month vendor delta
+- `Q07` Budget vs actual by month and cost center
+- `Q08` Top overruns
+- `Q09` Monthly budget coverage
+- `Q10` Variance traffic-light indicator
+
+Note:
+
+- Dashboards below require `Q01`, `Q02`, `Q03`, `Q05`, `Q07`, `Q08`, `Q09`, and `Q10`.
+- `Q04` and `Q06` are optional analysis extensions for operational and vendor deep dives.
 
 ## 4) Build a Reusable Widget Catalog
 
@@ -163,7 +170,7 @@ Build widgets once, then reuse them across multiple dashboards.
 ### Generic widget build flow
 
 1. Open **Widgets -> Editor**.
-2. Select a SQL statement (for example `#7`).
+2. Select a SQL statement (for example `Q07`).
 3. Run once to validate columns.
 4. Open **Configuration** and choose chart/table settings.
 5. Set a clear widget name and description.
@@ -174,15 +181,15 @@ Build widgets once, then reuse them across multiple dashboards.
 
 ### Recommended widget set
 
-- `W01 - Monthly IT Spend Trend` -> SQL `#1` -> Line chart
-- `W02 - Top Vendors by Spend` -> SQL `#2` -> Bar chart
-- `W03 - Spend by Service Category` -> SQL `#3` -> Donut (or Bar)
-- `W04 - Open Invoices` -> SQL `#5` -> Table
-- `W05 - Budget vs Actual Trend` -> SQL `#7` -> Line chart (2 series)
-- `W06 - Budget vs Actual by Cost Center` -> SQL `#7` -> Grouped bar
-- `W07 - Top Overruns` -> SQL `#8` -> Table (or Bar)
-- `W08 - Monthly Budget Coverage` -> SQL `#9` -> KPI/Line
-- `W09 - Variance Traffic Light` -> SQL `#10` -> Table (status-focused)
+- `W01 - Monthly IT Spend Trend` -> SQL `Q01` -> Line chart
+- `W02 - Top Vendors by Spend` -> SQL `Q02` -> Bar chart
+- `W03 - Spend by Service Category` -> SQL `Q03` -> Donut (or Bar)
+- `W04 - Open Invoices` -> SQL `Q05` -> Table
+- `W05 - Budget vs Actual Trend` -> SQL `Q07` -> Line chart (2 series)
+- `W06 - Budget vs Actual by Cost Center` -> SQL `Q07` -> Grouped bar
+- `W07 - Top Overruns` -> SQL `Q08` -> Table (or Bar)
+- `W08 - Monthly Budget Coverage` -> SQL `Q09` -> KPI/Line
+- `W09 - Variance Traffic Light` -> SQL `Q10` -> Table (status-focused)
 
 ## 5) Dashboard 1: Executive Management
 
@@ -194,10 +201,10 @@ Purpose:
 
 1. Create dashboard: `Executive Management`.
 2. Add widgets in this order:
-   - `W05 - Budget vs Actual Trend` (SQL `#7`)
-   - `W08 - Monthly Budget Coverage` (SQL `#9`)
-   - `W09 - Variance Traffic Light` (SQL `#10`)
-   - `W07 - Top Overruns` (SQL `#8`)
+   - `W05 - Budget vs Actual Trend` (SQL `Q07`)
+   - `W08 - Monthly Budget Coverage` (SQL `Q09`)
+   - `W09 - Variance Traffic Light` (SQL `Q10`)
+   - `W07 - Top Overruns` (SQL `Q08`)
 3. Layout recommendation:
    - top row: trend + coverage
    - second row: traffic-light table + top overruns
@@ -219,9 +226,9 @@ Purpose:
 
 1. Create dashboard: `Vendor & Category Analysis`.
 2. Add widgets:
-   - `W02 - Top Vendors by Spend` (SQL `#2`)
-   - `W03 - Spend by Service Category` (SQL `#3`)
-   - `W01 - Monthly IT Spend Trend` (SQL `#1`)
+   - `W02 - Top Vendors by Spend` (SQL `Q02`)
+   - `W03 - Spend by Service Category` (SQL `Q03`)
+   - `W01 - Monthly IT Spend Trend` (SQL `Q01`)
 3. Add filters:
    - `year_month`
    - optional `vendor_name`
@@ -239,9 +246,9 @@ Purpose:
 
 1. Create dashboard: `Operational Invoice Control`.
 2. Add widgets:
-   - `W04 - Open Invoices` (SQL `#5`)
-   - `W07 - Top Overruns` (SQL `#8`)
-   - `W09 - Variance Traffic Light` (SQL `#10`)
+   - `W04 - Open Invoices` (SQL `Q05`)
+   - `W07 - Top Overruns` (SQL `Q08`)
+   - `W09 - Variance Traffic Light` (SQL `Q10`)
 3. Prefer table-oriented layout for operational work.
 4. Add filters:
    - `year_month`
@@ -266,11 +273,11 @@ Use this mapping as a compact implementation reference:
 
 | Widget | SQL statement | Visualization | Target dashboard | Purpose |
 |---|---|---|---|---|
-| W05 - Budget vs Actual Trend | #7 | Line chart (2 series) | Executive Management | Monthly budget compliance trend |
-| W06 - Budget vs Actual by Cost Center | #7 | Grouped bar | Executive Management (optional) / Operational Invoice Control | Compare budget vs actual by cost center |
-| W07 - Top Overruns | #8 | Table or Bar | Executive Management + Operational Invoice Control | Identify largest positive variances |
-| W08 - Monthly Budget Coverage | #9 | KPI or Line | Executive Management | High-level budget coverage signal |
-| W09 - Variance Traffic Light | #10 | Table (status-focused) | Executive Management + Operational Invoice Control | Highlight red/yellow risk cost centers |
+| W05 - Budget vs Actual Trend | Q07 | Line chart (2 series) | Executive Management | Monthly budget compliance trend |
+| W06 - Budget vs Actual by Cost Center | Q07 | Grouped bar | Executive Management (optional) / Operational Invoice Control | Compare budget vs actual by cost center |
+| W07 - Top Overruns | Q08 | Table or Bar | Executive Management + Operational Invoice Control | Identify largest positive variances |
+| W08 - Monthly Budget Coverage | Q09 | KPI or Line | Executive Management | High-level budget coverage signal |
+| W09 - Variance Traffic Light | Q10 | Table (status-focused) | Executive Management + Operational Invoice Control | Highlight red/yellow risk cost centers |
 
 Recommended build order for Budget/Variance:
 

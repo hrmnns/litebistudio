@@ -1,7 +1,7 @@
 -- Cherit Systems GmbH - IT Invoice Control starter queries
 -- Load tables: invoices, invoice_items, vendors, cost_centers
 
--- 1) Monthly spend trend
+-- Q01) Monthly spend trend
 SELECT
   strftime('%Y-%m', invoice_date) AS year_month,
   ROUND(SUM(gross_total), 2) AS total_spend
@@ -9,7 +9,7 @@ FROM invoices
 GROUP BY 1
 ORDER BY 1;
 
--- 2) Top vendors
+-- Q02) Top vendors
 SELECT
   v.vendor_name,
   ROUND(SUM(i.gross_total), 2) AS total_spend
@@ -18,7 +18,7 @@ JOIN vendors v ON v.vendor_id = i.vendor_id
 GROUP BY v.vendor_name
 ORDER BY total_spend DESC;
 
--- 3) Spend by service category
+-- Q03) Spend by service category
 SELECT
   it.service_category,
   ROUND(SUM(it.amount_net), 2) AS amount_net
@@ -26,7 +26,7 @@ FROM invoice_items it
 GROUP BY it.service_category
 ORDER BY amount_net DESC;
 
--- 4) Open invoice volume
+-- Q04) Open invoice volume
 SELECT
   status,
   COUNT(*) AS invoice_count,
@@ -35,7 +35,7 @@ FROM invoices
 GROUP BY status
 ORDER BY total_amount DESC;
 
--- 5) Cost center split
+-- Q05) Cost center split
 SELECT
   cc.cost_center_code,
   cc.owner_team,
@@ -45,7 +45,7 @@ JOIN cost_centers cc ON cc.cost_center_id = it.cost_center_id
 GROUP BY cc.cost_center_code, cc.owner_team
 ORDER BY amount_net DESC;
 
--- 6) Month-over-month vendor delta
+-- Q06) Month-over-month vendor delta
 WITH vendor_month AS (
   SELECT
     v.vendor_name,
@@ -67,7 +67,7 @@ LEFT JOIN vendor_month prev
   AND prev.year_month = strftime('%Y-%m', date(cur.year_month || '-01', '-1 month'))
 ORDER BY ABS(delta_abs) DESC;
 
--- 7) Budget vs actual by month and cost center
+-- Q07) Budget vs actual by month and cost center
 -- Requires table: budget_monthly(year_month, cost_center_id, budget_amount, ...)
 WITH actuals AS (
   SELECT
@@ -97,7 +97,7 @@ LEFT JOIN actuals a
 LEFT JOIN cost_centers cc ON cc.cost_center_id = b.cost_center_id
 ORDER BY b.year_month, cc.cost_center_code;
 
--- 8) Top budget overruns
+-- Q08) Top budget overruns
 WITH variance AS (
   SELECT
     b.year_month,
@@ -129,7 +129,7 @@ WHERE actual_amount > budget_amount
 ORDER BY variance_abs DESC
 LIMIT 10;
 
--- 9) Monthly total budget coverage
+-- Q09) Monthly total budget coverage
 WITH actual_month AS (
   SELECT
     strftime('%Y-%m', i.invoice_date) AS year_month,
@@ -160,7 +160,7 @@ FROM budget_month b
 LEFT JOIN actual_month a ON a.year_month = b.year_month
 ORDER BY b.year_month;
 
--- 10) Variance with traffic-light indicator
+-- Q10) Variance with traffic-light indicator
 WITH variance AS (
   SELECT
     b.year_month,

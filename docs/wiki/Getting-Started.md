@@ -1,6 +1,6 @@
 # Getting Started
 
-_Last updated: 2026-03-11_
+_Last updated: 2026-03-12_
 
 ## Try Instantly (No Installation)
 
@@ -67,6 +67,23 @@ npm run test
 3. Run query
 4. Open configuration panel and verify graphic preview updates
 5. Save and confirm dirty marker clears
+
+## Example SQL Scope Clarification
+
+The Cherit example contains **10 SQL statements** in:
+
+- `docs/examples/cherit-systems-it-invoice-control/queries.sql` (`Q01` ... `Q10`)
+
+This is correct:
+
+- `Getting Started` is intentionally a fast onboarding path and does not execute all 10 statements.
+- The full step-by-step usage of the example SQL catalog is documented in:
+  - [Example: Cherit IT Invoice Control](Example-Cherit-IT-Invoice-Control)
+
+## Naming Convention (Recommended)
+
+- Queries: `Q01 - <name>`, `Q02 - <name>`, ...
+- Widgets: `W01 - <name>`, `W02 - <name>`, ...
 
 ## Troubleshooting
 

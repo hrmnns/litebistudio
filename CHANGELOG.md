@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
  
 ## [Unreleased]
+
+## [1.6.0] - 2026-03-12
 ### Added
 - Added a new end-to-end example scenario for documentation and onboarding: `Cherit Systems GmbH - IT Invoice Control`.
 - Added a dedicated example package under `docs/examples/cherit-systems-it-invoice-control/` with:
