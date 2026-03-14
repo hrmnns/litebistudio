@@ -244,8 +244,8 @@ export const WidgetsView: React.FC = () => {
     const [isGlobalRefreshing, setIsGlobalRefreshing] = useState(false);
     const [sqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
     const [sqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
-    const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
-    const [sqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', true);
+    const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', true);
+    const [sqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', false);
     const [sqlEditorFontSize] = useLocalStorage<number>('sql_editor_font_size', 14);
     const [sqlEditorTabSize] = useLocalStorage<number>('sql_editor_tab_size', 4);
     const [sqlEditorThemeIntensity] = useLocalStorage<'subtle' | 'normal' | 'high'>('sql_editor_theme_intensity', 'normal');
@@ -337,8 +337,10 @@ export const WidgetsView: React.FC = () => {
         () => {
             const activeLineDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.08)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.18)' : 'rgba(96, 165, 250, 0.12)';
             const activeLineLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.05)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(59, 130, 246, 0.08)';
-            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.34)' : 'rgba(96, 165, 250, 0.24)';
-            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.34)' : 'rgba(59, 130, 246, 0.25)';
+            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.30)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.46)' : 'rgba(96, 165, 250, 0.38)';
+            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(37, 99, 235, 0.26)' : sqlEditorThemeIntensity === 'high' ? 'rgba(37, 99, 235, 0.42)' : 'rgba(37, 99, 235, 0.34)';
+            const selectionTextDark = '#eaf2ff';
+            const selectionTextLight = '#0b1f3a';
             return EditorView.theme({
                 '&': {
                     height: '100%',
@@ -369,10 +371,12 @@ export const WidgetsView: React.FC = () => {
                     backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
                 },
                 '.cm-content ::selection': {
-                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
+                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`,
+                    color: isDarkSqlPreview ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
                 },
                 '.cm-line::selection, .cm-line > span::selection': {
-                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
+                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`,
+                    color: isDarkSqlPreview ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
                 },
                 '.cm-focused': {
                     outline: 'none'
@@ -1998,7 +2002,7 @@ export const WidgetsView: React.FC = () => {
                     </div>
                 </div>
                 {workspaceTab === 'editor' ? (
-                <div className={`flex flex-col lg:flex-row min-h-0 overflow-hidden relative ${isFullscreenEditorPanel ? 'fixed inset-0 z-[90] gap-4 lg:gap-6 p-4 lg:p-6 bg-[rgb(var(--ui-bg-subtle))] dark:bg-slate-900' : 'flex-1 gap-4 lg:gap-6'}`}>
+                <div className="flex flex-col lg:flex-row min-h-0 overflow-hidden relative flex-1 gap-4 lg:gap-6">
                     <RightOverlayPanel
                         isOpen={isConfigPanelOpen}
                         onClose={() => setIsConfigPanelOpen(false)}
@@ -2583,7 +2587,10 @@ export const WidgetsView: React.FC = () => {
                     </RightOverlayPanel>
 
                     {/* Preview Area */}
-                    <div id="query-visualization" className="w-full min-w-0 flex-1 min-h-0 bg-white dark:bg-[#0b1220] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col relative">
+                    <div
+                        id="query-visualization"
+                        className={`w-full min-w-0 flex-1 min-h-0 bg-white dark:bg-[#0b1220] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col relative ${isFullscreenEditorPanel ? 'fixed inset-0 z-[90] rounded-none border-0 shadow-none m-0' : ''}`}
+                    >
                         <div className="ui-surface-header">
                             <div className="p-3 flex items-center justify-between gap-2">
                                 <h3 className="text-sm text-slate-800 dark:text-slate-100 truncate">
