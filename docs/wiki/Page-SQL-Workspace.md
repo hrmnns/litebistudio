@@ -1,31 +1,30 @@
 # SQL Workspace
 
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-14_
 
 ## Purpose
 
-SQL Workspace is the place for writing, running, and saving SQL statements.
+SQL Workspace is the main place to create, run, and save SQL statements.
 
 ## What You Can Do Here
 
-- Author SQL queries
-- Run statements and inspect results
-- Save statements for reuse
-- Open existing statements and continue working
+- Write SQL manually or generate SQL via SQL Builder
+- Execute SQL and inspect results in split or full view
+- Save and reopen statements
+- Export result sets
 
-## How to Use It
+## Current Behavior
 
-1. Open `SQL Workspace`.
-2. Enter or load a SQL statement.
-3. Run the statement.
-4. Review results and iterate.
-5. Save when the query is useful for reuse or reporting.
+1. `Run` and `Refresh` are disabled when no executable SQL exists (empty/comment-only input).
+2. After execution, result output is shown directly and the active output view is restored on return.
+3. If a `SELECT` runs without explicit `LIMIT`, the workspace shows a compact footer badge (`LIMIT 5000 active`) instead of a large warning block.
+4. Page state is restored when you leave and return (SQL text, selected statement, split mode, output tab, editor scroll position).
 
-## Tips
+## Notes on Persistence
 
-- Keep statements named by business intent, not only technical detail.
-- Save reusable queries early to avoid rework.
-- If no executable SQL is present, run actions are intentionally disabled.
+- The workspace now uses global page-state persistence.
+- Unsaved editor content is restored on return.
+- `Clear SQL Workspace memory` resets this page state in Settings.
 
 ## Related Settings
 
@@ -41,7 +40,7 @@ Open `Settings > Apps > SQL Workspace`:
 Open `Settings > Controls > SQL Editor`:
 
 - Syntax/Autocomplete behavior
-- Line wrap/line numbers/active line highlight
+- Line wrap / line numbers / active line highlight
 - Font and tab size
 - Theme intensity and keyword formatting
 - Preview highlighting and remembered editor height
