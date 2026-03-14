@@ -58,7 +58,7 @@ export const AboutView: React.FC = () => {
             <div className="max-w-4xl space-y-8 pb-12">
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden">
                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-                        <div className="p-4 bg-white/20 backdrop-blur-md rounded-2xl shadow-inner group transition-transform hover:scale-105">
+                        <div className="group transition-transform hover:scale-105">
                             <AppBrandIcon size={80} />
                         </div>
                         <div className="text-center md:text-left">

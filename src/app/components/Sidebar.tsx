@@ -125,14 +125,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
         `}>
             <div className={`h-[var(--app-shell-header-h)] px-4 md:px-6 py-4 border-b flex items-center justify-between border-[rgb(var(--ui-border))] dark:border-slate-700 ${isCollapsed ? 'md:px-4 md:justify-center' : ''}`}>
-                <div className={`flex items-center overflow-hidden ${isCollapsed ? 'md:gap-0' : 'gap-2.5'}`}>
-                    <AppBrandIcon size={32} className="flex-shrink-0" />
+                <div className={`flex items-center ${isCollapsed ? 'md:gap-0 overflow-visible' : 'gap-3 overflow-hidden'}`}>
+                    <AppBrandIcon size={isCollapsed ? 32 : 40} className="flex-shrink-0" />
                     <div className={`transition-all duration-300 ${isCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100 flex flex-col'}`}>
-                        <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
+                        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
                             <span className="font-normal">Lite</span><span className="font-black">BI</span>{' '}
                             <span className="text-blue-600">Studio</span>
                         </h1>
-                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest whitespace-nowrap">{t('sidebar.analytics_platform')}</p>
+                        <p className="text-sm font-semibold text-slate-400 uppercase tracking-[0.08em] whitespace-nowrap">{t('sidebar.analytics_platform')}</p>
                     </div>
                 </div>
                 <button onClick={onCloseMobile} className="md:hidden p-1 text-slate-500 hover:text-slate-700">
