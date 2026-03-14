@@ -22,6 +22,9 @@
     --ui-surface-footer-bg: 248 250 252;
     --ui-surface-footer-bg-to: 243 247 251;
     --ui-surface-separator: 200 214 232;
+    --sql-editor-scroll-track: rgb(var(--ui-surface-subheader-bg));
+    --sql-editor-scroll-thumb: rgb(var(--ui-surface-separator));
+    --sql-editor-scroll-thumb-hover: rgb(var(--ui-primary));
 }
 
 :root.light.light-variant-classic {
@@ -97,6 +100,9 @@
     --ui-surface-footer-bg: 30 41 59;
     --ui-surface-footer-bg-to: 30 41 59;
     --ui-surface-separator: 51 65 85;
+    --sql-editor-scroll-track: #0f172a;
+    --sql-editor-scroll-thumb: #3b82f6;
+    --sql-editor-scroll-thumb-hover: #60a5fa;
 }
 
 html,
@@ -159,12 +165,12 @@ body,
     overflow-y: scroll !important;
     overflow-x: auto !important;
     scrollbar-width: auto;
-    scrollbar-color: #38bdf8 #1e293b;
-    scrollbar-gutter: stable both-edges;
+    scrollbar-color: var(--sql-editor-scroll-thumb) var(--sql-editor-scroll-track);
+    scrollbar-gutter: stable;
 }
 
 .dark .sql-editor-cm .cm-scroller {
-    scrollbar-color: #38bdf8 #0f172a;
+    scrollbar-color: var(--sql-editor-scroll-thumb) var(--sql-editor-scroll-track);
 }
 
 .sql-editor-cm .cm-scroller::-webkit-scrollbar {
@@ -173,17 +179,18 @@ body,
 }
 
 .sql-editor-cm .cm-scroller::-webkit-scrollbar-track {
-    background: #1e293b;
+    background: var(--sql-editor-scroll-track);
     border-radius: 99px;
 }
 
 .sql-editor-cm .cm-scroller::-webkit-scrollbar-thumb {
-    background: #38bdf8;
+    background: var(--sql-editor-scroll-thumb);
     border-radius: 99px;
+    border: 2px solid var(--sql-editor-scroll-track);
 }
 
-.dark .sql-editor-cm .cm-scroller::-webkit-scrollbar-thumb {
-    background: #38bdf8;
+.sql-editor-cm .cm-scroller::-webkit-scrollbar-thumb:hover {
+    background: var(--sql-editor-scroll-thumb-hover);
 }
 
 @layer utilities {
@@ -247,7 +254,7 @@ body,
         background-image:
             linear-gradient(180deg, rgb(var(--ui-bg) / 0.98) 0%, rgb(var(--ui-bg-muted) / 0.92) 100%),
             linear-gradient(90deg, rgb(var(--ui-primary) / 0.12) 0%, transparent 38%);
-        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6), inset 0 -1px 0 rgb(var(--ui-border) / 0.65);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6);
     }
 
     .dark .ui-page-header {
@@ -257,7 +264,7 @@ body,
         background-image:
             linear-gradient(180deg, rgb(var(--ui-bg) / 0.92) 0%, rgb(var(--ui-bg-muted) / 0.9) 100%),
             linear-gradient(90deg, rgb(var(--ui-primary) / 0.18) 0%, transparent 42%);
-        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03), inset 0 -1px 0 rgb(var(--ui-border) / 0.75);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
     }
 
     .overlay-backdrop-subtle {

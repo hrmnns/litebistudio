@@ -164,8 +164,8 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [sqlEditorSyntaxHighlight] = useLocalStorage<boolean>('sql_editor_syntax_highlighting', true);
     const [sqlEditorAutocompleteTyping] = useLocalStorage<boolean>('sql_editor_autocomplete_on_typing', true);
     const [sqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
-    const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
-    const [sqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', true);
+    const [sqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', true);
+    const [sqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', false);
     const [sqlEditorFontSize] = useLocalStorage<number>('sql_editor_font_size', 14);
     const [sqlEditorTabSize] = useLocalStorage<number>('sql_editor_tab_size', 4);
     const [sqlEditorIndentWithTab] = useLocalStorage<boolean>('sql_editor_indent_with_tab', true);
@@ -2073,8 +2073,10 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         () => {
             const activeLineDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.08)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.18)' : 'rgba(96, 165, 250, 0.12)';
             const activeLineLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.05)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(59, 130, 246, 0.08)';
-            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.34)' : 'rgba(96, 165, 250, 0.24)';
-            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.18)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.34)' : 'rgba(59, 130, 246, 0.25)';
+            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.30)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.46)' : 'rgba(96, 165, 250, 0.38)';
+            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(37, 99, 235, 0.26)' : sqlEditorThemeIntensity === 'high' ? 'rgba(37, 99, 235, 0.42)' : 'rgba(37, 99, 235, 0.34)';
+            const selectionTextDark = '#eaf2ff';
+            const selectionTextLight = '#0b1f3a';
             return EditorView.theme({
                 '&': {
                     fontSize: `${Math.max(12, Math.min(15, sqlEditorFontSize))}px`,
@@ -2091,8 +2093,8 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     overflowX: 'auto',
                     overscrollBehavior: 'contain',
                     scrollbarWidth: 'auto',
-                    scrollbarColor: isDarkEditor ? '#38bdf8 #0f172a' : '#38bdf8 #1e293b',
-                    scrollbarGutter: 'stable both-edges',
+                    scrollbarColor: 'var(--sql-editor-scroll-thumb) var(--sql-editor-scroll-track)',
+                    scrollbarGutter: 'stable',
                     backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,
                     paddingRight: '2px',
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
@@ -2113,10 +2115,12 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
                 },
                 '.cm-content ::selection': {
-                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
+                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`,
+                    color: isDarkEditor ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
                 },
                 '.cm-line::selection, .cm-line > span::selection': {
-                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
+                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`,
+                    color: isDarkEditor ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
                 },
                 '.cm-gutters': {
                     backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,

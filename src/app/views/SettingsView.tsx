@@ -85,8 +85,8 @@ export const SettingsView: React.FC = () => {
     const [sqlEditorAutocomplete, setSqlEditorAutocomplete] = useLocalStorage<boolean>('tables_autocomplete_enabled', true);
     const [sqlEditorAutocompleteOnTyping, setSqlEditorAutocompleteOnTyping] = useLocalStorage<boolean>('sql_editor_autocomplete_on_typing', true);
     const [sqlEditorLineWrap, setSqlEditorLineWrap] = useLocalStorage<boolean>('sql_editor_line_wrap', true);
-    const [sqlEditorLineNumbers, setSqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', false);
-    const [sqlEditorHighlightActiveLine, setSqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', true);
+    const [sqlEditorLineNumbers, setSqlEditorLineNumbers] = useLocalStorage<boolean>('sql_editor_line_numbers', true);
+    const [sqlEditorHighlightActiveLine, setSqlEditorHighlightActiveLine] = useLocalStorage<boolean>('sql_editor_highlight_active_line', false);
     const [sqlEditorFontSize, setSqlEditorFontSize] = useLocalStorage<number>('sql_editor_font_size', 14);
     const [sqlEditorTabSize, setSqlEditorTabSize] = useLocalStorage<number>('sql_editor_tab_size', 4);
     const [sqlEditorIndentWithTab, setSqlEditorIndentWithTab] = useLocalStorage<boolean>('sql_editor_indent_with_tab', true);
