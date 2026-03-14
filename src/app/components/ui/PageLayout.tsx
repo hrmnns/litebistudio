@@ -7,6 +7,7 @@ import { useAsync } from '../../../hooks/useAsync';
 import { SystemRepository } from '../../../lib/repositories/SystemRepository';
 import { RightOverlayPanel, type RightOverlayPanelWidth } from './RightOverlayPanel';
 import { Button } from './Button';
+import { useBackupStatus } from '../../../hooks/useBackupStatus';
 
 /* ─── Alert Types ─── */
 export type AlertLevel = 'error' | 'warning' | 'info' | 'success';
@@ -134,6 +135,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
 }) => {
     const { t } = useTranslation();
     const { isAdminMode, isReadOnly } = useDashboard();
+    const { isBackupRecommended, changeCount } = useBackupStatus();
     const [activeQueries, setActiveQueries] = useState(0);
     const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
     const [internalRightPanelOpen, setInternalRightPanelOpen] = useState(Boolean(rightPanel?.defaultOpen));
@@ -240,6 +242,10 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         if (!rightPanel) return;
         if (!isRightPanelControlled) setInternalRightPanelOpen(open);
         rightPanel.onOpenChange?.(open);
+    };
+    const handleOpenBackupCenter = () => {
+        if (typeof window === 'undefined') return;
+        window.location.hash = '#/datasource?tab=system';
     };
 
     return (
@@ -433,7 +439,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
             </div>
 
             {/* ── Footer ── */}
-            {(footer || (breadcrumbs && breadcrumbs.length > 0) || activeQueries > 0 || lastQueryMs !== null) && (
+            {(footer || (breadcrumbs && breadcrumbs.length > 0) || activeQueries > 0 || lastQueryMs !== null || isBackupRecommended) && (
                 <footer className="flex-shrink-0 px-6 md:px-8 py-3 border-t border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
@@ -490,6 +496,17 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
                                     title={t('common.stop_sql', 'Stop')}
                                 >
                                     {t('common.stop_sql', 'Stop')}
+                                </button>
+                            )}
+                            {isBackupRecommended && (
+                                <button
+                                    type="button"
+                                    onClick={handleOpenBackupCenter}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100/90 dark:bg-amber-900/35 border border-amber-300/80 dark:border-amber-700/70 shadow-sm text-[10px] font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider hover:bg-amber-200/90 dark:hover:bg-amber-900/55 transition-colors"
+                                    title={t('datasource.backup_recommended', { count: changeCount })}
+                                >
+                                    <ShieldAlert className="w-3 h-3" />
+                                    <span>{t('common.backup_badge', 'Backup {{count}}', { count: changeCount })}</span>
                                 </button>
                             )}
                         </div>

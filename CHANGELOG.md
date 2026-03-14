@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Introduced a new global page-state persistence infrastructure:
   - added shared `PageStateStore` (`src/lib/state/pageStateStore.ts`) with scoped state handling (`memory`/`session`) and versioned snapshots.
   - implemented restore-before-render behavior to reduce UI flicker and make page return feel like resuming the same workspace.
+- Added user-facing storage recovery documentation:
+  - new wiki page `Troubleshooting: Storage and Recovery` with quick/deep recovery steps and prevention guidance.
+  - added direct link to this guide from the global ErrorBoundary fallback screen.
 
 ### Changed
 - Rolled out the new global persistence mechanism across major app pages:
@@ -26,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - introduced reusable footer status hook (`usePageFooterStatus`) for consistent `Loading...` vs `Last update` rendering across pages.
   - aligned footer/breadcrumb presentation across Overview, Data Management, Widgets, Reporting, Worklist, About, Settings and SQL/Tables.
   - replaced the large SQL safety-limit notice block with a compact warning badge in SQL Workspace status/footer area.
+- Improved global operational guidance in the footer and diagnostics:
+  - added compact backup recommendation badge in the shared footer/status bar with one-click deep-link to `Data Management > Backup & Restore`.
+  - system-health quick fixes are now admin-gated in UI/handler flow (disabled for non-admin, explicit tooltip/message).
 
 ### Fixed
 - Completed settings cleanup for persistence reset actions:

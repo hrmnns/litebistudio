@@ -177,13 +177,20 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
     // Tab State
     const initialTabFromNavigation = (location.state as { initialTab?: string } | null)?.initialTab;
+    const initialTabFromQuery = React.useMemo(() => {
+        const tab = new URLSearchParams(location.search).get('tab');
+        if (tab === 'import' || tab === 'structure' || tab === 'system' || tab === 'danger') {
+            return tab;
+        }
+        return null;
+    }, [location.search]);
     const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system' | 'danger'>(
         initialTabFromNavigation === 'import'
             || initialTabFromNavigation === 'structure'
             || initialTabFromNavigation === 'system'
             || initialTabFromNavigation === 'danger'
             ? initialTabFromNavigation
-            : (initialPageState?.activeTab ?? 'import')
+            : (initialTabFromQuery ?? initialPageState?.activeTab ?? 'import')
     );
     const [visibleUserTablesCount, setVisibleUserTablesCount] = useState(initialPageState?.visibleUserTablesCount ?? STRUCTURE_META_BATCH_SIZE);
     const [visibleUserViewsCount, setVisibleUserViewsCount] = useState(initialPageState?.visibleUserViewsCount ?? STRUCTURE_META_BATCH_SIZE);
@@ -226,6 +233,11 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             visibleUserViewsCount
         }, { scope: 'memory', version: DATASOURCE_PAGE_STATE_VERSION });
     }, [activeTab, selectedTable, visibleUserTablesCount, visibleUserViewsCount]);
+
+    useEffect(() => {
+        if (!initialTabFromQuery) return;
+        setActiveTab(initialTabFromQuery);
+    }, [initialTabFromQuery]);
 
     const { data: backupHistory, refresh: refreshBackupHistory } = useAsync<BackupHistoryEntry[]>(
         () => SystemRepository.listBackupHistory(12),

@@ -330,6 +330,10 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
         || finding.code === 'worklist_enum_inconsistencies';
 
     const handleApplyQuickFix = async (finding: HealthFinding, key: string) => {
+        if (!isAdminMode) {
+            await appDialog.warning(t('widgets.system_health.quick_fix_admin_only'));
+            return;
+        }
         try {
             setFixingFindingKey(key);
             const statements = await buildQuickFixSql(finding);
@@ -767,9 +771,10 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
                                                                 </button>
                                                                 {supportsQuickFix(finding) && (
                                                                     <button
-                                                                        disabled={fixingFindingKey === findingKey}
+                                                                        disabled={fixingFindingKey === findingKey || !isAdminMode}
                                                                         onClick={() => handleApplyQuickFix(finding, findingKey)}
                                                                         className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded border border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                        title={!isAdminMode ? t('widgets.system_health.quick_fix_admin_only') : undefined}
                                                                     >
                                                                         <Wrench className="w-3 h-3" />
                                                                         {fixingFindingKey === findingKey

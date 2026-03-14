@@ -54,7 +54,8 @@
         "yes": "Ja",
         "no": "Nein",
         "not_available": "Nicht verfuegbar",
-        "untitled": "Unbenannt"
+        "untitled": "Unbenannt",
+        "backup_badge": "Backup {{count}}"
     },
     "sidebar": {
         "dashboard": "Übersicht",
@@ -1275,6 +1276,7 @@
             "quick_fix_success": "Quick Fix abgeschlossen. {{count}} Index(e) erstellt oder bestaetigt.",
             "quick_fix_failed": "Quick Fix fehlgeschlagen:",
             "quick_fix_none": "Fuer dieses Finding konnte kein automatischer Fix erzeugt werden.",
+            "quick_fix_admin_only": "Quick Fixes sind nur im Admin-Modus verfuegbar.",
             "client_health_title": "Umgebungs- & Einstellungs-Health",
             "client_health_meta": "Checks: {{checks}}",
             "client_storage_quota_critical": "Speicherkontingent kritisch hoch",

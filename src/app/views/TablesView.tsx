@@ -324,6 +324,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const hasRestoredLastOpenSqlRef = useRef(Boolean(initialPageState));
     const sqlEditorScrollTopRef = useRef(initialPageState?.sqlEditorScrollTop ?? 0);
     const sqlEditorScrollCleanupRef = useRef<(() => void) | null>(null);
+    const assistantAutoSelectedTableRef = useRef('');
 
     const forwardSqlToWorkspace = useCallback((sql: string) => {
         const trimmed = sql.trim();
@@ -1388,6 +1389,13 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 : sort
         )));
     }, [assistantAggregation, assistantAggregationColumn, assistantColumns, assistantMetricAlias]);
+
+    useEffect(() => {
+        if (!assistantTable || assistantColumns.length === 0) return;
+        if (assistantAutoSelectedTableRef.current === assistantTable) return;
+        setAssistantSelectedColumns(assistantColumns);
+        assistantAutoSelectedTableRef.current = assistantTable;
+    }, [assistantColumns, assistantTable]);
 
     useEffect(() => {
         if (assistantAggregation === 'none' || assistantAggregation === 'count') return;
@@ -3269,6 +3277,15 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
                             <div className="mt-3 -mx-5 -mb-5 px-5 py-3 border-t border-slate-200 dark:border-slate-700 bg-blue-50/40 dark:bg-blue-950/20">
                             <div className="flex flex-wrap justify-center gap-2">
+                                <Button
+                                    type="button"
+                                    onClick={() => setShowSqlAssist(false)}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="px-3 py-1.5 text-xs"
+                                >
+                                    {t('common.cancel', 'Abbrechen')}
+                                </Button>
                                 <Button
                                     type="button"
                                     onClick={() => { void applyAssistantSql('replace'); }}

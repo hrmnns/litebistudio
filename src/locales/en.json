@@ -54,7 +54,8 @@
         "yes": "Yes",
         "no": "No",
         "not_available": "Not available",
-        "untitled": "Untitled"
+        "untitled": "Untitled",
+        "backup_badge": "Backup {{count}}"
     },
     "sidebar": {
         "dashboard": "Overview",
@@ -1275,6 +1276,7 @@
             "quick_fix_success": "Quick fix completed. {{count}} index(es) created or confirmed.",
             "quick_fix_failed": "Quick fix failed:",
             "quick_fix_none": "No automatic fix could be generated for this finding.",
+            "quick_fix_admin_only": "Quick fixes are only available in admin mode.",
             "client_health_title": "Environment & Settings Health",
             "client_health_meta": "Checks: {{checks}}",
             "client_storage_quota_critical": "Storage quota critically high",

@@ -31,4 +31,5 @@
 
 - [Admin / Technical Appendix](Admin-Technical-Appendix)
 - [Operations Runbook](Operations-Runbook)
+- [Troubleshooting: Storage and Recovery](Troubleshooting-Storage-and-Recovery)
 - [Release Process](Release-Process)
