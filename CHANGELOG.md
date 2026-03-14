@@ -32,11 +32,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Improved global operational guidance in the footer and diagnostics:
   - added compact backup recommendation badge in the shared footer/status bar with one-click deep-link to `Data Management > Backup & Restore`.
   - system-health quick fixes are now admin-gated in UI/handler flow (disabled for non-admin, explicit tooltip/message).
+- Standardized modal layout/styling across additional dialogs:
+  - aligned `Create table` and `Create index` dialogs to shared modal structure (`noScroll`, structured body, `ui-surface-footer`, consistent action buttons).
+  - aligned `Dashboard > Add widget` and `Reporting > Add page / Manage categories` dialogs to the same tab + list + footer pattern.
+- Improved picker-dialog usability and consistency:
+  - `Reporting > Add page` now uses tabbed selection (`Dashboards` / `Reports`) instead of stacked sections.
+  - picker tabs remain fixed while only the list area scrolls.
+  - list rows keep natural height (no stretch-to-fill behavior when item count is low).
+- Improved dashboard-to-editor workflow:
+  - widget cards on dashboards now jump directly into `Widgets` editor and open the selected widget for editing.
 
 ### Fixed
 - Completed settings cleanup for persistence reset actions:
   - reset actions now clear the new global page-state entries instead of legacy workspace-specific localStorage keys.
   - removed obsolete bridge key `TABLES_LAST_SELECT_SQL_KEY`.
+- Fixed widget editor navigation instability:
+  - resolved `Maximum update depth exceeded` loop after dashboard-to-widget-editor jump by converting pending open handling to one-shot behavior per widget id.
+- Fixed release build blocker:
+  - removed unused `i18n` destructuring in `DatasourceView` so `npm run build` no longer fails with `TS6133`.
 
 ## [1.6.0] - 2026-03-12
 ### Added

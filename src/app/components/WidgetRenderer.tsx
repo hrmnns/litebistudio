@@ -34,13 +34,26 @@ interface WidgetRendererProps {
     headerActions?: React.ReactNode;
     globalFilters?: FilterDef[];
     showInspectorJump?: boolean;
+    inspectorMode?: 'sql-workspace' | 'widget-editor';
+    inspectorWidgetId?: string;
     inspectorReturnHash?: string;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const DASHBOARD_WIDGET_QUERY_TTL_MS = 90_000;
 
-const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, description, headerActions, globalFilters, showInspectorJump = false, inspectorReturnHash }) => {
+const WidgetRenderer: React.FC<WidgetRendererProps> = ({
+    title,
+    sql,
+    config,
+    description,
+    headerActions,
+    globalFilters,
+    showInspectorJump = false,
+    inspectorMode = 'sql-workspace',
+    inspectorWidgetId,
+    inspectorReturnHash
+}) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
@@ -97,7 +110,11 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
         return nextSql;
     }, [sql, globalFilters]);
 
-    const canOpenInInspector = showInspectorJump && /^\s*SELECT\b/i.test(effectiveSql);
+    const canOpenInInspector = showInspectorJump && (
+        inspectorMode === 'widget-editor'
+            ? Boolean((inspectorWidgetId || '').trim())
+            : /^\s*SELECT\b/i.test(effectiveSql)
+    );
     const widgetQueryCacheKey = useMemo(() => {
         const normalizedType = String(config.type || '').trim().toLowerCase();
         const normalizedSql = String(effectiveSql || '').trim();
@@ -106,6 +123,12 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
     }, [config.type, effectiveSql]);
     const handleOpenInInspector = React.useCallback(() => {
         if (!canOpenInInspector) return;
+        if (inspectorMode === 'widget-editor') {
+            const widgetId = (inspectorWidgetId || '').trim();
+            if (!widgetId) return;
+            navigate('/widgets', { state: { openWidgetId: widgetId } });
+            return;
+        }
         localStorage.setItem(TABLES_PENDING_SQL_KEY, effectiveSql);
         const descriptionFromConfig = (config.widgetDescription || '').trim();
         const descriptionText = (description || '').trim() || descriptionFromConfig;
@@ -117,7 +140,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
         const currentHash = `#${location.pathname}${location.search || ''}`;
         localStorage.setItem(TABLES_RETURN_HASH_KEY, inspectorReturnHash || currentHash);
         navigate('/sql-workspace');
-    }, [canOpenInInspector, config.widgetDescription, description, effectiveSql, inspectorReturnHash, location.pathname, location.search, navigate, title]);
+    }, [canOpenInInspector, config.widgetDescription, description, effectiveSql, inspectorMode, inspectorReturnHash, inspectorWidgetId, location.pathname, location.search, navigate, title]);
 
     const { data: results, loading, error } = useAsync<DbRow[]>(
         async () => {
@@ -563,7 +586,9 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ title, sql, config, des
                             type="button"
                             onClick={handleOpenInInspector}
                             className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-300 dark:hover:border-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title={t('common.open_in_inspector')}
+                            title={inspectorMode === 'widget-editor'
+                                ? t('querybuilder.open_widget_title', 'Widget öffnen')
+                                : t('common.open_in_inspector')}
                         >
                             <ExternalLink className="w-3 h-3" />
                         </button>

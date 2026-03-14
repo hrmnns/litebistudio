@@ -164,7 +164,7 @@ const shouldConfirmDestructiveActions = (): boolean => {
 };
 
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const initialPageState = React.useMemo(
@@ -1491,100 +1491,103 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 isOpen={isCreateIndexOpen}
                 onClose={() => setIsCreateIndexOpen(false)}
                 title={t('datasource.create_index_title', 'Index erstellen')}
+                noScroll
             >
-                <div className="space-y-4">
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {t('datasource.index_create_for_table', 'Tabelle')}: <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{indexTableName}</span>
-                    </div>
-
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_name', 'Indexname')}</label>
-                        <input
-                            value={indexName}
-                            onChange={(e) => setIndexName(e.target.value)}
-                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
-                            placeholder={`idx_${indexTableName}_...`}
-                        />
-                    </div>
-
-                    <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                        <input
-                            type="checkbox"
-                            checked={indexUnique}
-                            onChange={() => setIndexUnique(!indexUnique)}
-                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
-                        />
-                        {t('datasource.index_unique', 'Unique Index')}
-                    </label>
-
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_columns', 'Spalten')}</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-auto border border-slate-200 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-900/40">
-                            {availableIndexColumns.map((col) => (
-                                <label key={col} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                                    <input
-                                        type="checkbox"
-                                        checked={indexColumns.includes(col)}
-                                        onChange={() => toggleIndexColumn(col)}
-                                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
-                                    />
-                                    <span className="font-mono">{col}</span>
-                                </label>
-                            ))}
+                <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-auto px-5 pt-4 space-y-4">
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {t('datasource.index_create_for_table', 'Tabelle')}: <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{indexTableName}</span>
                         </div>
-                    </div>
 
-                    {indexColumns.length > 0 && (
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_name', 'Indexname')}</label>
+                            <input
+                                value={indexName}
+                                onChange={(e) => setIndexName(e.target.value)}
+                                className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
+                                placeholder={`idx_${indexTableName}_...`}
+                            />
+                        </div>
+
+                        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                            <input
+                                type="checkbox"
+                                checked={indexUnique}
+                                onChange={() => setIndexUnique(!indexUnique)}
+                                className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
+                            />
+                            {t('datasource.index_unique', 'Unique Index')}
+                        </label>
+
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_order', 'Spaltenreihenfolge')}</label>
-                            <div className="space-y-1 border border-slate-200 dark:border-slate-700 rounded p-2 bg-white dark:bg-slate-900">
-                                {indexColumns.map((col, idx) => (
-                                    <div key={col} className="flex items-center justify-between text-sm">
-                                        <span className="font-mono text-slate-700 dark:text-slate-200">{idx + 1}. {col}</span>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => moveIndexColumn(col, 'up')}
-                                                disabled={idx === 0}
-                                                className="px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
-                                            >
-                                                â†‘
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => moveIndexColumn(col, 'down')}
-                                                disabled={idx === indexColumns.length - 1}
-                                                className="px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
-                                            >
-                                                â†“
-                                            </button>
-                                        </div>
-                                    </div>
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_columns', 'Spalten')}</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-auto border border-slate-200 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-900/40">
+                                {availableIndexColumns.map((col) => (
+                                    <label key={col} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                                        <input
+                                            type="checkbox"
+                                            checked={indexColumns.includes(col)}
+                                            onChange={() => toggleIndexColumn(col)}
+                                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 accent-blue-600 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
+                                        />
+                                        <span className="font-mono">{col}</span>
+                                    </label>
                                 ))}
                             </div>
                         </div>
-                    )}
 
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_where_optional', 'WHERE (optional)')}</label>
-                        <input
-                            value={indexWhere}
-                            onChange={(e) => setIndexWhere(e.target.value)}
-                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-sm font-mono bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
-                            placeholder="status = 'open'"
-                        />
+                        {indexColumns.length > 0 && (
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_order', 'Spaltenreihenfolge')}</label>
+                                <div className="space-y-1 border border-slate-200 dark:border-slate-700 rounded p-2 bg-white dark:bg-slate-900">
+                                    {indexColumns.map((col, idx) => (
+                                        <div key={col} className="flex items-center justify-between text-sm">
+                                            <span className="font-mono text-slate-700 dark:text-slate-200">{idx + 1}. {col}</span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveIndexColumn(col, 'up')}
+                                                    disabled={idx === 0}
+                                                    className="px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                                                >
+                                                    â†‘
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveIndexColumn(col, 'down')}
+                                                    disabled={idx === indexColumns.length - 1}
+                                                    className="px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                                                >
+                                                    â†“
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t('datasource.index_where_optional', 'WHERE (optional)')}</label>
+                            <input
+                                value={indexWhere}
+                                onChange={(e) => setIndexWhere(e.target.value)}
+                                className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-sm font-mono bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
+                                placeholder="status = 'open'"
+                            />
+                        </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="mt-2 px-5 py-4 ui-surface-footer flex items-center justify-end gap-3 shrink-0">
                         <button
                             onClick={() => setIsCreateIndexOpen(false)}
-                            className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="px-5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                         >
                             {t('common.cancel')}
                         </button>
                         <button
                             onClick={() => { void handleCreateIndex(); }}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700"
+                            className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700"
                         >
                             {t('datasource.create_index_btn', 'Index erstellen')}
                         </button>

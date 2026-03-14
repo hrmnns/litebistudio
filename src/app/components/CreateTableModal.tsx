@@ -118,6 +118,7 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
             isOpen={isOpen}
             onClose={onClose}
             title={t('datasource.create_table_title')}
+            noScroll
             headerActions={(
                 <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
                     <button
@@ -137,8 +138,8 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
                 </div>
             )}
         >
-            <div className="h-[32rem] max-h-[calc(90vh-11rem)] flex flex-col gap-4">
-                <div className="flex-1 min-h-0 overflow-auto pr-1">
+            <div className="h-[32rem] max-h-[calc(90vh-11rem)] flex flex-col">
+                <div className="flex-1 min-h-0 overflow-auto px-5 pt-4">
                     {activeTab === 'manual' ? (
                         <div className="space-y-4">
                             <div>
@@ -225,17 +226,17 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
                     )}
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 shrink-0">
+                <div className="mt-2 px-5 py-4 ui-surface-footer flex items-center justify-end gap-3 shrink-0">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700"
+                        className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                         {t('common.cancel')}
                     </button>
                     <button
                         onClick={onSubmit}
                         disabled={activeTab !== 'manual'}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-40"
+                        className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-40"
                     >
                         {t('datasource.create_btn', 'Create')}
                     </button>

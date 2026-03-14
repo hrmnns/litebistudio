@@ -1298,6 +1298,8 @@ export const CustomDashboardView: React.FC = () => {
                                         )}
                                         globalFilters={activeDashboard.filters}
                                         showInspectorJump
+                                        inspectorMode="widget-editor"
+                                        inspectorWidgetId={widgetRef.id}
                                         inspectorReturnHash={activeDashboard?.id ? `#/?dashboard=${encodeURIComponent(activeDashboard.id)}` : '#/'}
                                     />
                                 </DashboardSortableItem>
@@ -1360,6 +1362,8 @@ export const CustomDashboardView: React.FC = () => {
                                                 description={dbWidget.description || ''}
                                                 globalFilters={activeDashboard?.filters}
                                                 showInspectorJump
+                                                inspectorMode="widget-editor"
+                                                inspectorWidgetId={zoomedWidgetRef.id}
                                                 inspectorReturnHash={activeDashboard?.id ? `#/?dashboard=${encodeURIComponent(activeDashboard.id)}` : '#/'}
                                             />
                                         </div>
@@ -1380,127 +1384,141 @@ export const CustomDashboardView: React.FC = () => {
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 title={t('dashboard.add_title')}
+                noScroll
             >
-                <div className="flex gap-4 mb-4 border-b border-slate-200 dark:border-slate-700">
-                    <button
-                        onClick={() => setActiveTab('system')}
-                        className={`pb-2 text-sm font-bold ${activeTab === 'system' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                    >
-                        {t('dashboard.system_widgets')}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('custom')}
-                        className={`pb-2 text-sm font-bold ${activeTab === 'custom' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                    >
-                        {t('dashboard.custom_widgets')}
-                    </button>
-                </div>
-
-                <div className="space-y-4 max-h-[60vh] overflow-y-auto min-h-[300px]">
-                    {activeTab === 'system' && (
-                        <div className="grid grid-cols-1 gap-2">
-                            {SYSTEM_WIDGETS.map(w => {
-                                const isAdded = activeDashboard?.layout.some(dw => dw.id === w.id);
-                                const componentConfig = COMPONENTS.find(c => c.component === w.id);
-                                const hasView = !!componentConfig?.targetView;
-                                const isPinned = hasView && visibleSidebarComponentIds.includes(componentConfig!.id);
-
-                                return (
-                                    <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-300">
-                                                <w.icon className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-slate-700 dark:text-slate-100">{t(w.titleKey)}</div>
-                                                <div className="text-xs text-slate-400 dark:text-slate-500">{t(w.descriptionKey)}</div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {/* Pin to Sidebar Toggle */}
-                                            {hasView && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (isPinned) {
-                                                            setVisibleSidebarComponentIds(visibleSidebarComponentIds.filter(id => id !== componentConfig!.id));
-                                                        } else {
-                                                            setVisibleSidebarComponentIds([...visibleSidebarComponentIds, componentConfig!.id]);
-                                                        }
-                                                    }}
-                                                    title={isPinned ? t('dashboard.unpin_sidebar') : t('dashboard.pin_sidebar')}
-                                                    className={`p-1.5 rounded-md border transition-all ${isPinned ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-500 dark:text-amber-300' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-500 hover:text-amber-400 dark:hover:text-amber-300'}`}
-                                                >
-                                                    <Star className={`w-4 h-4 ${isPinned ? 'fill-current' : ''}`} />
-                                                </button>
-                                            )}
-
-                                            <button
-                                                onClick={() => addToDashboard(w.id, 'system')}
-                                                disabled={isAdded}
-                                                className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'}`}
-                                            >
-                                                {isAdded ? t('dashboard.active') : t('common.add')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col">
+                    <div className="flex-1 min-h-0 px-5 pt-4 flex flex-col">
+                        <div className="flex gap-4 mb-3 border-b border-slate-200 dark:border-slate-700 shrink-0">
+                            <button
+                                onClick={() => setActiveTab('system')}
+                                className={`pb-2 text-sm font-bold ${activeTab === 'system' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                            >
+                                {t('dashboard.system_widgets')}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('custom')}
+                                className={`pb-2 text-sm font-bold ${activeTab === 'custom' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                            >
+                                {t('dashboard.custom_widgets')}
+                            </button>
                         </div>
-                    )}
 
-                    {activeTab === 'custom' && (
-                        <div className="grid grid-cols-1 gap-2">
-                            {customWidgets && customWidgets.length > 0 ? customWidgets.map(w => {
-                                const isAdded = activeDashboard?.layout.some(dw => dw.id === w.id);
-                                const widgetDescription = ((typeof w.description === 'string' ? w.description : '').trim())
-                                    || String(customWidgetConfigById.get(w.id)?.widgetDescription || '').trim();
-                                return (
-                                    <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 dark:text-blue-300">
-                                                <Database className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-slate-700 dark:text-slate-100">{w.name}</div>
-                                                <div
-                                                    className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[260px]"
-                                                    title={widgetDescription || w.sql_query}
-                                                >
-                                                    {widgetDescription || w.sql_query}
+                        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                            {activeTab === 'system' && (
+                                <div className="flex flex-col gap-2">
+                                    {SYSTEM_WIDGETS.map(w => {
+                                        const isAdded = activeDashboard?.layout.some(dw => dw.id === w.id);
+                                        const componentConfig = COMPONENTS.find(c => c.component === w.id);
+                                        const hasView = !!componentConfig?.targetView;
+                                        const isPinned = hasView && visibleSidebarComponentIds.includes(componentConfig!.id);
+
+                                        return (
+                                            <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-300">
+                                                        <w.icon className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-700 dark:text-slate-100">{t(w.titleKey)}</div>
+                                                        <div className="text-xs text-slate-400 dark:text-slate-500">{t(w.descriptionKey)}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Pin to Sidebar Toggle */}
+                                                    {hasView && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (isPinned) {
+                                                                    setVisibleSidebarComponentIds(visibleSidebarComponentIds.filter(id => id !== componentConfig!.id));
+                                                                } else {
+                                                                    setVisibleSidebarComponentIds([...visibleSidebarComponentIds, componentConfig!.id]);
+                                                                }
+                                                            }}
+                                                            title={isPinned ? t('dashboard.unpin_sidebar') : t('dashboard.pin_sidebar')}
+                                                            className={`p-1.5 rounded-md border transition-all ${isPinned ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-500 dark:text-amber-300' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-500 hover:text-amber-400 dark:hover:text-amber-300'}`}
+                                                        >
+                                                            <Star className={`w-4 h-4 ${isPinned ? 'fill-current' : ''}`} />
+                                                        </button>
+                                                    )}
+
+                                                    <button
+                                                        onClick={() => addToDashboard(w.id, 'system')}
+                                                        disabled={isAdded}
+                                                        className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'}`}
+                                                    >
+                                                        {isAdded ? t('dashboard.active') : t('common.add')}
+                                                    </button>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => { void renameCustomWidget(w); }}
-                                                className="p-2 text-slate-400 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-300"
-                                                title={t('common.rename')}
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => deleteCustomWidget(w.id)}
-                                                className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300"
-                                                title={t('common.delete')}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => addToDashboard(w.id, 'custom')}
-                                                disabled={isAdded}
-                                                className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'}`}
-                                            >
-                                                {isAdded ? t('dashboard.active') : t('common.add')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            }) : (
-                                <p className="text-center text-slate-400 dark:text-slate-500 py-4">{t('dashboard.no_reports')}</p>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {activeTab === 'custom' && (
+                                <div className="flex flex-col gap-2">
+                                    {customWidgets && customWidgets.length > 0 ? customWidgets.map(w => {
+                                        const isAdded = activeDashboard?.layout.some(dw => dw.id === w.id);
+                                        const widgetDescription = ((typeof w.description === 'string' ? w.description : '').trim())
+                                            || String(customWidgetConfigById.get(w.id)?.widgetDescription || '').trim();
+                                        return (
+                                            <div key={w.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 dark:text-blue-300">
+                                                        <Database className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-700 dark:text-slate-100">{w.name}</div>
+                                                        <div
+                                                            className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[260px]"
+                                                            title={widgetDescription || w.sql_query}
+                                                        >
+                                                            {widgetDescription || w.sql_query}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => { void renameCustomWidget(w); }}
+                                                        className="p-2 text-slate-400 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-300"
+                                                        title={t('common.rename')}
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteCustomWidget(w.id)}
+                                                        className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300"
+                                                        title={t('common.delete')}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => addToDashboard(w.id, 'custom')}
+                                                        disabled={isAdded}
+                                                        className={`px-3 py-1.5 text-xs font-bold rounded ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'}`}
+                                                    >
+                                                        {isAdded ? t('dashboard.active') : t('common.add')}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    }) : (
+                                        <p className="text-center text-slate-400 dark:text-slate-500 py-4">{t('dashboard.no_reports')}</p>
+                                    )}
+                                </div>
                             )}
                         </div>
-                    )}
+                    </div>
+
+                    <div className="mt-2 px-5 py-4 ui-surface-footer flex items-center justify-end gap-3 shrink-0">
+                        <button
+                            onClick={() => setIsAddModalOpen(false)}
+                            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700"
+                        >
+                            {t('common.cancel', 'Cancel')}
+                        </button>
+                    </div>
                 </div>
             </Modal>
         </PageLayout >

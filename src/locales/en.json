@@ -959,7 +959,7 @@
         "admin_mode_panel_hint": "Control visibility of advanced system structures.",
         "admin_mode_active": "Admin Mode active",
         "user_mode": "User Mode",
-        "last_update": "Last update: {{date}}, {{time}}"
+        "last_update": "View loaded: {{date}}, {{time}}"
     },
     "datasource": {
         "subtitle": "Central hub for imports, structures, and system maintenance.",

@@ -4315,6 +4315,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     setIsCreateIndexOpen(false);
                 }}
                 title={t('datasource.create_index_title_for_table', 'Create index for table {{name}}', { name: selectedTable })}
+                noScroll
                 headerActions={(
                     <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
                         <button
@@ -4334,8 +4335,8 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                     </div>
                 )}
             >
-                <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col gap-4">
-                    <div className="flex-1 min-h-0 overflow-auto pr-1">
+                <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-auto px-5 pt-4">
                         {indexModalTab === 'manual' && (
                             <div className="space-y-4">
                             <div>
@@ -4495,18 +4496,18 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                         )}
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 shrink-0">
+                    <div className="mt-2 px-5 py-4 ui-surface-footer flex items-center justify-end gap-3 shrink-0">
                         <button
                             onClick={() => setIsCreateIndexOpen(false)}
                             disabled={isCreatingIndex}
-                            className="px-3 py-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
+                            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40"
                         >
                             {t('common.cancel', 'Cancel')}
                         </button>
                         <button
                             onClick={() => { void handleCreateIndex(); }}
                             disabled={isCreatingIndex || indexModalTab !== 'manual'}
-                            className="px-4 py-1.5 rounded bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40"
+                            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-40"
                         >
                             {isCreatingIndex ? t('common.saving', 'Saving...') : t('datasource.create_index_btn', 'Create index')}
                         </button>

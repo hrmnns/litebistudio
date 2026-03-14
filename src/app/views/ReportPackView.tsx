@@ -72,6 +72,7 @@ const ReportPackView: React.FC = () => {
     const [expandedPacks, setExpandedPacks] = useState<Record<string, boolean>>(initialPageState?.expandedPacks ?? {});
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
+    const [addPickerTab, setAddPickerTab] = useState<'dashboards' | 'reports'>('dashboards');
     const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
     const [moveMenuPackId, setMoveMenuPackId] = useState<string | null>(null);
     const logoFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -538,6 +539,7 @@ const ReportPackView: React.FC = () => {
 
     const openPickerForPack = (packId: string) => {
         setActivePackId(packId);
+        setAddPickerTab('dashboards');
         setIsAddPickerOpen(true);
     };
 
@@ -1758,94 +1760,135 @@ const ReportPackView: React.FC = () => {
             </RightOverlayPanel>
 
             {/* Picker Modal */}
-            <Modal isOpen={isAddPickerOpen} onClose={() => setIsAddPickerOpen(false)} title={t('reports.pick_content', 'Add Page')}>
-                <div className="space-y-6">
-                    <div>
-                        <h4 className="text-[10px] font-black uppercase text-slate-400 mb-2">{t('dashboard.dashboards')}</h4>
-                        <div className="grid grid-cols-1 gap-1.5">
-                            {allDashboards?.map(d => (
+            <Modal isOpen={isAddPickerOpen} onClose={() => setIsAddPickerOpen(false)} title={t('reports.pick_content', 'Add Page')} noScroll>
+                <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-auto px-5 pt-4">
+                        <div className="h-full min-h-0 flex flex-col">
+                            <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-700 mb-3">
                                 <button
-                                    key={d.id}
-                                    onClick={() => addItem({ type: 'dashboard', id: d.id })}
-                                    className="flex items-center gap-3 p-3 text-left bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-xl transition-all border border-transparent hover:border-blue-200 group"
+                                    type="button"
+                                    onClick={() => setAddPickerTab('dashboards')}
+                                    className={`pb-2 text-sm font-bold transition-colors ${addPickerTab === 'dashboards' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
                                 >
-                                    <Layout className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{d.name}</span>
+                                    {t('dashboard.dashboards', 'Dashboards')}
                                 </button>
-                            ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setAddPickerTab('reports')}
+                                    className={`pb-2 text-sm font-bold transition-colors ${addPickerTab === 'reports' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                                >
+                                    {t('dashboard.reports', 'Reports')}
+                                </button>
+                            </div>
+
+                            {addPickerTab === 'dashboards' && (
+                                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-1.5 pr-1">
+                                    {allDashboards?.map(d => (
+                                        <button
+                                            key={d.id}
+                                            onClick={() => addItem({ type: 'dashboard', id: d.id })}
+                                            className="flex items-center gap-3 p-3 text-left bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-xl transition-all border border-transparent hover:border-blue-200 group"
+                                        >
+                                            <Layout className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{d.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {addPickerTab === 'reports' && (
+                                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-1.5 pr-1">
+                                    {allWidgets?.map(w => (
+                                        <button
+                                            key={w.id}
+                                            onClick={() => addItem({ type: 'widget', id: w.id })}
+                                            className="flex items-center gap-3 p-3 text-left bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-xl transition-all border border-transparent hover:border-blue-200 group"
+                                        >
+                                            <Database className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{w.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div>
-                        <h4 className="text-[10px] font-black uppercase text-slate-400 mb-2">{t('dashboard.reports')}</h4>
-                        <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto custom-scrollbar">
-                            {allWidgets?.map(w => (
-                                <button
-                                    key={w.id}
-                                    onClick={() => addItem({ type: 'widget', id: w.id })}
-                                    className="flex items-center gap-3 p-3 text-left bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-xl transition-all border border-transparent hover:border-blue-200 group"
-                                >
-                                    <Database className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{w.name}</span>
-                                </button>
-                            ))}
-                        </div>
+                    <div className="mt-2 px-5 py-4 ui-surface-footer flex items-center justify-end gap-3 shrink-0">
+                        <button
+                            onClick={() => setIsAddPickerOpen(false)}
+                            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700"
+                        >
+                            {t('common.cancel', 'Cancel')}
+                        </button>
                     </div>
                 </div>
             </Modal>
 
             {/* Manage Categories Modal */}
-            <Modal isOpen={isCategoryManagerOpen} onClose={() => setIsCategoryManagerOpen(false)} title={t('reports.manage_categories', 'Manage categories')}>
-                <div className="space-y-3">
-                    {categoryNames.length === 0 && (
-                        <div className="text-center py-8 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 text-sm">
-                            {t('reports.no_categories', 'No categories yet.')}
-                        </div>
-                    )}
-                    {categoryNames.map(category => {
-                        const isDefaultCategory = category === defaultCategory;
-                        const packCount = packs.filter(pack => (pack.category || defaultCategory) === category).length;
-                        return (
-                            <div key={category} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg group">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <Layout className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                                    <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{category}</span>
-                                    {isDefaultCategory && (
-                                        <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
-                                            {t('common.default', 'Default')}
-                                        </span>
-                                    )}
-                                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
-                                        {packCount} {t('reports.packages', 'packages')}
-                                    </span>
+            <Modal isOpen={isCategoryManagerOpen} onClose={() => setIsCategoryManagerOpen(false)} title={t('reports.manage_categories', 'Manage categories')} noScroll>
+                <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-auto px-5 pt-4">
+                        <div className="space-y-3">
+                            {categoryNames.length === 0 && (
+                                <div className="text-center py-8 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 text-sm">
+                                    {t('reports.no_categories', 'No categories yet.')}
                                 </div>
-                                {!isReadOnly && (
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => void renameCategory(category)}
-                                            disabled={isDefaultCategory}
-                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded disabled:opacity-30 disabled:hover:text-slate-400 dark:disabled:hover:text-slate-500 disabled:hover:bg-transparent"
-                                            title={t('common.rename', 'Rename')}
-                                        >
-                                            <Edit2 className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => void deleteCategory(category)}
-                                            disabled={isDefaultCategory}
-                                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-30 disabled:hover:text-slate-400 dark:disabled:hover:text-slate-500 disabled:hover:bg-transparent"
-                                            title={isDefaultCategory
-                                                ? t('reports.default_category_protected', 'Default category cannot be deleted')
-                                                : packCount > 0
-                                                    ? t('reports.delete_with_content', 'Delete category and its report packages')
-                                                    : t('reports.delete_empty_category', 'Delete empty category')}
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                            )}
+                            {categoryNames.map(category => {
+                                const isDefaultCategory = category === defaultCategory;
+                                const packCount = packs.filter(pack => (pack.category || defaultCategory) === category).length;
+                                return (
+                                    <div key={category} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg group">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Layout className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                                            <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{category}</span>
+                                            {isDefaultCategory && (
+                                                <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                                    {t('common.default', 'Default')}
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                                {packCount} {t('reports.packages', 'packages')}
+                                            </span>
+                                        </div>
+                                        {!isReadOnly && (
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => void renameCategory(category)}
+                                                    disabled={isDefaultCategory}
+                                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded disabled:opacity-30 disabled:hover:text-slate-400 dark:disabled:hover:text-slate-500 disabled:hover:bg-transparent"
+                                                    title={t('common.rename', 'Rename')}
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => void deleteCategory(category)}
+                                                    disabled={isDefaultCategory}
+                                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-30 disabled:hover:text-slate-400 dark:disabled:hover:text-slate-500 disabled:hover:bg-transparent"
+                                                    title={isDefaultCategory
+                                                        ? t('reports.default_category_protected', 'Default category cannot be deleted')
+                                                        : packCount > 0
+                                                            ? t('reports.delete_with_content', 'Delete category and its report packages')
+                                                            : t('reports.delete_empty_category', 'Delete empty category')}
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="mt-2 px-5 py-4 ui-surface-footer flex items-center justify-end gap-3 shrink-0">
+                        <button
+                            onClick={() => setIsCategoryManagerOpen(false)}
+                            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700"
+                        >
+                            {t('common.close', 'Close')}
+                        </button>
+                    </div>
                 </div>
             </Modal>
         </PageLayout>

@@ -959,7 +959,7 @@
         "admin_mode_panel_hint": "Steuern Sie die Sichtbarkeit erweiterter Systemstrukturen.",
         "admin_mode_active": "Admin-Modus aktiv",
         "user_mode": "User-Modus",
-        "last_update": "Letzte Aktualisierung: {{date}}, {{time}}"
+        "last_update": "Ansicht geladen: {{date}}, {{time}}"
     },
     "datasource": {
         "subtitle": "Zentrale Verwaltung für Importe, Strukturen und Systemwartung.",

@@ -39,6 +39,7 @@ import { SelectionListDialog } from '../components/ui/SelectionListDialog';
 import { Button } from '../components/ui/Button';
 import { getPageState, setPageState } from '../../lib/state/pageStateStore';
 import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
+import { useLocation } from 'react-router-dom';
 
 type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
@@ -183,6 +184,7 @@ const setCachedWidgetRun = (widgetId: string, normalizedSql: string, rows: DbRow
 
 export const WidgetsView: React.FC = () => {
     const { t, i18n } = useTranslation();
+    const location = useLocation();
     const initialPageState = useMemo(
         () => getPageState<WidgetsPageState>(WIDGETS_PAGE_STATE_ID, { scope: 'memory', version: WIDGETS_PAGE_STATE_VERSION }),
         []
@@ -255,6 +257,7 @@ export const WidgetsView: React.FC = () => {
     const { isExporting, exportToPdf } = useReportExport();
     const { togglePresentationMode, isPresentationMode, isReadOnly } = useDashboard();
     const hasRestoredLastWidgetRef = useRef(Boolean(initialPageState));
+    const handledPendingOpenWidgetIdRef = useRef('');
     const bypassUnsavedGuardRef = useRef(false);
     const headerHydrationStartedAtRef = useRef(Date.now());
     const headerHydrationTimerRef = useRef<number | null>(null);
@@ -296,6 +299,12 @@ export const WidgetsView: React.FC = () => {
         async () => await SystemRepository.getDashboards() as unknown as DbRow[],
         []
     );
+
+    const pendingOpenWidgetId = useMemo(() => {
+        const state = location.state as { openWidgetId?: unknown } | null;
+        const nextId = typeof state?.openWidgetId === 'string' ? state.openWidgetId.trim() : '';
+        return nextId;
+    }, [location.state]);
 
     // Widget Studio no longer builds SQL visually; schema metadata is optional.
     useEffect(() => {
@@ -1109,6 +1118,22 @@ export const WidgetsView: React.FC = () => {
             finishHeaderHydration();
         });
     }, [activeWidgetId, finishHeaderHydration, handleRun, lastOpenWidgetId, loadWidget, savedWidgets, savedWidgetsById, setLastOpenWidgetId, setQueryConfig, setSelectedSqlStatementId, sqlStatements, sqlStatementsById, unsavedWidgetDraft]);
+    useEffect(() => {
+        if (!pendingOpenWidgetId) return;
+        if (!savedWidgets) return;
+        if (handledPendingOpenWidgetIdRef.current === pendingOpenWidgetId) return;
+        handledPendingOpenWidgetIdRef.current = pendingOpenWidgetId;
+        const targetWidget = savedWidgetsById.get(pendingOpenWidgetId);
+        if (!targetWidget) {
+            return;
+        }
+        hasRestoredLastWidgetRef.current = true;
+        setWorkspaceTab('editor');
+        setSourceSelectTab('widget');
+        void loadWidget(targetWidget, false).finally(() => {
+            finishHeaderHydration();
+        });
+    }, [finishHeaderHydration, loadWidget, pendingOpenWidgetId, savedWidgets, savedWidgetsById]);
     useEffect(() => {
         if (!isHeaderHydrating) return;
         if (!savedWidgets) return;
