@@ -23,7 +23,7 @@ import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
 import { CreateTableModal } from '../components/CreateTableModal';
 import type { DataSourceEntry, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
-import { TABLES_LAST_SELECT_SQL_KEY, TABLES_PENDING_SQL_KEY, TABLES_PENDING_SQL_META_KEY, TABLES_RETURN_HASH_KEY } from '../../lib/tablesBridge';
+import { TABLES_PENDING_SQL_KEY, TABLES_PENDING_SQL_META_KEY, TABLES_RETURN_HASH_KEY } from '../../lib/tablesBridge';
 import { appDialog } from '../../lib/appDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SelectionListDialog } from '../components/ui/SelectionListDialog';
@@ -125,11 +125,8 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const { isAdminMode, isPresentationMode, togglePresentationMode } = useDashboard();
     const SQL_LIBRARY_SCOPE = 'global';
     const SQL_LIBRARY_MIGRATION_KEY = 'tables_sql_library_migrated_v1';
-    const sqlEditorHeightStorageKey = fixedMode === 'sql'
-        ? 'sql_workspace_sql_editor_height'
-        : 'tables_sql_editor_height';
     const [mode, setMode] = useState<'table' | 'sql'>(fixedMode ?? 'table');
-    const [inputSql, setInputSql] = useLocalStorage<string>('tables_sql_workspace_input_v1', ''); // Textarea content
+    const [inputSql, setInputSql] = useState(''); // Textarea content
     const [, setSqlHistory] = useLocalStorage<string[]>('tables_sql_history', []);
     const [explainMode] = useLocalStorage<boolean>('tables_explain_mode', false);
     const [showSqlAssist, setShowSqlAssist] = useLocalStorage<boolean>('tables_sql_assist_open', false);
@@ -151,23 +148,20 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [sqlStatements, setSqlStatements] = useState<SqlStatementRecord[]>([]);
     const [sqlStatementsLoaded, setSqlStatementsLoaded] = useState(false);
     const [activeSqlStatementId, setActiveSqlStatementId] = useState<string>('');
-    const [lastOpenSqlStatementId, setLastOpenSqlStatementId] = useLocalStorage<string>('sql_workspace_last_open_statement_id', '');
+    const [lastOpenSqlStatementId, setLastOpenSqlStatementId] = useState('');
     const [sqlSavedSnapshot, setSqlSavedSnapshot] = useState<{ id: string; normalizedSql: string }>({ id: '', normalizedSql: '' });
     const [sqlLibrarySearch, setSqlLibrarySearch] = useState('');
-    const [sqlLibrarySort, setSqlLibrarySort] = useLocalStorage<
+    const [sqlLibrarySort, setSqlLibrarySort] = useState<
         'updated_desc' | 'name_asc' | 'name_desc' | 'last_used_desc' | 'favorite_then_updated'
-    >('tables_sql_library_sort_v1', 'updated_desc');
+    >('updated_desc');
     const [, setLastSavedSqlTemplateName] = useLocalStorage<string>('tables_last_saved_sql_template_name', '');
     const [, setLastSavedSqlTemplateDescription] = useLocalStorage<string>('tables_last_saved_sql_template_description', '');
     const [loadedSqlTemplateMeta, setLoadedSqlTemplateMeta] = useState<{ name: string; description: string }>({ name: '', description: '' });
     const [isSqlOpenDialogOpen, setIsSqlOpenDialogOpen] = useState(false);
     const [selectedOpenSqlId, setSelectedOpenSqlId] = useState('');
-    const [sqlOpenPinnedOnly, setSqlOpenPinnedOnly] = useLocalStorage<boolean>('tables_sql_open_pinned_only', false);
-    const [showTableTools, setShowTableTools] = useLocalStorage<boolean>('tables_table_tools_open', false);
-    const [tableToolsTab, setTableToolsTab] = useLocalStorage<'tables' | 'columns' | 'filters'>(
-        'tables_table_tools_tab_v1',
-        'tables'
-    );
+    const [sqlOpenPinnedOnly, setSqlOpenPinnedOnly] = useState(false);
+    const [showTableTools, setShowTableTools] = useState(false);
+    const [tableToolsTab, setTableToolsTab] = useState<'tables' | 'columns' | 'filters'>('tables');
     const [isCreateTableOpen, setIsCreateTableOpen] = useState(false);
     const [newTableName, setNewTableName] = useState('');
     const [createColumns, setCreateColumns] = useState<Array<{ name: string; type: string }>>([
@@ -177,7 +171,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [tableVisibleColumns, setTableVisibleColumns] = useState<string[]>([]);
     const [tableFilterColumn, setTableFilterColumn] = useState('');
     const [tableFilterValue, setTableFilterValue] = useState('');
-    const [assistantPanels, setAssistantPanels] = useLocalStorage<{
+    const [assistantPanels, setAssistantPanels] = useState<{
         table: boolean;
         columns: boolean;
         aggregation: boolean;
@@ -186,7 +180,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         sorting: boolean;
         preview: boolean;
     }>(
-        'tables_sql_assistant_panels_v2',
         { table: true, columns: true, aggregation: false, grouping: true, filter: false, sorting: false, preview: true }
     );
     const [assistantTable, setAssistantTable] = useState('');
@@ -209,31 +202,19 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [explainError, setExplainError] = useState('');
     const [explainLoading, setExplainLoading] = useState(false);
     const [sqlOutputView, setSqlOutputView] = useState<'result' | 'explain'>(explainMode ? 'explain' : 'result');
-    const [sqlWorkspaceView, setSqlWorkspaceView] = useLocalStorage<'sql' | 'result' | 'explain'>(
-        'tables_sql_workspace_view_v1',
-        'sql'
-    );
-    const [sqlWorkspaceSplitView, setSqlWorkspaceSplitView] = useLocalStorage<boolean>(
-        'tables_sql_workspace_split_view_v1',
-        false
-    );
-    const [sqlSplitTopHeight, setSqlSplitTopHeight] = useLocalStorage<number>(
-        'tables_sql_workspace_split_top_height_v1',
-        260
-    );
-    const [sqlWorkspaceTab, setSqlWorkspaceTab] = useLocalStorage<'manage' | 'editor'>(
-        'tables_sql_workspace_tab_v1',
-        'editor'
-    );
+    const [sqlWorkspaceView, setSqlWorkspaceView] = useState<'sql' | 'result' | 'explain'>('sql');
+    const [sqlWorkspaceSplitView, setSqlWorkspaceSplitView] = useState(false);
+    const [sqlSplitTopHeight, setSqlSplitTopHeight] = useState(260);
+    const [sqlWorkspaceTab, setSqlWorkspaceTab] = useState<'manage' | 'editor'>('editor');
     const [isSqlHeaderHydrating, setIsSqlHeaderHydrating] = useState(true);
-    const [cachedSqlHeaderName, setCachedSqlHeaderName] = useLocalStorage<string>('tables_sql_header_name_cache_v1', '');
-    const [, setCachedSqlHeaderDirty] = useLocalStorage<boolean>('tables_sql_header_dirty_cache_v1', false);
-    const [, setCachedSqlHeaderStatementId] = useLocalStorage<string>('tables_sql_header_statement_id_cache_v1', '');
-    const [sqlExecutionSql, setSqlExecutionSql] = useLocalStorage<string>('tables_sql_workspace_execution_sql_v1', '');
+    const [cachedSqlHeaderName, setCachedSqlHeaderName] = useState('');
+    const [, setCachedSqlHeaderDirty] = useState(false);
+    const [, setCachedSqlHeaderStatementId] = useState('');
+    const [sqlExecutionSql, setSqlExecutionSql] = useState('');
     const [lastSqlRunHasSelect, setLastSqlRunHasSelect] = useState<boolean | null>(null);
     const [sqlRunToken, setSqlRunToken] = useState(0);
     const [sqlLimitNotice, setSqlLimitNotice] = useState('');
-    const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useLocalStorage<boolean>('tables_sql_limit_notice_dismissed', false);
+    const [sqlLimitNoticeDismissed, setSqlLimitNoticeDismissed] = useState(false);
     const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
     const [indexModalTab, setIndexModalTab] = useState<'manual' | 'suggestions'>('manual');
     const [indexName, setIndexName] = useState('');
@@ -244,11 +225,10 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const [indexSuggestions, setIndexSuggestions] = useState<IndexSuggestion[]>([]);
     const [isGeneratingIndexSuggestions, setIsGeneratingIndexSuggestions] = useState(false);
     const [applyingIndexSuggestionId, setApplyingIndexSuggestionId] = useState('');
-    const [storedSqlEditorHeight, setStoredSqlEditorHeight] = useLocalStorage<number>(sqlEditorHeightStorageKey, 160);
+    const [storedSqlEditorHeight, setStoredSqlEditorHeight] = useState(160);
     const [sqlEditorHeight, setSqlEditorHeight] = useState(sqlEditorRememberHeight ? storedSqlEditorHeight : 160);
     const indexSuggestionCacheRef = useRef<Map<string, IndexSuggestion[]>>(new Map());
     const indexSuggestionRunRef = useRef(0);
-    const hasAutoRestoredLastSelectRef = useRef(false);
     const sqlHeaderHydrationStartedAtRef = useRef(Date.now());
     const sqlHeaderHydrationTimerRef = useRef<number | null>(null);
     const finishSqlHeaderHydration = useCallback(() => {
@@ -373,22 +353,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         setActiveSqlStatementId('');
         setSqlOutputView('result');
     }, [fixedMode, forwardSqlToWorkspace, resetSqlOutputState]);
-
-    useEffect(() => {
-        if (fixedMode !== 'sql') return;
-        if (hasAutoRestoredLastSelectRef.current) return;
-        if (inputSql.trim()) {
-            hasAutoRestoredLastSelectRef.current = true;
-            return;
-        }
-        hasAutoRestoredLastSelectRef.current = true;
-        const lastSelectSql = localStorage.getItem(TABLES_LAST_SELECT_SQL_KEY);
-        if (!lastSelectSql || !/^\s*SELECT\b/i.test(lastSelectSql)) return;
-        resetSqlOutputState();
-        setInputSql(lastSelectSql);
-        setActiveSqlStatementId('');
-        setSqlOutputView('result');
-    }, [fixedMode, inputSql, resetSqlOutputState]);
 
     useEffect(() => {
         const root = document.documentElement;
@@ -651,9 +615,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         setLastSqlRunHasSelect(hasSelectStatement);
         setSqlRunToken((prev) => prev + 1);
         setSqlHistory((prev: string[]) => [trimmed, ...prev.filter((q: string) => q !== trimmed)].slice(0, 12));
-        if (hasSelectStatement) {
-            localStorage.setItem(TABLES_LAST_SELECT_SQL_KEY, trimmed);
-        }
     }, [setSqlHistory, setSqlRequireLimitConfirm, setSqlWorkspaceSplitView, setSqlWorkspaceView, sqlLimitNoticeDismissed, sqlMaxRows, sqlRequireLimitConfirm, sqlWorkspaceSplitView, t]);
 
     const handleRunSql = async () => {
@@ -669,7 +630,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         setLastSqlRunHasSelect(null);
         setSqlOutputView('result');
         setLoadedSqlTemplateMeta({ name: '', description: '' });
-        localStorage.removeItem(TABLES_LAST_SELECT_SQL_KEY);
     }, [resetSqlOutputState]);
 
     const runExplainPlan = useCallback(async (sql: string) => {

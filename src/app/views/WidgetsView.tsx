@@ -84,6 +84,18 @@ interface SavedWidget {
     updated_at?: string | null;
 }
 
+interface WidgetEditorDraft {
+    sourceSelectTab: 'none' | 'query' | 'widget';
+    sql: string;
+    selectedSqlStatementId: string;
+    previewTab: 'graphic' | 'table' | 'sql';
+    visType: VisualizationType;
+    visConfig: WidgetConfig;
+    builderMode: 'sql' | 'visual';
+    queryConfig?: QueryConfig;
+    lastRunSql: string;
+}
+
 const normalizeSqlText = (value: string) => value
     .replace(/;+$/g, '')
     .replace(/\s+/g, ' ')
@@ -141,24 +153,24 @@ export const WidgetsView: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [lastRunSql, setLastRunSql] = useState('');
     const [previewRenderVersion, setPreviewRenderVersion] = useState(0);
-    const [previewTab, setPreviewTab] = useLocalStorage<'graphic' | 'table' | 'sql'>('widgets_preview_tab', 'graphic');
+    const [previewTab, setPreviewTab] = useState<'graphic' | 'table' | 'sql'>('graphic');
     const [savedSnapshot, setSavedSnapshot] = useState('');
-    const [pendingBaselineSync, setPendingBaselineSync] = useState(false);
     const [isHeaderHydrating, setIsHeaderHydrating] = useState(true);
-    const [cachedHeaderName, setCachedHeaderName] = useLocalStorage<string>('widgets_header_name_cache_v1', '');
-    const [, setCachedHeaderDirty] = useLocalStorage<boolean>('widgets_header_dirty_cache_v1', false);
-    const [, setCachedHeaderWidgetId] = useLocalStorage<string>('widgets_header_widget_id_cache_v1', '');
+    const [isRestoringEditorState, setIsRestoringEditorState] = useState(false);
+    const [cachedHeaderName, setCachedHeaderName] = useState('');
+    const [, setCachedHeaderDirty] = useState(false);
+    const [, setCachedHeaderWidgetId] = useState('');
 
     // Mode State
     const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
-    const [workspaceTab, setWorkspaceTab] = useLocalStorage<'manage' | 'editor'>('widgets_workspace_tab', 'editor');
+    const [workspaceTab, setWorkspaceTab] = useState<'manage' | 'editor'>('editor');
     const [manageSearch, setManageSearch] = useState('');
     const [manageSort, setManageSort] = useState<'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc' | 'favorite_then_updated'>('updated_desc');
     const [, setSidebarTab] = useState<'source' | 'visual' | 'widget'>('visual');
     const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>('none');
     const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
     const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
-    const [queryConfig, setQueryConfig] = useLocalStorage<QueryConfig | undefined>('widgets_config', undefined);
+    const [queryConfig, setQueryConfig] = useState<QueryConfig | undefined>(undefined);
 
     // Visualization State
     const [visType, setVisType] = useState<VisualizationType>('table');
@@ -166,23 +178,24 @@ export const WidgetsView: React.FC = () => {
 
     // Active Widget State
     const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
-    const [lastOpenWidgetId, setLastOpenWidgetId] = useLocalStorage<string>('widgets_last_open_widget_id', '');
+    const [lastOpenWidgetId, setLastOpenWidgetId] = useState('');
 
     // Save Widget State
     const [widgetName, setWidgetName] = useState('');
-    const [selectedSqlStatementId, setSelectedSqlStatementId] = useLocalStorage<string>('widgets_selected_sql_statement_id', '');
+    const [selectedSqlStatementId, setSelectedSqlStatementId] = useState('');
     const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
     const [loadDialogType, setLoadDialogType] = useState<'widget' | 'sql'>('widget');
     const [loadDialogSearch, setLoadDialogSearch] = useState('');
-    const [loadDialogPinnedOnly, setLoadDialogPinnedOnly] = useLocalStorage<boolean>('widgets_load_dialog_pinned_only', false);
-    const [loadDialogSort, setLoadDialogSort] = useLocalStorage<'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first'>('widgets_load_dialog_sort', 'updated_desc');
-    const [pinnedWidgetIds, setPinnedWidgetIds] = useLocalStorage<string[]>('widgets_pinned_widget_ids', []);
+    const [loadDialogPinnedOnly, setLoadDialogPinnedOnly] = useState(false);
+    const [loadDialogSort, setLoadDialogSort] = useState<'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first'>('updated_desc');
+    const [pinnedWidgetIds, setPinnedWidgetIds] = useState<string[]>([]);
     const [selectedLoadWidgetId, setSelectedLoadWidgetId] = useState<string>('');
     const [selectedLoadSqlId, setSelectedLoadSqlId] = useState<string>('');
     const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
     const [localWidgetSavedAtById, setLocalWidgetSavedAtById] = useState<Record<string, string>>({});
-    const [widgetSqlDraftById, setWidgetSqlDraftById] = useLocalStorage<Record<string, string>>('widgets_sql_draft_by_id_v1', {});
-    const [widgetSqlStatementDraftById, setWidgetSqlStatementDraftById] = useLocalStorage<Record<string, string>>('widgets_sql_statement_draft_by_id_v1', {});
+    const [widgetDraftById, setWidgetDraftById] = useState<Record<string, WidgetEditorDraft>>({});
+    const [unsavedWidgetDraft, setUnsavedWidgetDraft] = useState<WidgetEditorDraft | null>(null);
+    const [widgetPreviewTabById, setWidgetPreviewTabById] = useState<Record<string, 'graphic' | 'table' | 'sql'>>({});
 
     // Detail View State
     const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -203,7 +216,6 @@ export const WidgetsView: React.FC = () => {
     const { togglePresentationMode, isPresentationMode, isReadOnly } = useDashboard();
     const hasRestoredLastWidgetRef = useRef(false);
     const bypassUnsavedGuardRef = useRef(false);
-    const pendingBaselineSnapshotRef = useRef<string | null>(null);
     const headerHydrationStartedAtRef = useRef(Date.now());
     const headerHydrationTimerRef = useRef<number | null>(null);
     const finishHeaderHydration = useCallback(() => {
@@ -374,21 +386,17 @@ export const WidgetsView: React.FC = () => {
 
     const buildSnapshot = useCallback((overrides?: {
         currentSql?: string;
-        currentBuilderMode?: 'sql' | 'visual';
-        currentQueryConfig?: QueryConfig | undefined;
         currentVisType?: VisualizationType;
         currentVisConfig?: WidgetConfig;
         currentWidgetName?: string;
         currentActiveWidgetId?: string | null;
     }) => JSON.stringify({
         sql: normalizeSqlText(overrides?.currentSql ?? sql),
-        builderMode: overrides?.currentBuilderMode ?? builderMode,
-        queryConfig: overrides?.currentQueryConfig ?? queryConfig ?? null,
         visType: overrides?.currentVisType ?? visType,
         visConfig: overrides?.currentVisConfig ?? visConfig,
         widgetName: (overrides?.currentWidgetName ?? widgetName).trim(),
         activeWidgetId: overrides?.currentActiveWidgetId ?? activeWidgetId
-    }), [sql, builderMode, queryConfig, visType, visConfig, widgetName, activeWidgetId]);
+    }), [sql, visType, visConfig, widgetName, activeWidgetId]);
 
     const handleRun = useCallback(async (
         overrideSql?: string,
@@ -454,108 +462,127 @@ export const WidgetsView: React.FC = () => {
     }, [sql, visConfig.xAxis, activeWidgetId]);
 
     const loadWidget = useCallback(async (widget: SavedWidget, navigate = true): Promise<void> => {
-        setPendingBaselineSync(true);
-        let parsedVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
-        let parsedVisType: VisualizationType = 'table';
-        let parsedBuilderMode: 'sql' | 'visual' = 'sql';
+        setIsRestoringEditorState(true);
         const linkedStatement = widget.sql_statement_id ? sqlStatementsById.get(widget.sql_statement_id) : undefined;
         const widgetSql = (linkedStatement?.sql_text || widget.sql_query || '').trim() || DEFAULT_SQL;
-        const hasDraftSql = Object.prototype.hasOwnProperty.call(widgetSqlDraftById, widget.id);
-        const draftSql = hasDraftSql ? String(widgetSqlDraftById[widget.id] ?? '') : '';
-        const restoredSql = hasDraftSql ? draftSql : widgetSql;
-        const hasDraftStatementId = Object.prototype.hasOwnProperty.call(widgetSqlStatementDraftById, widget.id);
-        const draftStatementId = hasDraftStatementId ? String(widgetSqlStatementDraftById[widget.id] ?? '') : '';
+        const draft = widgetDraftById[widget.id];
+        const persistedPreviewTab = widgetPreviewTabById[widget.id];
+        const draftStatementSql = draft?.selectedSqlStatementId
+            ? (sqlStatementsById.get(draft.selectedSqlStatementId)?.sql_text || '')
+            : '';
+        const restoredSql = draft
+            ? ((draft.sql || '').trim() || draftStatementSql || widgetSql)
+            : widgetSql;
 
-        setActiveWidgetId(widget.id);
-        setWidgetName(widget.name);
-        setSql(restoredSql);
-        const matchedBySql = sqlStatementByNormalizedSql.get(normalizeSqlText(restoredSql));
-        setSelectedSqlStatementId(
-            hasDraftStatementId
-                ? draftStatementId
-                : (typeof widget.sql_statement_id === 'string' && widget.sql_statement_id.trim().length > 0
-                    ? widget.sql_statement_id.trim()
-                    : (linkedStatement?.id || matchedBySql?.id || ''))
-        );
-        setLastRunSql('');
-        setResults([]);
-        setError('');
-        setQueryConfig(undefined);
-        setBuilderMode('sql');
-        setVisType('table');
-        setVisConfig({ type: 'table', color: '#3b82f6' });
+        let parsedVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
+        let parsedVisType: VisualizationType = 'table';
 
         try {
-            const visualConfig = JSON.parse(widget.visualization_config) as WidgetConfig;
-            const legacyType = visualConfig.type === 'kpu_manual' ? 'kpi_manual' : visualConfig.type;
-            parsedVisConfig = {
-                ...visualConfig,
-                type: (legacyType || 'table') as WidgetConfig['type'],
-                kpiTitle: visualConfig.kpiTitle ?? visualConfig.kpuTitle ?? '',
-                kpiValue: visualConfig.kpiValue ?? visualConfig.kpuValue ?? '',
-                kpiUnit: visualConfig.kpiUnit ?? visualConfig.kpuUnit ?? '',
-                kpiTarget: visualConfig.kpiTarget ?? visualConfig.kpuTarget ?? '',
-                kpiTrend: visualConfig.kpiTrend ?? visualConfig.kpuTrend ?? 'flat',
-                kpiAlign: visualConfig.kpiAlign ?? visualConfig.kpuAlign ?? 'left',
-                kpiNote: visualConfig.kpiNote ?? visualConfig.kpuNote ?? ''
-            };
-            parsedVisType = (legacyType || 'table') as VisualizationType;
-            setVisType(parsedVisType);
-            setVisConfig(parsedVisConfig);
+            setActiveWidgetId(widget.id);
+            setWidgetName(widget.name);
+            setSql(restoredSql);
+            const matchedBySql = sqlStatementByNormalizedSql.get(normalizeSqlText(restoredSql));
+            setSelectedSqlStatementId(
+                draft
+                    ? draft.selectedSqlStatementId
+                    : (typeof widget.sql_statement_id === 'string' && widget.sql_statement_id.trim().length > 0
+                        ? widget.sql_statement_id.trim()
+                        : (linkedStatement?.id || matchedBySql?.id || ''))
+            );
+            setLastRunSql('');
+            setResults([]);
+            setError('');
+            setQueryConfig(draft?.queryConfig);
+            setBuilderMode(draft?.builderMode || 'sql');
+            setVisType(draft?.visType || 'table');
+            setVisConfig(draft?.visConfig || { type: 'table', color: '#3b82f6' });
+            if (draft?.previewTab) {
+                setPreviewTab(draft.previewTab);
+            } else if (persistedPreviewTab) {
+                setPreviewTab(persistedPreviewTab);
+            }
 
-            parsedBuilderMode = 'sql';
-            setBuilderMode(parsedBuilderMode);
-            setQueryConfig(undefined);
-        } catch (e) {
-            logger.error('Error parsing widget config', e);
-        }
+            try {
+                const visualConfig = JSON.parse(widget.visualization_config) as WidgetConfig;
+                const legacyType = visualConfig.type === 'kpu_manual' ? 'kpi_manual' : visualConfig.type;
+                parsedVisConfig = {
+                    ...visualConfig,
+                    type: (legacyType || 'table') as WidgetConfig['type'],
+                    kpiTitle: visualConfig.kpiTitle ?? visualConfig.kpuTitle ?? '',
+                    kpiValue: visualConfig.kpiValue ?? visualConfig.kpuValue ?? '',
+                    kpiUnit: visualConfig.kpiUnit ?? visualConfig.kpuUnit ?? '',
+                    kpiTarget: visualConfig.kpiTarget ?? visualConfig.kpuTarget ?? '',
+                    kpiTrend: visualConfig.kpiTrend ?? visualConfig.kpuTrend ?? 'flat',
+                    kpiAlign: visualConfig.kpiAlign ?? visualConfig.kpuAlign ?? 'left',
+                    kpiNote: visualConfig.kpiNote ?? visualConfig.kpuNote ?? ''
+                };
+                parsedVisType = (legacyType || 'table') as VisualizationType;
+                if (!draft) {
+                    setVisType(parsedVisType);
+                    setVisConfig(parsedVisConfig);
+                    setBuilderMode('sql');
+                    setQueryConfig(undefined);
+                }
+            } catch (e) {
+                logger.error('Error parsing widget config', e);
+            }
 
-        if (navigate) {
-            setSidebarTab('source');
-        }
+            if (draft) {
+                parsedVisType = draft.visType;
+                parsedVisConfig = draft.visConfig;
+                setSourceSelectTab(draft.sourceSelectTab);
+            }
+
+            if (navigate) {
+                setSidebarTab('source');
+            }
             if (parsedVisType === 'text' || parsedVisType === 'markdown' || parsedVisType === 'status' || parsedVisType === 'section' || parsedVisType === 'kpi_manual' || parsedVisType === 'image') {
                 setSql('');
                 setLastRunSql('');
                 setBuilderMode('sql');
-            setQueryConfig(undefined);
-            if (navigate) {
-                setGuidedStep(3);
-                setSidebarTab('visual');
-            }
-        } else {
-            setSql(restoredSql);
-            const normalizedWidgetSql = normalizeSqlText(restoredSql);
-            const cachedRun = getCachedWidgetRun(widget.id, normalizedWidgetSql);
-            if (cachedRun) {
-                setResults(cachedRun.rows);
-                setLastRunSql(restoredSql);
-                setError('');
-            }
-            await handleRun(restoredSql, {
-                preserveVisualization: true,
-                cacheTarget: {
-                    widgetId: widget.id,
-                    normalizedSql: normalizedWidgetSql
+                setQueryConfig(undefined);
+                if (navigate) {
+                    setGuidedStep(3);
+                    setSidebarTab('visual');
                 }
-            });
-            if (navigate) {
-                setGuidedStep(3);
-                setSidebarTab('visual');
+            } else {
+                setSql(restoredSql);
+                const normalizedWidgetSql = normalizeSqlText(restoredSql);
+                const cachedRun = getCachedWidgetRun(widget.id, normalizedWidgetSql);
+                if (cachedRun) {
+                    setResults(cachedRun.rows);
+                    setLastRunSql(restoredSql);
+                    setError('');
+                }
+                if ((draft?.lastRunSql || restoredSql).trim().length > 0) {
+                    await handleRun(restoredSql, {
+                        preserveVisualization: true,
+                        cacheTarget: {
+                            widgetId: widget.id,
+                            normalizedSql: normalizedWidgetSql
+                        }
+                    });
+                    setLastRunSql(draft?.lastRunSql || restoredSql);
+                }
+                if (navigate) {
+                    setGuidedStep(3);
+                    setSidebarTab('visual');
+                }
             }
+
+            const persistedBaselineSnapshot = buildSnapshot({
+                // Keep baseline on persisted DB state so restored local drafts remain dirty.
+                currentSql: (parsedVisType === 'text' || parsedVisType === 'markdown' || parsedVisType === 'status' || parsedVisType === 'section' || parsedVisType === 'kpi_manual' || parsedVisType === 'image') ? '' : widgetSql,
+                currentVisType: parsedVisType,
+                currentVisConfig: parsedVisConfig,
+                currentWidgetName: widget.name,
+                currentActiveWidgetId: widget.id
+            });
+            setSavedSnapshot(persistedBaselineSnapshot);
+        } finally {
+            setIsRestoringEditorState(false);
         }
-        const persistedBaselineSnapshot = buildSnapshot({
-            // Keep baseline on persisted DB state so restored local drafts remain dirty.
-            currentSql: (parsedVisType === 'text' || parsedVisType === 'markdown' || parsedVisType === 'status' || parsedVisType === 'section' || parsedVisType === 'kpi_manual' || parsedVisType === 'image') ? '' : widgetSql,
-            currentBuilderMode: parsedBuilderMode,
-            currentQueryConfig: undefined,
-            currentVisType: parsedVisType,
-            currentVisConfig: parsedVisConfig,
-            currentWidgetName: widget.name,
-            currentActiveWidgetId: widget.id
-        });
-        pendingBaselineSnapshotRef.current = persistedBaselineSnapshot;
-        setSavedSnapshot(persistedBaselineSnapshot);
-    }, [buildSnapshot, handleRun, setQueryConfig, setSelectedSqlStatementId, sqlStatementByNormalizedSql, sqlStatementsById, widgetSqlDraftById, widgetSqlStatementDraftById]);
+    }, [buildSnapshot, handleRun, setPreviewTab, setQueryConfig, setSelectedSqlStatementId, sqlStatementByNormalizedSql, sqlStatementsById, widgetDraftById, widgetPreviewTabById]);
 
     const handleSaveWidget = useCallback(async (mode: 'update' | 'new' = 'update'): Promise<boolean> => {
         if (isReadOnly) return false;
@@ -587,8 +614,6 @@ export const WidgetsView: React.FC = () => {
                 }));
                 setSavedSnapshot(buildSnapshot({
                     currentSql: widget.sql_query,
-                    currentBuilderMode: builderMode,
-                    currentQueryConfig: builderMode === 'visual' ? queryConfig : undefined,
                     currentVisType: visType,
                     currentVisConfig: visConfig,
                     currentWidgetName: widget.name,
@@ -598,6 +623,13 @@ export const WidgetsView: React.FC = () => {
                 setSidebarTab('source');
                 setSourceSelectTab('widget');
                 setPreviewTab('graphic');
+                setUnsavedWidgetDraft(null);
+                setWidgetDraftById((prev) => {
+                    if (!Object.prototype.hasOwnProperty.call(prev, widget.id)) return prev;
+                    const next = { ...prev };
+                    delete next[widget.id];
+                    return next;
+                });
                 return true;
             } catch (err: unknown) {
                 await appDialog.error(t('querybuilder.error_save') + (err instanceof Error ? err.message : String(err)));
@@ -701,7 +733,9 @@ export const WidgetsView: React.FC = () => {
         queryConfig,
         visConfig,
         visType,
-        widgetName
+        widgetName,
+        setUnsavedWidgetDraft,
+        setWidgetDraftById
     ]);
     const columns = useMemo(() => {
         if (results.length === 0) return [];
@@ -881,39 +915,134 @@ export const WidgetsView: React.FC = () => {
         setLastOpenWidgetId(activeWidgetId);
     }, [activeWidgetId, lastOpenWidgetId, setLastOpenWidgetId]);
     useEffect(() => {
-        if (pendingBaselineSync) return;
-        if (!activeWidgetId) return;
-        if (CONTENT_VIS_TYPES.has(visType)) {
-            setWidgetSqlDraftById((prev) => {
-                if (!Object.prototype.hasOwnProperty.call(prev, activeWidgetId)) return prev;
-                const next = { ...prev };
-                delete next[activeWidgetId];
-                return next;
-            });
-            setWidgetSqlStatementDraftById((prev) => {
-                if (!Object.prototype.hasOwnProperty.call(prev, activeWidgetId)) return prev;
-                const next = { ...prev };
-                delete next[activeWidgetId];
-                return next;
+        if (isRestoringEditorState) return;
+        const selectedStatementSql = selectedSqlStatementId
+            ? (sqlStatementsById.get(selectedSqlStatementId)?.sql_text || '')
+            : '';
+        const draftSql = sql.trim().length > 0 ? sql : selectedStatementSql;
+        const normalizedSourceSelectTab: 'none' | 'query' | 'widget' = (
+            sourceSelectTab === 'none' && (Boolean((selectedSqlStatementId || '').trim()) || draftSql.trim().length > 0)
+                ? 'query'
+                : sourceSelectTab
+        );
+        const currentDraft: WidgetEditorDraft = {
+            sourceSelectTab: normalizedSourceSelectTab,
+            sql: draftSql,
+            selectedSqlStatementId,
+            previewTab,
+            visType,
+            visConfig,
+            builderMode,
+            queryConfig,
+            lastRunSql
+        };
+        if (activeWidgetId) {
+            setWidgetPreviewTabById((prev) => (
+                prev[activeWidgetId] === previewTab
+                    ? prev
+                    : { ...prev, [activeWidgetId]: previewTab }
+            ));
+            setWidgetDraftById((prev) => {
+                const existing = prev[activeWidgetId];
+                if (existing && JSON.stringify(existing) === JSON.stringify(currentDraft)) return prev;
+                return { ...prev, [activeWidgetId]: currentDraft };
             });
             return;
         }
-        setWidgetSqlDraftById((prev) => (
-            prev[activeWidgetId] === sql
-                ? prev
-                : { ...prev, [activeWidgetId]: sql }
-        ));
-        setWidgetSqlStatementDraftById((prev) => (
-            prev[activeWidgetId] === selectedSqlStatementId
-                ? prev
-                : { ...prev, [activeWidgetId]: selectedSqlStatementId }
-        ));
-    }, [activeWidgetId, selectedSqlStatementId, sql, visType, pendingBaselineSync, setWidgetSqlDraftById, setWidgetSqlStatementDraftById]);
+
+        const hasUnsavedNewWidgetDraft = (
+            normalizedSourceSelectTab !== 'none'
+            || Boolean((selectedSqlStatementId || '').trim())
+            || normalizeSqlText(draftSql) !== normalizeSqlText(DEFAULT_SQL)
+            || visType !== 'table'
+            || JSON.stringify(visConfig) !== JSON.stringify({ type: 'table', color: '#3b82f6' })
+            || Boolean(lastRunSql.trim())
+            || results.length > 0
+        );
+        if (!hasUnsavedNewWidgetDraft) {
+            if (unsavedWidgetDraft !== null) setUnsavedWidgetDraft(null);
+            return;
+        }
+        if (unsavedWidgetDraft && JSON.stringify(unsavedWidgetDraft) === JSON.stringify(currentDraft)) return;
+        setUnsavedWidgetDraft(currentDraft);
+    }, [
+        activeWidgetId,
+        builderMode,
+        buildSnapshot,
+        lastRunSql,
+        previewTab,
+        queryConfig,
+        results.length,
+        savedSnapshot,
+        selectedSqlStatementId,
+        setWidgetPreviewTabById,
+        setUnsavedWidgetDraft,
+        setWidgetDraftById,
+        sourceSelectTab,
+        sql,
+        sqlStatementsById,
+        unsavedWidgetDraft,
+        isRestoringEditorState,
+        visConfig,
+        visType
+    ]);
+
+    useEffect(() => {
+        if (!selectedSqlStatementId) return;
+        if (sql.trim().length > 0) return;
+        const statementSql = sqlStatementsById.get(selectedSqlStatementId)?.sql_text || '';
+        if (!statementSql.trim()) return;
+        setSql(statementSql);
+        if (sourceSelectTab === 'none') {
+            setSourceSelectTab('query');
+        }
+    }, [selectedSqlStatementId, sourceSelectTab, sql, sqlStatementsById]);
 
     useEffect(() => {
         if (hasRestoredLastWidgetRef.current) return;
-        if (!savedWidgets || savedWidgets.length === 0) return;
+        if (!savedWidgets) return;
         if (!lastOpenWidgetId) {
+            if (!activeWidgetId && unsavedWidgetDraft) {
+                const statementSql = unsavedWidgetDraft.selectedSqlStatementId
+                    ? (sqlStatementsById.get(unsavedWidgetDraft.selectedSqlStatementId)?.sql_text || '')
+                    : '';
+                const restoredSql = (unsavedWidgetDraft.sql || '').trim() || statementSql;
+                const needsStatementResolution = (
+                    unsavedWidgetDraft.sourceSelectTab === 'query'
+                    && Boolean((unsavedWidgetDraft.selectedSqlStatementId || '').trim())
+                    && restoredSql.trim().length === 0
+                );
+                if (needsStatementResolution && !sqlStatements) {
+                    // Wait for SQL statement catalog before restoring query-based unsaved drafts.
+                    return;
+                }
+                hasRestoredLastWidgetRef.current = true;
+                setIsRestoringEditorState(true);
+                setActiveWidgetId(null);
+                setWidgetName('');
+                setSourceSelectTab(unsavedWidgetDraft.sourceSelectTab);
+                setSql(restoredSql);
+                setSelectedSqlStatementId(unsavedWidgetDraft.selectedSqlStatementId);
+                setPreviewTab(unsavedWidgetDraft.previewTab || 'graphic');
+                setVisType(unsavedWidgetDraft.visType);
+                setVisConfig(unsavedWidgetDraft.visConfig);
+                setBuilderMode(unsavedWidgetDraft.builderMode);
+                setQueryConfig(unsavedWidgetDraft.queryConfig);
+                setLastRunSql(unsavedWidgetDraft.lastRunSql || '');
+                setResults([]);
+                setError('');
+                setSavedSnapshot('');
+                if (restoredSql.trim() && unsavedWidgetDraft.sourceSelectTab === 'query') {
+                    void handleRun(restoredSql, { preserveVisualization: true }).finally(() => {
+                        finishHeaderHydration();
+                        setIsRestoringEditorState(false);
+                    });
+                } else {
+                    finishHeaderHydration();
+                    setIsRestoringEditorState(false);
+                }
+                return;
+            }
             hasRestoredLastWidgetRef.current = true;
             finishHeaderHydration();
             return;
@@ -935,7 +1064,7 @@ export const WidgetsView: React.FC = () => {
         void loadWidget(saved, false).finally(() => {
             finishHeaderHydration();
         });
-    }, [activeWidgetId, finishHeaderHydration, lastOpenWidgetId, loadWidget, savedWidgets, savedWidgetsById, setLastOpenWidgetId]);
+    }, [activeWidgetId, finishHeaderHydration, handleRun, lastOpenWidgetId, loadWidget, savedWidgets, savedWidgetsById, setLastOpenWidgetId, setQueryConfig, setSelectedSqlStatementId, sqlStatements, sqlStatementsById, unsavedWidgetDraft]);
     useEffect(() => {
         if (!isHeaderHydrating) return;
         if (!savedWidgets) return;
@@ -1160,7 +1289,16 @@ export const WidgetsView: React.FC = () => {
         () => buildSnapshot(),
         [buildSnapshot]
     );
-    const hasUnsavedChanges = savedSnapshot.length > 0 && currentSnapshot !== savedSnapshot;
+    const hasUnsavedNewWidget = !activeWidgetId && (
+        sourceSelectTab !== 'none'
+        || Boolean((selectedSqlStatementId || '').trim())
+        || normalizeSqlText(sql) !== normalizeSqlText(DEFAULT_SQL)
+        || visType !== 'table'
+        || JSON.stringify(visConfig) !== JSON.stringify({ type: 'table', color: '#3b82f6' })
+        || Boolean(lastRunSql.trim())
+        || results.length > 0
+    );
+    const hasUnsavedChanges = (savedSnapshot.length > 0 && currentSnapshot !== savedSnapshot) || hasUnsavedNewWidget;
     const canSaveCurrentWidget = !isHeaderHydrating && !saveDisabled && hasUnsavedChanges;
     const applySqlStatementSource = useCallback((statement: SqlStatementRecord) => {
         setSelectedSqlStatementId(statement.id);
@@ -1198,6 +1336,15 @@ export const WidgetsView: React.FC = () => {
         if (!canContinue) return;
 
         const defaultVisConfig: WidgetConfig = { type: 'table', color: '#3b82f6' };
+        if (activeWidgetId) {
+            setWidgetDraftById((prev) => {
+                if (!Object.prototype.hasOwnProperty.call(prev, activeWidgetId)) return prev;
+                const next = { ...prev };
+                delete next[activeWidgetId];
+                return next;
+            });
+        }
+        setUnsavedWidgetDraft(null);
         setActiveWidgetId(null);
         setLastOpenWidgetId('');
         setWidgetName('');
@@ -1215,7 +1362,7 @@ export const WidgetsView: React.FC = () => {
         setGuidedStep(1);
         setSidebarTab('visual');
         setSavedSnapshot('');
-    }, [confirmSaveOrDiscardBeforeContinue, setLastOpenWidgetId, setPreviewTab, setQueryConfig, setSelectedSqlStatementId]);
+    }, [activeWidgetId, confirmSaveOrDiscardBeforeContinue, setLastOpenWidgetId, setPreviewTab, setQueryConfig, setSelectedSqlStatementId, setUnsavedWidgetDraft, setWidgetDraftById]);
     const openLoadDialog = useCallback((tab: 'widget' | 'sql') => {
         setLoadDialogType(tab);
         setLoadDialogSearch('');
@@ -1226,12 +1373,13 @@ export const WidgetsView: React.FC = () => {
     const openWidgetWithUnsavedGuard = useCallback(async (widget: SavedWidget, closeLoadDialog = false) => {
         const canContinue = await confirmSaveOrDiscardBeforeContinue();
         if (!canContinue) return false;
+        setUnsavedWidgetDraft(null);
         setSourceSelectTab('widget');
         setWorkspaceTab('editor');
         await loadWidget(widget, true);
         if (closeLoadDialog) setIsLoadDialogOpen(false);
         return true;
-    }, [confirmSaveOrDiscardBeforeContinue, loadWidget, setWorkspaceTab]);
+    }, [confirmSaveOrDiscardBeforeContinue, loadWidget, setUnsavedWidgetDraft, setWorkspaceTab]);
     const applyLoadSelection = async () => {
         if (loadDialogType === 'widget') {
             if (!selectedLoadWidgetId) return;
@@ -1349,26 +1497,24 @@ export const WidgetsView: React.FC = () => {
         );
         if (!confirmDelete) return;
         await SystemRepository.deleteUserWidget(widget.id);
-        setWidgetSqlDraftById((prev) => {
+        setWidgetDraftById((prev) => {
             if (!Object.prototype.hasOwnProperty.call(prev, widget.id)) return prev;
             const next = { ...prev };
             delete next[widget.id];
             return next;
         });
-        setWidgetSqlStatementDraftById((prev) => {
-            if (!Object.prototype.hasOwnProperty.call(prev, widget.id)) return prev;
-            const next = { ...prev };
-            delete next[widget.id];
-            return next;
-        });
+        if (!activeWidgetId) {
+            setUnsavedWidgetDraft(null);
+        }
         refreshWidgets();
         if (activeWidgetId === widget.id) {
             setActiveWidgetId(null);
             setLastOpenWidgetId('');
             setWidgetName('');
             setSavedSnapshot('');
+            setUnsavedWidgetDraft(null);
         }
-    }, [activeWidgetId, dashboardUsageByWidgetId, refreshWidgets, setLastOpenWidgetId, setWidgetSqlDraftById, setWidgetSqlStatementDraftById, t]);
+    }, [activeWidgetId, dashboardUsageByWidgetId, refreshWidgets, setLastOpenWidgetId, setUnsavedWidgetDraft, setWidgetDraftById, t]);
     const handleToggleWidgetFavorite = useCallback((widgetId: string) => {
         setPinnedWidgetIds((current) => {
             if (current.includes(widgetId)) return current.filter((entry) => entry !== widgetId);
@@ -1596,18 +1742,6 @@ export const WidgetsView: React.FC = () => {
         setCachedHeaderWidgetId(activeWidgetId || '');
         setCachedHeaderDirty(hasUnsavedChanges);
     }, [activeWidgetId, hasUnsavedChanges, isHeaderHydrating, setCachedHeaderDirty, setCachedHeaderName, setCachedHeaderWidgetId, widgetName]);
-
-    useEffect(() => {
-        if (!pendingBaselineSync) return;
-        if (loading) return;
-        const timer = window.setTimeout(() => {
-            const pendingBaseline = pendingBaselineSnapshotRef.current;
-            setSavedSnapshot(pendingBaseline ?? currentSnapshot);
-            pendingBaselineSnapshotRef.current = null;
-            setPendingBaselineSync(false);
-        }, 0);
-        return () => window.clearTimeout(timer);
-    }, [pendingBaselineSync, loading, currentSnapshot]);
 
     useEffect(() => {
         const onBeforeUnload = (event: BeforeUnloadEvent) => {

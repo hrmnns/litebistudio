@@ -22,7 +22,7 @@ import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { importDatabase, exportDatabase, factoryResetDatabase } from '../../lib/db';
 import { isValidIdentifier } from '../../lib/utils';
 
@@ -155,6 +155,7 @@ const shouldConfirmDestructiveActions = (): boolean => {
 export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete }) => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
+    const location = useLocation();
     const now = new Date();
     const footerText = t('settings.last_update', {
         date: now.toLocaleDateString(i18n.language === 'de' ? 'de-DE' : 'en-US'),
@@ -164,19 +165,17 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system' | 'danger'>(() => {
-        const stored = sessionStorage.getItem('litebistudio_datasource_tab');
-        if (stored === 'import' || stored === 'structure' || stored === 'system' || stored === 'danger') {
-            return stored;
-        }
-        return 'import';
-    });
+    const initialTabFromNavigation = (location.state as { initialTab?: string } | null)?.initialTab;
+    const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system' | 'danger'>(
+        initialTabFromNavigation === 'import'
+            || initialTabFromNavigation === 'structure'
+            || initialTabFromNavigation === 'system'
+            || initialTabFromNavigation === 'danger'
+            ? initialTabFromNavigation
+            : 'import'
+    );
     const [visibleUserTablesCount, setVisibleUserTablesCount] = useState(STRUCTURE_META_BATCH_SIZE);
     const [visibleUserViewsCount, setVisibleUserViewsCount] = useState(STRUCTURE_META_BATCH_SIZE);
-
-    useEffect(() => {
-        sessionStorage.setItem('litebistudio_datasource_tab', activeTab);
-    }, [activeTab]);
 
     // Import State
     const [selectedTable, setSelectedTable] = useState<string>('');
@@ -1413,7 +1412,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                 resetEnvironmentSettings();
                                                                 await appDialog.info(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));
                                                                 markBackupComplete();
-                                                                sessionStorage.removeItem('litebistudio_datasource_tab');
                                                                 navigate('/');
                                                                 window.location.reload();
                                                             } catch (err: unknown) {

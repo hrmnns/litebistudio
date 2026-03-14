@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { TablesView } from './TablesView';
 
@@ -105,16 +105,18 @@ describe('SQL Workspace controls smoke', () => {
     });
 
     it('disables run button when editor has no executable SQL', async () => {
-        window.localStorage.setItem('tables_sql_workspace_input_v1', '-- comment only');
         renderSqlWorkspace();
+        const editor = await screen.findByLabelText('sql-editor');
+        fireEvent.change(editor, { target: { value: '-- comment only' } });
 
         const runButton = await screen.findByTitle('Not available');
         expect(runButton).toBeDisabled();
     });
 
     it('enables run button when executable SQL is present', async () => {
-        window.localStorage.setItem('tables_sql_workspace_input_v1', 'SELECT 1;');
         renderSqlWorkspace();
+        const editor = await screen.findByLabelText('sql-editor');
+        fireEvent.change(editor, { target: { value: 'SELECT 1;' } });
 
         await waitFor(() => {
             const runButton = screen.getByTitle('Ausführen');
@@ -122,3 +124,4 @@ describe('SQL Workspace controls smoke', () => {
         });
     });
 });
+

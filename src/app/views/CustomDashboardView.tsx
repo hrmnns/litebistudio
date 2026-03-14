@@ -18,7 +18,6 @@ import {
 import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useReportExport } from '../../hooks/useReportExport';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
 import WidgetRenderer from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
 import { getComponent, SYSTEM_WIDGETS } from '../registry';
@@ -140,7 +139,7 @@ export const CustomDashboardView: React.FC = () => {
     const { t } = useTranslation();
     // Dashboards State
     const [dashboards, setDashboards] = useState<DashboardDef[]>([]);
-    const [dashboardOrderIds, setDashboardOrderIds] = useLocalStorage<string[]>('dashboard_order_v1', []);
+    const [dashboardOrderIds, setDashboardOrderIds] = useState<string[]>([]);
     const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
 
@@ -148,8 +147,8 @@ export const CustomDashboardView: React.FC = () => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'system' | 'custom'>('system');
 
-    const [showDashboardTools, setShowDashboardTools] = useLocalStorage<boolean>('dashboard_tools_open', false);
-    const [dashboardToolsTab, setDashboardToolsTab] = useLocalStorage<'layout' | 'filters' | 'dashboards'>('dashboard_tools_tab_v1', 'layout');
+    const [showDashboardTools, setShowDashboardTools] = useState(false);
+    const [dashboardToolsTab, setDashboardToolsTab] = useState<'layout' | 'filters' | 'dashboards'>('layout');
     const [movePickerWidgetId, setMovePickerWidgetId] = useState<string | null>(null);
     const [zoomedWidgetKey, setZoomedWidgetKey] = useState<string | null>(null);
     const [suggestedColumns, setSuggestedColumns] = useState<string[]>([]);

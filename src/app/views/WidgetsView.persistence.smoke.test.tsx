@@ -139,10 +139,7 @@ describe('WidgetsView persistence smoke', () => {
         ];
     });
 
-    it('keeps active preview tab across remount', async () => {
-        window.localStorage.setItem('widgets_last_open_widget_id', 'widget-1');
-        window.localStorage.setItem('widgets_preview_tab', 'graphic');
-
+    it('resets preview tab to initial state across remount', async () => {
         const rendered = render(<WidgetsView />);
 
         const tableTab = await screen.findByRole('button', { name: 'Tabelle' });
@@ -158,25 +155,32 @@ describe('WidgetsView persistence smoke', () => {
         rendered.unmount();
         render(<WidgetsView />);
 
-        const restoredTableTab = await screen.findByRole('button', { name: 'Tabelle' });
+        const graphicTab = await screen.findByRole('button', { name: 'Grafisch' });
         await waitFor(() => {
             expect(
-                restoredTableTab.className.includes('bg-blue-50')
-                || restoredTableTab.className.includes('bg-[rgb(var(--ui-primary))/0.12]')
+                graphicTab.className.includes('bg-blue-50')
+                || graphicTab.className.includes('bg-[rgb(var(--ui-primary))/0.12]')
             ).toBe(true);
         });
     }, 15000);
 
-    it('does not mark restored widget as dirty without user change', async () => {
-        window.localStorage.setItem('widgets_last_open_widget_id', 'widget-1');
-        window.localStorage.setItem('widgets_preview_tab', 'table');
-
+  it('starts clean on remount without persisted widget session', async () => {
         render(<WidgetsView />);
 
         await waitFor(() => {
-            expect(screen.getByRole('heading', { name: /Widget\s*-\s*Smoke Widget/ })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Widget\s*-\s*Unbenannt/ })).toBeInTheDocument();
         });
 
-        expect(screen.queryByRole('heading', { name: /Widget\s*-\s*Smoke Widget\s*\*/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: /Widget\s*-\s*Unbenannt\s*\*/ })).not.toBeInTheDocument();
     });
+
+    it('does not restore unsaved new widget draft across remount', async () => {
+        render(<WidgetsView />);
+
+        await waitFor(() => {
+            expect(screen.getByRole('heading', { name: /Widget\s*-\s*Unbenannt/ })).toBeInTheDocument();
+        });
+        expect(screen.queryByRole('heading', { name: /Widget\s*-\s*Unbenannt\s*\*/ })).not.toBeInTheDocument();
+    });
+
 });

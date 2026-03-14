@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from './app/Layout';
 // import { ComponentGridPage } from './app/pages/ComponentGridPage';
 const SettingsPage = React.lazy(() => import('./app/pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
@@ -13,6 +13,7 @@ const ReportPackView = React.lazy(() => import('./app/views/ReportPackView'));
 
 const AppRoutes: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     return (
         <React.Suspense fallback={<div className="h-screen w-full bg-slate-50 dark:bg-slate-900" />}>
             <Routes>
@@ -24,6 +25,7 @@ const AppRoutes: React.FC = () => {
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="tables" element={
                         <TablesView
+                            key={`tables-${location.key}`}
                             onBack={() => navigate(-1)}
                             fixedMode="table"
                             titleKey="sidebar.data_inspector"
@@ -32,6 +34,7 @@ const AppRoutes: React.FC = () => {
                     } />
                     <Route path="sql-workspace" element={
                         <TablesView
+                            key={`sql-workspace-${location.key}`}
                             onBack={() => navigate(-1)}
                             fixedMode="sql"
                             titleKey="sidebar.sql_workspace"

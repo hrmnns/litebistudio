@@ -223,8 +223,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
     };
 
     const openBackupCenter = () => {
-        sessionStorage.setItem('litebistudio_datasource_tab', 'system');
-        navigate('/datasource');
+        navigate('/datasource', { state: { initialTab: 'system' } });
     };
 
     const openInspector = () => {
