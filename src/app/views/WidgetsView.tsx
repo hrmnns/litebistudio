@@ -39,7 +39,6 @@ import { SelectionListDialog } from '../components/ui/SelectionListDialog';
 import { Button } from '../components/ui/Button';
 import { getPageState, setPageState } from '../../lib/state/pageStateStore';
 import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
-import { useLocation } from 'react-router-dom';
 
 type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
@@ -184,7 +183,6 @@ const setCachedWidgetRun = (widgetId: string, normalizedSql: string, rows: DbRow
 
 export const WidgetsView: React.FC = () => {
     const { t, i18n } = useTranslation();
-    const location = useLocation();
     const initialPageState = useMemo(
         () => getPageState<WidgetsPageState>(WIDGETS_PAGE_STATE_ID, { scope: 'memory', version: WIDGETS_PAGE_STATE_VERSION }),
         []
@@ -301,10 +299,13 @@ export const WidgetsView: React.FC = () => {
     );
 
     const pendingOpenWidgetId = useMemo(() => {
-        const state = location.state as { openWidgetId?: unknown } | null;
-        const nextId = typeof state?.openWidgetId === 'string' ? state.openWidgetId.trim() : '';
+        if (typeof window === 'undefined') return '';
+        const historyState = (window.history.state ?? null) as { usr?: { openWidgetId?: unknown } } | null;
+        const nextId = typeof historyState?.usr?.openWidgetId === 'string'
+            ? historyState.usr.openWidgetId.trim()
+            : '';
         return nextId;
-    }, [location.state]);
+    }, []);
 
     // Widget Studio no longer builds SQL visually; schema metadata is optional.
     useEffect(() => {
