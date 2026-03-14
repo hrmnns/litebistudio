@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
  
 ## [Unreleased]
+
+## [1.7.0] - 2026-03-14
 ### Added
 - Introduced a new global page-state persistence infrastructure:
   - added shared `PageStateStore` (`src/lib/state/pageStateStore.ts`) with scoped state handling (`memory`/`session`) and versioned snapshots.
