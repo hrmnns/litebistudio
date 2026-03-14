@@ -25,6 +25,8 @@ import { getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFil
 import { useLocation, useNavigate } from 'react-router-dom';
 import { importDatabase, exportDatabase, factoryResetDatabase } from '../../lib/db';
 import { isValidIdentifier } from '../../lib/utils';
+import { getPageState, setPageState } from '../../lib/state/pageStateStore';
+import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 interface DatasourceViewProps {
     onImportComplete: () => void;
@@ -48,6 +50,13 @@ interface TableMetaStats {
     indexes: number;
 }
 
+interface DatasourcePageState {
+    activeTab: 'import' | 'structure' | 'system' | 'danger';
+    selectedTable: string;
+    visibleUserTablesCount: number;
+    visibleUserViewsCount: number;
+}
+
 interface ViewMetaStatus {
     valid: boolean;
     rows?: number;
@@ -56,6 +65,8 @@ interface ViewMetaStatus {
 
 const logger = createLogger('DatasourceView');
 const STRUCTURE_META_BATCH_SIZE = 24;
+const DATASOURCE_PAGE_STATE_ID = 'datasource_view';
+const DATASOURCE_PAGE_STATE_VERSION = 1;
 
 const FACTORY_RESET_LOCALSTORAGE_PREFIXES = [
     'litebistudio_',
@@ -156,11 +167,11 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
-    const now = new Date();
-    const footerText = t('settings.last_update', {
-        date: now.toLocaleDateString(i18n.language === 'de' ? 'de-DE' : 'en-US'),
-        time: now.toLocaleTimeString(i18n.language === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' })
-    });
+    const initialPageState = React.useMemo(
+        () => getPageState<DatasourcePageState>(DATASOURCE_PAGE_STATE_ID, { scope: 'memory', version: DATASOURCE_PAGE_STATE_VERSION }),
+        []
+    );
+    const footerText = usePageFooterStatus();
     const { isReadOnly, isAdminMode } = useDashboard();
     const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
@@ -172,13 +183,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             || initialTabFromNavigation === 'system'
             || initialTabFromNavigation === 'danger'
             ? initialTabFromNavigation
-            : 'import'
+            : (initialPageState?.activeTab ?? 'import')
     );
-    const [visibleUserTablesCount, setVisibleUserTablesCount] = useState(STRUCTURE_META_BATCH_SIZE);
-    const [visibleUserViewsCount, setVisibleUserViewsCount] = useState(STRUCTURE_META_BATCH_SIZE);
+    const [visibleUserTablesCount, setVisibleUserTablesCount] = useState(initialPageState?.visibleUserTablesCount ?? STRUCTURE_META_BATCH_SIZE);
+    const [visibleUserViewsCount, setVisibleUserViewsCount] = useState(initialPageState?.visibleUserViewsCount ?? STRUCTURE_META_BATCH_SIZE);
 
     // Import State
-    const [selectedTable, setSelectedTable] = useState<string>('');
+    const [selectedTable, setSelectedTable] = useState<string>(initialPageState?.selectedTable ?? '');
     const [tableSchema, setTableSchema] = useState<SchemaDefinition | null>(null);
     const [isSchemaOpen, setIsSchemaOpen] = useState(false);
     const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
@@ -206,6 +217,15 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const [backupUseSavedLocation] = useLocalStorage<boolean>('backup_use_saved_location', true);
     const restoreInputRef = useRef<HTMLInputElement | null>(null);
     const backupDirectorySupported = isBackupDirectorySupported();
+
+    useEffect(() => {
+        setPageState<DatasourcePageState>(DATASOURCE_PAGE_STATE_ID, {
+            activeTab,
+            selectedTable,
+            visibleUserTablesCount,
+            visibleUserViewsCount
+        }, { scope: 'memory', version: DATASOURCE_PAGE_STATE_VERSION });
+    }, [activeTab, selectedTable, visibleUserTablesCount, visibleUserViewsCount]);
 
     const { data: backupHistory, refresh: refreshBackupHistory } = useAsync<BackupHistoryEntry[]>(
         () => SystemRepository.listBackupHistory(12),
@@ -755,6 +775,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                 onBack: () => navigate(-1)
             }}
             footer={footerText}
+            breadcrumbs={[{ label: t('sidebar.datasource') }]}
         >
             <div className={`max-w-4xl space-y-6 ${isReadOnly ? 'opacity-80' : ''}`}>
                 <div className="border-b border-slate-200 dark:border-slate-700">

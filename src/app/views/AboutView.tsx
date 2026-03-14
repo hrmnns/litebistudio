@@ -4,6 +4,7 @@ import { PageLayout } from '../components/ui/PageLayout';
 import { Github, BookOpen, FileText, Heart, Globe, Mail, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AppBrandIcon from '../components/ui/AppBrandIcon';
+import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 const LINKS = {
     github: 'https://github.com/hrmnns/litebistudio',
@@ -17,6 +18,7 @@ const LINKS = {
 export const AboutView: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const footerText = usePageFooterStatus();
     const version = __APP_VERSION__;
     const buildNumber = __BUILD_NUMBER__;
 
@@ -51,6 +53,7 @@ export const AboutView: React.FC = () => {
                 { label: t('sidebar.settings', 'Settings'), onClick: () => navigate('/settings') },
                 { label: t('about.title', 'About') }
             ]}
+            footer={footerText}
         >
             <div className="max-w-4xl space-y-8 pb-12">
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden">

@@ -26,9 +26,13 @@ import { useDashboard } from '../../lib/context/DashboardContext';
 import type { DbRow, WidgetConfig } from '../../types';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
+import { getPageState, setPageState } from '../../lib/state/pageStateStore';
+import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 const logger = createLogger('CustomDashboardView');
 const APP_READY_EVENT = 'litebi:app-ready';
+const DASHBOARD_PAGE_STATE_ID = 'dashboard_view';
+const DASHBOARD_PAGE_STATE_VERSION = 1;
 
 interface FilterDef {
     column: string;
@@ -49,6 +53,16 @@ interface DashboardDef {
     layout: SavedWidget[];
     is_default: boolean;
     filters?: FilterDef[];
+}
+
+interface DashboardPageState {
+    dashboardOrderIds: string[];
+    activeDashboardId: string | null;
+    activeTab: 'system' | 'custom';
+    showDashboardTools: boolean;
+    dashboardToolsTab: 'layout' | 'filters' | 'dashboards';
+    movePickerWidgetId: string | null;
+    zoomedWidgetKey: string | null;
 }
 
 type WidgetTileSize = NonNullable<SavedWidget['size']>;
@@ -137,20 +151,24 @@ const DashboardSortableItem: React.FC<DashboardSortableItemProps> = ({ id, class
 
 export const CustomDashboardView: React.FC = () => {
     const { t } = useTranslation();
+    const initialPageState = React.useMemo(
+        () => getPageState<DashboardPageState>(DASHBOARD_PAGE_STATE_ID, { scope: 'memory', version: DASHBOARD_PAGE_STATE_VERSION }),
+        []
+    );
     // Dashboards State
     const [dashboards, setDashboards] = useState<DashboardDef[]>([]);
-    const [dashboardOrderIds, setDashboardOrderIds] = useState<string[]>([]);
-    const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
+    const [dashboardOrderIds, setDashboardOrderIds] = useState<string[]>(initialPageState?.dashboardOrderIds ?? []);
+    const [activeDashboardId, setActiveDashboardId] = useState<string | null>(initialPageState?.activeDashboardId ?? null);
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Modals
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'system' | 'custom'>('system');
+    const [activeTab, setActiveTab] = useState<'system' | 'custom'>(initialPageState?.activeTab ?? 'system');
 
-    const [showDashboardTools, setShowDashboardTools] = useState(false);
-    const [dashboardToolsTab, setDashboardToolsTab] = useState<'layout' | 'filters' | 'dashboards'>('layout');
-    const [movePickerWidgetId, setMovePickerWidgetId] = useState<string | null>(null);
-    const [zoomedWidgetKey, setZoomedWidgetKey] = useState<string | null>(null);
+    const [showDashboardTools, setShowDashboardTools] = useState(initialPageState?.showDashboardTools ?? false);
+    const [dashboardToolsTab, setDashboardToolsTab] = useState<'layout' | 'filters' | 'dashboards'>(initialPageState?.dashboardToolsTab ?? 'layout');
+    const [movePickerWidgetId, setMovePickerWidgetId] = useState<string | null>(initialPageState?.movePickerWidgetId ?? null);
+    const [zoomedWidgetKey, setZoomedWidgetKey] = useState<string | null>(initialPageState?.zoomedWidgetKey ?? null);
     const [suggestedColumns, setSuggestedColumns] = useState<string[]>([]);
     const [filterValueSuggestions, setFilterValueSuggestions] = useState<Record<string, string[]>>({});
     const { visibleSidebarComponentIds, setVisibleSidebarComponentIds, togglePresentationMode, isReadOnly } = useDashboard();
@@ -167,7 +185,7 @@ export const CustomDashboardView: React.FC = () => {
     );
 
     // Fetch custom widgets
-    const { data: customWidgets, refresh: refreshCustomWidgets } = useAsync<CustomWidgetRecord[]>(
+    const { data: customWidgets, loading: widgetsLoading, refresh: refreshCustomWidgets } = useAsync<CustomWidgetRecord[]>(
         async () => {
             return await SystemRepository.executeRaw('SELECT * FROM sys_user_widgets ORDER BY created_at DESC') as CustomWidgetRecord[];
         },
@@ -227,16 +245,21 @@ export const CustomDashboardView: React.FC = () => {
             const hashPart = window.location.hash || '#/';
             const queryString = hashPart.includes('?') ? hashPart.slice(hashPart.indexOf('?') + 1) : '';
             const requestedDashboardId = queryString ? new URLSearchParams(queryString).get('dashboard') : null;
+            const restoredDashboardId = initialPageState?.activeDashboardId;
             const resolvedDashboardId = requestedDashboardId && dbDashboards.some(d => d.id === requestedDashboardId)
                 ? requestedDashboardId
-                : (dbDashboards[0]?.id ?? null);
+                : (
+                    restoredDashboardId && dbDashboards.some(d => d.id === restoredDashboardId)
+                        ? restoredDashboardId
+                        : (dbDashboards[0]?.id ?? null)
+                );
             setActiveDashboardId(resolvedDashboardId);
             setIsLoaded(true);
             (window as Window & { __LITEBI_READY__?: boolean }).__LITEBI_READY__ = true;
             window.dispatchEvent(new Event(APP_READY_EVENT));
         };
         init();
-    }, [t]);
+    }, [initialPageState?.activeDashboardId, t]);
 
     const orderedDashboards = React.useMemo(() => {
         if (!dashboards.length) return [];
@@ -705,6 +728,28 @@ export const CustomDashboardView: React.FC = () => {
         });
     }, [activeDashboard, filterValueSuggestions, loadFilterValueSuggestions]);
 
+    useEffect(() => {
+        setPageState<DashboardPageState>(DASHBOARD_PAGE_STATE_ID, {
+            dashboardOrderIds,
+            activeDashboardId,
+            activeTab,
+            showDashboardTools,
+            dashboardToolsTab,
+            movePickerWidgetId,
+            zoomedWidgetKey
+        }, { scope: 'memory', version: DASHBOARD_PAGE_STATE_VERSION });
+    }, [
+        activeDashboardId,
+        activeTab,
+        dashboardOrderIds,
+        dashboardToolsTab,
+        movePickerWidgetId,
+        showDashboardTools,
+        zoomedWidgetKey
+    ]);
+
+    const footerText = usePageFooterStatus({ loading: widgetsLoading });
+
     if (!isLoaded) return null;
 
     return (
@@ -721,6 +766,8 @@ export const CustomDashboardView: React.FC = () => {
                     loading: isExporting
                 }
             }}
+            footer={footerText}
+            breadcrumbs={[{ label: t('sidebar.dashboard') }]}
             rightPanel={{
                 title: t('dashboard.tools_title', 'Dashboard Tools'),
                 enabled: Boolean(activeDashboard),

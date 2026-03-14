@@ -37,6 +37,8 @@ import { MarkdownContent } from '../components/ui/MarkdownContent';
 import { RightOverlayPanel } from '../components/ui/RightOverlayPanel';
 import { SelectionListDialog } from '../components/ui/SelectionListDialog';
 import { Button } from '../components/ui/Button';
+import { getPageState, setPageState } from '../../lib/state/pageStateStore';
+import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
@@ -96,6 +98,38 @@ interface WidgetEditorDraft {
     lastRunSql: string;
 }
 
+interface WidgetsPageState {
+    sql: string;
+    results: DbRow[];
+    error: string;
+    lastRunSql: string;
+    previewTab: 'graphic' | 'table' | 'sql';
+    savedSnapshot: string;
+    cachedHeaderName: string;
+    builderMode: 'sql' | 'visual';
+    workspaceTab: 'manage' | 'editor';
+    manageSearch: string;
+    manageSort: 'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc' | 'favorite_then_updated';
+    sourceSelectTab: 'none' | 'query' | 'widget';
+    isConfigPanelOpen: boolean;
+    guidedStep: GuidedStep;
+    queryConfig?: QueryConfig;
+    visType: VisualizationType;
+    visConfig: WidgetConfig;
+    activeWidgetId: string | null;
+    lastOpenWidgetId: string;
+    widgetName: string;
+    selectedSqlStatementId: string;
+    loadDialogSearch: string;
+    loadDialogPinnedOnly: boolean;
+    loadDialogSort: 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first';
+    pinnedWidgetIds: string[];
+    widgetDraftById: Record<string, WidgetEditorDraft>;
+    unsavedWidgetDraft: WidgetEditorDraft | null;
+    widgetPreviewTabById: Record<string, 'graphic' | 'table' | 'sql'>;
+    localWidgetSavedAtById: Record<string, string>;
+}
+
 const normalizeSqlText = (value: string) => value
     .replace(/;+$/g, '')
     .replace(/\s+/g, ' ')
@@ -117,6 +151,8 @@ interface WidgetRunCacheEntry {
 }
 const WIDGET_RUN_CACHE_MAX_ENTRIES = 12;
 const widgetRunCache = new Map<string, WidgetRunCacheEntry>();
+const WIDGETS_PAGE_STATE_ID = 'widgets_view';
+const WIDGETS_PAGE_STATE_VERSION = 1;
 
 const getCachedWidgetRun = (widgetId: string, normalizedSql: string): WidgetRunCacheEntry | null => {
     const key = widgetId.trim();
@@ -147,55 +183,59 @@ const setCachedWidgetRun = (widgetId: string, normalizedSql: string, rows: DbRow
 
 export const WidgetsView: React.FC = () => {
     const { t, i18n } = useTranslation();
-    const [sql, setSql] = useState(DEFAULT_SQL);
-    const [results, setResults] = useState<DbRow[]>([]);
-    const [error, setError] = useState('');
+    const initialPageState = useMemo(
+        () => getPageState<WidgetsPageState>(WIDGETS_PAGE_STATE_ID, { scope: 'memory', version: WIDGETS_PAGE_STATE_VERSION }),
+        []
+    );
+    const [sql, setSql] = useState(initialPageState?.sql ?? DEFAULT_SQL);
+    const [results, setResults] = useState<DbRow[]>(initialPageState?.results ?? []);
+    const [error, setError] = useState(initialPageState?.error ?? '');
     const [loading, setLoading] = useState(false);
-    const [lastRunSql, setLastRunSql] = useState('');
+    const [lastRunSql, setLastRunSql] = useState(initialPageState?.lastRunSql ?? '');
     const [previewRenderVersion, setPreviewRenderVersion] = useState(0);
-    const [previewTab, setPreviewTab] = useState<'graphic' | 'table' | 'sql'>('graphic');
-    const [savedSnapshot, setSavedSnapshot] = useState('');
-    const [isHeaderHydrating, setIsHeaderHydrating] = useState(true);
+    const [previewTab, setPreviewTab] = useState<'graphic' | 'table' | 'sql'>(initialPageState?.previewTab ?? 'graphic');
+    const [savedSnapshot, setSavedSnapshot] = useState(initialPageState?.savedSnapshot ?? '');
+    const [isHeaderHydrating, setIsHeaderHydrating] = useState(!initialPageState);
     const [isRestoringEditorState, setIsRestoringEditorState] = useState(false);
-    const [cachedHeaderName, setCachedHeaderName] = useState('');
+    const [cachedHeaderName, setCachedHeaderName] = useState(initialPageState?.cachedHeaderName ?? '');
     const [, setCachedHeaderDirty] = useState(false);
     const [, setCachedHeaderWidgetId] = useState('');
 
     // Mode State
-    const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>('sql');
-    const [workspaceTab, setWorkspaceTab] = useState<'manage' | 'editor'>('editor');
-    const [manageSearch, setManageSearch] = useState('');
-    const [manageSort, setManageSort] = useState<'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc' | 'favorite_then_updated'>('updated_desc');
+    const [builderMode, setBuilderMode] = useState<'sql' | 'visual'>(initialPageState?.builderMode ?? 'sql');
+    const [workspaceTab, setWorkspaceTab] = useState<'manage' | 'editor'>(initialPageState?.workspaceTab ?? 'editor');
+    const [manageSearch, setManageSearch] = useState(initialPageState?.manageSearch ?? '');
+    const [manageSort, setManageSort] = useState<'name_asc' | 'name_desc' | 'updated_desc' | 'updated_asc' | 'usage_desc' | 'favorite_then_updated'>(initialPageState?.manageSort ?? 'updated_desc');
     const [, setSidebarTab] = useState<'source' | 'visual' | 'widget'>('visual');
-    const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>('none');
-    const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
-    const [guidedStep, setGuidedStep] = useState<GuidedStep>(1);
-    const [queryConfig, setQueryConfig] = useState<QueryConfig | undefined>(undefined);
+    const [sourceSelectTab, setSourceSelectTab] = useState<'none' | 'query' | 'widget'>(initialPageState?.sourceSelectTab ?? 'none');
+    const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(initialPageState?.isConfigPanelOpen ?? false);
+    const [guidedStep, setGuidedStep] = useState<GuidedStep>(initialPageState?.guidedStep ?? 1);
+    const [queryConfig, setQueryConfig] = useState<QueryConfig | undefined>(initialPageState?.queryConfig);
 
     // Visualization State
-    const [visType, setVisType] = useState<VisualizationType>('table');
-    const [visConfig, setVisConfig] = useState<WidgetConfig>({ type: 'table', color: '#3b82f6' });
+    const [visType, setVisType] = useState<VisualizationType>(initialPageState?.visType ?? 'table');
+    const [visConfig, setVisConfig] = useState<WidgetConfig>(initialPageState?.visConfig ?? { type: 'table', color: '#3b82f6' });
 
     // Active Widget State
-    const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
-    const [lastOpenWidgetId, setLastOpenWidgetId] = useState('');
+    const [activeWidgetId, setActiveWidgetId] = useState<string | null>(initialPageState?.activeWidgetId ?? null);
+    const [lastOpenWidgetId, setLastOpenWidgetId] = useState(initialPageState?.lastOpenWidgetId ?? '');
 
     // Save Widget State
-    const [widgetName, setWidgetName] = useState('');
-    const [selectedSqlStatementId, setSelectedSqlStatementId] = useState('');
+    const [widgetName, setWidgetName] = useState(initialPageState?.widgetName ?? '');
+    const [selectedSqlStatementId, setSelectedSqlStatementId] = useState(initialPageState?.selectedSqlStatementId ?? '');
     const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
     const [loadDialogType, setLoadDialogType] = useState<'widget' | 'sql'>('widget');
-    const [loadDialogSearch, setLoadDialogSearch] = useState('');
-    const [loadDialogPinnedOnly, setLoadDialogPinnedOnly] = useState(false);
-    const [loadDialogSort, setLoadDialogSort] = useState<'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first'>('updated_desc');
-    const [pinnedWidgetIds, setPinnedWidgetIds] = useState<string[]>([]);
+    const [loadDialogSearch, setLoadDialogSearch] = useState(initialPageState?.loadDialogSearch ?? '');
+    const [loadDialogPinnedOnly, setLoadDialogPinnedOnly] = useState(initialPageState?.loadDialogPinnedOnly ?? false);
+    const [loadDialogSort, setLoadDialogSort] = useState<'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc' | 'pinned_first'>(initialPageState?.loadDialogSort ?? 'updated_desc');
+    const [pinnedWidgetIds, setPinnedWidgetIds] = useState<string[]>(initialPageState?.pinnedWidgetIds ?? []);
     const [selectedLoadWidgetId, setSelectedLoadWidgetId] = useState<string>('');
     const [selectedLoadSqlId, setSelectedLoadSqlId] = useState<string>('');
     const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
-    const [localWidgetSavedAtById, setLocalWidgetSavedAtById] = useState<Record<string, string>>({});
-    const [widgetDraftById, setWidgetDraftById] = useState<Record<string, WidgetEditorDraft>>({});
-    const [unsavedWidgetDraft, setUnsavedWidgetDraft] = useState<WidgetEditorDraft | null>(null);
-    const [widgetPreviewTabById, setWidgetPreviewTabById] = useState<Record<string, 'graphic' | 'table' | 'sql'>>({});
+    const [localWidgetSavedAtById, setLocalWidgetSavedAtById] = useState<Record<string, string>>(initialPageState?.localWidgetSavedAtById ?? {});
+    const [widgetDraftById, setWidgetDraftById] = useState<Record<string, WidgetEditorDraft>>(initialPageState?.widgetDraftById ?? {});
+    const [unsavedWidgetDraft, setUnsavedWidgetDraft] = useState<WidgetEditorDraft | null>(initialPageState?.unsavedWidgetDraft ?? null);
+    const [widgetPreviewTabById, setWidgetPreviewTabById] = useState<Record<string, 'graphic' | 'table' | 'sql'>>(initialPageState?.widgetPreviewTabById ?? {});
 
     // Detail View State
     const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -214,7 +254,7 @@ export const WidgetsView: React.FC = () => {
     );
     const { isExporting, exportToPdf } = useReportExport();
     const { togglePresentationMode, isPresentationMode, isReadOnly } = useDashboard();
-    const hasRestoredLastWidgetRef = useRef(false);
+    const hasRestoredLastWidgetRef = useRef(Boolean(initialPageState));
     const bypassUnsavedGuardRef = useRef(false);
     const headerHydrationStartedAtRef = useRef(Date.now());
     const headerHydrationTimerRef = useRef<number | null>(null);
@@ -1758,6 +1798,70 @@ export const WidgetsView: React.FC = () => {
         setGuidedStep(prev => (prev > suggestedGuidedStep ? suggestedGuidedStep : prev));
     }, [suggestedGuidedStep]);
 
+    useEffect(() => {
+        setPageState<WidgetsPageState>(WIDGETS_PAGE_STATE_ID, {
+            sql,
+            results,
+            error,
+            lastRunSql,
+            previewTab,
+            savedSnapshot,
+            cachedHeaderName,
+            builderMode,
+            workspaceTab,
+            manageSearch,
+            manageSort,
+            sourceSelectTab,
+            isConfigPanelOpen,
+            guidedStep,
+            queryConfig,
+            visType,
+            visConfig,
+            activeWidgetId,
+            lastOpenWidgetId,
+            widgetName,
+            selectedSqlStatementId,
+            loadDialogSearch,
+            loadDialogPinnedOnly,
+            loadDialogSort,
+            pinnedWidgetIds,
+            widgetDraftById,
+            unsavedWidgetDraft,
+            widgetPreviewTabById,
+            localWidgetSavedAtById
+        }, { scope: 'memory', version: WIDGETS_PAGE_STATE_VERSION });
+    }, [
+        activeWidgetId,
+        builderMode,
+        cachedHeaderName,
+        error,
+        guidedStep,
+        isConfigPanelOpen,
+        lastOpenWidgetId,
+        lastRunSql,
+        loadDialogPinnedOnly,
+        loadDialogSearch,
+        loadDialogSort,
+        localWidgetSavedAtById,
+        manageSearch,
+        manageSort,
+        pinnedWidgetIds,
+        previewTab,
+        queryConfig,
+        results,
+        savedSnapshot,
+        selectedSqlStatementId,
+        sourceSelectTab,
+        sql,
+        unsavedWidgetDraft,
+        visConfig,
+        visType,
+        widgetDraftById,
+        widgetName,
+        widgetPreviewTabById,
+        workspaceTab
+    ]);
+
 
     useEffect(() => {
         if (visType !== 'scatter' || numericColumns.length === 0) return;
@@ -1817,6 +1921,8 @@ export const WidgetsView: React.FC = () => {
         }
     }, [workspaceTab, loading, hasSelectedSqlStatement, sql, handleRun, isGlobalRefreshing, refreshWidgets, refreshSqlStatements]);
 
+    const footerText = usePageFooterStatus({ loading: loading || isGlobalRefreshing });
+
     return (
         <PageLayout
             header={{
@@ -1857,6 +1963,8 @@ export const WidgetsView: React.FC = () => {
                 },
                 triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration öffnen')
             }}
+            footer={footerText}
+            breadcrumbs={[{ label: t('sidebar.query_builder') }]}
             fillHeight
         >
             <div className="flex flex-col gap-4 h-full min-h-0">

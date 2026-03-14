@@ -199,6 +199,7 @@
         "limit_confirm_do_not_show_again": "Diese Abfragebestaetigung nicht mehr anzeigen",
         "limit_confirm_settings_hint": "Diese Bestaetigung kann in Einstellungen > Apps > SQL Workspace wieder aktiviert werden.",
         "limit_applied_notice": "Sicherheitslimit aktiv: Im SQL-Modus werden maximal {{limit}} Zeilen zurueckgegeben.",
+        "limit_badge": "Limit {{limit}} aktiv",
         "autocomplete_toggle_title": "SQL-Autocomplete umschalten",
         "autocomplete_on": "Autocomplete an",
         "autocomplete_off": "Autocomplete aus",

@@ -11,6 +11,8 @@ import { LOG_LEVEL_STORAGE_KEY, type AppLogLevel } from '../../lib/logging';
 import { appDialog } from '../../lib/appDialog';
 import { SystemHealthModal } from '../components/SystemHealthModal';
 import { clearSavedBackupDirectory, getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickAndSaveBackupDirectory } from '../../lib/utils/backupLocation';
+import { clearPageState, getPageState, setPageState } from '../../lib/state/pageStateStore';
+import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
 type AppsSubTab = 'tables' | 'sqlworkspace' | 'widgets' | 'reports' | 'worklist' | 'datamanagement';
@@ -18,14 +20,18 @@ type ControlsSubTab = 'datatable' | 'notifications' | 'sqleditor';
 
 export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
+    const initialPageState = React.useMemo(
+        () => getPageState<{ activeTab: SettingsTab; appsSubTab: AppsSubTab; controlsSubTab: ControlsSubTab; isHealthModalOpen: boolean }>('settings_view', { scope: 'memory', version: 1 }),
+        []
+    );
     const version = __APP_VERSION__;
     const buildNumber = __BUILD_NUMBER__;
     const { theme, setTheme, lightThemeVariant, setLightThemeVariant } = useThemeContext();
     const { isReadOnly, isAdminMode, setIsAdminMode } = useDashboard();
-    const [activeTab, setActiveTab] = React.useState<SettingsTab>('appearance');
-    const [appsSubTab, setAppsSubTab] = React.useState<AppsSubTab>('datamanagement');
-    const [controlsSubTab, setControlsSubTab] = React.useState<ControlsSubTab>('datatable');
-    const [isHealthModalOpen, setIsHealthModalOpen] = React.useState(false);
+    const [activeTab, setActiveTab] = React.useState<SettingsTab>(initialPageState?.activeTab ?? 'appearance');
+    const [appsSubTab, setAppsSubTab] = React.useState<AppsSubTab>(initialPageState?.appsSubTab ?? 'datamanagement');
+    const [controlsSubTab, setControlsSubTab] = React.useState<ControlsSubTab>(initialPageState?.controlsSubTab ?? 'datatable');
+    const [isHealthModalOpen, setIsHealthModalOpen] = React.useState(initialPageState?.isHealthModalOpen ?? false);
 
     const themeOptions: { value: ThemeMode; label: string }[] = [
         { value: 'light', label: t('settings.theme_light') },
@@ -95,6 +101,15 @@ export const SettingsView: React.FC = () => {
         setImportTablePrefixInput(importTablePrefix);
     }, [importTablePrefix]);
 
+    React.useEffect(() => {
+        setPageState('settings_view', {
+            activeTab,
+            appsSubTab,
+            controlsSubTab,
+            isHealthModalOpen
+        }, { scope: 'memory', version: 1 });
+    }, [activeTab, appsSubTab, controlsSubTab, isHealthModalOpen]);
+
     const confirmAction = async (message: string): Promise<boolean> => {
         if (!confirmDestructive) return true;
         return await appDialog.confirm(message);
@@ -106,16 +121,14 @@ export const SettingsView: React.FC = () => {
         localStorage.removeItem('tables_saved_views');
         localStorage.removeItem('tables_active_view');
         localStorage.removeItem('tables_sql_editor_height');
+        clearPageState('tables_view');
         await appDialog.info(t('settings.inspector_reset_layout_done'));
     };
 
     const handleResetSqlWorkspaceLayout = async () => {
         if (!(await confirmAction(t('settings.sql_workspace_reset_layout_confirm')))) return;
-        localStorage.removeItem('sql_workspace_sql_editor_height');
-        localStorage.removeItem('tables_sql_workspace_view_v1');
-        localStorage.removeItem('tables_sql_workspace_split_view_v1');
-        localStorage.removeItem('tables_sql_workspace_split_top_height_v1');
-        localStorage.removeItem('tables_sql_workspace_tab_v1');
+        localStorage.removeItem('tables_sql_editor_height');
+        clearPageState('sql_workspace_view');
         await appDialog.info(t('settings.sql_workspace_reset_layout_done'));
     };
 
@@ -125,22 +138,13 @@ export const SettingsView: React.FC = () => {
         localStorage.removeItem('tables_favorite_queries');
         localStorage.removeItem('tables_custom_sql_templates');
         localStorage.removeItem('tables_selected_custom_template');
-        localStorage.removeItem('tables_last_select_sql');
-        localStorage.removeItem('tables_sql_workspace_input_v1');
-        localStorage.removeItem('tables_sql_workspace_execution_sql_v1');
-        localStorage.removeItem('tables_sql_header_name_cache_v1');
-        localStorage.removeItem('tables_sql_header_dirty_cache_v1');
-        localStorage.removeItem('tables_sql_header_statement_id_cache_v1');
-        localStorage.removeItem('sql_workspace_last_open_statement_id');
+        clearPageState('sql_workspace_view');
         await appDialog.info(t('settings.sql_workspace_reset_sql_done'));
     };
 
     const handleClearWidgetsMemory = async () => {
         if (!(await confirmAction(t('settings.widgets_reset_memory_confirm', 'Clear widget workspace memory?')))) return;
-        localStorage.removeItem('widgets_header_name_cache_v1');
-        localStorage.removeItem('widgets_header_dirty_cache_v1');
-        localStorage.removeItem('widgets_header_widget_id_cache_v1');
-        localStorage.removeItem('widgets_last_open_widget_id');
+        clearPageState('widgets_view');
         await appDialog.info(t('settings.widgets_reset_memory_done', 'Widget workspace memory was cleared.'));
     };
 
@@ -172,13 +176,8 @@ export const SettingsView: React.FC = () => {
         }
     };
 
-    const now = new Date();
-    const lang = i18n.language.startsWith('de') ? 'de-DE' : 'en-US';
+    const footerText = usePageFooterStatus();
     const backupFolderSupported = isBackupDirectorySupported();
-    const footerText = t('settings.last_update', {
-        date: now.toLocaleDateString(lang),
-        time: now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
-    });
 
     const handleChooseBackupFolder = async () => {
         try {

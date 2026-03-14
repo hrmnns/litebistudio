@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
  
 ## [Unreleased]
+### Added
+- Introduced a new global page-state persistence infrastructure:
+  - added shared `PageStateStore` (`src/lib/state/pageStateStore.ts`) with scoped state handling (`memory`/`session`) and versioned snapshots.
+  - implemented restore-before-render behavior to reduce UI flicker and make page return feel like resuming the same workspace.
+
+### Changed
+- Rolled out the new global persistence mechanism across major app pages:
+  - `Widgets`: restores editor context (active preview tab, draft context, selected statement, visualization/editor state).
+  - `SQL Workspace`/`Tables`: restores SQL editor workspace state (SQL text, statement context, split layout, output view, table/profiling tab, editor scroll position).
+  - `Dashboard`: restores active dashboard/tooling context (active dashboard, dashboard order, tools panel/tab, add/zoom context).
+  - `Data Management`: restores tab and structure browsing context (active tab, selected table, visible table/view batches).
+  - `Report Packs`: restores reporting workspace context (active category/pack, expanded cards, panel/section open state).
+  - `Worklist`: restores user focus context (filter, quick-filter, search, tools panel/tab, preview selection).
+  - `Settings`: restores navigation context (main tab, app/control subtabs, health modal state).
+- Standardized page footer/status behavior with a shared implementation:
+  - introduced reusable footer status hook (`usePageFooterStatus`) for consistent `Loading...` vs `Last update` rendering across pages.
+  - aligned footer/breadcrumb presentation across Overview, Data Management, Widgets, Reporting, Worklist, About, Settings and SQL/Tables.
+  - replaced the large SQL safety-limit notice block with a compact warning badge in SQL Workspace status/footer area.
+
+### Fixed
+- Completed settings cleanup for persistence reset actions:
+  - reset actions now clear the new global page-state entries instead of legacy workspace-specific localStorage keys.
+  - removed obsolete bridge key `TABLES_LAST_SELECT_SQL_KEY`.
 
 ## [1.6.0] - 2026-03-12
 ### Added

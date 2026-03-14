@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { TablesView } from './TablesView';
+import { clearPageState } from '../../lib/state/pageStateStore';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -102,6 +103,8 @@ describe('SQL Workspace controls smoke', () => {
     beforeEach(() => {
         window.localStorage.clear();
         window.sessionStorage.clear();
+        clearPageState('tables_view');
+        clearPageState('sql_workspace_view');
     });
 
     it('disables run button when editor has no executable SQL', async () => {
@@ -122,6 +125,18 @@ describe('SQL Workspace controls smoke', () => {
             const runButton = screen.getByTitle('Ausführen');
             expect(runButton).toBeEnabled();
         });
+    });
+
+    it('restores editor SQL after remount via global page state', async () => {
+        const rendered = renderSqlWorkspace();
+        const editor = await screen.findByLabelText('sql-editor');
+        fireEvent.change(editor, { target: { value: 'SELECT 42;' } });
+
+        rendered.unmount();
+        renderSqlWorkspace();
+
+        const restoredEditor = await screen.findByLabelText('sql-editor');
+        expect((restoredEditor as HTMLTextAreaElement).value).toContain('SELECT 42;');
     });
 });
 

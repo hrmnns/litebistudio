@@ -199,6 +199,7 @@
         "limit_confirm_do_not_show_again": "Do not show this confirmation again",
         "limit_confirm_settings_hint": "You can enable this confirmation again in Settings > Apps > SQL Workspace.",
         "limit_applied_notice": "Safety limit active: maximum {{limit}} rows are returned in SQL mode.",
+        "limit_badge": "Limit {{limit}} active",
         "autocomplete_toggle_title": "Toggle SQL autocomplete",
         "autocomplete_on": "Autocomplete on",
         "autocomplete_off": "Autocomplete off",

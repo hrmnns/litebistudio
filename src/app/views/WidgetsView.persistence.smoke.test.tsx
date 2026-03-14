@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { WidgetsView } from './WidgetsView';
+import { clearPageState } from '../../lib/state/pageStateStore';
 
 type MockWidget = {
     id: string;
@@ -114,6 +115,7 @@ describe('WidgetsView persistence smoke', () => {
     beforeEach(() => {
         cleanup();
         window.localStorage.clear();
+        clearPageState('widgets_view');
         mockRows = [
             { month: '2026-01', value: 10 },
             { month: '2026-02', value: 12 }
@@ -139,7 +141,7 @@ describe('WidgetsView persistence smoke', () => {
         ];
     });
 
-    it('resets preview tab to initial state across remount', async () => {
+    it('keeps active preview tab across remount', async () => {
         const rendered = render(<WidgetsView />);
 
         const tableTab = await screen.findByRole('button', { name: 'Tabelle' });
@@ -155,16 +157,16 @@ describe('WidgetsView persistence smoke', () => {
         rendered.unmount();
         render(<WidgetsView />);
 
-        const graphicTab = await screen.findByRole('button', { name: 'Grafisch' });
+        const restoredTableTab = await screen.findByRole('button', { name: 'Tabelle' });
         await waitFor(() => {
             expect(
-                graphicTab.className.includes('bg-blue-50')
-                || graphicTab.className.includes('bg-[rgb(var(--ui-primary))/0.12]')
+                restoredTableTab.className.includes('bg-blue-50')
+                || restoredTableTab.className.includes('bg-[rgb(var(--ui-primary))/0.12]')
             ).toBe(true);
         });
     }, 15000);
 
-  it('starts clean on remount without persisted widget session', async () => {
+    it('starts clean when no prior page state exists', async () => {
         render(<WidgetsView />);
 
         await waitFor(() => {
@@ -174,7 +176,9 @@ describe('WidgetsView persistence smoke', () => {
         expect(screen.queryByRole('heading', { name: /Widget\s*-\s*Unbenannt\s*\*/ })).not.toBeInTheDocument();
     });
 
-    it('does not restore unsaved new widget draft across remount', async () => {
+    it('keeps default clean state across remount if user made no changes', async () => {
+        render(<WidgetsView />);
+        cleanup();
         render(<WidgetsView />);
 
         await waitFor(() => {

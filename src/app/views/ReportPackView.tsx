@@ -16,6 +16,8 @@ import { RightOverlayPanel } from '../components/ui/RightOverlayPanel';
 import { type ReportPack, type ReportPackItem, type DbRow, type WidgetConfig } from '../../types';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { appDialog } from '../../lib/appDialog';
+import { getPageState, setPageState } from '../../lib/state/pageStateStore';
+import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 interface DashboardRow extends DbRow {
     id: string;
@@ -30,24 +32,44 @@ interface WidgetRow extends DbRow {
     visualization_config?: unknown;
 }
 
+interface ReportPackPageState {
+    activeCategory: string;
+    activePackId: string | null;
+    expandedPacks: Record<string, boolean>;
+    isCategoryManagerOpen: boolean;
+    isReportingPanelOpen: boolean;
+    settingsSections: {
+        general: boolean;
+        cover: boolean;
+        headerFooter: boolean;
+        pageOptions: boolean;
+        quality: boolean;
+        preview: boolean;
+    };
+}
+
 interface DashboardLayoutWidgetRef {
     id: string;
 }
 
 const ReportPackView: React.FC = () => {
     const { t } = useTranslation();
+    const initialPageState = useMemo(
+        () => getPageState<ReportPackPageState>('report_pack_view', { scope: 'memory', version: 1 }),
+        []
+    );
     const categorySettingsKey = 'report_pack_categories';
     const expandedStateSettingsKey = 'report_pack_expanded_state';
     const defaultCategory = t('reports.default_category', 'General');
     const allCategoriesTab = '__all__';
     const [packs, setPacks] = useState<ReportPack[]>([]);
     const [customCategories, setCustomCategories] = useState<string[]>([]);
-    const [activeCategory, setActiveCategory] = useState<string>(allCategoriesTab);
+    const [activeCategory, setActiveCategory] = useState<string>(initialPageState?.activeCategory ?? allCategoriesTab);
     const [isCreatingCategory, setIsCreatingCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
-    const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-    const [activePackId, setActivePackId] = useState<string | null>(null);
-    const [expandedPacks, setExpandedPacks] = useState<Record<string, boolean>>({});
+    const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(initialPageState?.isCategoryManagerOpen ?? false);
+    const [activePackId, setActivePackId] = useState<string | null>(initialPageState?.activePackId ?? null);
+    const [expandedPacks, setExpandedPacks] = useState<Record<string, boolean>>(initialPageState?.expandedPacks ?? {});
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
     const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
@@ -56,15 +78,17 @@ const ReportPackView: React.FC = () => {
     const packImportInputRef = useRef<HTMLInputElement | null>(null);
     const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
     const [importTargetPackId, setImportTargetPackId] = useState<string | null>(null);
-    const [settingsSections, setSettingsSections] = useState({
-        general: true,
-        cover: true,
-        headerFooter: true,
-        pageOptions: true,
-        quality: true,
-        preview: true
-    });
-    const [isReportingPanelOpen, setIsReportingPanelOpen] = useState(false);
+    const [settingsSections, setSettingsSections] = useState(
+        initialPageState?.settingsSections ?? {
+            general: true,
+            cover: true,
+            headerFooter: true,
+            pageOptions: true,
+            quality: true,
+            preview: true
+        }
+    );
+    const [isReportingPanelOpen, setIsReportingPanelOpen] = useState(initialPageState?.isReportingPanelOpen ?? false);
     const { isReadOnly } = useDashboard();
 
     // Export State
@@ -135,6 +159,24 @@ const ReportPackView: React.FC = () => {
         }, 0);
         return () => window.clearTimeout(initialLoadHandle);
     }, [loadCustomCategories, loadPacks]);
+
+    useEffect(() => {
+        setPageState<ReportPackPageState>('report_pack_view', {
+            activeCategory,
+            activePackId,
+            expandedPacks,
+            isCategoryManagerOpen,
+            isReportingPanelOpen,
+            settingsSections
+        }, { scope: 'memory', version: 1 });
+    }, [
+        activeCategory,
+        activePackId,
+        expandedPacks,
+        isCategoryManagerOpen,
+        isReportingPanelOpen,
+        settingsSections
+    ]);
 
     const parseWidgetConfig = (rawConfig: unknown): WidgetConfig => {
         if (typeof rawConfig === 'string') {
@@ -740,12 +782,16 @@ const ReportPackView: React.FC = () => {
         }
     };
 
+    const footerText = usePageFooterStatus();
+
     return (
         <PageLayout
             header={{
                 title: t('reports.title', 'Reporting'),
                 subtitle: t('reports.subtitle', 'Build and export multi-page management reports.')
             }}
+            footer={footerText}
+            breadcrumbs={[{ label: t('sidebar.reports') }]}
             rightPanel={{
                 title: t('reports.panel_title', 'Reporting Assistant'),
                 triggerTitle: t('reports.panel_title', 'Reporting Assistant'),

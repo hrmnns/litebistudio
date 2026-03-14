@@ -9,6 +9,8 @@ import type { TableColumn, WorklistPriority, WorklistStatus } from '../../types'
 import { createLogger } from '../../lib/logger';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useNavigate } from 'react-router-dom';
+import { getPageState, setPageState } from '../../lib/state/pageStateStore';
+import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 type WorklistFilter = 'all' | WorklistStatus;
 type WorklistQuickFilter = 'none' | 'overdue' | 'today' | 'high_priority';
@@ -37,6 +39,15 @@ interface WorklistItem {
     created_at: string;
     _exists?: boolean;
 }
+
+interface WorklistPageState {
+    filter: WorklistFilter;
+    quickFilter: WorklistQuickFilter;
+    search: string;
+    showWorklistTools: boolean;
+    worklistToolsTab: WorklistToolsTab;
+    previewItemId: number | null;
+}
 type WorklistUpdatePayload = {
     status?: WorklistStatus;
     comment?: string;
@@ -47,20 +58,26 @@ type WorklistUpdatePayload = {
 export const WorklistView: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const initialPageState = useMemo(
+        () => getPageState<WorklistPageState>('worklist_view', { scope: 'memory', version: 1 }),
+        []
+    );
     const defaultWorklistView = getStoredWorklistDefaultView();
     const [items, setItems] = useState<WorklistItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<WorklistFilter>(defaultWorklistView === 'open' ? 'open' : 'all');
+    const [filter, setFilter] = useState<WorklistFilter>(initialPageState?.filter ?? (defaultWorklistView === 'open' ? 'open' : 'all'));
     const [quickFilter, setQuickFilter] = useState<WorklistQuickFilter>(
-        defaultWorklistView === 'overdue' || defaultWorklistView === 'today' || defaultWorklistView === 'high_priority'
-            ? defaultWorklistView
-            : 'none'
+        initialPageState?.quickFilter ?? (
+            defaultWorklistView === 'overdue' || defaultWorklistView === 'today' || defaultWorklistView === 'high_priority'
+                ? defaultWorklistView
+                : 'none'
+        )
     );
-    const [search, setSearch] = useState('');
-    const [showWorklistTools, setShowWorklistTools] = useState(false);
-    const [worklistToolsTab, setWorklistToolsTab] = useState<WorklistToolsTab>('focus');
+    const [search, setSearch] = useState(initialPageState?.search ?? '');
+    const [showWorklistTools, setShowWorklistTools] = useState(initialPageState?.showWorklistTools ?? false);
+    const [worklistToolsTab, setWorklistToolsTab] = useState<WorklistToolsTab>(initialPageState?.worklistToolsTab ?? 'focus');
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
-    const [previewItemId, setPreviewItemId] = useState<number | null>(null);
+    const [previewItemId, setPreviewItemId] = useState<number | null>(initialPageState?.previewItemId ?? null);
     const [isMobileLayout, setIsMobileLayout] = useState(() =>
         typeof window !== 'undefined' ? window.innerWidth < 768 : false
     );
@@ -80,6 +97,17 @@ export const WorklistView: React.FC = () => {
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, []);
+
+    useEffect(() => {
+        setPageState<WorklistPageState>('worklist_view', {
+            filter,
+            quickFilter,
+            search,
+            showWorklistTools,
+            worklistToolsTab,
+            previewItemId
+        }, { scope: 'memory', version: 1 });
+    }, [filter, previewItemId, quickFilter, search, showWorklistTools, worklistToolsTab]);
 
     const loadWorklist = useCallback(async (options?: { silent?: boolean }) => {
         if (!options?.silent) {
@@ -374,6 +402,8 @@ export const WorklistView: React.FC = () => {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
 
+    const footerText = usePageFooterStatus({ loading });
+
     return (
         <PageLayout
             header={{
@@ -381,6 +411,8 @@ export const WorklistView: React.FC = () => {
                 subtitle: t('worklist.subtitle'),
                 onBack: () => navigate(-1)
             }}
+            footer={footerText}
+            breadcrumbs={[{ label: t('sidebar.worklist') }]}
             rightPanel={{
                 title: t('worklist.tools_title', 'Worklist Tools'),
                 enabled: true,
