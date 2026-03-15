@@ -12,6 +12,12 @@ Suggested naming style:
 - `widgets-overview.png`
 - `dashboard-overview.png`
 - `settings-overview.png`
+- `example-cherit-import-complete.png`
+- `example-cherit-sql-validation.png`
+- `example-cherit-sql-catalog.png`
+- `example-cherit-widget-configuration.png`
+- `example-cherit-dashboard-executive-management.png`
+- `example-cherit-dashboard-vendor-category-analysis.png`
 
 Use relative paths from wiki pages, for example:
 

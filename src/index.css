@@ -218,6 +218,37 @@ body,
 }
 
 @layer utilities {
+    .custom-scrollbar,
+    .container-scrollbar {
+        scrollbar-width: auto;
+        scrollbar-color: var(--sql-editor-scroll-thumb) var(--sql-editor-scroll-track);
+        scrollbar-gutter: stable;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar,
+    .container-scrollbar::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track,
+    .container-scrollbar::-webkit-scrollbar-track {
+        background: var(--sql-editor-scroll-track);
+        border-radius: 99px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb,
+    .container-scrollbar::-webkit-scrollbar-thumb {
+        background: var(--sql-editor-scroll-thumb);
+        border-radius: 99px;
+        border: 2px solid var(--sql-editor-scroll-track);
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover,
+    .container-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: var(--sql-editor-scroll-thumb-hover);
+    }
+
     .no-scrollbar {
         -ms-overflow-style: none;
         scrollbar-width: none;

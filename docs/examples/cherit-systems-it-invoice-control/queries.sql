@@ -69,7 +69,14 @@ ORDER BY ABS(delta_abs) DESC;
 
 -- Q07) Budget vs actual by month and cost center
 -- Requires table: budget_monthly(year_month, cost_center_id, budget_amount, ...)
-WITH actuals AS (
+WITH budget_base AS (
+  SELECT
+    substr(year_month, 1, 7) AS year_month,
+    cost_center_id,
+    budget_amount
+  FROM budget_monthly
+),
+actuals AS (
   SELECT
     strftime('%Y-%m', i.invoice_date) AS year_month,
     it.cost_center_id,
@@ -90,7 +97,7 @@ SELECT
       ELSE ((COALESCE(a.actual_amount, 0) - b.budget_amount) / b.budget_amount) * 100
     END
   , 2) AS variance_pct
-FROM budget_monthly b
+FROM budget_base b
 LEFT JOIN actuals a
   ON a.year_month = b.year_month
   AND a.cost_center_id = b.cost_center_id
@@ -98,13 +105,20 @@ LEFT JOIN cost_centers cc ON cc.cost_center_id = b.cost_center_id
 ORDER BY b.year_month, cc.cost_center_code;
 
 -- Q08) Top budget overruns
-WITH variance AS (
+WITH budget_base AS (
+  SELECT
+    substr(year_month, 1, 7) AS year_month,
+    cost_center_id,
+    budget_amount
+  FROM budget_monthly
+),
+variance AS (
   SELECT
     b.year_month,
     cc.cost_center_code,
     b.budget_amount,
     COALESCE(SUM(it.amount_net), 0) AS actual_amount
-  FROM budget_monthly b
+  FROM budget_base b
   LEFT JOIN cost_centers cc ON cc.cost_center_id = b.cost_center_id
   LEFT JOIN invoices i ON strftime('%Y-%m', i.invoice_date) = b.year_month
   LEFT JOIN invoice_items it
@@ -140,10 +154,10 @@ WITH actual_month AS (
 ),
 budget_month AS (
   SELECT
-    year_month,
+    substr(year_month, 1, 7) AS year_month,
     ROUND(SUM(budget_amount), 2) AS budget_amount
   FROM budget_monthly
-  GROUP BY year_month
+  GROUP BY substr(year_month, 1, 7)
 )
 SELECT
   b.year_month,
@@ -161,13 +175,20 @@ LEFT JOIN actual_month a ON a.year_month = b.year_month
 ORDER BY b.year_month;
 
 -- Q10) Variance with traffic-light indicator
-WITH variance AS (
+WITH budget_base AS (
+  SELECT
+    substr(year_month, 1, 7) AS year_month,
+    cost_center_id,
+    budget_amount
+  FROM budget_monthly
+),
+variance AS (
   SELECT
     b.year_month,
     cc.cost_center_code,
     b.budget_amount,
     COALESCE(SUM(it.amount_net), 0) AS actual_amount
-  FROM budget_monthly b
+  FROM budget_base b
   LEFT JOIN cost_centers cc ON cc.cost_center_id = b.cost_center_id
   LEFT JOIN invoices i ON strftime('%Y-%m', i.invoice_date) = b.year_month
   LEFT JOIN invoice_items it

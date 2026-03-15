@@ -115,7 +115,7 @@
         "tools_layout_hint": "Widgets umsortieren und entfernen, ohne die Übersicht zu verlassen.",
         "tools_filters_hint": "Globale Dashboard-Filter zentral verwalten.",
         "tools_filters_no_common_columns": "Keine gemeinsamen Filterfelder ueber die aktuellen Widgets verfuegbar.",
-        "tools_dashboards_hint": "Dashboards erstellen, umbenennen und löschen.",
+        "tools_dashboards_hint": "Dashboards erstellen, umbenennen, löschen und als Standard festlegen.",
         "tools_move_up": "Nach oben",
         "tools_move_down": "Nach unten",
         "tools_clear_filters": "Filter leeren",
@@ -123,7 +123,9 @@
         "tools_open": "Öffnen",
         "default_badge": "Standard",
         "rename_dashboard_prompt": "Name für Dashboard:",
-        "default_not_deletable": "Standard-Dashboard kann nicht gelöscht werden"
+        "default_not_deletable": "Standard-Dashboard kann nicht gelöscht werden",
+        "set_default": "Als Standard-Dashboard festlegen",
+        "already_default": "Dies ist bereits das Standard-Dashboard"
     },
     "worklist": {
         "add_dialog_title": "Zum Arbeitsvorrat",

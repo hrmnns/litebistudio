@@ -77,6 +77,15 @@ export function createWidgetRepository() {
             if (!silent) notifyDbChange();
         },
 
+        async setDefaultDashboard(id: string, silent: boolean = false): Promise<void> {
+            await runManagedQuery(
+                'UPDATE sys_dashboards SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END, updated_at = CURRENT_TIMESTAMP',
+                [id],
+                { allowedSystemWriteTables: ['sys_dashboards'] }
+            );
+            if (!silent) notifyDbChange();
+        },
+
         async deleteDashboard(id: string): Promise<void> {
             await runManagedQuery(
                 'DELETE FROM sys_dashboards WHERE id = ?',

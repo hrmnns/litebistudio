@@ -115,7 +115,7 @@
         "tools_layout_hint": "Reorder widgets and remove items without leaving the dashboard.",
         "tools_filters_hint": "Manage global dashboard filters in one place.",
         "tools_filters_no_common_columns": "No common filter fields are available across the current widgets.",
-        "tools_dashboards_hint": "Create, rename, and remove dashboards.",
+        "tools_dashboards_hint": "Create, rename, remove, and set dashboards as default.",
         "tools_move_up": "Move up",
         "tools_move_down": "Move down",
         "tools_clear_filters": "Clear filters",
@@ -123,7 +123,9 @@
         "tools_open": "Open",
         "default_badge": "Default",
         "rename_dashboard_prompt": "Name for dashboard:",
-        "default_not_deletable": "Default dashboard cannot be deleted"
+        "default_not_deletable": "Default dashboard cannot be deleted",
+        "set_default": "Set as default dashboard",
+        "already_default": "This is already the default dashboard"
     },
     "worklist": {
         "add_dialog_title": "Add to worklist",

@@ -1,6 +1,6 @@
 # Example Scenario: Cherit Systems GmbH IT Invoice Control
 
-_Last updated: 2026-03-11_
+_Last updated: 2026-03-15_
 
 ## Goal
 
@@ -74,6 +74,8 @@ Note:
 3. Validate mapping and types.
 4. Save to internal tables.
 
+![Cherit example import completed](assets/example-cherit-import-complete.png)
+
 Expected result:
 
 - Data is available in **Tables** and queryable from **SQL Workspace**.
@@ -81,6 +83,8 @@ Expected result:
 ## 2) Validate Data Quality
 
 Run these checks in **SQL Workspace**:
+
+![Cherit example SQL validation](assets/example-cherit-sql-validation.png)
 
 ```sql
 -- Duplicate invoice ids
@@ -140,6 +144,8 @@ Expected result:
 
 Open `docs/examples/cherit-systems-it-invoice-control/queries.sql` and save reusable statements in SQL Workspace.
 
+![Cherit example SQL catalog](assets/example-cherit-sql-catalog.png)
+
 Use this naming pattern:
 
 - Query names: `Q01 - <name>`, `Q02 - <name>`, ...
@@ -160,12 +166,14 @@ For this walkthrough, use this SQL catalog:
 
 Note:
 
-- Dashboards below require `Q01`, `Q02`, `Q03`, `Q05`, `Q07`, `Q08`, `Q09`, and `Q10`.
-- `Q04` and `Q06` are optional analysis extensions for operational and vendor deep dives.
+- Dashboards below require `Q01`, `Q02`, `Q03`, `Q04`, `Q07`, `Q08`, `Q09`, and `Q10`.
+- `Q06` is an optional analysis extension for vendor deep dives.
 
 ## 4) Build a Reusable Widget Catalog
 
 Build widgets once, then reuse them across multiple dashboards.
+
+![Cherit example widget configuration](assets/example-cherit-widget-configuration.png)
 
 ### Generic widget build flow
 
@@ -184,7 +192,7 @@ Build widgets once, then reuse them across multiple dashboards.
 - `W01 - Monthly IT Spend Trend` -> SQL `Q01` -> Line chart
 - `W02 - Top Vendors by Spend` -> SQL `Q02` -> Bar chart
 - `W03 - Spend by Service Category` -> SQL `Q03` -> Donut (or Bar)
-- `W04 - Open Invoices` -> SQL `Q05` -> Table
+- `W04 - Open Invoices` -> SQL `Q04` -> Table
 - `W05 - Budget vs Actual Trend` -> SQL `Q07` -> Line chart (2 series)
 - `W06 - Budget vs Actual by Cost Center` -> SQL `Q07` -> Grouped bar
 - `W07 - Top Overruns` -> SQL `Q08` -> Table (or Bar)
@@ -196,6 +204,8 @@ Build widgets once, then reuse them across multiple dashboards.
 Purpose:
 
 - Give management a fast monthly overview of budget compliance and major risks.
+
+![Cherit example executive dashboard](assets/example-cherit-dashboard-executive-management.png)
 
 ### Build steps
 
@@ -222,6 +232,8 @@ Purpose:
 
 - Explain where spend concentration comes from.
 
+![Cherit example vendor and category dashboard](assets/example-cherit-dashboard-vendor-category-analysis.png)
+
 ### Build steps
 
 1. Create dashboard: `Vendor & Category Analysis`.
@@ -246,7 +258,7 @@ Purpose:
 
 1. Create dashboard: `Operational Invoice Control`.
 2. Add widgets:
-   - `W04 - Open Invoices` (SQL `Q05`)
+   - `W04 - Open Invoices` (SQL `Q04`)
    - `W07 - Top Overruns` (SQL `Q08`)
    - `W09 - Variance Traffic Light` (SQL `Q10`)
 3. Prefer table-oriented layout for operational work.

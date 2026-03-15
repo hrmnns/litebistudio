@@ -239,6 +239,16 @@ export const CustomDashboardView: React.FC = () => {
                         layout: normalizedLayout
                     };
                 });
+
+                const defaultDashboards = dbDashboards.filter((d) => d.is_default);
+                if (defaultDashboards.length !== 1) {
+                    const nextDefaultId = defaultDashboards[0]?.id ?? dbDashboards[0].id;
+                    await SystemRepository.setDefaultDashboard(nextDefaultId, true);
+                    dbDashboards = dbDashboards.map((d) => ({
+                        ...d,
+                        is_default: d.id === nextDefaultId
+                    }));
+                }
             }
 
             setDashboards(dbDashboards);
@@ -246,12 +256,13 @@ export const CustomDashboardView: React.FC = () => {
             const queryString = hashPart.includes('?') ? hashPart.slice(hashPart.indexOf('?') + 1) : '';
             const requestedDashboardId = queryString ? new URLSearchParams(queryString).get('dashboard') : null;
             const restoredDashboardId = initialPageState?.activeDashboardId;
+            const defaultDashboardId = dbDashboards.find((d) => d.is_default)?.id ?? null;
             const resolvedDashboardId = requestedDashboardId && dbDashboards.some(d => d.id === requestedDashboardId)
                 ? requestedDashboardId
                 : (
                     restoredDashboardId && dbDashboards.some(d => d.id === restoredDashboardId)
                         ? restoredDashboardId
-                        : (dbDashboards[0]?.id ?? null)
+                        : (defaultDashboardId ?? dbDashboards[0]?.id ?? null)
                 );
             setActiveDashboardId(resolvedDashboardId);
             setIsLoaded(true);
@@ -356,6 +367,16 @@ export const CustomDashboardView: React.FC = () => {
     const syncDashboard = async (updatedDash: DashboardDef) => {
         await SystemRepository.saveDashboard(updatedDash);
         setDashboards(prev => prev.map(d => d.id === updatedDash.id ? updatedDash : d));
+    };
+
+    const setDefaultDashboard = async (dashboard: DashboardDef) => {
+        if (dashboard.is_default) return;
+        await SystemRepository.setDefaultDashboard(dashboard.id);
+        setDashboards(prev => prev.map((entry) => ({
+            ...entry,
+            is_default: entry.id === dashboard.id
+        })));
+        setActiveDashboardId(dashboard.id);
     };
 
     const addToDashboard = async (id: string, type: 'custom' | 'system') => {
@@ -1044,7 +1065,7 @@ export const CustomDashboardView: React.FC = () => {
                         ) : (
                             <div className="flex-1 min-h-0 flex flex-col gap-2">
                                 <div className="flex items-center justify-between gap-2">
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.tools_dashboards_hint', 'Create, rename, and remove dashboards.')}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.tools_dashboards_hint', 'Create, rename, remove, and set dashboards as default.')}</p>
                                     {!isReadOnly && (
                                         <button
                                             type="button"
@@ -1096,6 +1117,20 @@ export const CustomDashboardView: React.FC = () => {
                                                         title={t('dashboard.tools_move_down', 'Move down')}
                                                     >
                                                         <ArrowDown className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { void setDefaultDashboard(d); }}
+                                                        disabled={Boolean(d.is_default)}
+                                                        className={`h-7 w-7 inline-flex items-center justify-center rounded border ${d.is_default
+                                                            ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 disabled:opacity-100'
+                                                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                                            } disabled:cursor-default`}
+                                                        title={d.is_default
+                                                            ? t('dashboard.already_default', 'This is already the default dashboard')
+                                                            : t('dashboard.set_default', 'Set as default dashboard')}
+                                                    >
+                                                        <Star className="w-3.5 h-3.5" />
                                                     </button>
                                                     <button
                                                         type="button"
