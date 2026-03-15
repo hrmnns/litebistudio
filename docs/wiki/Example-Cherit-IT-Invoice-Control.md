@@ -67,6 +67,9 @@ For this example, a ready-to-use backup is available as a release asset.
 Asset name:
 `litebistudio-example-cherit-it-invoice-control.v02.sqlite3`
 
+Direct download:
+<https://github.com/hrmnns/litebistudio/releases/download/v1.8.0/litebistudio-example-cherit-it-invoice-control.v02.sqlite3>
+
 The backup contains:
 
 - imported example data
