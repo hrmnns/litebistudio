@@ -23,11 +23,11 @@ Alternative fast start with a ready-to-use example backup:
 - Open **Data Management**
 - Navigate to **Maintenance & Backup**
 - Select **Restore backup**
-- In the **Open File** dialog, enter this URL in the **File name** field:
+- In the **Open File** dialog, you can enter this URL directly in the **File name** field:
   <https://github.com/hrmnns/litebistudio/releases/download/v1.8.0/litebistudio-example-cherit-it-invoice-control.v02.sqlite3>
 - This loads a fully prepared example database without a separate manual download step
 
-If your browser or file dialog does not support this shortcut, download the `.sqlite3` file once and select it locally instead.
+If your browser, operating system, or file dialog does not support this shortcut, download the `.sqlite3` file once and select it locally instead.
 
 If you use this shortcut, the detailed walkthrough of the included example is documented here:
 

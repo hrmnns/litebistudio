@@ -79,6 +79,8 @@ The backup contains:
 
 You can restore it via `Data Management > Maintenance & Backup > Restore`.
 
+On some platforms, you can paste the direct download URL into the `Open File` dialog directly. If that is not supported, download the `.sqlite3` file first and then select it locally.
+
 Important:
 This backup is intended for the matching LiteBI Studio release version. It may also work with newer versions, but the documented step-by-step setup in this guide remains the primary reference.
 
