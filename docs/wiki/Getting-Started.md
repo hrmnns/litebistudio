@@ -1,6 +1,6 @@
 # Getting Started
 
-_Last updated: 2026-03-12_
+_Last updated: 2026-03-15_
 
 ## Try Instantly (No Installation)
 
@@ -17,6 +17,21 @@ Fastest path to first value:
 3. Start with **Excel import** and load your first dataset.
 
 This is the recommended entry point for new users who want to evaluate the tool quickly.
+
+Alternative fast start with a ready-to-use example backup:
+
+- Open **Data Management**
+- Navigate to **Maintenance & Backup**
+- Select **Restore backup**
+- In the **Open File** dialog, enter this URL in the **File name** field:
+  <https://github.com/hrmnns/litebistudio/releases/download/v1.8.0/litebistudio-example-cherit-it-invoice-control.v02.sqlite3>
+- This loads a fully prepared example database without a separate manual download step
+
+If your browser or file dialog does not support this shortcut, download the `.sqlite3` file once and select it locally instead.
+
+If you use this shortcut, the detailed walkthrough of the included example is documented here:
+
+- [Example: Cherit IT Invoice Control](Example-Cherit-IT-Invoice-Control)
 
 Privacy note:
 
