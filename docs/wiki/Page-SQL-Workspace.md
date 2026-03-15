@@ -6,6 +6,8 @@ _Last updated: 2026-03-14_
 
 SQL Workspace is the main place to create, run, and save SQL statements.
 
+![SQL Workspace overview](assets/sql-workspace-overview.png)
+
 ## What You Can Do Here
 
 - Write SQL manually or generate SQL via SQL Builder

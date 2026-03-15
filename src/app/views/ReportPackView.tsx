@@ -886,7 +886,7 @@ const ReportPackView: React.FC = () => {
         >
             <div className={`h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar ${isReadOnly ? 'pointer-events-none opacity-80' : ''}`}>
                 <div className="space-y-6">
-                    <div className="border-b border-slate-200 dark:border-slate-800">
+                    <div className="border-b border-[rgb(var(--ui-border))] dark:border-slate-800">
                         <div className="flex items-center justify-between px-1">
                             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
                             <button
@@ -1764,7 +1764,7 @@ const ReportPackView: React.FC = () => {
                 <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col">
                     <div className="flex-1 min-h-0 overflow-auto px-5 pt-4">
                         <div className="h-full min-h-0 flex flex-col">
-                            <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-700 mb-3">
+                            <div className="flex items-center gap-4 border-b border-[rgb(var(--ui-border))] dark:border-slate-700 mb-3">
                                 <button
                                     type="button"
                                     onClick={() => setAddPickerTab('dashboards')}

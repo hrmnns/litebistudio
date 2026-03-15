@@ -55,7 +55,7 @@ export const AboutView: React.FC = () => {
             ]}
             footer={footerText}
         >
-            <div className="max-w-4xl space-y-8 pb-12">
+            <div className="max-w-6xl space-y-8 pb-12">
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden">
                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
                         <div className="group transition-transform hover:scale-105">

@@ -15,7 +15,7 @@ import { clearPageState, getPageState, setPageState } from '../../lib/state/page
 import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
-type AppsSubTab = 'tables' | 'sqlworkspace' | 'widgets' | 'reports' | 'worklist' | 'datamanagement';
+type AppsSubTab = 'gettingstarted' | 'tables' | 'sqlworkspace' | 'widgets' | 'reports' | 'worklist' | 'datamanagement';
 type ControlsSubTab = 'datatable' | 'notifications' | 'sqleditor';
 
 export const SettingsView: React.FC = () => {
@@ -41,7 +41,8 @@ export const SettingsView: React.FC = () => {
     const lightThemeVariantOptions: { value: LightThemeVariant; label: string; hint: string }[] = [
         { value: 'classic', label: t('settings.light_variant_classic'), hint: t('settings.light_variant_classic_hint') },
         { value: 'ocean', label: t('settings.light_variant_ocean'), hint: t('settings.light_variant_ocean_hint') },
-        { value: 'aurora', label: t('settings.light_variant_aurora'), hint: t('settings.light_variant_aurora_hint') }
+        { value: 'aurora', label: t('settings.light_variant_aurora'), hint: t('settings.light_variant_aurora_hint') },
+        { value: 'circuit', label: t('settings.light_variant_circuit'), hint: t('settings.light_variant_circuit_hint') }
     ];
 
     const [hasPin, setHasPin] = React.useState(!!localStorage.getItem('litebistudio_app_pin'));
@@ -95,6 +96,7 @@ export const SettingsView: React.FC = () => {
     const [sqlEditorSchemaHints, setSqlEditorSchemaHints] = useLocalStorage<boolean>('sql_editor_schema_hints', true);
     const [sqlEditorPreviewHighlighting, setSqlEditorPreviewHighlighting] = useLocalStorage<boolean>('sql_editor_preview_highlighting', true);
     const [sqlEditorRememberHeight, setSqlEditorRememberHeight] = useLocalStorage<boolean>('sql_editor_remember_height', true);
+    const [showSidebarWelcome, setShowSidebarWelcome] = useLocalStorage<boolean>('ui_sidebar_show_welcome', true);
     const [showSidebarLanguageSwitch, setShowSidebarLanguageSwitch] = useLocalStorage<boolean>('ui_sidebar_show_language_switch', true);
     const [showSidebarSystemStatus, setShowSidebarSystemStatus] = useLocalStorage<boolean>('ui_sidebar_show_system_status', true);
     React.useEffect(() => {
@@ -261,8 +263,8 @@ export const SettingsView: React.FC = () => {
                 { label: t('sidebar.settings') }
             ]}
         >
-            <div className="max-w-3xl space-y-6">
-                <div className="border-b border-slate-200 dark:border-slate-800">
+            <div className="max-w-6xl space-y-6">
+                <div className="border-b border-[rgb(var(--ui-border))] dark:border-slate-800">
                     <div className="flex items-center justify-between px-1">
                         <div className="flex items-center overflow-x-auto">
                             {[
@@ -289,9 +291,10 @@ export const SettingsView: React.FC = () => {
                 </div>
 
                 {activeTab === 'apps' && (
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 -mt-2">
+                    <div className="flex items-center justify-between border-b border-[rgb(var(--ui-border))] dark:border-slate-800 -mt-2">
                         <div className="flex items-center overflow-x-auto">
                             {[
+                                { id: 'gettingstarted', label: t('sidebar.welcome', 'Erste Schritte') },
                                 { id: 'datamanagement', label: t('sidebar.datasource') },
                                 { id: 'tables', label: t('sidebar.data_inspector') },
                                 { id: 'sqlworkspace', label: t('sidebar.sql_workspace') },
@@ -315,8 +318,48 @@ export const SettingsView: React.FC = () => {
                     </div>
                 )}
 
+                {activeTab === 'apps' && appsSubTab === 'gettingstarted' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <Info className="w-4 h-4 text-blue-500" />
+                            </span>
+                            {t('sidebar.welcome', 'Erste Schritte')}
+                        </h3>
+                        <div className="space-y-5">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                {t('settings.getting_started_hint', 'Control how the Getting Started page appears in navigation and reopen it whenever you need the guided workflow.')}
+                            </p>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {t('settings.show_sidebar_welcome', 'Show Getting Started in sidebar')}
+                                </span>
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={showSidebarWelcome}
+                                    onChange={() => {
+                                        const next = !showSidebarWelcome;
+                                        setShowSidebarWelcome(next);
+                                        window.dispatchEvent(new CustomEvent('sidebar-welcome-visibility-changed', { detail: { visible: next } }));
+                                    }}
+                                />
+                            </label>
+
+                            <Link
+                                to="/welcome"
+                                className="w-full sm:w-auto inline-flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+                            >
+                                <span className="font-medium">{t('settings.open_getting_started', 'Open Getting Started')}</span>
+                                <ChevronRight className="w-4 h-4" />
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'controls' && (
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 -mt-2">
+                    <div className="flex items-center justify-between border-b border-[rgb(var(--ui-border))] dark:border-slate-800 -mt-2">
                         <div className="flex items-center overflow-x-auto">
                             {[
                                 { id: 'datatable', label: t('settings.tab_datatable') },
@@ -340,8 +383,8 @@ export const SettingsView: React.FC = () => {
                 )}
 
                 {activeTab === 'appearance' && (
-                    <div className={`space-y-4 transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                    <div className={`grid grid-cols-1 gap-4 transition-opacity lg:grid-cols-2 ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm lg:col-span-2">
                             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                                 <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                                     <Palette className="w-4 h-4 text-blue-500" />
@@ -487,7 +530,7 @@ export const SettingsView: React.FC = () => {
                 )}
 
                 {activeTab === 'security' && (
-                    <div className={`space-y-4 transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className={`grid grid-cols-1 gap-4 transition-opacity xl:grid-cols-2 ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
                         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                                 <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
@@ -584,7 +627,7 @@ export const SettingsView: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm xl:col-span-2">
                             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                                 <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                                     <Activity className="w-4 h-4 text-blue-500" />
@@ -825,33 +868,35 @@ export const SettingsView: React.FC = () => {
                         <div className="space-y-5">
                             <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.reports_hint')}</p>
 
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.reports_default_author')}</label>
-                                <input
-                                    value={reportsDefaultAuthor}
-                                    onChange={(e) => setReportsDefaultAuthor(e.target.value)}
-                                    className="w-full sm:w-80 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
-                                />
-                            </div>
+                            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.reports_default_author')}</label>
+                                    <input
+                                        value={reportsDefaultAuthor}
+                                        onChange={(e) => setReportsDefaultAuthor(e.target.value)}
+                                        className="w-full sm:w-80 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                    />
+                                </div>
 
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.reports_default_theme_color')}</label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="color"
-                                        value={reportsDefaultThemeColor}
-                                        onChange={(e) => setReportsDefaultThemeColor(e.target.value)}
-                                        className="h-9 w-14 p-1 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
-                                    />
-                                    <input
-                                        value={reportsDefaultThemeColor}
-                                        onChange={(e) => setReportsDefaultThemeColor(e.target.value)}
-                                        className="w-full sm:w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 font-mono"
-                                    />
+                                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.reports_default_theme_color')}</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="color"
+                                            value={reportsDefaultThemeColor}
+                                            onChange={(e) => setReportsDefaultThemeColor(e.target.value)}
+                                            className="h-9 w-14 p-1 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
+                                        />
+                                        <input
+                                            value={reportsDefaultThemeColor}
+                                            onChange={(e) => setReportsDefaultThemeColor(e.target.value)}
+                                            className="w-full sm:w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 font-mono"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
                                     <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.reports_default_show_header')}</span>
                                     <input
@@ -900,68 +945,70 @@ export const SettingsView: React.FC = () => {
                         <div className="space-y-5">
                             <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.worklist_hint')}</p>
 
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_view')}</label>
-                                <select
-                                    value={worklistDefaultView}
-                                    onChange={(e) => setWorklistDefaultView(e.target.value as 'all' | 'open' | 'overdue' | 'today' | 'high_priority')}
-                                    className="w-full sm:w-60 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
-                                >
-                                    <option value="all">{t('worklist.filter_all')}</option>
-                                    <option value="open">{t('worklist.filter_open')}</option>
-                                    <option value="overdue">{t('worklist.quick_overdue')}</option>
-                                    <option value="today">{t('worklist.quick_today')}</option>
-                                    <option value="high_priority">{t('worklist.quick_high_priority')}</option>
-                                </select>
-                            </div>
+                            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_view')}</label>
+                                    <select
+                                        value={worklistDefaultView}
+                                        onChange={(e) => setWorklistDefaultView(e.target.value as 'all' | 'open' | 'overdue' | 'today' | 'high_priority')}
+                                        className="w-full sm:w-60 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                    >
+                                        <option value="all">{t('worklist.filter_all')}</option>
+                                        <option value="open">{t('worklist.filter_open')}</option>
+                                        <option value="overdue">{t('worklist.quick_overdue')}</option>
+                                        <option value="today">{t('worklist.quick_today')}</option>
+                                        <option value="high_priority">{t('worklist.quick_high_priority')}</option>
+                                    </select>
+                                </div>
 
-                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.worklist_hide_completed')}</span>
-                                <input
-                                    type="checkbox"
-                                    className="h-4 w-4"
-                                    checked={worklistHideCompleted}
-                                    onChange={() => setWorklistHideCompleted(!worklistHideCompleted)}
-                                />
-                            </label>
+                                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_priority')}</label>
+                                    <select
+                                        value={worklistDefaultPriority}
+                                        onChange={(e) => setWorklistDefaultPriority(e.target.value as 'low' | 'normal' | 'high' | 'critical')}
+                                        className="w-full sm:w-60 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                    >
+                                        <option value="low">{t('worklist.priority_low')}</option>
+                                        <option value="normal">{t('worklist.priority_normal')}</option>
+                                        <option value="high">{t('worklist.priority_high')}</option>
+                                        <option value="critical">{t('worklist.priority_critical')}</option>
+                                    </select>
+                                </div>
 
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_priority')}</label>
-                                <select
-                                    value={worklistDefaultPriority}
-                                    onChange={(e) => setWorklistDefaultPriority(e.target.value as 'low' | 'normal' | 'high' | 'critical')}
-                                    className="w-full sm:w-60 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
-                                >
-                                    <option value="low">{t('worklist.priority_low')}</option>
-                                    <option value="normal">{t('worklist.priority_normal')}</option>
-                                    <option value="high">{t('worklist.priority_high')}</option>
-                                    <option value="critical">{t('worklist.priority_critical')}</option>
-                                </select>
-                            </div>
+                                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700 xl:col-span-2">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.worklist_hide_completed')}</span>
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={worklistHideCompleted}
+                                        onChange={() => setWorklistHideCompleted(!worklistHideCompleted)}
+                                    />
+                                </label>
 
-                            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_due_days')}</label>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={365}
-                                    value={worklistDefaultDueDays}
-                                    onChange={(e) => {
-                                        const next = Math.max(0, Math.min(365, Number(e.target.value) || 0));
-                                        setWorklistDefaultDueDays(next);
-                                    }}
-                                    className="w-full sm:w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
-                                />
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    {t('settings.worklist_default_due_days_hint')}
-                                </p>
+                                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 xl:col-span-2">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('settings.worklist_default_due_days')}</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={365}
+                                        value={worklistDefaultDueDays}
+                                        onChange={(e) => {
+                                            const next = Math.max(0, Math.min(365, Number(e.target.value) || 0));
+                                            setWorklistDefaultDueDays(next);
+                                        }}
+                                        className="w-full sm:w-40 p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200"
+                                    />
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        {t('settings.worklist_default_due_days_hint')}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
 
                 {activeTab === 'apps' && appsSubTab === 'datamanagement' && (
-                    <div className={`space-y-6 transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className={`grid grid-cols-1 gap-6 transition-opacity xl:grid-cols-2 ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
                         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm space-y-5">
                             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.import_title')}</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.import_hint')}</p>

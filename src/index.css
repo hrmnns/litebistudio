@@ -84,6 +84,30 @@
     --ui-surface-separator: 123 172 173;
 }
 
+:root.light.light-variant-circuit {
+    --ui-bg: 245 249 255;
+    --ui-bg-muted: 232 240 252;
+    --ui-bg-subtle: 217 229 247;
+    --ui-border: 108 145 191;
+    --ui-text: 10 26 47;
+    --ui-text-muted: 76 101 133;
+    --ui-primary: 0 122 255;
+    --ui-primary-hover: 0 86 179;
+    --ui-elev-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
+    --ui-nav-active-bg: 203 224 250;
+    --ui-nav-active-text: 0 86 179;
+    --ui-nav-hover-bg: 221 235 252;
+    --ui-surface-header-bg: 193 214 244;
+    --ui-surface-header-bg-to: 176 199 234;
+    --ui-surface-subheader-bg: 214 228 247;
+    --ui-surface-footer-bg: 191 212 242;
+    --ui-surface-footer-bg-to: 177 199 232;
+    --ui-surface-separator: 95 136 184;
+    --sql-editor-scroll-track: rgb(214 228 247);
+    --sql-editor-scroll-thumb: rgb(95 136 184);
+    --sql-editor-scroll-thumb-hover: rgb(0 122 255);
+}
+
 .dark {
     --ui-bg: 30 41 59;
     --ui-bg-muted: 15 23 42;

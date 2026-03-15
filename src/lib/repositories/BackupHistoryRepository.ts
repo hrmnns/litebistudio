@@ -74,7 +74,7 @@ async function writeHistory(entries: BackupHistoryEntry[]): Promise<void> {
         [BACKUP_HISTORY_KEY, JSON.stringify(entries)],
         { allowedSystemWriteTables: ['sys_settings'] }
     );
-    notifyDbChange();
+    notifyDbChange(0, 'backup-history');
 }
 
 export function createBackupHistoryRepository() {

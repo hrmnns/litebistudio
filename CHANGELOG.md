@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
  
 ## [Unreleased]
 
+## [1.8.0] - 2026-03-15
+### Added
+- Added a new guided `Getting Started` experience:
+  - introduced a dedicated welcome/start page with workflow-based navigation from import through SQL, widgets, dashboard, and documentation.
+  - added direct wiki deep-links from the onboarding workflow.
+  - made the page available from the sidebar and controllable through `Settings > Apps > Getting Started`.
+- Added broader operational reset coverage for `Factory settings`:
+  - local app cleanup now also clears theme, backup, health, reports, worklist, SQL editor, sidebar, and persisted page-state entries.
+  - remembered backup-folder handles stored via browser APIs are now explicitly removed during factory reset.
+- Added a new technical light theme variant `Circuit` for stronger presentation/screenshot styling.
+- Expanded wiki coverage and screenshot support:
+  - extended `Page-Data-Management` with detailed documentation for import, maintenance & backup, and danger-zone flows.
+  - added screenshot references and supporting asset guidance for `Getting Started`, `Dashboard`, `Settings`, `SQL Workspace`, `Widgets`, and `Data Management`.
+
+### Changed
+- Refined first-run onboarding and navigation behavior:
+  - `Getting Started` now behaves like a normal app area, can be reopened from the sidebar, and no longer depends on a header-only dismissal pattern.
+  - aligned the welcome hero/header styling closely with the About dialog, including logo treatment, typography, badge styling, spacing, and gradient behavior.
+- Standardized content width for key content-heavy pages:
+  - aligned `About`, `Settings`, `Data Management`, and `Getting Started` to the same `max-w-6xl` layout width.
+  - improved `Settings` layout on wide screens with better use of grids in `Appearance`, `Security`, `Apps`, `Reports`, and `Worklist`.
+- Improved theme visibility in light styles:
+  - tab-strip separator lines now use theme-aware border colors so they remain visible across light variants.
+
+### Fixed
+- Fixed incomplete post-backup status handling:
+  - writing backup-history entries no longer increments the global "unsaved changes / backup recommended" counter immediately after a successful backup.
+- Fixed same-tab sidebar visibility updates for `Getting Started`:
+  - toggling `Show Getting Started in sidebar` now updates the sidebar instantly without reload.
+- Fixed remaining translation/fallback inconsistencies in the widgets configuration side panel for English UI mode.
+
 ## [1.7.0] - 2026-03-14
 ### Added
 - Introduced a new global page-state persistence infrastructure:

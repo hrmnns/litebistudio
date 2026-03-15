@@ -6,6 +6,8 @@ _Last updated: 2026-03-14_
 
 Widgets transform SQL result data into reusable visual components for dashboards and reports.
 
+![Widgets overview](assets/widgets-overview.png)
+
 ## What You Can Do Here
 
 - Create new widgets

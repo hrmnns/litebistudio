@@ -59,6 +59,7 @@
     },
     "sidebar": {
         "dashboard": "Übersicht",
+        "welcome": "Erste Schritte",
         "worklist": "Arbeitsvorrat",
         "data_inspector": "Tabellen",
         "sql_workspace": "SQL Workspace",
@@ -576,6 +577,7 @@
         "sql_statement": "SQL-Statement",
         "select_sql_statement": "SQL-Statement auswählen",
         "remove_sql_statement": "SQL entfernen",
+        "config_panel_title": "Widget-Konfiguration",
         "open_config_panel": "Konfiguration öffnen",
         "tab_config": "Konfiguration",
         "tab_metadata": "Metadaten",
@@ -836,10 +838,13 @@
         "language_de": "Deutsch",
         "language_en": "Englisch",
         "show_sidebar_language_switch": "Sprachumschalter in der Sidebar anzeigen",
+        "show_sidebar_welcome": "Erste Schritte in der Sidebar anzeigen",
         "health_link_title": "Diagnose",
         "health_link_hint": "Öffnen Sie den System-Health-Check und die Diagnose-Übersicht.",
         "health_link_open": "Health Check oeffnen",
         "show_sidebar_system_status": "'System-Status' in der Sidebar anzeigen",
+        "getting_started_hint": "Steuere hier, ob die Seite 'Erste Schritte' in der Navigation sichtbar ist, und oeffne den gefuehrten Workflow bei Bedarf erneut.",
+        "open_getting_started": "Erste Schritte oeffnen",
         "theme_light": "Hell",
         "theme_dark": "Dunkel",
         "theme_system": "System",
@@ -851,6 +856,8 @@
         "light_variant_ocean_hint": "Frischer Blau-Cyan-Kontrast, sichtbar lebendiger.",
         "light_variant_aurora": "Aurora",
         "light_variant_aurora_hint": "Kuehle Teal-Petrol-Akzente mit klarer, eleganter Abgrenzung.",
+        "light_variant_circuit": "Circuit",
+        "light_variant_circuit_hint": "Technischer Blue-Print-Look mit starken Konturen und screenshot-freundlichem Kontrast.",
         "inspector_title": "Tabellen",
         "inspector_hint": "Zentrale Standardwerte fuer den Tabellenbereich.",
         "inspector_autocomplete": "SQL Autocomplete",
@@ -1153,6 +1160,59 @@
         "copyright_prefix": "(c) {{year}} LiteBI Studio Projekt. Freigegeben unter ",
         "settings_hint": "Erfahren Sie mehr über das Projekt, die Version und die Vision hinter LiteBI Studio.",
         "view_info": "Projekt-Informationen"
+    },
+    "welcome": {
+        "title": "Erste Schritte",
+        "subtitle": "Gefuehrter Einstieg von Datenimport bis Dashboard",
+        "breadcrumb": "Erste Schritte",
+        "header_help": "Getting Started im Wiki",
+        "badge_local": "Lokal",
+        "badge_private": "Datenschutz zuerst",
+        "badge_workflow": "Gefuehrter Workflow",
+        "hero_prefix": "Willkommen bei",
+        "hero_title": "Willkommen in LiteBI Studio",
+        "hero_text": "Diese Startseite fuehrt dich Schritt fuer Schritt vom Datenimport ueber Struktur und SQL bis hin zu Widgets, Dashboard und Dokumentation.",
+        "start_import_cta": "Mit Datenimport starten",
+        "open_workspace_cta": "Arbeitsbereich oeffnen",
+        "dismiss_cta": "Nicht mehr automatisch anzeigen",
+        "workflow_title": "Empfohlener Workflow",
+        "workflow_hint": "Nutze diese Reihenfolge als sicheren Einstieg von der ersten Datei bis zum fertigen Ergebnis.",
+        "open_page_cta": "Zur Funktion",
+        "open_wiki_cta": "Wiki oeffnen",
+        "safe_start_title": "Sicher starten",
+        "safe_start_text": "Lege vor groesseren Importen oder strukturellen Aenderungen ein Backup an und pruefe neue Daten erst in Tabellen oder SQL Workspace.",
+        "safe_start_backup_cta": "Zu Wartung und Backup",
+        "quick_links_title": "Schnellzugriffe",
+        "quick_link_dashboard": "Dashboard",
+        "quick_link_reports": "Berichte",
+        "quick_link_settings": "Einstellungen",
+        "docs_title": "Wichtige Dokumentation",
+        "docs_text": "Die wichtigsten Wiki-Seiten stehen dir direkt aus dem Workflow heraus zur Verfuegung. Fuer tiefergehende Informationen kannst du hier gezielt abspringen.",
+        "docs_getting_started": "Getting Started",
+        "docs_data_management": "Datenverwaltung",
+        "docs_widgets": "Widgets",
+        "steps": {
+            "import": {
+                "title": "Daten importieren",
+                "description": "Importiere Excel- oder CSV-Dateien, lege neue Tabellen an oder lade Daten in bestehende Tabellen."
+            },
+            "structure": {
+                "title": "Schema und Tabellen pruefen",
+                "description": "Kontrolliere Tabellen, Spalten, Views und Indizes, damit die Datenbasis sauber fuer Analyse und Dashboard vorbereitet ist."
+            },
+            "sql": {
+                "title": "SQL und Views aufbauen",
+                "description": "Validiere Daten mit Abfragen, entwickle Views und bereite die fachliche Logik fuer Widgets und Reports vor."
+            },
+            "widgets": {
+                "title": "Widgets konfigurieren",
+                "description": "Baue Kennzahlen, Tabellen und Visualisierungen auf und richte die Praesentation deiner Inhalte aus."
+            },
+            "dashboard": {
+                "title": "Dashboard und Reports nutzen",
+                "description": "Bringe Widgets auf das Dashboard, arbeite mit den Ergebnissen weiter und erstelle bei Bedarf Berichte."
+            }
+        }
     },
     "record_detail": {
         "title": "Datensatz-Details",

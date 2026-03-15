@@ -225,7 +225,8 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
         '/reports': 'Page-Reports',
         '/worklist': 'Page-Worklist',
         '/settings': 'Page-Settings',
-        '/about': 'Page-About'
+        '/about': 'Page-About',
+        '/welcome': 'Getting-Started'
     };
     const currentPath = (() => {
         if (typeof window === 'undefined') return '/';

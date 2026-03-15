@@ -8,6 +8,8 @@ You can use LiteBI Studio directly in your browser without installing anything:
 
 - https://hrmnns.github.io/litebistudio/
 
+![Getting Started overview](assets/getting-started-overview.png)
+
 Fastest path to first value:
 
 1. Open the URL.

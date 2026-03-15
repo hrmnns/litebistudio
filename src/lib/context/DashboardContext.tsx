@@ -61,6 +61,8 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
                 logger.debug('DB Restore detected. Resetting count to 0.');
                 setChangeCount(0);
                 setLastBackup(new Date().toISOString());
+            } else if (detail.type === 'backup-history') {
+                logger.debug('Backup history update detected. Change count remains unchanged.');
             } else if (detail.type === 'clear') {
                 logger.debug('DB Clear detected. Incrementing count.');
                 setChangeCount((prev: number) => prev + 1);

@@ -6,6 +6,8 @@ _Last updated: 2026-03-08_
 
 Settings controls application behavior, editor defaults, and operational preferences.
 
+![Settings overview](assets/settings-overview.png)
+
 ## What You Can Do Here
 
 - Adjust UI and language behavior

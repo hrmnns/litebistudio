@@ -6,6 +6,8 @@ _Last updated: 2026-03-08_
 
 The Dashboard page is your main overview. It combines widgets into one visual workspace so you can monitor key metrics quickly.
 
+![Dashboard overview](assets/dashboard-overview.png)
+
 ## What You Can Do Here
 
 - Open and switch dashboards

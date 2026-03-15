@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock, Code2 } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, Wallet, Server, Radar, Search, Play, Globe, Info, FileText, Lock, Code2, Sparkles } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
@@ -32,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const { t, i18n } = useTranslation();
     const { visibleSidebarComponentIds, lockApp } = useDashboard();
     const [isPinActive, setIsPinActive] = React.useState(!!localStorage.getItem('litebistudio_app_pin'));
+    const [showWelcomeEntry, setShowWelcomeEntry] = useLocalStorage<boolean>('ui_sidebar_show_welcome', true);
     const [showLanguageSwitch, setShowLanguageSwitch] = useLocalStorage<boolean>('ui_sidebar_show_language_switch', true);
     const [showSystemStatus, setShowSystemStatus] = useLocalStorage<boolean>('ui_sidebar_show_system_status', true);
 
@@ -42,6 +43,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         window.addEventListener('pin-changed', handlePinChange);
         return () => window.removeEventListener('pin-changed', handlePinChange);
     }, []);
+
+    React.useEffect(() => {
+        const handleWelcomeVisibilityChange = (event: Event) => {
+            const customEvent = event as CustomEvent<{ visible?: boolean }>;
+            if (typeof customEvent.detail?.visible === 'boolean') {
+                setShowWelcomeEntry(customEvent.detail.visible);
+            }
+        };
+        window.addEventListener('sidebar-welcome-visibility-changed', handleWelcomeVisibilityChange as EventListener);
+        return () => window.removeEventListener('sidebar-welcome-visibility-changed', handleWelcomeVisibilityChange as EventListener);
+    }, [setShowWelcomeEntry]);
 
     React.useEffect(() => {
         const handleLanguageVisibilityChange = (event: Event) => {
@@ -80,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
 
     const staticTopItems: NavItem[] = [
+        ...(showWelcomeEntry ? [{ to: '/welcome', icon: <Sparkles className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.welcome', 'Erste Schritte') }] : []),
         { to: '/', icon: <LayoutDashboard className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.dashboard') },
     ];
 
@@ -99,15 +112,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { to: '/about', icon: <Info className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.about') },
     ];
     const navOrder: Record<string, number> = {
-        '/': 0,
-        '/datasource': 1,
-        '/tables': 2,
-        '/sql-workspace': 3,
-        '/widgets': 4,
-        '/reports': 5,
-        '/worklist': 6,
-        '/settings': 7,
-        '/about': 8
+        '/welcome': 0,
+        '/': 1,
+        '/datasource': 2,
+        '/tables': 3,
+        '/sql-workspace': 4,
+        '/widgets': 5,
+        '/reports': 6,
+        '/worklist': 7,
+        '/settings': 8,
+        '/about': 9
     };
     const orderedNavItems = [...staticTopItems, ...dynamicItems, ...staticBottomItems]
         .sort((a, b) => {

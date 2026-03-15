@@ -12,8 +12,9 @@ interface PageStateOptions {
 }
 
 const MEMORY_PAGE_STATE = new Map<string, PageStateEnvelope<unknown>>();
+const PAGE_STATE_STORAGE_PREFIX = 'litebistudio_page_state_';
 
-const getStorageKey = (pageId: string) => `litebistudio_page_state_${pageId}`;
+const getStorageKey = (pageId: string) => `${PAGE_STATE_STORAGE_PREFIX}${pageId}`;
 
 const readSessionEnvelope = <T>(pageId: string): PageStateEnvelope<T> | null => {
     if (typeof window === 'undefined') return null;
@@ -78,3 +79,17 @@ export const clearPageState = (pageId: string, options?: PageStateOptions): void
     MEMORY_PAGE_STATE.delete(pageId);
 };
 
+export const clearAllPageStates = (): void => {
+    MEMORY_PAGE_STATE.clear();
+    if (typeof window === 'undefined') return;
+    try {
+        const sessionKeys = Object.keys(window.sessionStorage);
+        for (const key of sessionKeys) {
+            if (key.startsWith(PAGE_STATE_STORAGE_PREFIX)) {
+                window.sessionStorage.removeItem(key);
+            }
+        }
+    } catch {
+        // ignore
+    }
+};

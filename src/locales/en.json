@@ -59,6 +59,7 @@
     },
     "sidebar": {
         "dashboard": "Overview",
+        "welcome": "Getting Started",
         "worklist": "Worklist",
         "data_inspector": "Tables",
         "sql_workspace": "SQL Workspace",
@@ -576,6 +577,7 @@
         "sql_statement": "SQL Statement",
         "select_sql_statement": "Select SQL statement",
         "remove_sql_statement": "Remove SQL",
+        "config_panel_title": "Widget configuration",
         "open_config_panel": "Open configuration",
         "tab_config": "Configuration",
         "tab_metadata": "Metadata",
@@ -836,10 +838,13 @@
         "language_de": "German",
         "language_en": "English",
         "show_sidebar_language_switch": "Show language switch in sidebar",
+        "show_sidebar_welcome": "Show Getting Started in sidebar",
         "health_link_title": "Diagnostics",
         "health_link_hint": "Open the system health check and diagnostics overview.",
         "health_link_open": "Open Health Check",
         "show_sidebar_system_status": "Show 'System Status' in sidebar",
+        "getting_started_hint": "Control whether the Getting Started page is visible in navigation and reopen the guided workflow whenever needed.",
+        "open_getting_started": "Open Getting Started",
         "theme_light": "Light",
         "theme_dark": "Dark",
         "theme_system": "System",
@@ -851,6 +856,8 @@
         "light_variant_ocean_hint": "Fresh blue-cyan contrast, more vivid.",
         "light_variant_aurora": "Aurora",
         "light_variant_aurora_hint": "Cool teal-petrol accents with clear, elegant contrast.",
+        "light_variant_circuit": "Circuit",
+        "light_variant_circuit_hint": "Technical blueprint look with strong outlines and screenshot-friendly contrast.",
         "inspector_title": "Tables",
         "inspector_hint": "Central defaults for Tables behavior.",
         "inspector_autocomplete": "SQL autocomplete",
@@ -1153,6 +1160,59 @@
         "copyright_prefix": "(c) {{year}} LiteBI Studio Project. Released under ",
         "settings_hint": "Learn more about the project, the version and the vision behind LiteBI Studio.",
         "view_info": "Project Information"
+    },
+    "welcome": {
+        "title": "Getting Started",
+        "subtitle": "Guided onboarding from data import to dashboard",
+        "breadcrumb": "Getting Started",
+        "header_help": "Getting Started in the wiki",
+        "badge_local": "Local",
+        "badge_private": "Privacy first",
+        "badge_workflow": "Guided workflow",
+        "hero_prefix": "Welcome to",
+        "hero_title": "Welcome to LiteBI Studio",
+        "hero_text": "This start page guides you step by step from data import through structure and SQL to widgets, dashboard, and documentation.",
+        "start_import_cta": "Start with data import",
+        "open_workspace_cta": "Open workspace",
+        "dismiss_cta": "Do not show automatically again",
+        "workflow_title": "Recommended workflow",
+        "workflow_hint": "Use this sequence as a safe path from the first file to the finished result.",
+        "open_page_cta": "Open feature",
+        "open_wiki_cta": "Open wiki",
+        "safe_start_title": "Safe start",
+        "safe_start_text": "Create a backup before larger imports or structural changes, and validate new data in Tables or SQL Workspace first.",
+        "safe_start_backup_cta": "Open Maintenance and Backup",
+        "quick_links_title": "Quick links",
+        "quick_link_dashboard": "Dashboard",
+        "quick_link_reports": "Reports",
+        "quick_link_settings": "Settings",
+        "docs_title": "Important documentation",
+        "docs_text": "The most relevant wiki pages are linked directly from the workflow. Use these shortcuts whenever you want to dive deeper into the documentation.",
+        "docs_getting_started": "Getting Started",
+        "docs_data_management": "Data Management",
+        "docs_widgets": "Widgets",
+        "steps": {
+            "import": {
+                "title": "Import data",
+                "description": "Import Excel or CSV files, create new tables, or load data into existing tables."
+            },
+            "structure": {
+                "title": "Review schema and tables",
+                "description": "Inspect tables, columns, views, and indexes so the data foundation is ready for analysis and dashboard work."
+            },
+            "sql": {
+                "title": "Build SQL and views",
+                "description": "Validate your data with queries, create views, and prepare the business logic for widgets and reports."
+            },
+            "widgets": {
+                "title": "Configure widgets",
+                "description": "Build KPIs, tables, and visualizations, and shape how your content should be presented."
+            },
+            "dashboard": {
+                "title": "Use dashboard and reports",
+                "description": "Bring widgets onto the dashboard, continue working with results, and create reports when needed."
+            }
+        }
     },
     "record_detail": {
         "title": "Record Details",

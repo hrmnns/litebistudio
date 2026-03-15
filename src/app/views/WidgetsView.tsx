@@ -1980,7 +1980,7 @@ export const WidgetsView: React.FC = () => {
                 }
             }}
             rightPanel={{
-                title: t('querybuilder.config_panel_title', 'Widget-Konfiguration'),
+                title: t('querybuilder.config_panel_title', 'Widget configuration'),
                 content: null,
                 enabled: workspaceTab === 'editor',
                 isOpen: isConfigPanelOpen,
@@ -1991,14 +1991,14 @@ export const WidgetsView: React.FC = () => {
                     }
                     setIsConfigPanelOpen(false);
                 },
-                triggerTitle: t('querybuilder.open_config_panel', 'Konfiguration öffnen')
+                triggerTitle: t('querybuilder.open_config_panel', 'Open configuration')
             }}
             footer={footerText}
             breadcrumbs={[{ label: t('sidebar.query_builder') }]}
             fillHeight
         >
             <div className="flex flex-col gap-4 h-full min-h-0">
-                <div className="border-b border-slate-200 dark:border-slate-700">
+                <div className="border-b border-[rgb(var(--ui-border))] dark:border-slate-700">
                     <div className="flex items-center gap-6 px-1 overflow-x-auto whitespace-nowrap no-scrollbar">
                     <button
                         type="button"
@@ -2011,7 +2011,7 @@ export const WidgetsView: React.FC = () => {
                             : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                         }`}
                     >
-                        {t('querybuilder.workspace_tab_manage', 'Widgets verwalten')}
+                        {t('querybuilder.workspace_tab_manage', 'Manage widgets')}
                         {workspaceTab === 'manage' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
                     </button>
                     <button
@@ -2022,7 +2022,7 @@ export const WidgetsView: React.FC = () => {
                             : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                         }`}
                     >
-                        {t('querybuilder.workspace_tab_editor', 'Widget erstellen')}
+                        {t('querybuilder.workspace_tab_editor', 'Create widget')}
                         {workspaceTab === 'editor' && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-blue-600 dark:bg-blue-400" />}
                     </button>
                     </div>
@@ -2032,7 +2032,7 @@ export const WidgetsView: React.FC = () => {
                     <RightOverlayPanel
                         isOpen={isConfigPanelOpen}
                         onClose={() => setIsConfigPanelOpen(false)}
-                        title={t('querybuilder.config_panel_title', 'Widget-Konfiguration')}
+                        title={t('querybuilder.config_panel_title', 'Widget configuration')}
                         width="md"
                         noScroll
                         backdropStyle="subtle"
@@ -2696,10 +2696,10 @@ export const WidgetsView: React.FC = () => {
                                             variant="toggle"
                                             size="sm"
                                             active={isConfigPanelOpen}
-                                            title={t('querybuilder.open_config_panel', 'Konfiguration öffnen')}
+                                            title={t('querybuilder.open_config_panel', 'Open configuration')}
                                         >
                                             <SlidersHorizontal className="w-3 h-3" />
-                                            <span className="hidden xl:inline">{t('querybuilder.tab_config', 'Konfiguration')}</span>
+                                            <span className="hidden xl:inline">{t('querybuilder.tab_config', 'Configuration')}</span>
                                         </Button>
                                     </div>
                                     <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pl-1">

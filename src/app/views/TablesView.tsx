@@ -3326,7 +3326,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
             </div>
 
             {mode === 'sql' && (
-                <div className="border-b border-slate-200 dark:border-slate-700">
+                <div className="border-b border-[rgb(var(--ui-border))] dark:border-slate-700">
                     <div className="flex items-center gap-8 px-1">
                         <button
                             type="button"

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, type ReactNode } from 'rea
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type LightThemeVariant = 'classic' | 'ocean' | 'aurora';
+export type LightThemeVariant = 'classic' | 'ocean' | 'aurora' | 'circuit';
 
 interface ThemeContextType {
     theme: ThemeMode;
@@ -20,7 +20,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     useEffect(() => {
         const root = window.document.documentElement;
-        const lightVariantClasses = ['light-variant-classic', 'light-variant-ocean', 'light-variant-aurora', 'light-variant-slate'];
+        const lightVariantClasses = ['light-variant-classic', 'light-variant-ocean', 'light-variant-aurora', 'light-variant-circuit', 'light-variant-slate'];
         const effectiveLightVariant = lightThemeVariant;
 
         const removeOldTheme = () => {

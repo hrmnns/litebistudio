@@ -21,11 +21,11 @@ import type { BackupHistoryEntry, TableIndexInfo } from '../../lib/repositories/
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
+import { clearSavedBackupDirectory, getSavedBackupDirectoryLabel, isBackupDirectorySupported, pickBackupFileFromRememberedDirectoryWithStatus, saveBackupToRememberedDirectory } from '../../lib/utils/backupLocation';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { importDatabase, exportDatabase, factoryResetDatabase } from '../../lib/db';
 import { isValidIdentifier } from '../../lib/utils';
-import { getPageState, setPageState } from '../../lib/state/pageStateStore';
+import { clearAllPageStates, getPageState, setPageState } from '../../lib/state/pageStateStore';
 import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 interface DatasourceViewProps {
@@ -75,7 +75,13 @@ const FACTORY_RESET_LOCALSTORAGE_PREFIXES = [
     'data_table_',
     'ui_table_',
     'notifications_',
-    'import_'
+    'import_',
+    'backup_',
+    'health_',
+    'reports_',
+    'worklist_',
+    'sql_editor_',
+    'ui_sidebar_'
 ];
 
 const FACTORY_RESET_LOCALSTORAGE_KEYS = new Set([
@@ -86,7 +92,9 @@ const FACTORY_RESET_LOCALSTORAGE_KEYS = new Set([
     'visibleComponentIds',
     'visibleSidebarComponentIds',
     'componentOrder',
-    'isSidebarCollapsed'
+    'isSidebarCollapsed',
+    'theme',
+    'ui_light_theme_variant'
 ]);
 
 const FACTORY_RESET_SESSIONSTORAGE_PREFIXES = [
@@ -128,7 +136,7 @@ const isWeakBackupPassword = (password: string): boolean => {
     return score < 3;
 };
 
-const resetEnvironmentSettings = (): void => {
+const resetEnvironmentSettings = async (): Promise<void> => {
     try {
         const localKeys = Object.keys(window.localStorage);
         for (const key of localKeys) {
@@ -152,6 +160,14 @@ const resetEnvironmentSettings = (): void => {
         }
     } catch (error) {
         logger.warn('Failed to clear sessionStorage during factory reset cleanup', error);
+    }
+
+    clearAllPageStates();
+
+    try {
+        await clearSavedBackupDirectory();
+    } catch (error) {
+        logger.warn('Failed to clear remembered backup directory during factory reset cleanup', error);
     }
 };
 
@@ -789,8 +805,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             footer={footerText}
             breadcrumbs={[{ label: t('sidebar.datasource') }]}
         >
-            <div className={`max-w-4xl space-y-6 ${isReadOnly ? 'opacity-80' : ''}`}>
-                <div className="border-b border-slate-200 dark:border-slate-700">
+            <div className={`max-w-6xl space-y-6 ${isReadOnly ? 'opacity-80' : ''}`}>
+                <div className="border-b border-[rgb(var(--ui-border))] dark:border-slate-700">
                     <div className="flex items-center gap-6 px-1 overflow-x-auto whitespace-nowrap no-scrollbar">
                         <button
                             onClick={() => setActiveTab('import')}
@@ -1442,7 +1458,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                             try {
                                                                 setIsResetting(true);
                                                                 await factoryResetDatabase();
-                                                                resetEnvironmentSettings();
+                                                                await resetEnvironmentSettings();
                                                                 await appDialog.info(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));
                                                                 markBackupComplete();
                                                                 navigate('/');

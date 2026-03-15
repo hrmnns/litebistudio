@@ -1126,7 +1126,7 @@ export const CustomDashboardView: React.FC = () => {
             }}
         >
             {/* Dashboard Tabs */}
-            <div className="border-b border-slate-200 dark:border-slate-800">
+            <div className="border-b border-[rgb(var(--ui-border))] dark:border-slate-800">
                 <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
                         {orderedDashboards.map(d => (
@@ -1388,7 +1388,7 @@ export const CustomDashboardView: React.FC = () => {
             >
                 <div className="h-[34rem] max-h-[calc(90vh-11rem)] flex flex-col">
                     <div className="flex-1 min-h-0 px-5 pt-4 flex flex-col">
-                        <div className="flex gap-4 mb-3 border-b border-slate-200 dark:border-slate-700 shrink-0">
+                        <div className="flex gap-4 mb-3 border-b border-[rgb(var(--ui-border))] dark:border-slate-700 shrink-0">
                             <button
                                 onClick={() => setActiveTab('system')}
                                 className={`pb-2 text-sm font-bold ${activeTab === 'system' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
