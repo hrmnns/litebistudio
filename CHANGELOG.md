@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
  
 ## [Unreleased]
 
+### Added
+- Added a ready-to-use Cherit example backup as a release asset reference in the example wiki, including restore guidance for `Maintenance & Backup`.
+
 ## [1.8.0] - 2026-03-15
 ### Added
 - Added a new guided `Getting Started` experience:

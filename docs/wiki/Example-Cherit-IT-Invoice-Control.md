@@ -60,6 +60,25 @@ Recommended import order:
 4. `invoice_items.csv`
 5. `budget_monthly.csv`
 
+## Optional: Ready-to-Use Backup
+
+For this example, a ready-to-use backup is available as a release asset.
+
+Asset name:
+`litebistudio-example-cherit-it-invoice-control.v02.sqlite3`
+
+The backup contains:
+
+- imported example data
+- saved SQL statements
+- prepared widgets
+- prepared dashboards
+
+You can restore it via `Data Management > Maintenance & Backup > Restore`.
+
+Important:
+This backup is intended for the matching LiteBI Studio release version. It may also work with newer versions, but the documented step-by-step setup in this guide remains the primary reference.
+
 ## Step-by-Step in LiteBI Studio
 
 Note:
