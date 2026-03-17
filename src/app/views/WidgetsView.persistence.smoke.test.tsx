@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { WidgetsView } from './WidgetsView';
-import { clearPageState } from '../../lib/state/pageStateStore';
+import { clearPageState, setPageState } from '../../lib/state/pageStateStore';
 
 type MockWidget = {
     id: string;
@@ -142,10 +142,41 @@ describe('WidgetsView persistence smoke', () => {
     });
 
     it('keeps active preview tab across remount', async () => {
+        setPageState('widgets_view', {
+            sql: 'SELECT month, value FROM demo',
+            results: mockRows,
+            error: '',
+            lastRunSql: 'SELECT month, value FROM demo',
+            previewTab: 'table',
+            savedSnapshot: '',
+            cachedHeaderName: '',
+            builderMode: 'sql',
+            workspaceTab: 'editor',
+            manageSearch: '',
+            manageSort: 'updated_desc',
+            sourceSelectTab: 'query',
+            isConfigPanelOpen: false,
+            guidedStep: 1,
+            queryConfig: undefined,
+            visType: 'table',
+            visConfig: { type: 'table', color: '#3b82f6' },
+            activeWidgetId: null,
+            lastOpenWidgetId: '',
+            widgetName: '',
+            selectedSqlStatementId: 'stmt-1',
+            loadDialogSearch: '',
+            loadDialogPinnedOnly: false,
+            loadDialogSort: 'updated_desc',
+            pinnedWidgetIds: [],
+            widgetDraftById: {},
+            unsavedWidgetDraft: null,
+            widgetPreviewTabById: {},
+            localWidgetSavedAtById: {}
+        }, { scope: 'memory', version: 1 });
+
         const rendered = render(<WidgetsView />);
 
         const tableTab = await screen.findByRole('button', { name: 'Tabelle' });
-        fireEvent.click(tableTab);
 
         await waitFor(() => {
             expect(

@@ -185,6 +185,32 @@ const setCachedWidgetRun = (widgetId: string, normalizedSql: string, rows: DbRow
     }
 };
 
+const getDefaultPreviewTabForWidget = (
+    visType: VisualizationType,
+    sqlText: string,
+    preferredTab?: 'graphic' | 'table' | 'sql'
+): 'graphic' | 'table' | 'sql' => {
+    const isContentWidget = visType === 'text'
+        || visType === 'markdown'
+        || visType === 'status'
+        || visType === 'section'
+        || visType === 'kpi_manual'
+        || visType === 'image';
+    const hasQueryPreviewTabs = !isContentWidget && sqlText.trim().length > 0;
+
+    if (preferredTab === 'table' || preferredTab === 'sql') {
+        return hasQueryPreviewTabs ? preferredTab : 'graphic';
+    }
+    if (preferredTab === 'graphic') {
+        return 'graphic';
+    }
+    if (!hasQueryPreviewTabs) {
+        return 'graphic';
+    }
+
+    return visType === 'table' || visType === 'pivot' ? 'table' : 'graphic';
+};
+
 export const WidgetsView: React.FC = () => {
     const { t, i18n } = useTranslation();
     const initialPageState = useMemo(
@@ -584,23 +610,13 @@ export const WidgetsView: React.FC = () => {
                 setSourceSelectTab(draft.sourceSelectTab);
             }
 
-            const hasDataSourceForWidget = (restoredSql || '').trim().length > 0
-                && parsedVisType !== 'text'
-                && parsedVisType !== 'markdown'
-                && parsedVisType !== 'status'
-                && parsedVisType !== 'section'
-                && parsedVisType !== 'kpi_manual'
-                && parsedVisType !== 'image';
-            const hasRenderablePreview = !hasDataSourceForWidget || (parsedVisType !== 'table' && parsedVisType !== 'pivot');
-            if (hasRenderablePreview) {
-                setPreviewTab('graphic');
-            } else if (draft?.previewTab && draft.previewTab !== 'graphic') {
-                setPreviewTab(draft.previewTab);
-            } else if (persistedPreviewTab && persistedPreviewTab !== 'graphic') {
-                setPreviewTab(persistedPreviewTab);
-            } else {
-                setPreviewTab('table');
-            }
+            setPreviewTab(
+                getDefaultPreviewTabForWidget(
+                    parsedVisType,
+                    restoredSql,
+                    draft?.previewTab ?? persistedPreviewTab
+                )
+            );
 
             if (navigate) {
                 setSidebarTab('source');
@@ -1092,7 +1108,13 @@ export const WidgetsView: React.FC = () => {
                 setSourceSelectTab(unsavedWidgetDraft.sourceSelectTab);
                 setSql(restoredSql);
                 setSelectedSqlStatementId(unsavedWidgetDraft.selectedSqlStatementId);
-                setPreviewTab(unsavedWidgetDraft.previewTab || 'graphic');
+                setPreviewTab(
+                    getDefaultPreviewTabForWidget(
+                        unsavedWidgetDraft.visType,
+                        restoredSql,
+                        unsavedWidgetDraft.previewTab
+                    )
+                );
                 setVisType(unsavedWidgetDraft.visType);
                 setVisConfig(unsavedWidgetDraft.visConfig);
                 setBuilderMode(unsavedWidgetDraft.builderMode);
