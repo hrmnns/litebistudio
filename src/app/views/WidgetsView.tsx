@@ -2587,43 +2587,43 @@ export const WidgetsView: React.FC = () => {
                                     )}
 
                                     {(visType === 'pivot' && results.length > 0) && (
-                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
                                             <button
                                                 type="button"
                                                 onClick={() => setIsPivotPanelOpen(open => !open)}
-                                                className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs font-black uppercase text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300"
+                                                className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                             >
                                                 <span className="flex items-center gap-2"><TableIcon className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.pivot', 'Pivot-Tabelle')}</span>
                                                 {isPivotPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                             </button>
                                             {isPivotPanelOpen && (
-                                                <div className="space-y-4">
+                                                <div className="space-y-4 px-3 pb-3 pt-3 animate-in slide-in-from-top-2 duration-300">
                                             <div>
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.pivot_rows')}</label>
-                                                <div className="flex flex-wrap gap-1 mb-2">
+                                                <div className="mb-2 flex flex-wrap gap-1">
                                                     {(visConfig.pivotRows || []).map(r => (
-                                                        <span key={r} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold flex items-center gap-1">
+                                                        <span key={r} className="flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
                                                             {r}
                                                             <button onClick={() => setVisConfig({ ...visConfig, pivotRows: (visConfig.pivotRows || []).filter(row => row !== r) })}><X className="w-2.5 h-2.5" /></button>
                                                         </span>
                                                     ))}
                                                 </div>
-                                                <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotRows: [...(visConfig.pivotRows || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
+                                                <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotRows: [...(visConfig.pivotRows || []), e.target.value] }); e.target.value = ''; }} className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                                                     <option value="">{t('querybuilder.pivot_add_row')}</option>
                                                     {resultColumns.filter(c => !(visConfig.pivotRows || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
                                                 </select>
                                             </div>
                                             <div>
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.pivot_cols')}</label>
-                                                <div className="flex flex-wrap gap-1 mb-2">
+                                                <div className="mb-2 flex flex-wrap gap-1">
                                                     {(visConfig.pivotCols || []).map(c => (
-                                                        <span key={c} className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold flex items-center gap-1">
+                                                        <span key={c} className="flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                                                             {c}
                                                             <button onClick={() => setVisConfig({ ...visConfig, pivotCols: (visConfig.pivotCols || []).filter(col => col !== c) })}><X className="w-2.5 h-2.5" /></button>
                                                         </span>
                                                     ))}
                                                 </div>
-                                                <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotCols: [...(visConfig.pivotCols || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
+                                                <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotCols: [...(visConfig.pivotCols || []), e.target.value] }); e.target.value = ''; }} className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                                                     <option value="">{t('querybuilder.pivot_add_col')}</option>
                                                     {resultColumns.filter(c => !(visConfig.pivotCols || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
                                                 </select>
@@ -2632,9 +2632,9 @@ export const WidgetsView: React.FC = () => {
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-2">{t('querybuilder.pivot_measures')}</label>
                                                 <div className="space-y-2">
                                                     {(visConfig.pivotMeasures || []).map((m, idx) => (
-                                                        <div key={idx} className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100">
-                                                            <span className="text-[10px] font-bold text-slate-600 truncate flex-1">{m.field}</span>
-                                                            <select value={m.agg} onChange={e => { const next = [...(visConfig.pivotMeasures || [])]; const agg = e.target.value as NonNullable<WidgetConfig['pivotMeasures']>[number]['agg']; next[idx] = { ...m, agg }; setVisConfig({ ...visConfig, pivotMeasures: next }); }} className="bg-transparent text-[10px] font-bold text-blue-600 outline-none">
+                                                        <div key={idx} className="flex items-center gap-1 rounded border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-800/50">
+                                                            <span className="flex-1 truncate text-[10px] font-bold text-slate-600 dark:text-slate-300">{m.field}</span>
+                                                            <select value={m.agg} onChange={e => { const next = [...(visConfig.pivotMeasures || [])]; const agg = e.target.value as NonNullable<WidgetConfig['pivotMeasures']>[number]['agg']; next[idx] = { ...m, agg }; setVisConfig({ ...visConfig, pivotMeasures: next }); }} className="bg-transparent text-[10px] font-bold text-blue-600 outline-none dark:text-blue-300">
                                                                 <option value="sum">{t('querybuilder.pivot_agg_sum')}</option>
                                                                 <option value="count">{t('querybuilder.pivot_agg_count')}</option>
                                                                 <option value="avg">{t('querybuilder.pivot_agg_avg')}</option>
@@ -2644,7 +2644,7 @@ export const WidgetsView: React.FC = () => {
                                                             <button onClick={() => setVisConfig({ ...visConfig, pivotMeasures: (visConfig.pivotMeasures || []).filter((_, i) => i !== idx) })} className="text-slate-300 hover:text-red-500"><X className="w-3" /></button>
                                                         </div>
                                                     ))}
-                                                    <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotMeasures: [...(visConfig.pivotMeasures || []), { field: e.target.value, agg: 'sum' }] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
+                                                    <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotMeasures: [...(visConfig.pivotMeasures || []), { field: e.target.value, agg: 'sum' }] }); e.target.value = ''; }} className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                                                         <option value="">{t('querybuilder.pivot_add_measure')}</option>
                                                         {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
                                                     </select>
@@ -2656,17 +2656,17 @@ export const WidgetsView: React.FC = () => {
                                     )}
 
                                     {(visType === 'kpi' && results.length > 0) && (
-                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
                                             <button
                                                 type="button"
                                                 onClick={() => setIsKpiRulesPanelOpen(open => !open)}
-                                                className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs font-black uppercase text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300"
+                                                className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                             >
                                                 <span className="flex items-center gap-2"><Gauge className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.kpi_rules')}</span>
                                                 {isKpiRulesPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                             </button>
                                             {isKpiRulesPanelOpen && (
-                                                <div className="space-y-4">
+                                                <div className="space-y-4 px-3 pb-3 pt-3 animate-in slide-in-from-top-2 duration-300">
                                             <div>
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.kpi_unit', 'Einheit')}</label>
                                                 <input
@@ -2676,18 +2676,17 @@ export const WidgetsView: React.FC = () => {
                                                     placeholder={t('querybuilder.kpi_placeholder_unit', '%')}
                                                 />
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="text-[10px] font-black uppercase text-slate-400">{t('querybuilder.kpi_rules')}</h4>
+                                            <div className="flex items-center justify-end">
                                                 <button
                                                     onClick={() => setVisConfig({ ...visConfig, rules: [...(visConfig.rules || []), { operator: '>', value: 0, color: 'green' }] })}
-                                                    className="p-1 px-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 rounded text-[9px] font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700/60 transition-colors"
+                                                    className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-700/60 dark:bg-blue-900/30 dark:text-blue-200 dark:hover:bg-blue-900/50"
                                                 >
                                                     + {t('querybuilder.add_rule')}
                                                 </button>
                                             </div>
                                             <div className="space-y-2">
                                                 {(visConfig.rules || []).map((rule, idx) => (
-                                                    <div key={idx} className="flex items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                                    <div key={idx} className="flex items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-800/50">
                                                         <select
                                                             value={rule.operator}
                                                             onChange={e => {
@@ -2696,7 +2695,7 @@ export const WidgetsView: React.FC = () => {
                                                                 next[idx] = { ...rule, operator };
                                                                 setVisConfig({ ...visConfig, rules: next });
                                                             }}
-                                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-1 text-[10px] outline-none"
+                                                            className="rounded border border-slate-200 bg-white p-1 text-[10px] outline-none dark:border-slate-700 dark:bg-slate-900"
                                                         >
                                                             <option value=">">&gt;</option>
                                                             <option value="<">&lt;</option>
@@ -2712,7 +2711,7 @@ export const WidgetsView: React.FC = () => {
                                                                 next[idx] = { ...rule, value: Number(e.target.value) };
                                                                 setVisConfig({ ...visConfig, rules: next });
                                                             }}
-                                                            className="w-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-1 text-[10px] outline-none"
+                                                            className="w-16 rounded border border-slate-200 bg-white p-1 text-[10px] outline-none dark:border-slate-700 dark:bg-slate-900"
                                                         />
                                                         <div className="flex gap-1">
                                                             {(['green', 'yellow', 'red', 'blue'] as const).map(c => (
@@ -2723,7 +2722,7 @@ export const WidgetsView: React.FC = () => {
                                                                         next[idx] = { ...rule, color: c };
                                                                         setVisConfig({ ...visConfig, rules: next });
                                                                     }}
-                                                                    className={`w-4 h-4 rounded-full border-2 ${rule.color === c ? 'border-slate-400 scale-110' : 'border-transparent opacity-40 hover:opacity-100'}`}
+                                                                    className={`h-4 w-4 rounded-full border-2 ${rule.color === c ? 'scale-110 border-slate-400' : 'border-transparent opacity-40 hover:opacity-100'}`}
                                                                     style={{ backgroundColor: c === 'green' ? '#10b981' : c === 'red' ? '#f43f5e' : c === 'yellow' ? '#fbbf24' : '#3b82f6' }}
                                                                 />
                                                             ))}
