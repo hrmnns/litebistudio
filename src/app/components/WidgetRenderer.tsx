@@ -221,6 +221,20 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
             return normalized;
         });
     }, [config.yAxes, config.yAxis, results]);
+    const resultColumns = useMemo(
+        () => (results && results.length > 0 ? Object.keys(results[0]) : []),
+        [results]
+    );
+    const effectiveLabelField = useMemo(() => {
+        const candidate = (config.labelField || '').trim();
+        return candidate && resultColumns.includes(candidate) ? candidate : '';
+    }, [config.labelField, resultColumns]);
+    const formatChartLabel = React.useCallback((value: unknown, fallbackKey: string) => {
+        if (effectiveLabelField) {
+            return value == null ? '' : String(value);
+        }
+        return formatValue(value, fallbackKey);
+    }, [effectiveLabelField]);
     const widgetDescription = (config.widgetDescription || '').trim();
     const widgetDescriptionPosition: 'top' | 'bottom' = config.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
     const renderWidgetDescription = (position: 'top' | 'bottom') => {
@@ -775,7 +789,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Bar key={y} dataKey={y} fill={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
-                                        {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                        {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, y)} />}
                                     </Bar>
                                 ))}
                             </BarChart>
@@ -794,7 +808,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Bar key={y} dataKey={y} stackId="stacked" fill={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
-                                        {config.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                        {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => formatChartLabel(val, y)} />}
                                     </Bar>
                                 ))}
                             </BarChart>
@@ -813,7 +827,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Bar key={y} dataKey={y} stackId="stacked100" fill={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
-                                        {config.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => `${Number(val).toFixed(0)}%`} />}
+                                        {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => effectiveLabelField ? formatChartLabel(val, y) : `${Number(val).toFixed(0)}%`} />}
                                     </Bar>
                                 ))}
                             </BarChart>
@@ -831,7 +845,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Line key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                                        {config.showLabels && <LabelList dataKey={y} position="top" offset={10} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                        {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="top" offset={10} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, y)} />}
                                     </Line>
                                 ))}
                             </LineChart>
@@ -857,7 +871,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                 {(config.yAxes || (config.yAxis ? [config.yAxis] : [])).map((y, idx) => (
                                     <Area key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (config.color || COLORS[0]) : COLORS[idx % COLORS.length]} strokeWidth={3} fillOpacity={1} fill={`url(#color-${y}-${title.replace(/\s+/g, '')})`}>
-                                        {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                        {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, y)} />}
                                     </Area>
                                 ))}
                             </AreaChart>
@@ -868,7 +882,12 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
-                                    label={({ name, percent }: { name?: string | number; percent?: number }) => `${name ?? ''} ${(percent ? percent * 100 : 0).toFixed(0)}%`}
+                                    label={config.showLabels ? ({ payload, name, percent }: { payload?: DbRow; name?: string | number; percent?: number }) => {
+                                        const baseLabel = effectiveLabelField
+                                            ? (payload?.[effectiveLabelField] == null ? '' : String(payload[effectiveLabelField]))
+                                            : String(name ?? '');
+                                        return `${baseLabel} ${(percent ? percent * 100 : 0).toFixed(0)}%`;
+                                    } : false}
                                     outerRadius={80}
                                     innerRadius={50}
                                     paddingAngle={5}
@@ -897,11 +916,11 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                 {(config.yAxes || []).map((y, idx) => (
                                     config.lineSeries?.includes(y) ? (
                                         <Line key={y} type="monotone" dataKey={y} stroke={COLORS[idx % COLORS.length]} strokeWidth={3}>
-                                            {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                            {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, y)} />}
                                         </Line>
                                     ) : (
                                         <Bar key={y} dataKey={y} fill={COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
-                                            {config.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatValue(val, y)} />}
+                                            {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, y)} />}
                                         </Bar>
                                     )
                                 ))}

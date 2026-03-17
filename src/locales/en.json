@@ -504,6 +504,8 @@
         "labels": "Labels",
         "label_on": "ON",
         "label_off": "OFF",
+        "label_field": "Label field",
+        "label_field_auto_value": "Y value (default)",
         "select_column": "Select column...",
         "add_y_axis": "Add Y-Axis",
         "y_axes": "Y-Axes",

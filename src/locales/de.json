@@ -504,6 +504,8 @@
         "labels": "Beschriftungen",
         "label_on": "AN",
         "label_off": "AUS",
+        "label_field": "Label-Feld",
+        "label_field_auto_value": "Y-Wert (Standard)",
         "select_column": "Spalte wählen...",
         "add_y_axis": "Y-Achse hinzufügen",
         "y_axes": "Y-Achsen",

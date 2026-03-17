@@ -107,6 +107,7 @@ export interface WidgetConfig {
     yAxis?: string;
     color?: string;
     showLabels?: boolean;
+    labelField?: string;
     barSeries?: string[];
     lineSeries?: string[];
     rules?: AlertRule[];

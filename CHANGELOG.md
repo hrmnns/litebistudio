@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Added a ready-to-use Cherit example backup as a release asset reference in the example wiki, including restore guidance for `Maintenance & Backup`.
+- Added configurable chart label source selection in `Widgets`, so enabled labels can now use any field from the active SQL result set instead of only the Y-value default.
 
 ## [1.8.0] - 2026-03-15
 ### Added

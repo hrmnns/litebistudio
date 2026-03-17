@@ -1203,6 +1203,16 @@ export const WidgetsView: React.FC = () => {
             return normalized;
         });
     }, [results, visConfig.yAxes]);
+    const previewLabelField = useMemo(() => {
+        const candidate = (visConfig.labelField || '').trim();
+        return candidate && resultColumns.includes(candidate) ? candidate : '';
+    }, [resultColumns, visConfig.labelField]);
+    const formatPreviewLabel = useCallback((value: unknown, fallbackKey: string) => {
+        if (previewLabelField) {
+            return value == null ? '' : String(value);
+        }
+        return formatValue(value, fallbackKey);
+    }, [previewLabelField]);
     const previewVisType: VisualizationType = visType;
     const hasQueryPreviewTabs = !isContentWidget && sql.trim().length > 0;
     const isGraphicCapableType = previewVisType !== 'table' && previewVisType !== 'pivot' && previewVisType !== 'text' && previewVisType !== 'markdown' && previewVisType !== 'status' && previewVisType !== 'section' && previewVisType !== 'kpi_manual' && previewVisType !== 'image';
@@ -2056,11 +2066,26 @@ export const WidgetsView: React.FC = () => {
                                         </p>
                                     )}
                                     {(visType !== 'table' && visType !== 'pivot' && visType !== 'text' && visType !== 'markdown' && visType !== 'status' && visType !== 'section' && visType !== 'kpi_manual' && visType !== 'image') && (
-                                        <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('querybuilder.labels')}:</span>
-                                            <button onClick={() => setVisConfig({ ...visConfig, showLabels: !visConfig.showLabels })} className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.showLabels ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-200"}`}>
-                                                {visConfig.showLabels ? t('querybuilder.label_on') : t('querybuilder.label_off')}
-                                            </button>
+                                        <div className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('querybuilder.labels')}:</span>
+                                                <button onClick={() => setVisConfig({ ...visConfig, showLabels: !visConfig.showLabels })} className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.showLabels ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-200"}`}>
+                                                    {visConfig.showLabels ? t('querybuilder.label_on') : t('querybuilder.label_off')}
+                                                </button>
+                                            </div>
+                                            {visConfig.showLabels && resultColumns.length > 0 && (
+                                                <div>
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.label_field', 'Label-Feld')}</label>
+                                                    <select
+                                                        value={visConfig.labelField || ''}
+                                                        onChange={e => setVisConfig({ ...visConfig, labelField: e.target.value })}
+                                                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
+                                                    >
+                                                        <option value="">{t('querybuilder.label_field_auto_value', 'Y-Wert (Standard)')}</option>
+                                                        {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -3143,7 +3168,7 @@ export const WidgetsView: React.FC = () => {
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Bar key={y} dataKey={y} fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]}>
-                                                            {visConfig.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatValue(val, y)} />}
+                                                            {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
                                                         </Bar>
                                                     ))}
                                                 </BarChart>
@@ -3156,7 +3181,7 @@ export const WidgetsView: React.FC = () => {
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Bar key={y} dataKey={y} stackId="stacked" fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
-                                                            {visConfig.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={val => formatValue(val, y)} />}
+                                                            {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={val => formatPreviewLabel(val, y)} />}
                                                         </Bar>
                                                     ))}
                                                 </BarChart>
@@ -3175,7 +3200,7 @@ export const WidgetsView: React.FC = () => {
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Bar key={y} dataKey={y} stackId="stacked100" fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]}>
-                                                            {visConfig.showLabels && <LabelList dataKey={y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => `${Number(val).toFixed(0)}%`} />}
+                                                            {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="center" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#e2e8f0' }} formatter={(val: unknown) => previewLabelField ? formatPreviewLabel(val, y) : `${Number(val).toFixed(0)}%`} />}
                                                         </Bar>
                                                     ))}
                                                 </BarChart>
@@ -3188,7 +3213,7 @@ export const WidgetsView: React.FC = () => {
                                                     <Legend verticalAlign="top" height={36} iconType="circle" />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Line key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                                                            {visConfig.showLabels && <LabelList dataKey={y} position="top" offset={10} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatValue(val, y)} />}
+                                                            {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" offset={10} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
                                                         </Line>
                                                     ))}
                                                 </LineChart>
@@ -3201,7 +3226,7 @@ export const WidgetsView: React.FC = () => {
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         <Area key={y} type="monotone" dataKey={y} stroke={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} fill={idx === 0 ? (visConfig.color || COLORS[0]) : COLORS[idx % COLORS.length]} fillOpacity={0.2} strokeWidth={2}>
-                                                            {visConfig.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatValue(val, y)} />}
+                                                            {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
                                                         </Area>
                                                     ))}
                                                 </AreaChart>
@@ -3211,7 +3236,12 @@ export const WidgetsView: React.FC = () => {
                                                         data={results}
                                                         cx="50%" cy="50%"
                                                         labelLine={false}
-                                                        label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                                        label={visConfig.showLabels ? ({ payload, name, percent }) => {
+                                                            const baseLabel = previewLabelField
+                                                                ? (payload?.[previewLabelField] == null ? '' : String(payload[previewLabelField]))
+                                                                : String(name ?? '');
+                                                            return `${baseLabel} ${((percent || 0) * 100).toFixed(0)}%`;
+                                                        } : false}
                                                         outerRadius={120}
                                                         innerRadius={80}
                                                         paddingAngle={5}
@@ -3233,11 +3263,11 @@ export const WidgetsView: React.FC = () => {
                                                     {(visConfig.yAxes || []).map((y, idx) => (
                                                         idx === 0 ? (
                                                             <Bar key={y} dataKey={y} fill={COLORS[0]} radius={[4, 4, 0, 0]}>
-                                                                {visConfig.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatValue(val, y)} />}
+                                                                {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
                                                             </Bar>
                                                         ) : (
                                                             <Line key={y} type="monotone" dataKey={y} stroke={COLORS[idx % COLORS.length]} strokeWidth={3}>
-                                                                {visConfig.showLabels && <LabelList dataKey={y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatValue(val, y)} />}
+                                                                {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
                                                             </Line>
                                                         )
                                                     ))}
