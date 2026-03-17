@@ -252,7 +252,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
     const scatterYKey = chartYAxes[0] || '';
     const scatterData = useMemo(() => {
         if (config.type !== 'scatter') return [] as DbRow[];
-        return buildScatterData(results, scatterXKey, scatterYKey);
+        return buildScatterData(results || [], scatterXKey, scatterYKey);
     }, [config.type, results, scatterXKey, scatterYKey]);
     const isComposedLineSeries = React.useCallback((seriesKey: string, idx: number) => {
         return resolveComposedSeriesAsLine(config, seriesKey, idx);
