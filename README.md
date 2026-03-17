@@ -1,155 +1,242 @@
 # LiteBI Studio
 
-A high-performance, browser-based business intelligence platform with local SQLite persistence and no-code reporting capabilities.
+![Version](https://img.shields.io/badge/version-1.8.0-0f172a)
+![License](https://img.shields.io/badge/license-MIT-0f172a)
+![Frontend](https://img.shields.io/badge/frontend-React%2019%20%2B%20TypeScript-0f172a)
+![Storage](https://img.shields.io/badge/storage-SQLite%20WASM%20%2B%20OPFS-0f172a)
+![Privacy](https://img.shields.io/badge/privacy-local--first-0f172a)
 
-## Key Features
+Local-first BI and reporting for privacy-sensitive analytics.
 
-- **Multi-Dashboard Support**: Create, manage, and arrange multiple dashboards with a drag-and-drop grid system.
-- **Visual & SQL Workspace**:
-  - **Visual Mode**: Drag-and-drop interface for table selection, filtering, and aggregation.
-  - **SQL Mode**: Full SQL editor for advanced users with real-time preview and charting.
-  - **SQL Copilot**: Integrated snippet assistant and schema-aware templates for rapid query development.
-- **Advanced Visualization**:
-  - **Charts**: Responsive Pie, Bar, Line, Area, Radar, and Scatter charts with multi-series support.
-  - **Pivot Tables**: Multi-dimensional matrix analysis with drag-and-drop grouping (rows/cols/values) and 5+ aggregation types (Sum, Count, Avg, Min, Max).
-  - **KPI Alerts**: Traffic light indicator systems for single-value tiles based on customizable threshold rules.
-- **Reporting & Multi-Page Export**:
-  - **Report Packages**: Build complex management reports by combining multiple dashboards, pivot tables, and charts into one sequential document.
-  - **Advanced PDF Core**: Automated multi-page exports including Cover Pages, Tables of Contents (TOC), and consistent branding.
-  - **Single-Widget Export**: High-quality image and PDF export of individual results.
-- **Modular Data Import**:
-  - **Smart Import**: Automated schema generation from Excel files.
-  - **Generic Import**: Direct mapping of Excel data to existing database structures with pre-import validation.
-- **Interactive Worklist**:
-  - Centralized management of flagged records with unified status tracking (Open, In Progress, Done, Closed) and contextual commenting.
-- **Multi-Language Support**: Full internationalization (English & German) with instant UI switching.
-- **Security & Privacy**:
-  - **App Lock**: Salted PIN protection for the entire interface.
-  - **Encrypted Backups**: Password-protected database exports using AES-GCM encryption.
-- **Zero-Backend Architecture**: Runs entirely in the browser using SQLite WASM + OPFS for maximum performance, data sovereignty, and domain neutrality (works with any data structure).
+LiteBI Studio is a browser-based workspace for importing, modeling, analyzing, and presenting data without a backend.
 
-## Tech Stack
+It combines Excel import, SQL-based analysis, configurable widgets, dashboards, and report exports in a zero-backend architecture built on SQLite WASM. Your data stays on your machine. No telemetry, no server component, no external data calls during normal usage.
 
-- **Framework**: React 19 + TypeScript (Vite)
-- **Styling**: Tailwind CSS (Utility First)
-- **Database**: SQLite WASM + OPFS (Persistent Browser Storage)
-- **Visualization**: Recharts & Lucide Icons
-- **Internationalization**: i18next & react-i18next
-- **PDF Core**: html2canvas & jsPDF
+[Live Demo](https://hrmnns.github.io/litebistudio/) | [Getting Started](docs/wiki/Getting-Started.md) | [Wiki](docs/wiki/Home.md) | [Example: Cherit IT Invoice Control](docs/wiki/Example-Cherit-IT-Invoice-Control.md)
 
-## Getting Started
+![Getting Started overview](docs/wiki/assets/getting-started-overview.png)
 
-### Try Instantly (No Installation)
+## Why LiteBI Studio?
 
-You can use LiteBI Studio directly in your browser:
+- Local-first by design: data is processed and stored in the browser with SQLite WASM + OPFS.
+- No backend required: the app can be hosted statically, including on GitHub Pages.
+- Built for controlled environments: suitable for IT controlling, internal reporting, demos, and privacy-sensitive analysis.
+- End-to-end workflow in one tool: import, inspect, query, visualize, assemble dashboards, and export reports.
+- Flexible data model: works with generic relational structures instead of forcing one business schema.
+
+## Use Cases
+
+- IT controlling: analyze invoices, budgets, vendors, cost centers, and operational KPIs locally.
+- Internal reporting: build dashboards and export management-ready report packs without standing up backend infrastructure.
+- Proof of concept work: validate data models, SQL logic, and reporting flows quickly with a static deployment.
+- Regulated or privacy-sensitive scenarios: keep source files and derived datasets on-device.
+- Demo and training environments: load prepared examples and walk through realistic end-to-end workflows.
+
+## What You Can Do
+
+### Analyze Data
+
+- Import Excel data with schema-aware helper flows.
+- Inspect tables and views directly in the browser.
+- Build SQL statements in a dedicated SQL editor and preview results immediately.
+- Use reusable SQL statements as the basis for widgets and dashboards.
+
+### Build Visuals
+
+- Create widgets for tables, KPI tiles, bar/line/area/pie/radar/scatter charts, gauges, pivot tables, and rich text content.
+- Configure axes, series, labels, colors, thresholds, and widget descriptions.
+- Assemble multiple widgets into dashboards with drag-and-drop layout management.
+
+### Package Results
+
+- Build multi-page report packs from dashboards and widgets.
+- Export outputs as PDF, image, HTML, JSON, and PPT where supported.
+- Use example datasets and guided flows to evaluate the app quickly.
+
+### Stay Local and Secure
+
+- Keep data on-device with no mandatory cloud dependency.
+- Use app lock protection and encrypted backups.
+- Benefit from CSP hardening and a zero-telemetry operating model.
+
+## Typical Workflow
+
+1. Import an Excel file in `Data Management`.
+2. Explore the loaded tables in `Tables`.
+3. Create or refine queries in `SQL Workspace`.
+4. Turn query results into visuals in `Widgets`.
+5. Arrange widgets into a dashboard.
+6. Export a report pack or share results as a local artifact.
+
+## Product Tour
+
+### Data import and preparation
+
+![Data Management overview](docs/wiki/assets/data-management-import-overview.png)
+
+### SQL analysis workspace
+
+![SQL Workspace overview](docs/wiki/assets/sql-workspace-overview.png)
+
+### Widget and dashboard creation
+
+![Widgets overview](docs/wiki/assets/widgets-overview.png)
+
+![Dashboard overview](docs/wiki/assets/dashboard-overview.png)
+
+## Try It Quickly
+
+### Live Demo
+
+Open the hosted version:
 
 - https://hrmnns.github.io/litebistudio/
 
-Fastest path:
+Fastest evaluation path:
 
-1. Open the URL.
-2. Go to **Data Management**.
-3. Start with **Excel import** and load your first dataset.
+1. Open the app.
+2. Go to `Data Management`.
+3. Import an Excel file or restore the prepared example backup.
+
+Detailed walkthroughs:
+
+- [Getting Started](docs/wiki/Getting-Started.md)
+- [Example: Cherit IT Invoice Control](docs/wiki/Example-Cherit-IT-Invoice-Control.md)
+- [Examples](docs/wiki/Examples.md)
 
 Privacy note:
 
 - Your data stays local in your browser.
-- No dataset is uploaded to an external server during normal app usage.
+- Normal app usage does not upload your datasets to an external server.
+
+## Local Development
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v20.x or later, recommended)
-- [npm](https://www.npmjs.com/)
+- Node.js 20.x or later
+- npm
 
-### Local Installation & Development
+### Install and Run
 
-1.  **Clone & Install**:
-    ```bash
-    git clone https://github.com/hrmnns/litebistudio.git
-    cd litebistudio
-    npm install
-    ```
+```bash
+git clone https://github.com/hrmnns/litebistudio.git
+cd litebistudio
+npm install
+npm run dev
+```
 
-2.  **Run Locally**:
-    ```bash
-    npm run dev
-    ```
-
-Optional (recommended once per clone):
+Optional once per clone:
 
 ```bash
 npm run hooks:install
 ```
 
-This enables repository git hooks (`.githooks/`) so `build` and `test` run automatically on push.
+This activates the repository git hooks from `.githooks/` so `build` and `test` run automatically on push.
 
-3.  **Build Phase**:
-    ```bash
-    npm run build
-    ```
+### Build
 
-## Quality Checks
+```bash
+npm run build
+```
 
-For local quality gates before release:
+### Local Quality Gates
 
-- `npm run lint`
-- `npm run check:i18n`
-- `npm run check:encoding`
-- `npm run build`
-- `npm run test`
+```bash
+npm run lint
+npm run check:i18n
+npm run check:encoding
+npm run build
+npm run test
+```
 
-## CI & Branch Protection
+## Architecture Overview
 
-- GitHub Actions workflow: `.github/workflows/ci.yml`
-- Job name: `quality-gates`
-- Trigger: push/PR to `main`
-- Required branch check (recommended): `CI / quality-gates (pull_request)`
+LiteBI Studio follows a local analytics pipeline:
 
-Recommended local pre-push sequence:
+1. `Sources`
+   Excel files and local example datasets enter the app through browser-based import flows.
+2. `Ingest`
+   Data is read, mapped, and validated before being persisted.
+3. `Storage`
+   SQLite WASM stores tables, views, and derived structures in browser storage.
+4. `Analytics`
+   SQL statements, saved queries, and widget configurations build reusable analysis layers.
+5. `UI`
+   Widgets, dashboards, and report packs present the results.
 
-- `npm run lint`
-- `npm run check:i18n`
-- `npm run check:encoding`
-- `npm run build`
-- `npm run test`
+Important technical characteristics:
 
-## Releases and Changelog
+- Frontend: React 19 + TypeScript + Vite
+- Styling: Tailwind CSS
+- Database: SQLite WASM + OPFS
+- Charts: Recharts
+- i18n: i18next (`DE` / `EN`)
+- Export stack: `html2canvas` + `jsPDF`
 
-- Release history is maintained in `CHANGELOG.md`.
-- The project follows [Semantic Versioning](https://semver.org/).
-- New changes should be added to the `Unreleased` section first, then moved into a versioned section at release time.
+## Documentation
 
-## Wiki Maintenance
+The repository wiki source lives in `docs/wiki/`.
 
-- Source of truth for wiki pages: `docs/wiki/`
-- GitHub Wiki is synchronized from repository content via `.github/workflows/wiki-sync.yml`.
-- Preferred workflow: edit wiki pages in-repo, review via PR, merge to `main`, then let automation publish.
+Recommended starting points:
 
-## Project Architecture
+- [Wiki Home](docs/wiki/Home.md)
+- [Getting Started](docs/wiki/Getting-Started.md)
+- [Examples](docs/wiki/Examples.md)
+- [Architecture](docs/wiki/Architecture.md)
+- [Page: SQL Workspace](docs/wiki/Page-SQL-Workspace.md)
+- [Page: Widgets](docs/wiki/Page-Widgets.md)
+- [Page: Dashboard](docs/wiki/Page-Dashboard.md)
+- [Security and Privacy](docs/wiki/Security-and-Privacy.md)
 
-- `src/app/`: Primary UI layer including views (Dashboard, Tables, SQL Workspace, Widgets, Report Packs).
-- `src/hooks/`: Unified infrastructure hooks (Database, Export, i18n).
-- `src/lib/`: Core system logic (DB Worker, Repositories, Cryptography utilities).
-- `src/config/`: Component definitions and system registry.
-- `src/locales/`: i18n translation files (EN/DE).
-- `src/datasets/`: Initial generic schemas and SQL views.
-- `scripts/`: Dynamic schema compilation and build utilities.
+The GitHub Wiki is synchronized from the repository through `.github/workflows/wiki-sync.yml`.
 
-## Deployment (GitHub Pages)
+## Project Structure
 
-This project is optimized for static hosting while maintaining full database features.
+- `src/app/` UI views, widgets, layout, and page-specific logic
+- `src/components/` shared UI building blocks
+- `src/hooks/` reusable hooks for async state, local storage, export, and app behavior
+- `src/lib/` repositories, DB integration, security utilities, app state, and infrastructure
+- `src/locales/` translation files for German and English
+- `src/datasets/` schema and dataset-related SQL
+- `docs/wiki/` user and maintainer documentation
+- `scripts/` repository maintenance and validation scripts
 
-1.  **Build**: Execute `npm run build`.
-2.  **COI Headers**: Uses `coi-serviceworker.js` to enable SharedArrayBuffer/OPFS support on GitHub Pages without server-side header configuration.
-3.  **Cross-Browser**: Gracefully falls back to an in-memory database if OPFS is unavailable.
+## Deployment
 
-## Security & Data Privacy
+LiteBI Studio is optimized for static hosting.
 
-- **No External Tracking**: Zero-telemetry, zero-API calls architecture.
-- **Local Sovereignty**: Your data remains on your machine; only you can export or share it.
-- **Hardened CSP**: Content Security Policy actively blocks unauthorized `connect-src` and `img-src` requests to prevent data exfiltration.
-- **Salted Protection**: The application lock uses unique cryptographic salts per device deployment to protect against brute-force/rainbow table attacks.
-- **AES-GCM Encryption**: Modern authenticated encryption used for backups.
+- `npm run build` produces the production bundle in `dist/`.
+- The app uses `coi-serviceworker.js` so SharedArrayBuffer/OPFS features can work on GitHub Pages without custom server headers.
+- If OPFS is unavailable, the app falls back gracefully to in-memory database behavior.
+
+## Security and Privacy
+
+- No external tracking or telemetry
+- No mandatory server component
+- Data sovereignty through local browser storage and local file import/export
+- CSP restrictions to limit unauthorized outbound connections
+- App lock with salted protection
+- AES-GCM encrypted backups
+
+## CI, Releases, and Changelog
+
+- CI workflow: `.github/workflows/ci.yml`
+- Wiki sync workflow: `.github/workflows/wiki-sync.yml`
+- Release history: [CHANGELOG.md](CHANGELOG.md)
+- Versioning: [Semantic Versioning](https://semver.org/)
+
+Recommended branch protection:
+
+- require `CI / quality-gates (pull_request)` before merging into `main`
+
+## What LiteBI Studio Is Not
+
+- Not a hosted SaaS BI platform
+- Not a multi-user server application
+- Not dependent on a cloud warehouse or external API backend
+
+That tradeoff is intentional: LiteBI Studio prioritizes local control, portability, and privacy over centralized orchestration.
 
 ---
-Built for data sovereignty and insights.
+
+Built for local analytics, data sovereignty, and fast insight loops.
