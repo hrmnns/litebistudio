@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { WidgetsView } from './WidgetsView';
 import { clearPageState, setPageState } from '../../lib/state/pageStateStore';
 
