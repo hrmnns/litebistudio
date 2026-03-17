@@ -943,7 +943,9 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                 <YAxis type="number" dataKey={(config.yAxes || [])[0]} name={(config.yAxes || [])[0]} axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
                                 <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} cursor={{ strokeDasharray: '3 3' }} />
                                 <Legend verticalAlign="top" height={36} />
-                                <Scatter name={title} data={results} fill={config.color || COLORS[0]} />
+                                <Scatter name={title} data={results} fill={config.color || COLORS[0]}>
+                                    {config.showLabels && <LabelList dataKey={effectiveLabelField || ((config.yAxes || [])[0] || '')} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, (config.yAxes || [])[0] || '')} />}
+                                </Scatter>
                             </ScatterChart>
                         ) : config.type === 'pivot' ? (
                             <PivotTable

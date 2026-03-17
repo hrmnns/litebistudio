@@ -3290,7 +3290,9 @@ export const WidgetsView: React.FC = () => {
                                                     <YAxis type="number" dataKey={(visConfig.yAxes || [])[0]} name={(visConfig.yAxes || [])[0]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} cursor={{ strokeDasharray: '3 3' }} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
-                                                    <Scatter name={widgetName || 'Scatter'} data={scatterData} fill={visConfig.color || COLORS[0]} />
+                                                    <Scatter name={widgetName || 'Scatter'} data={scatterData} fill={visConfig.color || COLORS[0]}>
+                                                        {visConfig.showLabels && <LabelList dataKey={previewLabelField || scatterYKey} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, scatterYKey)} />}
+                                                    </Scatter>
                                                 </ScatterChart>
                                             ) : null}
                                         </ResponsiveContainer>
