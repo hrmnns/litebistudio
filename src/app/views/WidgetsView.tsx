@@ -11,17 +11,18 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import {
     Play, BarChart2, Table as TableIcon, TrendingUp, AlertCircle,
     Layout, Folder, Gauge, Image as ImageIcon,
-    Edit3, X, Download, Search, FileCode2, Save, SlidersHorizontal, Plus, Trash2, Copy, FolderOpen, Star, Database, FileText
+    Edit3, X, Download, Search, FileCode2, Save, SlidersHorizontal, Plus, Trash2, Copy, FolderOpen, Star, Database, FileText, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { DataTable } from '../../components/ui/DataTable';
 import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-    ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+    ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ReferenceLine,
     ScatterChart, Scatter, LabelList, RadialBarChart, RadialBar
 } from 'recharts';
 import { formatValue } from '../utils/formatUtils';
+import { buildScatterData, isNumericLikeValue, parseNumericLikeValue, resolveComposedSeriesAsLine } from '../utils/chartUtils';
 import type { DbRow, WidgetConfig } from '../../types';
 import type { QueryConfig } from '../components/VisualQueryBuilder';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
@@ -39,6 +40,7 @@ import { SelectionListDialog } from '../components/ui/SelectionListDialog';
 import { Button } from '../components/ui/Button';
 import { getPageState, setPageState } from '../../lib/state/pageStateStore';
 import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
+import { createReadonlySelectionExtension } from '../utils/codeMirrorSelection';
 
 type VisualizationType = 'table' | 'bar' | 'stacked_bar' | 'stacked_bar_100' | 'line' | 'area' | 'pie' | 'kpi' | 'gauge' | 'composed' | 'radar' | 'scatter' | 'pivot' | 'text' | 'markdown' | 'status' | 'section' | 'kpi_manual' | 'image';
 type GuidedStep = 1 | 2 | 3 | 4;
@@ -153,6 +155,8 @@ const WIDGET_RUN_CACHE_MAX_ENTRIES = 12;
 const widgetRunCache = new Map<string, WidgetRunCacheEntry>();
 const WIDGETS_PAGE_STATE_ID = 'widgets_view';
 const WIDGETS_PAGE_STATE_VERSION = 1;
+const LABEL_FIELD_NONE = '__none__';
+const LABEL_FIELD_AUTO = '__auto__';
 
 const getCachedWidgetRun = (widgetId: string, normalizedSql: string): WidgetRunCacheEntry | null => {
     const key = widgetId.trim();
@@ -232,6 +236,13 @@ export const WidgetsView: React.FC = () => {
     const [selectedLoadWidgetId, setSelectedLoadWidgetId] = useState<string>('');
     const [selectedLoadSqlId, setSelectedLoadSqlId] = useState<string>('');
     const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
+    const [isGraphTypePanelOpen, setIsGraphTypePanelOpen] = useState(true);
+    const [isLabelsPanelOpen, setIsLabelsPanelOpen] = useState(true);
+    const [isChartTargetPanelOpen, setIsChartTargetPanelOpen] = useState(true);
+    const [isAxesPanelOpen, setIsAxesPanelOpen] = useState(true);
+    const [isPivotPanelOpen, setIsPivotPanelOpen] = useState(true);
+    const [isKpiRulesPanelOpen, setIsKpiRulesPanelOpen] = useState(true);
+    const [isDescriptionPanelOpen, setIsDescriptionPanelOpen] = useState(true);
     const [localWidgetSavedAtById, setLocalWidgetSavedAtById] = useState<Record<string, string>>(initialPageState?.localWidgetSavedAtById ?? {});
     const [widgetDraftById, setWidgetDraftById] = useState<Record<string, WidgetEditorDraft>>(initialPageState?.widgetDraftById ?? {});
     const [unsavedWidgetDraft, setUnsavedWidgetDraft] = useState<WidgetEditorDraft | null>(initialPageState?.unsavedWidgetDraft ?? null);
@@ -347,10 +358,6 @@ export const WidgetsView: React.FC = () => {
         () => {
             const activeLineDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.08)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.18)' : 'rgba(96, 165, 250, 0.12)';
             const activeLineLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.05)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(59, 130, 246, 0.08)';
-            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.30)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.46)' : 'rgba(96, 165, 250, 0.38)';
-            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(37, 99, 235, 0.26)' : sqlEditorThemeIntensity === 'high' ? 'rgba(37, 99, 235, 0.42)' : 'rgba(37, 99, 235, 0.34)';
-            const selectionTextDark = '#eaf2ff';
-            const selectionTextLight = '#0b1f3a';
             return EditorView.theme({
                 '&': {
                     height: '100%',
@@ -377,17 +384,6 @@ export const WidgetsView: React.FC = () => {
                 '.cm-activeLine': {
                     backgroundColor: sqlEditorHighlightActiveLine ? (isDarkSqlPreview ? activeLineDark : activeLineLight) : 'transparent'
                 },
-                '.cm-selectionLayer .cm-selectionBackground': {
-                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`
-                },
-                '.cm-content ::selection': {
-                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`,
-                    color: isDarkSqlPreview ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
-                },
-                '.cm-line::selection, .cm-line > span::selection': {
-                    backgroundColor: isDarkSqlPreview ? `${selectionDark} !important` : `${selectionLight} !important`,
-                    color: isDarkSqlPreview ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
-                },
                 '.cm-focused': {
                     outline: 'none'
                 },
@@ -404,6 +400,11 @@ export const WidgetsView: React.FC = () => {
         [isDarkSqlPreview, sqlEditorFontSize, sqlEditorHighlightActiveLine, sqlEditorThemeIntensity]
     );
 
+    const readonlySqlPreviewSelection = useMemo(
+        () => createReadonlySelectionExtension(isDarkSqlPreview),
+        [isDarkSqlPreview]
+    );
+
     const sqlPreviewExtensions = useMemo(() => {
         const exts = [sqlLang(), sqlPreviewTheme, EditorState.tabSize.of(Math.max(2, Math.min(4, sqlEditorTabSize)))];
         if (sqlEditorSyntaxHighlight) {
@@ -412,8 +413,9 @@ export const WidgetsView: React.FC = () => {
         if (sqlEditorLineWrap) {
             exts.push(EditorView.lineWrapping);
         }
+        exts.push(readonlySqlPreviewSelection);
         return exts;
-    }, [sqlEditorLineWrap, sqlEditorSyntaxHighlight, sqlEditorTabSize, sqlPreviewHighlightStyle, sqlPreviewTheme]);
+    }, [readonlySqlPreviewSelection, sqlEditorLineWrap, sqlEditorSyntaxHighlight, sqlEditorTabSize, sqlPreviewHighlightStyle, sqlPreviewTheme]);
     const savedWidgetsById = useMemo(() => {
         const map = new Map<string, SavedWidget>();
         for (const widget of savedWidgets || []) {
@@ -550,11 +552,6 @@ export const WidgetsView: React.FC = () => {
             setBuilderMode(draft?.builderMode || 'sql');
             setVisType(draft?.visType || 'table');
             setVisConfig(draft?.visConfig || { type: 'table', color: '#3b82f6' });
-            if (draft?.previewTab) {
-                setPreviewTab(draft.previewTab);
-            } else if (persistedPreviewTab) {
-                setPreviewTab(persistedPreviewTab);
-            }
 
             try {
                 const visualConfig = JSON.parse(widget.visualization_config) as WidgetConfig;
@@ -585,6 +582,24 @@ export const WidgetsView: React.FC = () => {
                 parsedVisType = draft.visType;
                 parsedVisConfig = draft.visConfig;
                 setSourceSelectTab(draft.sourceSelectTab);
+            }
+
+            const hasDataSourceForWidget = (restoredSql || '').trim().length > 0
+                && parsedVisType !== 'text'
+                && parsedVisType !== 'markdown'
+                && parsedVisType !== 'status'
+                && parsedVisType !== 'section'
+                && parsedVisType !== 'kpi_manual'
+                && parsedVisType !== 'image';
+            const hasRenderablePreview = !hasDataSourceForWidget || (parsedVisType !== 'table' && parsedVisType !== 'pivot');
+            if (hasRenderablePreview) {
+                setPreviewTab('graphic');
+            } else if (draft?.previewTab && draft.previewTab !== 'graphic') {
+                setPreviewTab(draft.previewTab);
+            } else if (persistedPreviewTab && persistedPreviewTab !== 'graphic') {
+                setPreviewTab(persistedPreviewTab);
+            } else {
+                setPreviewTab('table');
             }
 
             if (navigate) {
@@ -1159,7 +1174,7 @@ export const WidgetsView: React.FC = () => {
     const numericColumns = useMemo(() => {
         if (results.length === 0) return [] as string[];
         return resultColumns.filter((col) =>
-            results.some((row) => row[col] !== null && row[col] !== undefined && typeof row[col] === 'number')
+            results.some((row) => isNumericLikeValue(row[col]))
         );
     }, [results, resultColumns]);
     const isTextWidget = visType === 'text';
@@ -1172,14 +1187,8 @@ export const WidgetsView: React.FC = () => {
     const scatterXKey = visConfig.xAxis || '';
     const scatterYKey = (visConfig.yAxes || [])[0] || '';
     const scatterData = useMemo(() => {
-        if (visType !== 'scatter' || !scatterXKey || !scatterYKey) return [] as DbRow[];
-        return results
-            .map((row) => {
-                const x = Number(row[scatterXKey]);
-                const y = Number(row[scatterYKey]);
-                return { ...row, [scatterXKey]: x, [scatterYKey]: y };
-            })
-            .filter((row) => Number.isFinite(row[scatterXKey] as number) && Number.isFinite(row[scatterYKey] as number));
+        if (visType !== 'scatter') return [] as DbRow[];
+        return buildScatterData(results, scatterXKey, scatterYKey);
     }, [results, scatterXKey, scatterYKey, visType]);
     const stackedBar100Data = useMemo(() => {
         const yAxes = visConfig.yAxes || [];
@@ -1207,15 +1216,42 @@ export const WidgetsView: React.FC = () => {
         const candidate = (visConfig.labelField || '').trim();
         return candidate && resultColumns.includes(candidate) ? candidate : '';
     }, [resultColumns, visConfig.labelField]);
+    const labelFieldSelectValue = !visConfig.showLabels
+        ? LABEL_FIELD_NONE
+        : (visConfig.labelField || LABEL_FIELD_AUTO);
     const formatPreviewLabel = useCallback((value: unknown, fallbackKey: string) => {
         if (previewLabelField) {
             return value == null ? '' : String(value);
         }
         return formatValue(value, fallbackKey);
     }, [previewLabelField]);
+    const isPreviewComposedLineSeries = useCallback((seriesKey: string, idx: number) => {
+        return resolveComposedSeriesAsLine(visConfig, seriesKey, idx);
+    }, [visConfig.barSeries, visConfig.lineSeries]);
     const previewVisType: VisualizationType = visType;
     const hasQueryPreviewTabs = !isContentWidget && sql.trim().length > 0;
     const isGraphicCapableType = previewVisType !== 'table' && previewVisType !== 'pivot' && previewVisType !== 'text' && previewVisType !== 'markdown' && previewVisType !== 'status' && previewVisType !== 'section' && previewVisType !== 'kpi_manual' && previewVisType !== 'image';
+    const supportsRenderedLabels = previewVisType === 'bar'
+        || previewVisType === 'stacked_bar'
+        || previewVisType === 'stacked_bar_100'
+        || previewVisType === 'line'
+        || previewVisType === 'area'
+        || previewVisType === 'pie'
+        || previewVisType === 'composed'
+        || previewVisType === 'scatter';
+    const supportsChartTargetLine = previewVisType === 'bar'
+        || previewVisType === 'stacked_bar'
+        || previewVisType === 'stacked_bar_100'
+        || previewVisType === 'line'
+        || previewVisType === 'area'
+        || previewVisType === 'composed'
+        || previewVisType === 'scatter';
+    const previewChartTargetValue = useMemo(
+        () => parseNumericLikeValue(visConfig.chartTargetValue),
+        [visConfig.chartTargetValue]
+    );
+    const previewChartTargetColor = (visConfig.chartTargetColor || '#ef4444').trim() || '#ef4444';
+    const previewChartTargetLabel = (visConfig.chartTargetLabel || '').trim();
     const canPersistWidget = isContentWidget || results.length > 0;
     const exportDisabled = isExporting || (!isContentWidget && results.length === 0);
     const saveDisabled = !canPersistWidget || isReadOnly || (!isContentWidget && !hasSelectedSqlStatement);
@@ -1732,6 +1768,8 @@ export const WidgetsView: React.FC = () => {
         fontSize: '12px'
     };
     const previewTooltipCursor = { fill: isDarkSqlPreview ? 'rgba(148, 163, 184, 0.14)' : '#f8fafc' };
+    const previewChartGridStroke = isDarkSqlPreview ? '#334155' : '#cbd5e1';
+    const previewAxisLine = { stroke: isDarkSqlPreview ? '#475569' : '#94a3b8', strokeWidth: 1 };
     const previewWidgetDescription = (visConfig.widgetDescription || '').trim();
     const previewWidgetDescriptionPosition: 'top' | 'bottom' = visConfig.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
 
@@ -1922,6 +1960,12 @@ export const WidgetsView: React.FC = () => {
     }, [visType, numericColumns, visConfig.xAxis, visConfig.yAxes]);
 
     useEffect(() => {
+        if ((previewTab === 'table' || previewTab === 'sql') && !hasQueryPreviewTabs) {
+            setPreviewTab('graphic');
+        }
+    }, [hasQueryPreviewTabs, previewTab, setPreviewTab]);
+
+    useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             const isModifier = event.ctrlKey || event.metaKey;
             if (!isModifier) return;
@@ -2050,78 +2094,164 @@ export const WidgetsView: React.FC = () => {
                     >
                         <div className="flex flex-col h-full min-h-0 overflow-hidden">
                             <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-2">
-                                <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 space-y-3 animate-in slide-in-from-right-4 duration-300">
-                                    <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><Layout className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.graph_type')}</h3>
-                                    <div className="grid grid-cols-3 gap-2">
-                                            {(hasSelectedSqlStatement ? QUERY_VIS_OPTIONS : CONTENT_VIS_OPTIONS).map(type => (
-                                                <button key={type.id} onClick={() => setVisType(type.id)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
-                                                    <type.icon className="w-4 h-4" />
-                                                    <span className="text-[9px] uppercase font-black">{t(type.labelKey, type.fallback)}</span>
-                                                </button>
-                                            ))}
-                                    </div>
-                                    {!hasSelectedSqlStatement && (
-                                        <p className="text-[10px] text-slate-500">
-                                            {t('querybuilder.visual_text_only_hint', 'Ohne ausgewaehlte Abfrage sind nur Text-, Markdown-, Status-, Section-, KPI-Manual- oder Image-Widgets verfuegbar.')}
-                                        </p>
-                                    )}
-                                    {(visType !== 'table' && visType !== 'pivot' && visType !== 'text' && visType !== 'markdown' && visType !== 'status' && visType !== 'section' && visType !== 'kpi_manual' && visType !== 'image') && (
-                                        <div className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('querybuilder.labels')}:</span>
-                                                <button onClick={() => setVisConfig({ ...visConfig, showLabels: !visConfig.showLabels })} className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.showLabels ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-200"}`}>
-                                                    {visConfig.showLabels ? t('querybuilder.label_on') : t('querybuilder.label_off')}
-                                                </button>
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsGraphTypePanelOpen(open => !open)}
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
+                                    >
+                                        <span className="flex items-center gap-2"><Layout className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.graph_type')}</span>
+                                        {isGraphTypePanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                    </button>
+                                    {isGraphTypePanelOpen && (
+                                        <div className="space-y-3 px-3 pb-3 pt-3">
+                                            <div className="grid grid-cols-3 gap-2">
+                                                    {(hasSelectedSqlStatement ? QUERY_VIS_OPTIONS : CONTENT_VIS_OPTIONS).map(type => (
+                                                        <button key={type.id} onClick={() => setVisType(type.id)} className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 border transition-all ${visType === type.id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 text-blue-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'}`}>
+                                                            <type.icon className="w-4 h-4" />
+                                                            <span className="text-[9px] uppercase font-black">{t(type.labelKey, type.fallback)}</span>
+                                                        </button>
+                                                    ))}
                                             </div>
-                                            {visConfig.showLabels && resultColumns.length > 0 && (
-                                                <div>
-                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.label_field', 'Label-Feld')}</label>
-                                                    <select
-                                                        value={visConfig.labelField || ''}
-                                                        onChange={e => setVisConfig({ ...visConfig, labelField: e.target.value })}
-                                                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
-                                                    >
-                                                        <option value="">{t('querybuilder.label_field_auto_value', 'Y-Wert (Standard)')}</option>
-                                                        {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
-                                                    </select>
-                                                </div>
+                                            {!hasSelectedSqlStatement && (
+                                                <p className="text-[10px] text-slate-500">
+                                                    {t('querybuilder.visual_text_only_hint', 'Ohne ausgewaehlte Abfrage sind nur Text-, Markdown-, Status-, Section-, KPI-Manual- oder Image-Widgets verfuegbar.')}
+                                                </p>
                                             )}
                                         </div>
                                     )}
+                                </div>
 
-                                    {(isGraphicCapableType && results.length > 0) && (
-                                        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
-                                            {visType !== 'gauge' && (
+                                {(isGraphicCapableType && results.length > 0) && (
+                                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAxesPanelOpen(open => !open)}
+                                            className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
+                                        >
+                                            <span className="flex items-center gap-2"><SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.x_axis')} / {visType === 'gauge' ? t('querybuilder.value', 'Wert') : t('querybuilder.y_axes')}</span>
+                                            {isAxesPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                        </button>
+                                        {isAxesPanelOpen && (
+                                            <div className="space-y-4 px-3 pb-3 pt-3 animate-in slide-in-from-top-2 duration-300">
+                                                {visType !== 'gauge' && (
+                                                    <div>
+                                                        <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.x_axis')}</label>
+                                                        <select value={visConfig.xAxis || ''} onChange={e => setVisConfig({ ...visConfig, xAxis: e.target.value })} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
+                                                            <option value="">{t('querybuilder.select_column')}</option>
+                                                            {(visType === 'scatter' ? numericColumns : resultColumns).map(col => <option key={col} value={col}>{col}</option>)}
+                                                        </select>
+                                                    </div>
+                                                )}
                                                 <div>
-                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.x_axis')}</label>
-                                                    <select value={visConfig.xAxis || ''} onChange={e => setVisConfig({ ...visConfig, xAxis: e.target.value })} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
-                                                        <option value="">{t('querybuilder.select_column')}</option>
-                                                        {(visType === 'scatter' ? numericColumns : resultColumns).map(col => <option key={col} value={col}>{col}</option>)}
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{visType === 'gauge' ? t('querybuilder.value', 'Wert') : t('querybuilder.y_axes')}</label>
+                                                    <div className="flex flex-wrap gap-2 mb-2">
+                                                        {(visConfig.yAxes || []).map(y => (
+                                                            <span key={y} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-200">
+                                                                {y}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setVisConfig({ ...visConfig, yAxes: (visConfig.yAxes || []).filter(axis => axis !== y) })}
+                                                                    className="text-slate-400 hover:text-slate-600"
+                                                                >
+                                                                    <X className="w-3 h-3" />
+                                                                </button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, yAxes: visType === 'gauge' ? [e.target.value] : [...(visConfig.yAxes || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
+                                                        <option value="">{t('querybuilder.add_column')}</option>
+                                                        {(visType === 'scatter' || visType === 'gauge' ? numericColumns : resultColumns).filter(c => (visType === 'gauge' ? true : !(visConfig.yAxes || []).includes(c))).map(col => <option key={col} value={col}>{col}</option>)}
                                                     </select>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{visType === 'gauge' ? t('querybuilder.value', 'Wert') : t('querybuilder.y_axes')}</label>
-                                                <div className="flex flex-wrap gap-1 mb-2">
-                                                    {(visConfig.yAxes || []).map(y => (
-                                                        <span key={y} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 rounded text-[10px] font-bold flex items-center gap-1 border border-blue-200 dark:border-blue-700/60">
-                                                            {y}
-                                                            <button
-                                                                onClick={() => setVisConfig({ ...visConfig, yAxes: (visConfig.yAxes || []).filter(axis => axis !== y) })}
-                                                                className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100"
-                                                            >
-                                                                <X className="w-2.5 h-2.5" />
-                                                            </button>
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                                <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, yAxes: visType === 'gauge' ? [e.target.value] : [...(visConfig.yAxes || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
-                                                    <option value="">{visType === 'gauge' ? t('querybuilder.select_column') : t('querybuilder.add_y_axis')}</option>
-                                                    {(visType === 'scatter' || visType === 'gauge' ? numericColumns : resultColumns).filter(c => (visType === 'gauge' ? true : !(visConfig.yAxes || []).includes(c))).map(col => <option key={col} value={col}>{col}</option>)}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {supportsRenderedLabels && (
+                                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLabelsPanelOpen(open => !open)}
+                                            className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
+                                        >
+                                            <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.labels')}</span>
+                                            {isLabelsPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                        </button>
+                                        {isLabelsPanelOpen && resultColumns.length > 0 && (
+                                            <div className="px-3 pb-3 pt-3 animate-in slide-in-from-top-2 duration-300">
+                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.label_field', 'Label-Feld')}</label>
+                                                <select
+                                                    value={labelFieldSelectValue}
+                                                    onChange={e => {
+                                                        const nextValue = e.target.value;
+                                                        if (nextValue === LABEL_FIELD_NONE) {
+                                                            setVisConfig({ ...visConfig, showLabels: false, labelField: '' });
+                                                            return;
+                                                        }
+                                                        if (nextValue === LABEL_FIELD_AUTO) {
+                                                            setVisConfig({ ...visConfig, showLabels: true, labelField: '' });
+                                                            return;
+                                                        }
+                                                        setVisConfig({ ...visConfig, showLabels: true, labelField: nextValue });
+                                                    }}
+                                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
+                                                >
+                                                    <option value={LABEL_FIELD_NONE}>{t('querybuilder.label_field_none', 'Keine Labels')}</option>
+                                                    <option value={LABEL_FIELD_AUTO}>{t('querybuilder.label_field_auto_value', 'Y-Wert (Standard)')}</option>
+                                                    {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
                                                 </select>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
+                                )}
+
+                                {supportsChartTargetLine && (
+                                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsChartTargetPanelOpen(open => !open)}
+                                            className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
+                                        >
+                                            <span className="flex items-center gap-2"><TrendingUp className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.chart_target', 'Zielwert')}</span>
+                                            {isChartTargetPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                        </button>
+                                        {isChartTargetPanelOpen && (
+                                            <div className="space-y-4 px-3 pb-3 pt-3 animate-in slide-in-from-top-2 duration-300">
+                                                <div>
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.chart_target_value', 'Zielwert (Y)')}</label>
+                                                    <input
+                                                        value={visConfig.chartTargetValue || ''}
+                                                        onChange={e => setVisConfig({ ...visConfig, chartTargetValue: e.target.value })}
+                                                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
+                                                        placeholder="100"
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-[1fr_auto] gap-2">
+                                                    <div>
+                                                        <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.chart_target_label', 'Ziellabel')}</label>
+                                                        <input
+                                                            value={visConfig.chartTargetLabel || ''}
+                                                            onChange={e => setVisConfig({ ...visConfig, chartTargetLabel: e.target.value })}
+                                                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
+                                                            placeholder="Plan"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.chart_target_color', 'Zielfarbe')}</label>
+                                                        <input
+                                                            type="color"
+                                                            value={visConfig.chartTargetColor || '#ef4444'}
+                                                            onChange={e => setVisConfig({ ...visConfig, chartTargetColor: e.target.value })}
+                                                            className="h-[36px] w-12 p-1 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                     {visType === 'text' && (
                                         <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
@@ -2236,15 +2366,16 @@ export const WidgetsView: React.FC = () => {
                                                     placeholder={t('querybuilder.status_placeholder_message', 'Alle Kernsysteme laufen stabil.')}
                                                 />
                                             </div>
-                                            <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
-                                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">{t('querybuilder.status_pulse', 'Signal-Animation')}</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setVisConfig({ ...visConfig, statusPulse: !visConfig.statusPulse })}
-                                                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${visConfig.statusPulse ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-200'}`}
+                                            <div>
+                                                <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.status_pulse', 'Signal-Animation')}</label>
+                                                <select
+                                                    value={visConfig.statusPulse ? 'on' : 'off'}
+                                                    onChange={e => setVisConfig({ ...visConfig, statusPulse: e.target.value === 'on' })}
+                                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
                                                 >
-                                                    {visConfig.statusPulse ? t('querybuilder.label_on') : t('querybuilder.label_off')}
-                                                </button>
+                                                    <option value="off">{t('querybuilder.label_off')}</option>
+                                                    <option value="on">{t('querybuilder.label_on')}</option>
+                                                </select>
                                             </div>
                                         </div>
                                     )}
@@ -2434,7 +2565,17 @@ export const WidgetsView: React.FC = () => {
                                     )}
 
                                     {(visType === 'pivot' && results.length > 0) && (
-                                        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsPivotPanelOpen(open => !open)}
+                                                className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs font-black uppercase text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300"
+                                            >
+                                                <span className="flex items-center gap-2"><TableIcon className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.pivot', 'Pivot-Tabelle')}</span>
+                                                {isPivotPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                            </button>
+                                            {isPivotPanelOpen && (
+                                                <div className="space-y-4">
                                             <div>
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.pivot_rows')}</label>
                                                 <div className="flex flex-wrap gap-1 mb-2">
@@ -2487,11 +2628,23 @@ export const WidgetsView: React.FC = () => {
                                                     </select>
                                                 </div>
                                             </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {(visType === 'kpi' && results.length > 0) && (
-                                        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsKpiRulesPanelOpen(open => !open)}
+                                                className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs font-black uppercase text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300"
+                                            >
+                                                <span className="flex items-center gap-2"><Gauge className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.kpi_rules')}</span>
+                                                {isKpiRulesPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                            </button>
+                                            {isKpiRulesPanelOpen && (
+                                                <div className="space-y-4">
                                             <div>
                                                 <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.kpi_unit', 'Einheit')}</label>
                                                 <input
@@ -2562,36 +2715,50 @@ export const WidgetsView: React.FC = () => {
                                                     </div>
                                                 ))}
                                             </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
-                                    <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
-                                        <div>
-                                            <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">
-                                                {t('querybuilder.widget_description', 'Widget-Beschreibung')}
-                                            </label>
-                                            <textarea
-                                                value={visConfig.widgetDescription || ''}
-                                                onChange={e => setVisConfig({ ...visConfig, widgetDescription: e.target.value })}
-                                                className="w-full h-20 p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none resize-y"
-                                                placeholder={t('querybuilder.widget_description_placeholder', 'Kurze Einordnung oder Kontext (optional)')}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">
-                                                {t('querybuilder.widget_description_position', 'Position')}
-                                            </label>
-                                            <select
-                                                value={visConfig.widgetDescriptionPosition || 'bottom'}
-                                                onChange={e => setVisConfig({ ...visConfig, widgetDescriptionPosition: e.target.value as NonNullable<WidgetConfig['widgetDescriptionPosition']> })}
-                                                className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
-                                            >
-                                                <option value="top">{t('querybuilder.widget_description_position_top', 'Oben')}</option>
-                                                <option value="bottom">{t('querybuilder.widget_description_position_bottom', 'Unten')}</option>
-                                            </select>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500">
-                                            {t('querybuilder.widget_description_hint', 'Die Beschreibung wird im Widget oberhalb oder unterhalb des Inhalts angezeigt.')}
-                                        </p>
+                                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsDescriptionPanelOpen(open => !open)}
+                                            className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
+                                        >
+                                            <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 text-blue-500" />{t('querybuilder.widget_description', 'Widget-Beschreibung')}</span>
+                                            {isDescriptionPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                        </button>
+                                        {isDescriptionPanelOpen && (
+                                            <div className="space-y-3 px-3 pb-3 pt-3 animate-in slide-in-from-top-2 duration-300">
+                                                <div>
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">
+                                                        {t('querybuilder.widget_description', 'Widget-Beschreibung')}
+                                                    </label>
+                                                    <textarea
+                                                        value={visConfig.widgetDescription || ''}
+                                                        onChange={e => setVisConfig({ ...visConfig, widgetDescription: e.target.value })}
+                                                        className="w-full h-20 p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none resize-y"
+                                                        placeholder={t('querybuilder.widget_description_placeholder', 'Kurze Einordnung oder Kontext (optional)')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">
+                                                        {t('querybuilder.widget_description_position', 'Position')}
+                                                    </label>
+                                                    <select
+                                                        value={visConfig.widgetDescriptionPosition || 'bottom'}
+                                                        onChange={e => setVisConfig({ ...visConfig, widgetDescriptionPosition: e.target.value as NonNullable<WidgetConfig['widgetDescriptionPosition']> })}
+                                                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none"
+                                                    >
+                                                        <option value="top">{t('querybuilder.widget_description_position_top', 'Oben')}</option>
+                                                        <option value="bottom">{t('querybuilder.widget_description_position_bottom', 'Unten')}</option>
+                                                    </select>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500">
+                                                    {t('querybuilder.widget_description_hint', 'Die Beschreibung wird im Widget oberhalb oder unterhalb des Inhalts angezeigt.')}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                         </div>
@@ -2634,7 +2801,6 @@ export const WidgetsView: React.FC = () => {
                                 )}
                             </div>
                         )}
-                    </div>
                     </RightOverlayPanel>
 
                     {/* Preview Area */}
@@ -2742,8 +2908,8 @@ export const WidgetsView: React.FC = () => {
                                         <Button
                                             type="button"
                                             onClick={() => { if (!isContentWidget) setPreviewTab('table'); }}
-                                            disabled={isContentWidget}
-                                            title={isContentWidget ? t('common.not_available', 'Not available') : t('querybuilder.preview_tab_table', 'Tabelle')}
+                                            disabled={!hasQueryPreviewTabs}
+                                            title={!hasQueryPreviewTabs ? t('common.not_available', 'Not available') : t('querybuilder.preview_tab_table', 'Tabelle')}
                                             variant="toggle"
                                             size="sm"
                                             active={previewTab === 'table'}
@@ -2754,8 +2920,8 @@ export const WidgetsView: React.FC = () => {
                                         <Button
                                             type="button"
                                             onClick={() => { if (!isContentWidget) setPreviewTab('sql'); }}
-                                            disabled={isContentWidget}
-                                            title={isContentWidget ? t('common.not_available', 'Not available') : t('querybuilder.preview_tab_sql', 'SQL')}
+                                            disabled={!hasQueryPreviewTabs}
+                                            title={!hasQueryPreviewTabs ? t('common.not_available', 'Not available') : t('querybuilder.preview_tab_sql', 'SQL')}
                                             variant="toggle"
                                             size="sm"
                                             active={previewTab === 'sql'}
@@ -3161,9 +3327,10 @@ export const WidgetsView: React.FC = () => {
                                         <ResponsiveContainer width="100%" height="100%" minWidth={320} minHeight={280}>
                                             {previewVisType === 'bar' ? (
                                                 <BarChart data={results}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={previewChartGridStroke} />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    {Number.isFinite(previewChartTargetValue) && <ReferenceLine y={previewChartTargetValue} stroke={previewChartTargetColor} strokeDasharray="6 4" label={previewChartTargetLabel || undefined} />}
                                                     <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} cursor={previewTooltipCursor} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
@@ -3174,9 +3341,10 @@ export const WidgetsView: React.FC = () => {
                                                 </BarChart>
                                             ) : previewVisType === 'stacked_bar' ? (
                                                 <BarChart data={results}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={previewChartGridStroke} />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    {Number.isFinite(previewChartTargetValue) && <ReferenceLine y={previewChartTargetValue} stroke={previewChartTargetColor} strokeDasharray="6 4" label={previewChartTargetLabel || undefined} />}
                                                     <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} cursor={previewTooltipCursor} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
@@ -3187,9 +3355,10 @@ export const WidgetsView: React.FC = () => {
                                                 </BarChart>
                                             ) : previewVisType === 'stacked_bar_100' ? (
                                                 <BarChart data={stackedBar100Data}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} domain={[0, 100]} tickFormatter={(val) => `${Number(val).toFixed(0)}%`} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={previewChartGridStroke} />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} domain={[0, 100]} tickFormatter={(val) => `${Number(val).toFixed(0)}%`} />
+                                                    {Number.isFinite(previewChartTargetValue) && <ReferenceLine y={previewChartTargetValue} stroke={previewChartTargetColor} strokeDasharray="6 4" label={previewChartTargetLabel || undefined} />}
                                                     <Tooltip
                                                         contentStyle={previewTooltipContentStyle}
                                                         labelStyle={previewTooltipLabelStyle}
@@ -3206,9 +3375,10 @@ export const WidgetsView: React.FC = () => {
                                                 </BarChart>
                                             ) : previewVisType === 'line' ? (
                                                 <LineChart data={results}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={previewChartGridStroke} />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    {Number.isFinite(previewChartTargetValue) && <ReferenceLine y={previewChartTargetValue} stroke={previewChartTargetColor} strokeDasharray="6 4" label={previewChartTargetLabel || undefined} />}
                                                     <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
@@ -3219,9 +3389,10 @@ export const WidgetsView: React.FC = () => {
                                                 </LineChart>
                                             ) : previewVisType === 'area' ? (
                                                 <AreaChart data={results}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={previewChartGridStroke} />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    {Number.isFinite(previewChartTargetValue) && <ReferenceLine y={previewChartTargetValue} stroke={previewChartTargetColor} strokeDasharray="6 4" label={previewChartTargetLabel || undefined} />}
                                                     <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
@@ -3255,26 +3426,27 @@ export const WidgetsView: React.FC = () => {
                                                 </PieChart>
                                             ) : previewVisType === 'composed' ? (
                                                 <ComposedChart data={results}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={previewChartGridStroke} />
+                                                    <XAxis dataKey={visConfig.xAxis} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} tickFormatter={val => formatValue(val, (visConfig.yAxes || [])[0])} />
+                                                    {Number.isFinite(previewChartTargetValue) && <ReferenceLine y={previewChartTargetValue} stroke={previewChartTargetColor} strokeDasharray="6 4" label={previewChartTargetLabel || undefined} />}
                                                     <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} formatter={(val, name) => [formatValue(val, name as string), name]} />
                                                     <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
-                                                        idx === 0 ? (
-                                                            <Bar key={y} dataKey={y} fill={COLORS[0]} radius={[4, 4, 0, 0]}>
-                                                                {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
-                                                            </Bar>
-                                                        ) : (
+                                                        isPreviewComposedLineSeries(y, idx) ? (
                                                             <Line key={y} type="monotone" dataKey={y} stroke={COLORS[idx % COLORS.length]} strokeWidth={3}>
                                                                 {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
                                                             </Line>
+                                                        ) : (
+                                                            <Bar key={y} dataKey={y} fill={COLORS[0]} radius={[4, 4, 0, 0]}>
+                                                                {visConfig.showLabels && <LabelList dataKey={previewLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={val => formatPreviewLabel(val, y)} />}
+                                                            </Bar>
                                                         )
                                                     ))}
                                                 </ComposedChart>
                                             ) : previewVisType === 'radar' ? (
                                                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={results}>
-                                                    <PolarGrid stroke="#e2e8f0" />
+                                                    <PolarGrid stroke={previewChartGridStroke} />
                                                     <PolarAngleAxis dataKey={visConfig.xAxis} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
                                                     <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                                                     {(visConfig.yAxes || []).map((y, idx) => (
@@ -3285,9 +3457,10 @@ export const WidgetsView: React.FC = () => {
                                                 </RadarChart>
                                             ) : previewVisType === 'scatter' ? (
                                                 <ScatterChart>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis type="number" dataKey={visConfig.xAxis} name={visConfig.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
-                                                    <YAxis type="number" dataKey={(visConfig.yAxes || [])[0]} name={(visConfig.yAxes || [])[0]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={previewChartGridStroke} />
+                                                    <XAxis type="number" dataKey={visConfig.xAxis} name={visConfig.xAxis} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    <YAxis type="number" dataKey={(visConfig.yAxes || [])[0]} name={(visConfig.yAxes || [])[0]} axisLine={previewAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} />
+                                                    {Number.isFinite(previewChartTargetValue) && <ReferenceLine y={previewChartTargetValue} stroke={previewChartTargetColor} strokeDasharray="6 4" label={previewChartTargetLabel || undefined} />}
                                                     <Tooltip contentStyle={previewTooltipContentStyle} labelStyle={previewTooltipLabelStyle} itemStyle={previewTooltipItemStyle} cursor={{ strokeDasharray: '3 3' }} />
                                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                                                     <Scatter name={widgetName || 'Scatter'} data={scatterData} fill={visConfig.color || COLORS[0]}>

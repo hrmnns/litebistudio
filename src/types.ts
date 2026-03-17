@@ -108,6 +108,9 @@ export interface WidgetConfig {
     color?: string;
     showLabels?: boolean;
     labelField?: string;
+    chartTargetValue?: string;
+    chartTargetLabel?: string;
+    chartTargetColor?: string;
     barSeries?: string[];
     lineSeries?: string[];
     rules?: AlertRule[];

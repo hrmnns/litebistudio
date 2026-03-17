@@ -7,12 +7,13 @@ import { DataTable } from '../../components/ui/DataTable';
 import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-    ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+    ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ReferenceLine,
     ScatterChart, Scatter, LabelList, RadialBarChart, RadialBar
 } from 'recharts';
 import { Loader2, AlertCircle, BarChart3, ExternalLink, FileText, Layout, Gauge, Image as ImageIcon } from 'lucide-react';
 import { RecordDetailModal } from './RecordDetailModal';
 import { formatValue } from '../utils/formatUtils';
+import { buildScatterData, parseNumericLikeValue, resolveComposedSeriesAsLine } from '../utils/chartUtils';
 import { type WidgetConfig, type DbRow } from '../../types';
 import { PivotTable } from './PivotTable';
 import type { SchemaDefinition } from './SchemaDocumentation';
@@ -75,6 +76,8 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
         fontSize: '12px'
     };
     const chartTooltipCursor = { fill: isDarkTheme ? 'rgba(148, 163, 184, 0.14)' : '#f1f5f9' };
+    const chartGridStroke = isDarkTheme ? '#334155' : '#cbd5e1';
+    const chartAxisLine = { stroke: isDarkTheme ? '#475569' : '#94a3b8', strokeWidth: 1 };
     const effectiveSql = useMemo(() => {
         let nextSql = sql;
         if (!globalFilters || globalFilters.length === 0) {
@@ -221,6 +224,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
             return normalized;
         });
     }, [config.yAxes, config.yAxis, results]);
+    const chartYAxes = useMemo(
+        () => config.yAxes || (config.yAxis ? [config.yAxis] : []),
+        [config.yAxes, config.yAxis]
+    );
     const resultColumns = useMemo(
         () => (results && results.length > 0 ? Object.keys(results[0]) : []),
         [results]
@@ -235,6 +242,21 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
         }
         return formatValue(value, fallbackKey);
     }, [effectiveLabelField]);
+    const chartTargetValue = React.useMemo(
+        () => parseNumericLikeValue(config.chartTargetValue),
+        [config.chartTargetValue]
+    );
+    const chartTargetColor = (config.chartTargetColor || '#ef4444').trim() || '#ef4444';
+    const chartTargetLabel = (config.chartTargetLabel || '').trim();
+    const scatterXKey = config.xAxis || '';
+    const scatterYKey = chartYAxes[0] || '';
+    const scatterData = useMemo(() => {
+        if (config.type !== 'scatter') return [] as DbRow[];
+        return buildScatterData(results, scatterXKey, scatterYKey);
+    }, [config.type, results, scatterXKey, scatterYKey]);
+    const isComposedLineSeries = React.useCallback((seriesKey: string, idx: number) => {
+        return resolveComposedSeriesAsLine(config, seriesKey, idx);
+    }, [config.barSeries, config.lineSeries]);
     const widgetDescription = (config.widgetDescription || '').trim();
     const widgetDescriptionPosition: 'top' | 'bottom' = config.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
     const renderWidgetDescription = (position: 'top' | 'bottom') => {
@@ -776,9 +798,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         {config.type === 'bar' ? (
                             <BarChart data={results}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridStroke} />
+                                <XAxis dataKey={config.xAxis} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                {Number.isFinite(chartTargetValue) && <ReferenceLine y={chartTargetValue} stroke={chartTargetColor} strokeDasharray="6 4" label={chartTargetLabel || undefined} />}
                                 <Tooltip
                                     contentStyle={chartTooltipContentStyle}
                                     labelStyle={chartTooltipLabelStyle}
@@ -795,9 +818,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                             </BarChart>
                         ) : config.type === 'stacked_bar' ? (
                             <BarChart data={results}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridStroke} />
+                                <XAxis dataKey={config.xAxis} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                {Number.isFinite(chartTargetValue) && <ReferenceLine y={chartTargetValue} stroke={chartTargetColor} strokeDasharray="6 4" label={chartTargetLabel || undefined} />}
                                 <Tooltip
                                     contentStyle={chartTooltipContentStyle}
                                     labelStyle={chartTooltipLabelStyle}
@@ -814,9 +838,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                             </BarChart>
                         ) : config.type === 'stacked_bar_100' ? (
                             <BarChart data={stackedBar100Data}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} domain={[0, 100]} tickFormatter={(val) => `${Number(val).toFixed(0)}%`} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridStroke} />
+                                <XAxis dataKey={config.xAxis} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} domain={[0, 100]} tickFormatter={(val) => `${Number(val).toFixed(0)}%`} />
+                                {Number.isFinite(chartTargetValue) && <ReferenceLine y={chartTargetValue} stroke={chartTargetColor} strokeDasharray="6 4" label={chartTargetLabel || undefined} />}
                                 <Tooltip
                                     contentStyle={chartTooltipContentStyle}
                                     labelStyle={chartTooltipLabelStyle}
@@ -833,9 +858,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                             </BarChart>
                         ) : config.type === 'line' ? (
                             <LineChart data={results}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridStroke} />
+                                <XAxis dataKey={config.xAxis} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                {Number.isFinite(chartTargetValue) && <ReferenceLine y={chartTargetValue} stroke={chartTargetColor} strokeDasharray="6 4" label={chartTargetLabel || undefined} />}
                                 <Tooltip
                                     contentStyle={chartTooltipContentStyle}
                                     labelStyle={chartTooltipLabelStyle}
@@ -859,9 +885,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                         </linearGradient>
                                     ))}
                                 </defs>
-                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey={config.xAxis} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridStroke} />
+                                {Number.isFinite(chartTargetValue) && <ReferenceLine y={chartTargetValue} stroke={chartTargetColor} strokeDasharray="6 4" label={chartTargetLabel || undefined} />}
                                 <Tooltip
                                     contentStyle={chartTooltipContentStyle}
                                     labelStyle={chartTooltipLabelStyle}
@@ -903,9 +930,10 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                             </PieChart>
                         ) : config.type === 'composed' ? (
                             <ComposedChart data={results}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridStroke} />
+                                <XAxis dataKey={config.xAxis} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => formatValue(val, (config.yAxes || [])[0])} />
+                                {Number.isFinite(chartTargetValue) && <ReferenceLine y={chartTargetValue} stroke={chartTargetColor} strokeDasharray="6 4" label={chartTargetLabel || undefined} />}
                                 <Tooltip
                                     contentStyle={chartTooltipContentStyle}
                                     labelStyle={chartTooltipLabelStyle}
@@ -913,8 +941,8 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                                     formatter={(val, name) => [formatValue(val, name as string), name]}
                                 />
                                 <Legend verticalAlign="top" height={36} iconType="circle" />
-                                {(config.yAxes || []).map((y, idx) => (
-                                    config.lineSeries?.includes(y) ? (
+                                {chartYAxes.map((y, idx) => (
+                                    isComposedLineSeries(y, idx) ? (
                                         <Line key={y} type="monotone" dataKey={y} stroke={COLORS[idx % COLORS.length]} strokeWidth={3}>
                                             {config.showLabels && <LabelList dataKey={effectiveLabelField || y} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, y)} />}
                                         </Line>
@@ -927,7 +955,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                             </ComposedChart>
                         ) : config.type === 'radar' ? (
                             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={results}>
-                                <PolarGrid stroke="#e2e8f0" />
+                                <PolarGrid stroke={chartGridStroke} />
                                 <PolarAngleAxis dataKey={config.xAxis} tick={{ fontSize: 10, fill: '#64748b' }} />
                                 <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={{ fontSize: 8 }} />
                                 {(config.yAxes || []).map((y, idx) => (
@@ -938,13 +966,14 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
                             </RadarChart>
                         ) : config.type === 'scatter' ? (
                             <ScatterChart>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis type="number" dataKey={config.xAxis} name={config.xAxis} axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
-                                <YAxis type="number" dataKey={(config.yAxes || [])[0]} name={(config.yAxes || [])[0]} axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridStroke} />
+                                <XAxis type="number" dataKey={scatterXKey} name={scatterXKey} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis type="number" dataKey={scatterYKey} name={scatterYKey} axisLine={chartAxisLine} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                {Number.isFinite(chartTargetValue) && <ReferenceLine y={chartTargetValue} stroke={chartTargetColor} strokeDasharray="6 4" label={chartTargetLabel || undefined} />}
                                 <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} cursor={{ strokeDasharray: '3 3' }} />
                                 <Legend verticalAlign="top" height={36} />
-                                <Scatter name={title} data={results} fill={config.color || COLORS[0]}>
-                                    {config.showLabels && <LabelList dataKey={effectiveLabelField || ((config.yAxes || [])[0] || '')} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, (config.yAxes || [])[0] || '')} />}
+                                <Scatter name={title} data={scatterData} fill={config.color || COLORS[0]}>
+                                    {config.showLabels && <LabelList dataKey={effectiveLabelField || scatterYKey} position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} formatter={(val: unknown) => formatChartLabel(val, scatterYKey)} />}
                                 </Scatter>
                             </ScatterChart>
                         ) : config.type === 'pivot' ? (

@@ -5,6 +5,7 @@ import { sql as sqlLang } from '@codemirror/lang-sql';
 import { EditorView } from '@codemirror/view';
 import { Plus, Trash2 } from 'lucide-react';
 import { Modal } from './Modal';
+import { createReadonlySelectionExtension } from '../utils/codeMirrorSelection';
 
 interface CreateTableColumn {
     name: string;
@@ -110,6 +111,11 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
                 color: isDarkEditor ? '#94a3b8' : '#64748b'
             }
         }, { dark: isDarkEditor }),
+        [isDarkEditor]
+    );
+
+    const readOnlySelectionExtension = React.useMemo(
+        () => createReadonlySelectionExtension(isDarkEditor),
         [isDarkEditor]
     );
 
@@ -219,7 +225,7 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
                                         highlightActiveLine: false,
                                         highlightActiveLineGutter: false
                                     }}
-                                    extensions={[sqlLang(), readOnlyTheme]}
+                                    extensions={[sqlLang(), readOnlyTheme, readOnlySelectionExtension]}
                                 />
                             </div>
                         </div>

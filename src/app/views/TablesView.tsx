@@ -31,6 +31,7 @@ import { analyzeSqlStatements } from '../../lib/security/sqlAnalysis';
 import { Button } from '../components/ui/Button';
 import { getPageState, setPageState } from '../../lib/state/pageStateStore';
 import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
+import { createInteractiveSelectionExtensions, createReadonlySelectionExtension } from '../utils/codeMirrorSelection';
 
 interface TablesViewProps {
     onBack: () => void;
@@ -2081,10 +2082,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         () => {
             const activeLineDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.08)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.18)' : 'rgba(96, 165, 250, 0.12)';
             const activeLineLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(59, 130, 246, 0.05)' : sqlEditorThemeIntensity === 'high' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(59, 130, 246, 0.08)';
-            const selectionDark = sqlEditorThemeIntensity === 'subtle' ? 'rgba(96, 165, 250, 0.30)' : sqlEditorThemeIntensity === 'high' ? 'rgba(96, 165, 250, 0.46)' : 'rgba(96, 165, 250, 0.38)';
-            const selectionLight = sqlEditorThemeIntensity === 'subtle' ? 'rgba(37, 99, 235, 0.26)' : sqlEditorThemeIntensity === 'high' ? 'rgba(37, 99, 235, 0.42)' : 'rgba(37, 99, 235, 0.34)';
-            const selectionTextDark = '#eaf2ff';
-            const selectionTextLight = '#0b1f3a';
             return EditorView.theme({
                 '&': {
                     fontSize: `${Math.max(12, Math.min(15, sqlEditorFontSize))}px`,
@@ -2118,17 +2115,6 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 },
                 '.cm-activeLine': {
                     backgroundColor: sqlEditorHighlightActiveLine ? (isDarkEditor ? activeLineDark : activeLineLight) : 'transparent'
-                },
-                '.cm-selectionLayer .cm-selectionBackground': {
-                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`
-                },
-                '.cm-content ::selection': {
-                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`,
-                    color: isDarkEditor ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
-                },
-                '.cm-line::selection, .cm-line > span::selection': {
-                    backgroundColor: isDarkEditor ? `${selectionDark} !important` : `${selectionLight} !important`,
-                    color: isDarkEditor ? `${selectionTextDark} !important` : `${selectionTextLight} !important`
                 },
                 '.cm-gutters': {
                     backgroundColor: `${isDarkEditor ? '#0b1220' : '#f8fafc'} !important`,
@@ -2292,6 +2278,16 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         sqlEditorTheme,
         sqlHighlightStyle
     ]);
+
+    const sqlEditorInteractiveExtensions = React.useMemo(
+        () => [...sqlEditorExtensions, ...createInteractiveSelectionExtensions(isDarkEditor)],
+        [isDarkEditor, sqlEditorExtensions]
+    );
+
+    const readonlySqlPreviewExtension = React.useMemo(
+        () => createReadonlySelectionExtension(isDarkEditor),
+        [isDarkEditor]
+    );
 
     const sqlEditorBasicSetup = React.useMemo(() => ({
         lineNumbers: sqlEditorLineNumbers,
@@ -2833,39 +2829,41 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                     {t('datainspector.assistant_reset', 'Reset')}
                                 </Button>
                             </div>
-                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
                                     <button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('table')}
-                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                     >
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_table', 'Table')}</span>
+                                        <span className="flex items-center gap-2"><Database className="w-3.5 h-3.5 text-blue-500" />{t('datainspector.assistant_table', 'Table')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.table ? 'rotate-180' : ''}`} />
                                     </button>
                                     {assistantPanels.table && (
-                                    <select
-                                        value={assistantTable}
-                                        onChange={(e) => setAssistantTable(e.target.value)}
-                                        className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        {tables.map(table => (
-                                            <option key={table} value={table}>{table}</option>
-                                        ))}
-                                    </select>
+                                    <div className="px-3 pb-3 pt-3">
+                                        <select
+                                            value={assistantTable}
+                                            onChange={(e) => setAssistantTable(e.target.value)}
+                                            className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            {tables.map(table => (
+                                                <option key={table} value={table}>{table}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     )}
                                 </div>
 
-                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
                                     <button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('columns')}
-                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                     >
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_columns', 'Columns')}</span>
+                                        <span className="flex items-center gap-2"><Table2 className="w-3.5 h-3.5 text-blue-500" />{t('datainspector.assistant_columns', 'Columns')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.columns ? 'rotate-180' : ''}`} />
                                     </button>
                                     {assistantPanels.columns && (
-                                    <>
+                                    <div className="space-y-3 px-3 pb-3 pt-3">
                                         <div className="flex items-center justify-end gap-2">
                                             <Button
                                                 type="button"
@@ -2911,21 +2909,21 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                 <p className="text-[11px] text-slate-400 dark:text-slate-500 px-1 py-0.5">{t('datainspector.sql_manager_no_results', 'No matches')}</p>
                                             )}
                                         </div>
-                                    </>
+                                    </div>
                                     )}
                                 </div>
 
-                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
                                     <button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('aggregation')}
-                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                     >
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation', 'Aggregation')}</span>
+                                        <span className="flex items-center gap-2"><ListPlus className="w-3.5 h-3.5 text-blue-500" />{t('datainspector.assistant_aggregation', 'Aggregation')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.aggregation ? 'rotate-180' : ''}`} />
                                     </button>
                                     {assistantPanels.aggregation && (
-                                    <>
+                                    <div className="px-3 pb-3 pt-3">
                                         <div className="grid grid-cols-2 gap-2">
                                             <div className="space-y-1">
                                                 <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_aggregation_function', 'Function')}</label>
@@ -2957,24 +2955,24 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                 </select>
                                             </div>
                                         </div>
-                                    </>
+                                    </div>
                                     )}
                                 </div>
 
-                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
                                     <button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('grouping')}
                                         disabled={!isAggregationActive}
-                                        className="w-full flex items-center justify-between text-left rounded-md px-1 py-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-xs font-black uppercase text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-900/80 dark:text-slate-300"
                                     >
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_group_by', 'Group by')}</span>
+                                        <span className="flex items-center gap-2"><ListChecks className="w-3.5 h-3.5 text-blue-500" />{t('datainspector.assistant_group_by', 'Group by')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.grouping ? 'rotate-180' : ''}`} />
                                     </button>
                                     {!isAggregationActive ? (
-                                        <p className="text-[11px] text-slate-400 dark:text-slate-500 px-1 py-1">{t('datainspector.assistant_grouping_requires_aggregation', 'Enable aggregation to configure grouping.')}</p>
+                                        <p className="px-3 py-3 text-[11px] text-slate-400 dark:text-slate-500">{t('datainspector.assistant_grouping_requires_aggregation', 'Enable aggregation to configure grouping.')}</p>
                                     ) : assistantPanels.grouping && (
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-2 gap-2 px-3 pb-3 pt-3">
                                         <div className="space-y-1">
                                             <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_grouping_columns', 'Grouping Columns')}</label>
                                             <div className="max-h-20 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
@@ -3008,19 +3006,17 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                     )}
                                 </div>
 
-                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
-                                    <Button
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                    <button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('filter')}
-                                        variant="ghost"
-                                        size="sm"
-                                        className="w-full justify-between text-left rounded-md px-1 py-1 h-auto border-transparent bg-transparent hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-left text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                     >
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_filter', 'Filter')}</span>
+                                        <span className="flex items-center gap-2"><Filter className="w-3.5 h-3.5 text-blue-500" />{t('datainspector.assistant_filter', 'Filter')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.filter ? 'rotate-180' : ''}`} />
-                                    </Button>
+                                    </button>
                                     {assistantPanels.filter && (
-                                    <>
+                                    <div className="space-y-3 px-3 pb-3 pt-3">
                                         <div className="flex items-center justify-end">
                                             <Button
                                                 type="button"
@@ -3143,23 +3139,21 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                 className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                             />
                                         </div>
-                                    </>
+                                    </div>
                                     )}
                                 </div>
 
-                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
-                                    <Button
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                    <button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('sorting')}
-                                        variant="ghost"
-                                        size="sm"
-                                        className="w-full justify-between text-left rounded-md px-1 py-1 h-auto border-transparent bg-transparent hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-left text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                     >
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_order_by', 'Order by')}</span>
+                                        <span className="flex items-center gap-2"><ArrowDown className="w-3.5 h-3.5 text-blue-500" />{t('datainspector.assistant_order_by', 'Order by')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.sorting ? 'rotate-180' : ''}`} />
-                                    </Button>
+                                    </button>
                                     {assistantPanels.sorting && (
-                                    <>
+                                    <div className="space-y-3 px-3 pb-3 pt-3">
                                         <div className="flex items-center justify-end">
                                             <Button
                                                 type="button"
@@ -3245,30 +3239,30 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                 className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                             />
                                         </div>
-                                    </>
+                                    </div>
                                     )}
                                 </div>
 
-                                <div className="space-y-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 px-2 py-2">
-                                    <Button
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white animate-in slide-in-from-right-4 duration-300 dark:border-slate-800 dark:bg-slate-950/30">
+                                    <button
                                         type="button"
                                         onClick={() => toggleAssistantPanel('preview')}
-                                        variant="ghost"
-                                        size="sm"
-                                        className="w-full justify-between text-left rounded-md px-1 py-1 h-auto border-transparent bg-transparent hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                                        className="flex w-full items-center justify-between gap-2 bg-slate-50/90 px-3 py-2.5 text-left text-xs font-black uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300"
                                     >
-                                        <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_generated_sql', 'Generated SQL')}</span>
+                                        <span className="flex items-center gap-2"><Code className="w-3.5 h-3.5 text-blue-500" />{t('datainspector.assistant_generated_sql', 'Generated SQL')}</span>
                                         <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${assistantPanels.preview ? 'rotate-180' : ''}`} />
-                                    </Button>
+                                    </button>
                                     {assistantPanels.preview && (
-                                    <div className="h-32 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                                        <CodeMirror
-                                            value={assistantSqlPreview}
-                                            height="128px"
-                                            editable={false}
-                                            basicSetup={readonlySqlPreviewBasicSetup}
-                                            extensions={sqlEditorExtensions}
-                                        />
+                                    <div className="border-t border-slate-200 bg-slate-50 px-3 pb-3 pt-3 dark:border-slate-800 dark:bg-slate-900/50">
+                                        <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
+                                            <CodeMirror
+                                                value={assistantSqlPreview}
+                                                height="128px"
+                                                editable={false}
+                                                basicSetup={readonlySqlPreviewBasicSetup}
+                                                extensions={[...sqlEditorExtensions, readonlySqlPreviewExtension]}
+                                            />
+                                        </div>
                                     </div>
                                     )}
                                 </div>
@@ -3557,7 +3551,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         };
                                     }}
                                     basicSetup={sqlEditorBasicSetup}
-                                    extensions={sqlEditorExtensions}
+                                    extensions={sqlEditorInteractiveExtensions}
                                     placeholder={t('datainspector.sql_placeholder')}
                                     onChange={handleSqlEditorChange}
                                 />
@@ -4437,7 +4431,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         height="112px"
                                         editable={false}
                                         basicSetup={readonlySqlPreviewBasicSetup}
-                                        extensions={sqlEditorExtensions}
+                                        extensions={[...sqlEditorExtensions, readonlySqlPreviewExtension]}
                                     />
                                 </div>
                             </div>
