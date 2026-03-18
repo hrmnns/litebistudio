@@ -86,6 +86,7 @@ interface SqlResultCacheEntry {
 
 interface TablesPageState {
     mode: 'table' | 'sql';
+    selectedTable: string;
     inputSql: string;
     activeSqlStatementId: string;
     lastOpenSqlStatementId: string;
@@ -283,7 +284,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedTable, setSelectedTable] = useState('');
+    const [selectedTable, setSelectedTable] = useState(initialPageState?.selectedTable ?? '');
     const [selectedItem, setSelectedItem] = useState<DbRow | null>(null);
     const [pageSize, setPageSize] = useLocalStorage<number>('tables_page_size', 100);
     const [currentPage, setCurrentPage] = useState(1);
@@ -343,6 +344,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     const persistPageState = useCallback(() => {
         setPageState<TablesPageState>(pageStateId, {
             mode,
+            selectedTable,
             inputSql,
             activeSqlStatementId,
             lastOpenSqlStatementId,
@@ -370,6 +372,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         lastSqlRunHasSelect,
         loadedSqlTemplateMeta,
         mode,
+        selectedTable,
         pageStateId,
         sqlExecutionSql,
         sqlLibrarySearch,
