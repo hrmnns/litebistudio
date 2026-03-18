@@ -254,9 +254,9 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
         if (config.type !== 'scatter') return [] as DbRow[];
         return buildScatterData(results || [], scatterXKey, scatterYKey);
     }, [config.type, results, scatterXKey, scatterYKey]);
-    const isComposedLineSeries = React.useCallback((seriesKey: string, idx: number) => {
+    const isComposedLineSeries = (seriesKey: string, idx: number) => {
         return resolveComposedSeriesAsLine(config, seriesKey, idx);
-    }, [config.barSeries, config.lineSeries]);
+    };
     const widgetDescription = (config.widgetDescription || '').trim();
     const widgetDescriptionPosition: 'top' | 'bottom' = config.widgetDescriptionPosition === 'top' ? 'top' : 'bottom';
     const renderWidgetDescription = (position: 'top' | 'bottom') => {
