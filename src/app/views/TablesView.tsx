@@ -22,7 +22,13 @@ import type { DbRow } from '../../types';
 import type { TableColumn } from '../../types';
 import { Modal } from '../components/Modal';
 import { CreateTableModal } from '../components/CreateTableModal';
-import type { DataSourceEntry, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
+import type {
+    DataSourceEntry,
+    SchemaColumnDocRecord,
+    SchemaRelationshipDocRecord,
+    SchemaTableDocRecord,
+    SqlStatementRecord
+} from '../../lib/repositories/SystemRepository';
 import { TABLES_PENDING_SQL_KEY, TABLES_PENDING_SQL_META_KEY, TABLES_RETURN_HASH_KEY } from '../../lib/tablesBridge';
 import { appDialog } from '../../lib/appDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -107,6 +113,12 @@ interface TablesPageState {
     tableResultTab: 'data' | 'profiling';
 }
 
+interface DecoratedColumnInfo {
+    name: string;
+    type: string;
+    doc?: SchemaColumnDocRecord;
+}
+
 const SQL_RESULT_CACHE_MAX_ENTRIES = 10;
 const sqlResultCache = new Map<string, SqlResultCacheEntry>();
 const SQL_HEADER_HYDRATION_MIN_MS = 120;
@@ -157,6 +169,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     );
     const SQL_LIBRARY_SCOPE = 'global';
     const SQL_LIBRARY_MIGRATION_KEY = 'tables_sql_library_migrated_v1';
+    const initialTableFromNavigation = (location.state as { initialTable?: string } | null)?.initialTable;
     const [mode, setMode] = useState<'table' | 'sql'>(initialPageState?.mode ?? fixedMode ?? 'table');
     const [inputSql, setInputSql] = useState(initialPageState?.inputSql ?? ''); // Textarea content
     const [, setSqlHistory] = useLocalStorage<string[]>('tables_sql_history', []);
@@ -284,7 +297,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
 
     // Table Mode State
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedTable, setSelectedTable] = useState(initialPageState?.selectedTable ?? '');
+    const [selectedTable, setSelectedTable] = useState(initialTableFromNavigation ?? initialPageState?.selectedTable ?? '');
     const [selectedItem, setSelectedItem] = useState<DbRow | null>(null);
     const [pageSize, setPageSize] = useLocalStorage<number>('tables_page_size', 100);
     const [currentPage, setCurrentPage] = useState(1);
@@ -395,6 +408,12 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         if (!fixedMode || mode === fixedMode) return;
         setMode(fixedMode);
     }, [fixedMode, mode]);
+
+    useEffect(() => {
+        if (!initialTableFromNavigation) return;
+        setSelectedTable(initialTableFromNavigation);
+        setMode('table');
+    }, [initialTableFromNavigation]);
 
     useEffect(() => {
         persistPageState();
@@ -609,6 +628,46 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         },
         [assistantTable]
     );
+    const { data: schemaTableDocs } = useAsync<SchemaTableDocRecord[]>(
+        async () => await SystemRepository.listSchemaTableDocs(),
+        []
+    );
+    const { data: schemaColumnDocs } = useAsync<SchemaColumnDocRecord[]>(
+        async () => await SystemRepository.listSchemaColumnDocs(),
+        []
+    );
+    const { data: schemaRelationshipDocs } = useAsync<SchemaRelationshipDocRecord[]>(
+        async () => await SystemRepository.listSchemaRelationshipDocs(),
+        []
+    );
+
+    const schemaTableDocMap = useMemo(() => {
+        const entries = (schemaTableDocs || []).map((doc) => [`${doc.object_type}:${doc.table_name}`, doc] as const);
+        return new Map<string, SchemaTableDocRecord>(entries);
+    }, [schemaTableDocs]);
+    const schemaColumnDocMap = useMemo(() => {
+        const grouped = new Map<string, Map<string, SchemaColumnDocRecord>>();
+        for (const doc of schemaColumnDocs || []) {
+            const objectKey = `${doc.object_type}:${doc.table_name}`;
+            if (!grouped.has(objectKey)) {
+                grouped.set(objectKey, new Map<string, SchemaColumnDocRecord>());
+            }
+            grouped.get(objectKey)!.set(doc.column_name, doc);
+        }
+        return grouped;
+    }, [schemaColumnDocs]);
+    const schemaRelationshipHintsByTable = useMemo(() => {
+        const grouped = new Map<string, SchemaRelationshipDocRecord[]>();
+        for (const doc of schemaRelationshipDocs || []) {
+            if (!grouped.has(doc.source_table)) grouped.set(doc.source_table, []);
+            if (!grouped.has(doc.target_table)) grouped.set(doc.target_table, []);
+            grouped.get(doc.source_table)!.push(doc);
+            if (doc.target_table !== doc.source_table) {
+                grouped.get(doc.target_table)!.push(doc);
+            }
+        }
+        return grouped;
+    }, [schemaRelationshipDocs]);
 
     useEffect(() => {
         const schemaColumns = (selectedTableSchema || []).map(col => col.name);
@@ -634,6 +693,50 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
             ? rowKeys.filter(key => tableVisibleColumns.includes(key))
             : rowKeys;
     }, [items, tableVisibleColumns]);
+    const assistantSourceType = useMemo<'table' | 'view'>(
+        () => (dataSources?.find((source) => source.name === assistantTable)?.type ?? 'table'),
+        [assistantTable, dataSources]
+    );
+    const selectedTableDoc = useMemo(
+        () => schemaTableDocMap.get(`${selectedSourceType}:${selectedTable}`) || null,
+        [schemaTableDocMap, selectedSourceType, selectedTable]
+    );
+    const assistantTableDoc = useMemo(
+        () => schemaTableDocMap.get(`${assistantSourceType}:${assistantTable}`) || null,
+        [assistantSourceType, assistantTable, schemaTableDocMap]
+    );
+    const selectedColumnDocs = useMemo(
+        () => schemaColumnDocMap.get(`${selectedSourceType}:${selectedTable}`) || new Map<string, SchemaColumnDocRecord>(),
+        [schemaColumnDocMap, selectedSourceType, selectedTable]
+    );
+    const assistantColumnDocs = useMemo(
+        () => schemaColumnDocMap.get(`${assistantSourceType}:${assistantTable}`) || new Map<string, SchemaColumnDocRecord>(),
+        [schemaColumnDocMap, assistantSourceType, assistantTable]
+    );
+    const assistantRelationshipHints = useMemo(
+        () => schemaRelationshipHintsByTable.get(assistantTable) || [],
+        [assistantTable, schemaRelationshipHintsByTable]
+    );
+    const getObjectDisplayLabel = useCallback((name: string, objectType: 'table' | 'view') => {
+        const doc = schemaTableDocMap.get(`${objectType}:${name}`);
+        return doc?.display_name?.trim() ? `${name} - ${doc.display_name.trim()}` : name;
+    }, [schemaTableDocMap]);
+    const getColumnDisplayLabel = useCallback((name: string, doc?: SchemaColumnDocRecord | null) => {
+        const displayName = doc?.display_name?.trim();
+        return displayName ? `${name} - ${displayName}` : name;
+    }, []);
+    const getSemanticTypeLabel = useCallback((semanticType?: string | null) => {
+        const normalized = semanticType?.trim();
+        if (!normalized) return '';
+        return t(`datasource.schema_semantic_type_${normalized}`, normalized);
+    }, [t]);
+    const matchesSchemaDocPrefix = useCallback((name: string, prefix: string, doc?: { display_name?: string; description?: string } | null) => {
+        if (!prefix) return true;
+        const normalizedPrefix = prefix.toLowerCase();
+        return name.toLowerCase().startsWith(normalizedPrefix)
+            || (doc?.display_name || '').toLowerCase().includes(normalizedPrefix)
+            || (doc?.description || '').toLowerCase().includes(normalizedPrefix);
+    }, []);
 
     useEffect(() => {
         if (mode !== 'table' || !showTableTools || tableToolsTab !== 'columns') return;
@@ -1363,6 +1466,14 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
         () => (assistantTableSchema || []).map(col => col.name),
         [assistantTableSchema]
     );
+    const assistantColumnsDetailed = React.useMemo<DecoratedColumnInfo[]>(
+        () => (assistantTableSchema || []).map((col) => ({
+            name: col.name,
+            type: col.type || '',
+            doc: assistantColumnDocs.get(col.name)
+        })),
+        [assistantColumnDocs, assistantTableSchema]
+    );
     const assistantNumericColumns = React.useMemo(
         () => (assistantTableSchema || [])
             .filter(col => /int|real|num|dec|float|double/i.test(col.type || ''))
@@ -1371,9 +1482,13 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
     );
     const filteredAssistantColumns = React.useMemo(() => {
         const query = assistantColumnSearch.trim().toLowerCase();
-        if (!query) return assistantColumns;
-        return assistantColumns.filter(col => col.toLowerCase().includes(query));
-    }, [assistantColumnSearch, assistantColumns]);
+        if (!query) return assistantColumnsDetailed;
+        return assistantColumnsDetailed.filter((col) => {
+            const displayName = col.doc?.display_name?.toLowerCase() || '';
+            const description = col.doc?.description?.toLowerCase() || '';
+            return col.name.toLowerCase().includes(query) || displayName.includes(query) || description.includes(query);
+        });
+    }, [assistantColumnSearch, assistantColumnsDetailed]);
     const isAggregationActive = assistantAggregation !== 'none';
 
     useEffect(() => {
@@ -2190,20 +2305,43 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 /\b(SELECT|WHERE|AND|OR|ON|HAVING|BY|ORDER BY|GROUP BY)\s+["A-Z0-9_.,\s]*$/.test(beforeCursor) ||
                 /\.\s*["A-Z0-9_]*$/.test(beforeCursor);
 
-            const schemaTables = sqlEditorSchemaHints ? tables : [];
+            const schemaSources = sqlEditorSchemaHints ? (dataSources || []) : [];
             const schemaColumns = sqlEditorSchemaHints ? (selectedTableSchema || []).map(col => col.name) : [];
             const options: Completion[] = [];
             const seen = new Set<string>();
-            const addOption = (label: string, type: Completion['type'], boost = 0, applyValue?: string) => {
+            const addOption = (
+                label: string,
+                type: Completion['type'],
+                boost = 0,
+                applyValue?: string,
+                detail?: string,
+                info?: string
+            ) => {
                 const key = `${type}:${label.toLowerCase()}`;
                 if (seen.has(key)) return;
                 seen.add(key);
-                options.push({ label, type, boost, apply: applyValue || label });
+                options.push({
+                    label,
+                    type,
+                    boost,
+                    apply: applyValue || label,
+                    detail,
+                    info: info || undefined
+                });
             };
 
             if (tableContext) {
-                for (const name of schemaTables) {
-                    if (!prefix || name.toLowerCase().startsWith(prefix)) addOption(name, 'variable', 99);
+                for (const source of schemaSources) {
+                    const tableDoc = schemaTableDocMap.get(`${source.type}:${source.name}`);
+                    if (!matchesSchemaDocPrefix(source.name, prefix, tableDoc)) continue;
+                    addOption(
+                        source.name,
+                        'variable',
+                        99,
+                        source.name,
+                        tableDoc?.display_name?.trim() || source.type,
+                        tableDoc?.description?.trim() || undefined
+                    );
                 }
                 for (const keyword of SQL_KEYWORDS) {
                     if (!prefix || keyword.toLowerCase().startsWith(prefix)) {
@@ -2213,7 +2351,19 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 }
             } else if (columnContext) {
                 for (const col of schemaColumns) {
-                    if (!prefix || col.toLowerCase().startsWith(prefix)) addOption(col, 'property', 99);
+                    const columnDoc = selectedColumnDocs.get(col);
+                    if (!matchesSchemaDocPrefix(col, prefix, columnDoc)) continue;
+                    addOption(
+                        col,
+                        'property',
+                        99,
+                        col,
+                        [
+                            columnDoc?.display_name?.trim() || '',
+                            getSemanticTypeLabel(columnDoc?.semantic_type)
+                        ].filter(Boolean).join(' - ') || undefined,
+                        columnDoc?.description?.trim() || undefined
+                    );
                 }
                 for (const keyword of SQL_KEYWORDS) {
                     if (!prefix || keyword.toLowerCase().startsWith(prefix)) {
@@ -2221,8 +2371,17 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                         addOption(keyword, 'keyword', 80, apply);
                     }
                 }
-                for (const name of schemaTables) {
-                    if (!prefix || name.toLowerCase().startsWith(prefix)) addOption(name, 'variable', 70);
+                for (const source of schemaSources) {
+                    const tableDoc = schemaTableDocMap.get(`${source.type}:${source.name}`);
+                    if (!matchesSchemaDocPrefix(source.name, prefix, tableDoc)) continue;
+                    addOption(
+                        source.name,
+                        'variable',
+                        70,
+                        source.name,
+                        tableDoc?.display_name?.trim() || source.type,
+                        tableDoc?.description?.trim() || undefined
+                    );
                 }
             } else {
                 for (const keyword of SQL_KEYWORDS) {
@@ -2231,11 +2390,32 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                         addOption(keyword, 'keyword', 90, apply);
                     }
                 }
-                for (const name of schemaTables) {
-                    if (!prefix || name.toLowerCase().startsWith(prefix)) addOption(name, 'variable', 80);
+                for (const source of schemaSources) {
+                    const tableDoc = schemaTableDocMap.get(`${source.type}:${source.name}`);
+                    if (!matchesSchemaDocPrefix(source.name, prefix, tableDoc)) continue;
+                    addOption(
+                        source.name,
+                        'variable',
+                        80,
+                        source.name,
+                        tableDoc?.display_name?.trim() || source.type,
+                        tableDoc?.description?.trim() || undefined
+                    );
                 }
                 for (const col of schemaColumns) {
-                    if (!prefix || col.toLowerCase().startsWith(prefix)) addOption(col, 'property', 70);
+                    const columnDoc = selectedColumnDocs.get(col);
+                    if (!matchesSchemaDocPrefix(col, prefix, columnDoc)) continue;
+                    addOption(
+                        col,
+                        'property',
+                        70,
+                        col,
+                        [
+                            columnDoc?.display_name?.trim() || '',
+                            getSemanticTypeLabel(columnDoc?.semantic_type)
+                        ].filter(Boolean).join(' - ') || undefined,
+                        columnDoc?.description?.trim() || undefined
+                    );
                 }
             }
 
@@ -2246,7 +2426,18 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                 validFor: /^[A-Za-z0-9_."-]*$/
             };
         },
-        [autocompleteEnabled, mode, selectedTableSchema, sqlEditorSchemaHints, sqlEditorUppercaseKeywords, tables]
+        [
+            autocompleteEnabled,
+            dataSources,
+            getSemanticTypeLabel,
+            matchesSchemaDocPrefix,
+            mode,
+            schemaTableDocMap,
+            selectedColumnDocs,
+            selectedTableSchema,
+            sqlEditorSchemaHints,
+            sqlEditorUppercaseKeywords
+        ]
     );
 
     const sqlEditorExtensions = React.useMemo(() => {
@@ -2561,10 +2752,17 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                     ) : (
                                         physicalTables.map((table) => {
                                             const isActive = selectedTable === table.name;
+                                            const tableDoc = schemaTableDocMap.get(`${table.type}:${table.name}`);
                                             return (
                                                 <div key={table.name} className={`p-3 flex items-center justify-between gap-3 ${isActive ? 'bg-blue-50/40 dark:bg-blue-900/15' : ''}`}>
                                                     <div className="min-w-0">
                                                         <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{table.name}</div>
+                                                        {tableDoc?.display_name?.trim() && (
+                                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{tableDoc.display_name.trim()}</div>
+                                                        )}
+                                                        {tableDoc?.description?.trim() && (
+                                                            <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{tableDoc.description.trim()}</div>
+                                                        )}
                                                         <div className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">{table.type}</div>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
@@ -2616,6 +2814,11 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                         {tableToolsTab === 'columns' && (
                             <div className="flex-1 min-h-0 flex flex-col gap-2">
                                 <p className="text-xs text-slate-500 dark:text-slate-400">{t('datainspector.table_tools_columns_hint', 'Inspect schema and set sorting per column.')}</p>
+                                {selectedTableDoc?.description?.trim() && (
+                                    <div className="rounded-lg border border-blue-200/70 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/20 px-3 py-2 text-[11px] text-blue-700 dark:text-blue-300">
+                                        {selectedTableDoc.description.trim()}
+                                    </div>
+                                )}
                                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2 space-y-2">
                                     <div className="flex items-center justify-between gap-2">
                                         <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
@@ -2671,6 +2874,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                             const isSortedColumn = tableSortConfig?.key === col.name;
                                             const sortDirection = isSortedColumn ? tableSortConfig?.direction : null;
                                             const isSelectedColumn = tableSelectedColumns.includes(col.name);
+                                            const columnDoc = selectedColumnDocs.get(col.name);
                                             return (
                                             <div
                                                 key={col.name}
@@ -2690,7 +2894,21 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                             }}
                                                             className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
                                                         />
-                                                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{col.name}</span>
+                                                        <span className="min-w-0">
+                                                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate block">
+                                                                {getColumnDisplayLabel(col.name, columnDoc)}
+                                                            </span>
+                                                            {(columnDoc?.description?.trim() || columnDoc?.semantic_type?.trim()) && (
+                                                                <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block">
+                                                                    {[
+                                                                        columnDoc?.semantic_type?.trim()
+                                                                            ? t(`datasource.schema_semantic_type_${columnDoc.semantic_type}`, columnDoc.semantic_type)
+                                                                            : '',
+                                                                        columnDoc?.description?.trim() || ''
+                                                                    ].filter(Boolean).join(' - ')}
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                     </label>
                                                     {isSortedColumn && (
                                                         <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
@@ -2749,7 +2967,7 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                             className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none"
                                         >
                                             {(selectedTableSchema || []).map(col => (
-                                                <option key={col.name} value={col.name}>{col.name}</option>
+                                                <option key={col.name} value={col.name}>{getColumnDisplayLabel(col.name, selectedColumnDocs.get(col.name))}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -2849,9 +3067,52 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                             className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             {tables.map(table => (
-                                                <option key={table} value={table}>{table}</option>
+                                                <option
+                                                    key={table}
+                                                    value={table}
+                                                >
+                                                    {getObjectDisplayLabel(table, (dataSources?.find((source) => source.name === table)?.type ?? 'table'))}
+                                                </option>
                                             ))}
                                         </select>
+                                        {(assistantTableDoc?.description?.trim() || assistantRelationshipHints.length > 0) && (
+                                            <div className="mt-3 space-y-2">
+                                                {assistantTableDoc?.description?.trim() && (
+                                                    <div className="rounded-lg border border-blue-200/70 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/20 px-3 py-2 text-[11px] text-blue-700 dark:text-blue-300">
+                                                        {assistantTableDoc.description.trim()}
+                                                    </div>
+                                                )}
+                                                {assistantRelationshipHints.length > 0 && (
+                                                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-3 py-2">
+                                                        <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
+                                                            {t('datainspector.assistant_relationship_hints', 'Join hints')}
+                                                        </div>
+                                                        <div className="mt-2 space-y-1.5">
+                                                            {assistantRelationshipHints.slice(0, 4).map((relationship) => {
+                                                                const isOutgoing = relationship.source_table === assistantTable;
+                                                                const otherTable = isOutgoing ? relationship.target_table : relationship.source_table;
+                                                                const left = isOutgoing ? relationship.source_column : relationship.target_column;
+                                                                const right = isOutgoing ? relationship.target_column : relationship.source_column;
+                                                                return (
+                                                                    <div key={relationship.id} className="text-[11px] text-slate-600 dark:text-slate-300">
+                                                                        <span className="font-mono text-slate-700 dark:text-slate-200">
+                                                                            {assistantTable}.{left}
+                                                                        </span>
+                                                                        <span className="px-1 text-slate-400">-&gt;</span>
+                                                                        <span className="font-mono text-slate-700 dark:text-slate-200">
+                                                                            {otherTable}.{right}
+                                                                        </span>
+                                                                        <span className="ml-2 text-slate-400">
+                                                                            {relationship.join_type} {relationship.relationship_kind}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                     )}
                                 </div>
@@ -2893,19 +3154,26 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                             className="w-full h-8 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none"
                                         />
                                         <div className="max-h-28 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
-                                            {filteredAssistantColumns.map(col => (
-                                                <label key={col} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                            {filteredAssistantColumns.map((col) => (
+                                                <label key={col.name} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
                                                     <input
                                                         type="checkbox"
-                                                        checked={assistantSelectedColumns.includes(col)}
+                                                        checked={assistantSelectedColumns.includes(col.name)}
                                                         onChange={() => {
                                                             setAssistantSelectedColumns(prev => (
-                                                                prev.includes(col) ? prev.filter(item => item !== col) : [...prev, col]
+                                                                prev.includes(col.name) ? prev.filter(item => item !== col.name) : [...prev, col.name]
                                                             ));
                                                         }}
                                                         className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 accent-blue-600 dark:accent-blue-500 focus:ring-blue-500/50 [color-scheme:light] dark:[color-scheme:dark]"
                                                     />
-                                                    <span className="font-mono">{col}</span>
+                                                    <span className="min-w-0">
+                                                        <span className="font-mono block">{getColumnDisplayLabel(col.name, col.doc)}</span>
+                                                        {(col.doc?.description?.trim() || col.type) && (
+                                                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                                                {[col.type, col.doc?.description?.trim() || ''].filter(Boolean).join(' - ')}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 </label>
                                             ))}
                                             {filteredAssistantColumns.length === 0 && (
@@ -2952,8 +3220,8 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                                     className="w-full h-9 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none disabled:opacity-40"
                                                 >
                                                     <option value="">-</option>
-                                                    {assistantColumns.map(col => (
-                                                        <option key={col} value={col}>{col}</option>
+                                                    {assistantColumnsDetailed.map(col => (
+                                                        <option key={col.name} value={col.name}>{getColumnDisplayLabel(col.name, col.doc)}</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -2979,19 +3247,19 @@ export const TablesView: React.FC<TablesViewProps> = ({ onBack, fixedMode, title
                                         <div className="space-y-1">
                                             <label className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{t('datainspector.assistant_grouping_columns', 'Grouping Columns')}</label>
                                             <div className="max-h-20 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
-                                                {assistantColumns.map(col => (
-                                                    <label key={col} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                                {assistantColumnsDetailed.map(col => (
+                                                    <label key={col.name} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                                                         <input
                                                             type="checkbox"
-                                                            checked={assistantGroupByColumns.includes(col)}
+                                                            checked={assistantGroupByColumns.includes(col.name)}
                                                             onChange={() => {
                                                                 setAssistantGroupByColumns(prev => (
-                                                                    prev.includes(col) ? prev.filter(item => item !== col) : [...prev, col]
+                                                                    prev.includes(col.name) ? prev.filter(item => item !== col.name) : [...prev, col.name]
                                                                 ));
                                                             }}
                                                             className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 accent-blue-600 dark:accent-blue-500 focus:ring-blue-500/50 [color-scheme:light] dark:[color-scheme:dark]"
                                                         />
-                                                        <span className="font-mono">{col}</span>
+                                                        <span className="font-mono">{getColumnDisplayLabel(col.name, col.doc)}</span>
                                                     </label>
                                                 ))}
                                             </div>

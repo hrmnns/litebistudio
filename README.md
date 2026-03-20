@@ -38,6 +38,8 @@ It combines Excel import, SQL-based analysis, configurable widgets, dashboards, 
 
 - Import Excel data with schema-aware helper flows.
 - Inspect tables and views directly in the browser.
+- Maintain optional schema documentation for tables, views, columns, and relationships.
+- Validate, clean up, export, and import schema metadata without exposing row-level data.
 - Build SQL statements in a dedicated SQL editor and preview results immediately.
 - Use reusable SQL statements as the basis for widgets and dashboards.
 
@@ -62,11 +64,12 @@ It combines Excel import, SQL-based analysis, configurable widgets, dashboards, 
 ## Typical Workflow
 
 1. Import an Excel file in `Data Management`.
-2. Explore the loaded tables in `Tables`.
-3. Create or refine queries in `SQL Workspace`.
-4. Turn query results into visuals in `Widgets`.
-5. Arrange widgets into a dashboard.
-6. Export a report pack or share results as a local artifact.
+2. Optionally enrich the schema with semantic documentation in `Structure & Schema`.
+3. Explore the loaded tables in `Tables`.
+4. Create or refine queries in `SQL Workspace`.
+5. Turn query results into visuals in `Widgets`.
+6. Arrange widgets into a dashboard.
+7. Export a report pack or share results as a local artifact.
 
 ## Product Tour
 
@@ -183,6 +186,7 @@ Recommended starting points:
 - [Getting Started](docs/wiki/Getting-Started.md)
 - [Examples](docs/wiki/Examples.md)
 - [Architecture](docs/wiki/Architecture.md)
+- [Page: Data Management](docs/wiki/Page-Data-Management.md)
 - [Page: SQL Workspace](docs/wiki/Page-SQL-Workspace.md)
 - [Page: Widgets](docs/wiki/Page-Widgets.md)
 - [Page: Dashboard](docs/wiki/Page-Dashboard.md)

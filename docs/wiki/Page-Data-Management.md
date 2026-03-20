@@ -21,6 +21,22 @@ Data Management is used to import, structure, and maintain your local database c
 3. Validate schema and naming before applying changes.
 4. Save and verify updates in `Tables` or `SQL Workspace`.
 
+## Schema Documentation
+
+The `Structure & Schema` area can also be used to maintain semantic schema metadata on top of the technical SQLite structure.
+
+This includes:
+- display names and descriptions for tables and views
+- display names, descriptions, and semantic types for columns
+- documented semantic relationships
+- schema validation and cleanup
+- schema import/export for metadata-only JSON packages
+
+Use this layer when technical object names alone are not sufficient for analysis and reporting work.
+
+See also:
+- [Schema Documentation](Schema-Documentation)
+
 ## Data Import
 
 The `Import` tab provides two different import paths. Which one you should use depends on whether you want to create new tables from a file or import rows into an existing table.
@@ -133,6 +149,8 @@ Use `Overwrite` only when the uploaded file is intended to fully replace the cur
 4. Review table names, mapping, and import mode before executing.
 5. Verify row counts and structure after the import.
 6. Re-check widgets, reports, and SQL queries if the imported data is part of downstream analysis.
+
+If imported data changes the shape or meaning of important objects, re-check the semantic layer in [Schema Documentation](Schema-Documentation) as well.
 
 ### Common Pitfalls
 

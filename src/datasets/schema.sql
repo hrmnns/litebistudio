@@ -87,3 +87,54 @@ CREATE TABLE IF NOT EXISTS sys_health_snapshot (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sys_health_snapshot_created_at ON sys_health_snapshot(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS sys_schema_table_docs (
+    table_name TEXT NOT NULL,
+    object_type TEXT NOT NULL DEFAULT 'table',
+    display_name TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'valid',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_validated_at TIMESTAMP,
+    PRIMARY KEY (table_name, object_type)
+);
+
+CREATE TABLE IF NOT EXISTS sys_schema_column_docs (
+    table_name TEXT NOT NULL,
+    object_type TEXT NOT NULL DEFAULT 'table',
+    column_name TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    semantic_type TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'valid',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_validated_at TIMESTAMP,
+    PRIMARY KEY (table_name, object_type, column_name)
+);
+
+CREATE TABLE IF NOT EXISTS sys_schema_relationship_docs (
+    id TEXT PRIMARY KEY,
+    source_table TEXT NOT NULL,
+    source_column TEXT NOT NULL,
+    target_table TEXT NOT NULL,
+    target_column TEXT NOT NULL,
+    relationship_kind TEXT NOT NULL DEFAULT 'n:1',
+    join_type TEXT NOT NULL DEFAULT 'LEFT JOIN',
+    display_name TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    origin TEXT NOT NULL DEFAULT 'manual',
+    confidence REAL,
+    status TEXT NOT NULL DEFAULT 'valid',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_validated_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sys_schema_column_docs_table_name ON sys_schema_column_docs(table_name);
+CREATE INDEX IF NOT EXISTS idx_sys_schema_column_docs_table_object_type ON sys_schema_column_docs(table_name, object_type);
+CREATE INDEX IF NOT EXISTS idx_sys_schema_relationship_docs_source ON sys_schema_relationship_docs(source_table, source_column);
+CREATE INDEX IF NOT EXISTS idx_sys_schema_relationship_docs_target ON sys_schema_relationship_docs(target_table, target_column);
+CREATE INDEX IF NOT EXISTS idx_sys_schema_relationship_docs_status ON sys_schema_relationship_docs(status);
