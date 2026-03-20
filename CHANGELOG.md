@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - Added a ready-to-use Cherit example backup as a release asset reference in the example wiki, including restore guidance for `Maintenance & Backup`.
 - Added configurable chart label source selection in `Widgets`, so enabled labels can now use any field from the active SQL result set instead of only the Y-value default.
+- Added schema documentation and semantic metadata management:
+  - users can now document tables, views, columns, semantic column types, and relationships in `Data Management > Structure & Schema`.
+  - added schema validation, cleanup, and metadata-only schema import/export workflows via `Schema Tools`.
+  - added controlled schema metadata import analysis, conflict review, and merge flow without exporting row data.
+  - integrated semantic labels and schema context into `SQL Workspace`, SQL hints/autocomplete, and `Widgets`.
 
 ## [1.8.0] - 2026-03-15
 ### Added
