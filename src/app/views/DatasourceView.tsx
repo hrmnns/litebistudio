@@ -1,5 +1,6 @@
 ﻿import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle, Loader2, ListPlus, FileText, Columns3, ChevronDown, Link2, Check, Pencil, Search } from 'lucide-react';
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
 import { SmartImport } from '../components/SmartImport';
@@ -91,7 +92,7 @@ interface ColumnDocDraft {
 
 type StructureSchemaFilter = 'all' | 'issues' | 'review' | 'undocumented';
 
-function getSchemaStatusMeta(status: string, t: (key: string, fallback?: string) => string): { label: string; className: string; iconOnly?: boolean; tooltip: string } {
+function getSchemaStatusMeta(status: string, t: TFunction): { label: string; className: string; iconOnly?: boolean; tooltip: string } {
     switch (status) {
         case 'missing_table':
             return {
@@ -1511,19 +1512,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
         if (schemaImportInputRef.current) {
             schemaImportInputRef.current.value = '';
         }
-    };
-
-    const setAllSchemaImportConflictResolutions = (resolution: SchemaImportConflictResolution) => {
-        const nextResolutions = Object.fromEntries(
-            schemaImportConflictEntries.map((entry, index) => {
-                const label = entry.column_name
-                    ? `${entry.table_name}.${entry.column_name}`
-                    : entry.technical_name || entry.id || '';
-                const conflictKey = entry.conflict_key || `${label}:${entry.field}:${index}`;
-                return [conflictKey, resolution];
-            })
-        ) as Record<string, SchemaImportConflictResolution>;
-        setSchemaImportConflictResolutions(nextResolutions);
     };
 
     const setAllSchemaImportConflictDraftResolutions = (resolution: SchemaImportConflictResolution) => {

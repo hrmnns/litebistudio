@@ -938,7 +938,7 @@ export function createSchemaDocumentationRepository() {
                         technical_name: importObject.technical_name,
                         status: 'direct_match'
                     });
-                    const localDoc = existingTableDocByKey.get(objectKey);
+                    const localDoc = existingTableDocByKey.get(objectKey as `${'table' | 'view'}:${string}`);
                     const tableConflictCandidates = [
                         ['display_name', localDoc?.display_name || '', importObject.display_name || ''],
                         ['description', localDoc?.description || '', importObject.description || '']
@@ -1182,7 +1182,7 @@ export function createSchemaDocumentationRepository() {
                 const objectKey = `${object.object_type}:${object.technical_name}`;
                 if (!localObjectKeySet.has(objectKey)) continue;
 
-                const existingTableDoc = tableDocByKey.get(objectKey);
+                const existingTableDoc = tableDocByKey.get(objectKey as `${'table' | 'view'}:${string}`);
                 const hasIncomingTableDoc = Boolean(object.display_name?.trim() || object.description?.trim());
                 if (hasIncomingTableDoc) {
                     const hasExistingTableDoc = Boolean(existingTableDoc?.display_name?.trim() || existingTableDoc?.description?.trim());
@@ -1224,7 +1224,7 @@ export function createSchemaDocumentationRepository() {
 
                 for (const column of object.columns) {
                     const columnKey = `${object.object_type}:${object.technical_name}:${column.technical_name}`;
-                    const existingColumnDoc = columnDocByKey.get(columnKey);
+                    const existingColumnDoc = columnDocByKey.get(columnKey as `${'table' | 'view'}:${string}:${string}`);
                     const hasIncomingColumnDoc = Boolean(column.display_name?.trim() || column.description?.trim() || column.semantic_type?.trim());
                     if (!hasIncomingColumnDoc) continue;
                     const hasExistingColumnDoc = Boolean(
@@ -1282,7 +1282,7 @@ export function createSchemaDocumentationRepository() {
                 const targetKey = Array.from(localObjectKeySet).find((entry) => entry.endsWith(`:${relationship.target_table}`));
                 if (!sourceKey || !targetKey) continue;
                 const signature = `${relationship.source_table}:${relationship.source_column}:${relationship.target_table}:${relationship.target_column}`;
-                const existingRelationship = relationshipBySignature.get(signature);
+                const existingRelationship = relationshipBySignature.get(signature as `${string}:${string}:${string}:${string}`);
                 if (existingRelationship) {
                     const nextRelationshipKind = conflictResolutions[`relationship:${relationship.source_table}:${relationship.source_column}:${relationship.target_table}:${relationship.target_column}:relationship_kind`] === 'use_import'
                         ? relationship.relationship_kind
