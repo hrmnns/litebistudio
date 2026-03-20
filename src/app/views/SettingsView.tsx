@@ -15,7 +15,7 @@ import { clearPageState, getPageState, setPageState } from '../../lib/state/page
 import { usePageFooterStatus } from '../hooks/usePageFooterStatus';
 
 type SettingsTab = 'appearance' | 'security' | 'apps' | 'controls' | 'about';
-type AppsSubTab = 'gettingstarted' | 'tables' | 'sqlworkspace' | 'widgets' | 'reports' | 'worklist' | 'datamanagement';
+type AppsSubTab = 'gettingstarted' | 'datamanagement' | 'schema' | 'tables' | 'sqlworkspace' | 'widgets' | 'reports' | 'worklist';
 type ControlsSubTab = 'datatable' | 'notifications' | 'sqleditor';
 
 export const SettingsView: React.FC = () => {
@@ -77,6 +77,12 @@ export const SettingsView: React.FC = () => {
     const [worklistHideCompleted, setWorklistHideCompleted] = useLocalStorage<boolean>('worklist_hide_completed', false);
     const [worklistDefaultPriority, setWorklistDefaultPriority] = useLocalStorage<'low' | 'normal' | 'high' | 'critical'>('worklist_default_priority', 'normal');
     const [worklistDefaultDueDays, setWorklistDefaultDueDays] = useLocalStorage<number>('worklist_default_due_days', 0);
+    const [schemaDocsAutosave, setSchemaDocsAutosave] = useLocalStorage<boolean>('schema_docs_autosave', true);
+    const [schemaDocsIncludeViews, setSchemaDocsIncludeViews] = useLocalStorage<boolean>('schema_docs_include_views', true);
+    const [schemaDocsPreferTechnicalNames, setSchemaDocsPreferTechnicalNames] = useLocalStorage<boolean>('schema_docs_prefer_technical_names', true);
+    const [schemaDocsHighlightUndocumented, setSchemaDocsHighlightUndocumented] = useLocalStorage<boolean>('schema_docs_highlight_undocumented', true);
+    const [schemaDocsShowSystemDescriptions, setSchemaDocsShowSystemDescriptions] = useLocalStorage<boolean>('schema_docs_show_system_descriptions', true);
+    const [schemaDocsShowImportDifferences, setSchemaDocsShowImportDifferences] = useLocalStorage<boolean>('schema_docs_show_import_differences', false);
     const [tableDensity, setTableDensity] = useLocalStorage<'compact' | 'normal'>('ui_table_density', 'normal');
     const [tableWrapCells, setTableWrapCells] = useLocalStorage<boolean>('ui_table_wrap_cells', false);
     const [tableDefaultShowFilters, setTableDefaultShowFilters] = useLocalStorage<boolean>('data_table_default_show_filters', false);
@@ -296,6 +302,7 @@ export const SettingsView: React.FC = () => {
                             {[
                                 { id: 'gettingstarted', label: t('sidebar.welcome', 'Erste Schritte') },
                                 { id: 'datamanagement', label: t('sidebar.datasource') },
+                                { id: 'schema', label: t('settings.tab_schema', 'Schema') },
                                 { id: 'tables', label: t('sidebar.data_inspector') },
                                 { id: 'sqlworkspace', label: t('sidebar.sql_workspace') },
                                 { id: 'widgets', label: t('sidebar.query_builder') },
@@ -1149,6 +1156,45 @@ export const SettingsView: React.FC = () => {
                                     {t('settings.health_snapshot_retention_hint', 'Used by the cleanup action in the Health Check overview.')}
                                 </p>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'apps' && appsSubTab === 'schema' && (
+                    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-opacity ${isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.schema_title', 'Schema')}</h3>
+                        <div className="space-y-5 mt-4">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.schema_hint', 'Defaults for semantic schema documentation in Data Management > Structure & Schema.')}</p>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.schema_autosave', 'Schema documentation autosave')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={schemaDocsAutosave} onChange={() => setSchemaDocsAutosave(!schemaDocsAutosave)} />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.schema_include_views', 'Include views in schema documentation')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={schemaDocsIncludeViews} onChange={() => setSchemaDocsIncludeViews(!schemaDocsIncludeViews)} />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.schema_prefer_technical_names', 'Prefer technical names')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={schemaDocsPreferTechnicalNames} onChange={() => setSchemaDocsPreferTechnicalNames(!schemaDocsPreferTechnicalNames)} />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.schema_highlight_undocumented', 'Highlight undocumented columns')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={schemaDocsHighlightUndocumented} onChange={() => setSchemaDocsHighlightUndocumented(!schemaDocsHighlightUndocumented)} />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.schema_show_system_descriptions', 'Show system table descriptions')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={schemaDocsShowSystemDescriptions} onChange={() => setSchemaDocsShowSystemDescriptions(!schemaDocsShowSystemDescriptions)} />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('settings.schema_show_import_differences', 'Show import differences in Schema Tools')}</span>
+                                <input type="checkbox" className="h-4 w-4" checked={schemaDocsShowImportDifferences} onChange={() => setSchemaDocsShowImportDifferences(!schemaDocsShowImportDifferences)} />
+                            </label>
                         </div>
                     </div>
                 )}

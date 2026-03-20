@@ -33,7 +33,7 @@ import { PivotTable } from '../components/PivotTable';
 import type { SchemaDefinition } from '../components/SchemaDocumentation';
 import { createLogger } from '../../lib/logger';
 import { appDialog } from '../../lib/appDialog';
-import type { SqlStatementRecord } from '../../lib/repositories/SystemRepository';
+import type { SchemaColumnDocRecord, SqlStatementRecord } from '../../lib/repositories/SystemRepository';
 import { MarkdownContent } from '../components/ui/MarkdownContent';
 import { RightOverlayPanel } from '../components/ui/RightOverlayPanel';
 import { SelectionListDialog } from '../components/ui/SelectionListDialog';
@@ -332,6 +332,10 @@ export const WidgetsView: React.FC = () => {
     );
     const { data: dashboards } = useAsync<DbRow[]>(
         async () => await SystemRepository.getDashboards() as unknown as DbRow[],
+        []
+    );
+    const { data: schemaColumnDocs } = useAsync<SchemaColumnDocRecord[]>(
+        async () => await SystemRepository.listSchemaColumnDocs(),
         []
     );
 
@@ -1193,6 +1197,28 @@ export const WidgetsView: React.FC = () => {
         () => (results.length > 0 ? Object.keys(results[0]) : []),
         [results]
     );
+    const widgetColumnDocByName = useMemo(() => {
+        const grouped = new Map<string, SchemaColumnDocRecord[]>();
+        for (const doc of schemaColumnDocs || []) {
+            if (!grouped.has(doc.column_name)) grouped.set(doc.column_name, []);
+            grouped.get(doc.column_name)!.push(doc);
+        }
+        const unique = new Map<string, SchemaColumnDocRecord>();
+        for (const [columnName, docs] of grouped.entries()) {
+            if (docs.length === 1) {
+                unique.set(columnName, docs[0]);
+            }
+        }
+        return unique;
+    }, [schemaColumnDocs]);
+    const getWidgetColumnDoc = useCallback((columnName: string) => {
+        return widgetColumnDocByName.get(columnName) || null;
+    }, [widgetColumnDocByName]);
+    const getWidgetColumnLabel = useCallback((columnName: string) => {
+        const doc = getWidgetColumnDoc(columnName);
+        const displayName = doc?.display_name?.trim();
+        return displayName ? `${columnName} - ${displayName}` : columnName;
+    }, [getWidgetColumnDoc]);
     const numericColumns = useMemo(() => {
         if (results.length === 0) return [] as string[];
         return resultColumns.filter((col) =>
@@ -2161,7 +2187,7 @@ export const WidgetsView: React.FC = () => {
                                                         <label className="block text-left text-[10px] font-black uppercase text-slate-400 mb-1">{t('querybuilder.x_axis')}</label>
                                                         <select value={visConfig.xAxis || ''} onChange={e => setVisConfig({ ...visConfig, xAxis: e.target.value })} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
                                                             <option value="">{t('querybuilder.select_column')}</option>
-                                                            {(visType === 'scatter' ? numericColumns : resultColumns).map(col => <option key={col} value={col}>{col}</option>)}
+                                                            {(visType === 'scatter' ? numericColumns : resultColumns).map(col => <option key={col} value={col}>{getWidgetColumnLabel(col)}</option>)}
                                                         </select>
                                                     </div>
                                                 )}
@@ -2170,7 +2196,7 @@ export const WidgetsView: React.FC = () => {
                                                     <div className="flex flex-wrap gap-2 mb-2">
                                                         {(visConfig.yAxes || []).map(y => (
                                                             <span key={y} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-200">
-                                                                {y}
+                                                                {getWidgetColumnLabel(y)}
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setVisConfig({ ...visConfig, yAxes: (visConfig.yAxes || []).filter(axis => axis !== y) })}
@@ -2183,7 +2209,7 @@ export const WidgetsView: React.FC = () => {
                                                     </div>
                                                     <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, yAxes: visType === 'gauge' ? [e.target.value] : [...(visConfig.yAxes || []), e.target.value] }); e.target.value = ''; }} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-[11px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-none">
                                                         <option value="">{t('querybuilder.add_column')}</option>
-                                                        {(visType === 'scatter' || visType === 'gauge' ? numericColumns : resultColumns).filter(c => (visType === 'gauge' ? true : !(visConfig.yAxes || []).includes(c))).map(col => <option key={col} value={col}>{col}</option>)}
+                                                        {(visType === 'scatter' || visType === 'gauge' ? numericColumns : resultColumns).filter(c => (visType === 'gauge' ? true : !(visConfig.yAxes || []).includes(c))).map(col => <option key={col} value={col}>{getWidgetColumnLabel(col)}</option>)}
                                                     </select>
                                                 </div>
                                             </div>
@@ -2222,7 +2248,7 @@ export const WidgetsView: React.FC = () => {
                                                 >
                                                     <option value={LABEL_FIELD_NONE}>{t('querybuilder.label_field_none', 'Keine Labels')}</option>
                                                     <option value={LABEL_FIELD_AUTO}>{t('querybuilder.label_field_auto_value', 'Y-Wert (Standard)')}</option>
-                                                    {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
+                                                    {resultColumns.map(col => <option key={col} value={col}>{getWidgetColumnLabel(col)}</option>)}
                                                 </select>
                                             </div>
                                         )}
@@ -2603,14 +2629,14 @@ export const WidgetsView: React.FC = () => {
                                                 <div className="mb-2 flex flex-wrap gap-1">
                                                     {(visConfig.pivotRows || []).map(r => (
                                                         <span key={r} className="flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                                                            {r}
+                                                            {getWidgetColumnLabel(r)}
                                                             <button onClick={() => setVisConfig({ ...visConfig, pivotRows: (visConfig.pivotRows || []).filter(row => row !== r) })}><X className="w-2.5 h-2.5" /></button>
                                                         </span>
                                                     ))}
                                                 </div>
                                                 <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotRows: [...(visConfig.pivotRows || []), e.target.value] }); e.target.value = ''; }} className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                                                     <option value="">{t('querybuilder.pivot_add_row')}</option>
-                                                    {resultColumns.filter(c => !(visConfig.pivotRows || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
+                                                    {resultColumns.filter(c => !(visConfig.pivotRows || []).includes(c)).map(col => <option key={col} value={col}>{getWidgetColumnLabel(col)}</option>)}
                                                 </select>
                                             </div>
                                             <div>
@@ -2618,14 +2644,14 @@ export const WidgetsView: React.FC = () => {
                                                 <div className="mb-2 flex flex-wrap gap-1">
                                                     {(visConfig.pivotCols || []).map(c => (
                                                         <span key={c} className="flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                                                            {c}
+                                                            {getWidgetColumnLabel(c)}
                                                             <button onClick={() => setVisConfig({ ...visConfig, pivotCols: (visConfig.pivotCols || []).filter(col => col !== c) })}><X className="w-2.5 h-2.5" /></button>
                                                         </span>
                                                     ))}
                                                 </div>
                                                 <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotCols: [...(visConfig.pivotCols || []), e.target.value] }); e.target.value = ''; }} className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                                                     <option value="">{t('querybuilder.pivot_add_col')}</option>
-                                                    {resultColumns.filter(c => !(visConfig.pivotCols || []).includes(c)).map(col => <option key={col} value={col}>{col}</option>)}
+                                                    {resultColumns.filter(c => !(visConfig.pivotCols || []).includes(c)).map(col => <option key={col} value={col}>{getWidgetColumnLabel(col)}</option>)}
                                                 </select>
                                             </div>
                                             <div>
@@ -2633,7 +2659,7 @@ export const WidgetsView: React.FC = () => {
                                                 <div className="space-y-2">
                                                     {(visConfig.pivotMeasures || []).map((m, idx) => (
                                                         <div key={idx} className="flex items-center gap-1 rounded border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-800/50">
-                                                            <span className="flex-1 truncate text-[10px] font-bold text-slate-600 dark:text-slate-300">{m.field}</span>
+                                                            <span className="flex-1 truncate text-[10px] font-bold text-slate-600 dark:text-slate-300">{getWidgetColumnLabel(m.field)}</span>
                                                             <select value={m.agg} onChange={e => { const next = [...(visConfig.pivotMeasures || [])]; const agg = e.target.value as NonNullable<WidgetConfig['pivotMeasures']>[number]['agg']; next[idx] = { ...m, agg }; setVisConfig({ ...visConfig, pivotMeasures: next }); }} className="bg-transparent text-[10px] font-bold text-blue-600 outline-none dark:text-blue-300">
                                                                 <option value="sum">{t('querybuilder.pivot_agg_sum')}</option>
                                                                 <option value="count">{t('querybuilder.pivot_agg_count')}</option>
@@ -2646,7 +2672,7 @@ export const WidgetsView: React.FC = () => {
                                                     ))}
                                                     <select onChange={e => { if (!e.target.value) return; setVisConfig({ ...visConfig, pivotMeasures: [...(visConfig.pivotMeasures || []), { field: e.target.value, agg: 'sum' }] }); e.target.value = ''; }} className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                                                         <option value="">{t('querybuilder.pivot_add_measure')}</option>
-                                                        {resultColumns.map(col => <option key={col} value={col}>{col}</option>)}
+                                                        {resultColumns.map(col => <option key={col} value={col}>{getWidgetColumnLabel(col)}</option>)}
                                                     </select>
                                                 </div>
                                             </div>

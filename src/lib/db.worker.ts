@@ -87,7 +87,7 @@ const error = (...args: unknown[]) => {
     if (shouldLog(workerLogLevel, 'error')) console.error('[DB Worker]', ...args);
 };
 
-const CURRENT_SCHEMA_VERSION = 14;
+const CURRENT_SCHEMA_VERSION = 17;
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
@@ -471,6 +471,190 @@ function applyMigrations(databaseInstance: DatabaseLike) {
             migrationOk = false;
         }
         if (!finalizeMigration(14, 'V14', migrationOk)) return;
+    }
+
+    // Version 15: Migration: Add semantic schema documentation tables
+    if (userVersion < 15) {
+        log('Migration V15: Adding semantic schema documentation tables...');
+        let migrationOk = true;
+        try {
+            databaseInstance.exec(`
+                CREATE TABLE IF NOT EXISTS sys_schema_table_docs (
+                    table_name TEXT NOT NULL,
+                    object_type TEXT NOT NULL DEFAULT 'table',
+                    display_name TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    tags_json TEXT NOT NULL DEFAULT '[]',
+                    status TEXT NOT NULL DEFAULT 'valid',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_validated_at TIMESTAMP,
+                    PRIMARY KEY (table_name, object_type)
+                );
+
+                CREATE TABLE IF NOT EXISTS sys_schema_column_docs (
+                    table_name TEXT NOT NULL,
+                    object_type TEXT NOT NULL DEFAULT 'table',
+                    column_name TEXT NOT NULL,
+                    display_name TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    semantic_type TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'valid',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_validated_at TIMESTAMP,
+                    PRIMARY KEY (table_name, object_type, column_name)
+                );
+
+                CREATE TABLE IF NOT EXISTS sys_schema_relationship_docs (
+                    id TEXT PRIMARY KEY,
+                    source_table TEXT NOT NULL,
+                    source_column TEXT NOT NULL,
+                    target_table TEXT NOT NULL,
+                    target_column TEXT NOT NULL,
+                    relationship_kind TEXT NOT NULL DEFAULT 'n:1',
+                    join_type TEXT NOT NULL DEFAULT 'LEFT JOIN',
+                    display_name TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    origin TEXT NOT NULL DEFAULT 'manual',
+                    confidence REAL,
+                    status TEXT NOT NULL DEFAULT 'valid',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_validated_at TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_sys_schema_column_docs_table_name ON sys_schema_column_docs(table_name);
+                CREATE INDEX IF NOT EXISTS idx_sys_schema_column_docs_table_object_type ON sys_schema_column_docs(table_name, object_type);
+                CREATE INDEX IF NOT EXISTS idx_sys_schema_relationship_docs_source ON sys_schema_relationship_docs(source_table, source_column);
+                CREATE INDEX IF NOT EXISTS idx_sys_schema_relationship_docs_target ON sys_schema_relationship_docs(target_table, target_column);
+                CREATE INDEX IF NOT EXISTS idx_sys_schema_relationship_docs_status ON sys_schema_relationship_docs(status);
+            `);
+        } catch (e) {
+            error('Migration failed for V15', e);
+            migrationOk = false;
+        }
+        if (!finalizeMigration(15, 'V15', migrationOk)) return;
+    }
+
+    // Version 16: Migration: Distinguish table and view documentation entries
+    if (userVersion < 16) {
+        log('Migration V16: Adding object_type to schema documentation tables...');
+        let migrationOk = true;
+        try {
+            const tableDocColumns: string[] = [];
+            databaseInstance.exec({
+                sql: "PRAGMA table_info(sys_schema_table_docs)",
+                rowMode: 'object',
+                callback: (row: SqliteRow) => tableDocColumns.push(getRowString(row, 'name'))
+            });
+            if (tableDocColumns.length > 0 && !tableDocColumns.includes('object_type')) {
+                databaseInstance.exec("ALTER TABLE sys_schema_table_docs ADD COLUMN object_type TEXT NOT NULL DEFAULT 'table'");
+            }
+
+            databaseInstance.exec(`
+                CREATE TABLE IF NOT EXISTS sys_schema_column_docs_new (
+                    table_name TEXT NOT NULL,
+                    object_type TEXT NOT NULL DEFAULT 'table',
+                    column_name TEXT NOT NULL,
+                    display_name TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    semantic_type TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'valid',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_validated_at TIMESTAMP,
+                    PRIMARY KEY (table_name, object_type, column_name)
+                );
+
+                INSERT INTO sys_schema_column_docs_new (
+                    table_name,
+                    object_type,
+                    column_name,
+                    display_name,
+                    description,
+                    semantic_type,
+                    status,
+                    created_at,
+                    updated_at,
+                    last_validated_at
+                )
+                SELECT
+                    table_name,
+                    'table' AS object_type,
+                    column_name,
+                    display_name,
+                    description,
+                    semantic_type,
+                    status,
+                    created_at,
+                    updated_at,
+                    last_validated_at
+                FROM sys_schema_column_docs;
+
+                DROP TABLE sys_schema_column_docs;
+                ALTER TABLE sys_schema_column_docs_new RENAME TO sys_schema_column_docs;
+
+                CREATE INDEX IF NOT EXISTS idx_sys_schema_column_docs_table_name ON sys_schema_column_docs(table_name);
+                CREATE INDEX IF NOT EXISTS idx_sys_schema_column_docs_table_object_type ON sys_schema_column_docs(table_name, object_type);
+            `);
+        } catch (e) {
+            error('Migration failed for V16', e);
+            migrationOk = false;
+        }
+        if (!finalizeMigration(16, 'V16', migrationOk)) return;
+    }
+
+    // Version 17: Migration: Make sys_schema_table_docs unique per object_type
+    if (userVersion < 17) {
+        log('Migration V17: Rebuilding sys_schema_table_docs for composite primary key...');
+        let migrationOk = true;
+        try {
+            databaseInstance.exec(`
+                CREATE TABLE IF NOT EXISTS sys_schema_table_docs_new (
+                    table_name TEXT NOT NULL,
+                    object_type TEXT NOT NULL DEFAULT 'table',
+                    display_name TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    tags_json TEXT NOT NULL DEFAULT '[]',
+                    status TEXT NOT NULL DEFAULT 'valid',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_validated_at TIMESTAMP,
+                    PRIMARY KEY (table_name, object_type)
+                );
+
+                INSERT INTO sys_schema_table_docs_new (
+                    table_name,
+                    object_type,
+                    display_name,
+                    description,
+                    tags_json,
+                    status,
+                    created_at,
+                    updated_at,
+                    last_validated_at
+                )
+                SELECT
+                    table_name,
+                    COALESCE(NULLIF(object_type, ''), 'table') AS object_type,
+                    display_name,
+                    description,
+                    tags_json,
+                    status,
+                    created_at,
+                    updated_at,
+                    last_validated_at
+                FROM sys_schema_table_docs;
+
+                DROP TABLE sys_schema_table_docs;
+                ALTER TABLE sys_schema_table_docs_new RENAME TO sys_schema_table_docs;
+            `);
+        } catch (e) {
+            error('Migration failed for V17', e);
+            migrationOk = false;
+        }
+        if (!finalizeMigration(17, 'V17', migrationOk)) return;
     }
 
     log(`Database migrated to version ${userVersion}`);

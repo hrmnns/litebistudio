@@ -5,12 +5,33 @@ import { createHealthRepository } from './HealthRepository';
 import { createWidgetRepository } from './WidgetRepository';
 import { createReportPackRepository } from './ReportPackRepository';
 import { createSqlStatementRepository } from './SqlStatementRepository';
+import { createSchemaDocumentationRepository } from './SchemaDocumentationRepository';
 import { createWorklistRepository } from './WorklistRepository';
 import { createBackupHistoryRepository } from './BackupHistoryRepository';
 import { isAdminModeRuntimeActive } from '../security/runtimeFlags';
 import { analyzeSqlStatements, getSystemTableWriteBlockedMessage as getSystemTableWriteBlockedMessageByLanguage, hasSystemWriteWithoutAdmin } from '../security/sqlAnalysis';
 export type { SqlStatementRecord } from './SqlStatementRepository';
 export type { BackupHistoryEntry } from './BackupHistoryRepository';
+export type {
+    LiteBiSchemaExportPackage,
+    SchemaImportConflictResolution,
+    SchemaImportAnalysisEntry,
+    SchemaImportAnalysisResult,
+    SchemaImportAnalysisSummary,
+    SchemaImportMergeSummary,
+    SchemaCleanupSummary,
+    SchemaColumnDocRecord,
+    SchemaExportObject,
+    SchemaExportColumn,
+    SchemaExportRelationship,
+    SchemaRelationshipCheckSummary,
+    SchemaRelationshipDocRecord,
+    SchemaTableDocRecord,
+    SchemaValidationSummary,
+    SaveSchemaColumnDocInput,
+    SaveSchemaRelationshipDocInput,
+    SaveSchemaTableDocInput
+} from './SchemaDocumentationRepository';
 
 const schemaCache = new Map<string, TableColumn[]>();
 type BindValue = string | number | null | undefined;
@@ -303,6 +324,7 @@ export const SystemRepository = {
     ...createWidgetRepository(),
     ...createReportPackRepository(),
     ...createSqlStatementRepository(),
+    ...createSchemaDocumentationRepository(),
     ...createWorklistRepository({
         getTableSchema: getTableSchemaCached
     }),
