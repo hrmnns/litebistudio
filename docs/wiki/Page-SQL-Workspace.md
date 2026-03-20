@@ -15,6 +15,21 @@ SQL Workspace is the main place to create, run, and save SQL statements.
 - Save and reopen statements
 - Export result sets
 
+## Schema Documentation Integration
+
+When schema documentation exists, SQL Workspace can reuse it to improve readability and guidance.
+
+This may include:
+- clearer table labels
+- clearer column labels
+- schema-aware hints and autocomplete support
+- documented relationship context
+
+If no schema documentation exists, SQL Workspace behaves as before.
+
+See also:
+- [Schema Documentation](Schema-Documentation)
+
 ## Current Behavior
 
 1. `Run` and `Refresh` are disabled when no executable SQL exists (empty/comment-only input).

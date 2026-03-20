@@ -10,6 +10,7 @@ This wiki is maintained from the repository source folder:
 
 - [User Guide](Getting-Started)
 - [Examples](Examples)
+- [Schema Documentation](Schema-Documentation)
 - [Concept Guide](Concept-Guide)
 - [Admin / Technical Appendix](Admin-Technical-Appendix)
 

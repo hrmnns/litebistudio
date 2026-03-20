@@ -16,6 +16,20 @@ Widgets transform SQL result data into reusable visual components for dashboards
 - Configure chart/table visualization
 - Save widgets for reuse
 
+## Schema Documentation Integration
+
+Widgets can reuse semantic schema metadata when it is available.
+
+Typical effects:
+- clearer field labels in configuration pickers
+- better readability for documented result fields
+- more understandable setup for chart axes, labels, and pivot-related selections
+
+If no schema documentation exists, Widgets continue to work with technical field names only.
+
+See also:
+- [Schema Documentation](Schema-Documentation)
+
 ## Current Behavior
 
 1. A widget is marked dirty (`*`) only when it differs from the last saved state.
